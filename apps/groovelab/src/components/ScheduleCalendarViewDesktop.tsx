@@ -606,7 +606,7 @@ export function ScheduleCalendarViewDesktop({
       } else {
         localStorage.removeItem('groovelab_pending_schedule_changes');
       }
-      window.dispatchEvent(new Event('groovelab_schedule_changed'));
+      // 🛡️ Staging Isolation: Kein vorzeitiger globaler Broadcast vor dem expliziten Speichern
     } catch (e) {}
   }, [pendingChanges]);
   const [loading, setLoading] = useState<boolean>(() => initialScheduleCache.length === 0);
@@ -1955,254 +1955,247 @@ export function ScheduleCalendarViewDesktop({
         }
 
         const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
+        const origTimeStr = change.original_start_time || (originalOcc ? (originalOcc.original_start_time || originalOcc.start_time) : change.start_time);
         const targetScheduleId = change.schedule_id || (change as any).schedules?.id || originalOcc?.schedule_id || (originalOcc as any)?.schedules?.id || null;
         const targetTemplateRoomId = change.template_room_id || (change as any).schedules?.room_id || originalOcc?.template_room_id || (originalOcc as any)?.schedules?.room_id || null;
         const targetRoomOverrideId = (change as any).room_override_id !== undefined
           ? (change as any).room_override_id
           : ((originalOcc as any)?.room_override_id || null);
 
-        const payload: any = {
-          date: change.date,
-          original_date: origDateStr,
-          start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
-          teacher_id: userId,
-          student_id: targetStudentId,
-          duration: change.duration || originalOcc?.duration || 30,
-          status: change.status || 'pending_reschedule',
-          notes: change.notes !== undefined ? change.notes : (originalOcc?.notes || null),
-          student_acknowledged: false,
-          ...(targetScheduleId ? { schedule_id: targetScheduleId } : {}),
-          ...(targetTemplateRoomId ? { template_room_id: targetTemplateRoomId } : {}),
-          ...(targetRoomOverrideId ? { room_override_id: targetRoomOverrideId } : {})
-        };
-
         const isGroupBlock = (change as any).isGroupBlock || ((change as any).groupOccurrences && (change as any).groupOccurrences.length > 0);
+        const isRealDbId = change.id && !change.id.startsWith('mock-') && !change.id.startsWith('sched-proj-') && !change.id.startsWith('adhoc-');
 
-        if (isGroupBlock && (change as any).groupOccurrences && (change as any).groupOccurrences.length > 0) {
-          for (const gs of (change as any).groupOccurrences) {
-            let gsStudentId = gs.id || gs.student_id;
-            if (gsStudentId && typeof gsStudentId === 'string' && gsStudentId.startsWith('group-')) {
-              gsStudentId = gsStudentId.replace('group-', '');
-            }
-            if (!gsStudentId || gsStudentId.length < 10) continue;
+        let savedOccId: string | null = isRealDbId ? change.id : null;
+        let rpcHandled = false;
 
-            const { data: existingGroupOccs } = await supabase
-              .from('schedule_occurrences')
-              .select('id')
-              .eq('student_id', gsStudentId)
-              .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
-
-            const groupPayload = {
-              ...payload,
-              student_id: gsStudentId,
-              duration: gs.duration || payload.duration
-            };
-
-            if (existingGroupOccs && existingGroupOccs.length > 0) {
-              await supabase.from('schedule_occurrences').update(groupPayload).eq('id', existingGroupOccs[0].id);
-              if (existingGroupOccs.length > 1) {
-                await supabase.from('schedule_occurrences').delete().in('id', existingGroupOccs.slice(1).map(e => e.id));
-              }
-            } else {
-              await supabase.from('schedule_occurrences').insert(groupPayload);
-            }
-          }
-        } else {
-          // Check if we have a real DB id for this occurrence directly
-          const isRealDbId = change.id && !change.id.startsWith('mock-') && !change.id.startsWith('sched-proj-') && !change.id.startsWith('adhoc-');
-          if (isRealDbId) {
-            const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', change.id);
-            if (error) throw error;
-          } else {
-            // Check if an occurrence already exists in DB for this student on this original_date
-            const { data: existingOccs } = await supabase
-              .from('schedule_occurrences')
-              .select('id')
-              .eq('student_id', targetStudentId)
-              .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
-
-            if (existingOccs && existingOccs.length > 0) {
-              // Idempotent UPDATE: Never create duplicate records on repeated moves
-              const targetId = existingOccs[0].id;
-              const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', targetId);
-              if (error) throw error;
-
-              // Self-Healing Cleanup: Delete any historical duplicate records for this student on this date
-              if (existingOccs.length > 1) {
-                const dupIds = existingOccs.slice(1).map(e => e.id);
-                await supabase.from('schedule_occurrences').delete().in('id', dupIds);
-              }
-            } else {
-              // First-time INSERT
-              const { error } = await supabase.from('schedule_occurrences').insert(payload);
-              if (error) throw error;
-            }
-          }
-        }
-
-        // Sync room booking
-        try {
-          const oldDate = originalOcc?.date || change.date;
-          const oldStartTime = originalOcc?.start_time || change.start_time;
-
-          const oldBookingKey = `${userId}_${oldDate}_${oldStartTime.substring(0, 5)}`;
-          if (!processedBookings.has(`del_${oldBookingKey}`)) {
-            processedBookings.add(`del_${oldBookingKey}`);
-            await supabase.from('room_bookings')
-              .delete()
-              .eq('booked_by', userId)
-              .eq('date', oldDate)
-              .eq('start_time', oldStartTime);
-          }
-
-          const targetDate = new Date(change.date + 'T00:00:00');
-          const targetDayOfWeek = targetDate.getDay() || 7; // 1=Mon … 7=Sun
-          const { regularRoomId, regMin, regMax } = getTeacherRegularWindowForDay(targetDayOfWeek);
-
-          const currentRoomId = change.schedules?.room_id || null;
-          const effectiveTargetRoomId = currentRoomId || regularRoomId;
-          const isCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
-
-          const occStartMinutes = timeToMinutes(change.start_time);
-          const occEndMinutes = occStartMinutes + (change.duration || 30);
-          const isInsideOwnRegularBlock = regMin !== Infinity && occStartMinutes >= regMin && occEndMinutes <= regMax;
-          const isDifferentRoom = Boolean(effectiveTargetRoomId && regularRoomId && effectiveTargetRoomId !== regularRoomId);
-
-          // Raumbuchungen dürfen NUR stattfinden:
-          // 1. wenn ein neuer Raum gebucht wird (isDifferentRoom), ODER
-          // 2. wenn der Termin außerhalb der regulären Unterrichtszeiten verschoben wurde (!isInsideOwnRegularBlock)
-          const needsRoomBooking = !isCancelled && Boolean(effectiveTargetRoomId) && (isDifferentRoom || !isInsideOwnRegularBlock);
-
-          const newBookingKey = `${effectiveTargetRoomId}_${change.date}_${change.start_time.substring(0, 5)}`;
-          if (needsRoomBooking && !processedBookings.has(`ins_${newBookingKey}`)) {
-            processedBookings.add(`ins_${newBookingKey}`);
-            const startMins = timeToMinutes(change.start_time);
-            const duration = change.duration || 30;
-            const endMins = startMins + duration;
-            const eh = Math.floor(endMins / 60);
-            const em = endMins % 60;
-            const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
-
-            const studentName = `${change.student?.first_name || ''} ${maskLastName(change.student?.last_name, showRealNames)}`.trim() || 'Schüler';
-
-            await supabase.from('room_bookings').insert({
-              school_id: schoolId,
-              room_id: effectiveTargetRoomId,
-              booked_by: userId,
-              date: change.date,
-              start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
-              end_time: endTimeStr,
-              title: `Unterricht: ${studentName}`
+        // 🛡️ TIER 1: Autoritativer Server-RPC (PostgreSQL Security Definer)
+        if (!isGroupBlock) {
+          try {
+            const { data: rpcRes, error: rpcErr } = await supabase.rpc('reschedule_lesson_authoritative', {
+              p_occurrence_id: isRealDbId ? change.id : null,
+              p_student_id: targetStudentId,
+              p_teacher_id: userId,
+              p_date: change.date,
+              p_start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
+              p_original_date: origDateStr,
+              p_original_start_time: origTimeStr && origTimeStr.length === 5 ? `${origTimeStr}:00` : (origTimeStr || change.start_time),
+              p_duration: change.duration || originalOcc?.duration || 30,
+              p_schedule_id: targetScheduleId,
+              p_template_room_id: targetTemplateRoomId,
+              p_room_override_id: targetRoomOverrideId,
+              p_notes: change.notes !== undefined ? change.notes : (originalOcc?.notes || null)
             });
-          }
 
-          window.dispatchEvent(new CustomEvent('refresh-bookings'));
-        } catch (bookingErr) {
-          console.warn('Error syncing room booking in persistChangesDirectly:', bookingErr);
+            if (!rpcErr && rpcRes && rpcRes.success) {
+              rpcHandled = true;
+              savedOccId = rpcRes.occurrence_id || savedOccId;
+              window.dispatchEvent(new CustomEvent('refresh-bookings'));
+            }
+          } catch (rpcErr) {
+            console.warn('[ScheduleCalendarViewDesktop] RPC reschedule_lesson_authoritative failed, falling back to resilient client pipeline:', rpcErr);
+          }
         }
 
-        // DM notifications
-        try {
-          if (change.student_id) {
-            let notificationMessage = '';
-            
-            const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
-            const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
-            
-            const origDate = new Date(origDateStr);
-            const origDayLabel = DAYS_DE[origDate.getDay()];
-            const origTimeLabel = origTimeStr.substring(0, 5);
+        // 🛡️ TIER 2: Resilient Client-Side Fallback Pipeline (if RPC unavailable or group block)
+        if (!rpcHandled) {
+          const payload: any = {
+            school_id: schoolId,
+            date: change.date,
+            original_date: origDateStr,
+            start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
+            original_start_time: origTimeStr && origTimeStr.length === 5 ? `${origTimeStr}:00` : (origTimeStr || change.start_time),
+            teacher_id: userId,
+            student_id: targetStudentId,
+            duration: change.duration || originalOcc?.duration || 30,
+            status: change.status || 'pending_reschedule',
+            notes: change.notes !== undefined ? change.notes : (originalOcc?.notes || null),
+            student_acknowledged: false,
+            ...(targetScheduleId ? { schedule_id: targetScheduleId } : {}),
+            ...(targetTemplateRoomId ? { template_room_id: targetTemplateRoomId } : {}),
+            ...(targetRoomOverrideId ? { room_override_id: targetRoomOverrideId } : {})
+          };
 
-            const newDate = new Date(change.date);
-            const newDayLabel = DAYS_DE[newDate.getDay()];
-            const newTimeLabel = change.start_time.substring(0, 5);
+          if (isGroupBlock && (change as any).groupOccurrences && (change as any).groupOccurrences.length > 0) {
+            for (const gs of (change as any).groupOccurrences) {
+              let gsStudentId = gs.id || gs.student_id;
+              if (gsStudentId && typeof gsStudentId === 'string' && gsStudentId.startsWith('group-')) {
+                gsStudentId = gsStudentId.replace('group-', '');
+              }
+              if (!gsStudentId || gsStudentId.length < 10) continue;
 
-            const oldDbDate = originalOcc ? originalOcc.date : origDateStr;
-            const oldDbTime = originalOcc ? originalOcc.start_time : origTimeStr;
-            const timeActuallyChanged = change.date !== oldDbDate || change.start_time.substring(0, 5) !== oldDbTime.substring(0, 5);
-            
-            const isNowCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
-            const wasCancelled = originalOcc ? ['cancelled', 'canceled_by_student'].includes(originalOcc.status) : false;
-            const isReset = (wasCancelled && !isNowCancelled) || (timeActuallyChanged && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5) && !isNowCancelled);
+              const { data: existingGroupOccs } = await supabase
+                .from('schedule_occurrences')
+                .select('id')
+                .eq('student_id', gsStudentId)
+                .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
 
-            const now = new Date();
-            const execDateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const execTimeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
+              const groupPayload = {
+                ...payload,
+                student_id: gsStudentId,
+                duration: gs.duration || payload.duration
+              };
 
-            if (isNowCancelled && !wasCancelled) {
-              const shortOrigDay = origDayLabel.substring(0, 2) + '.';
-              const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `Terminabsage: Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.\nAbgesagt am: ${execTimestampStr} durch Lehrkraft.`;
-            } else if (isReset) {
-              const shortNewDay = newDayLabel.substring(0, 2) + '.';
-              const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `Termin reaktiviert: Dein Unterrichtstermin am ${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr findet regulär statt.\nReaktiviert am: ${execTimestampStr} durch Lehrkraft.`;
-            } else if (timeActuallyChanged && !isNowCancelled) {
-              const shortOrigDay = origDayLabel.substring(0, 2) + '.';
-              const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-              const shortNewDay = newDayLabel.substring(0, 2) + '.';
-              const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `Dein Termin wurde verschoben: ${shortOrigDay} ${shortOrigDate} ${origTimeLabel} Uhr -> ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin.`;
+              if (existingGroupOccs && existingGroupOccs.length > 0) {
+                await supabase.from('schedule_occurrences').update(groupPayload).eq('id', existingGroupOccs[0].id);
+                savedOccId = existingGroupOccs[0].id;
+                if (existingGroupOccs.length > 1) {
+                  await supabase.from('schedule_occurrences').delete().in('id', existingGroupOccs.slice(1).map(e => e.id));
+                }
+              } else {
+                const { data: insData } = await supabase.from('schedule_occurrences').insert(groupPayload).select('id').single();
+                if (insData?.id) savedOccId = insData.id;
+              }
+            }
+          } else {
+            if (isRealDbId) {
+              const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', change.id);
+              if (error) throw error;
+              savedOccId = change.id;
+            } else {
+              const { data: existingOccs } = await supabase
+                .from('schedule_occurrences')
+                .select('id')
+                .eq('student_id', targetStudentId)
+                .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
+
+              if (existingOccs && existingOccs.length > 0) {
+                const targetId = existingOccs[0].id;
+                const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', targetId);
+                if (error) throw error;
+                savedOccId = targetId;
+
+                if (existingOccs.length > 1) {
+                  const dupIds = existingOccs.slice(1).map(e => e.id);
+                  await supabase.from('schedule_occurrences').delete().in('id', dupIds);
+                }
+              } else {
+                const { data: insData, error } = await supabase.from('schedule_occurrences').insert(payload).select('id').single();
+                if (error) throw error;
+                if (insData?.id) savedOccId = insData.id;
+              }
+            }
+          }
+
+          // Fallback Room booking & Revisionssichere Audit-Protokollierung
+          try {
+            const oldDate = originalOcc?.date || change.date;
+            const oldStartTime = originalOcc?.start_time || change.start_time;
+
+            const oldBookingKey = `${userId}_${oldDate}_${oldStartTime.substring(0, 5)}`;
+            if (!processedBookings.has(`del_${oldBookingKey}`)) {
+              processedBookings.add(`del_${oldBookingKey}`);
+              await supabase.from('room_bookings')
+                .delete()
+                .eq('booked_by', userId)
+                .eq('date', oldDate)
+                .eq('start_time', oldStartTime);
             }
 
-            if (notificationMessage) {
-              const targetOccId = change.schedule_id ? `virtual-${change.schedule_id}-${change.date}` : change.id;
+            const targetDate = new Date(change.date + 'T00:00:00');
+            const targetDayOfWeek = targetDate.getDay() || 7;
+            const { regularRoomId } = getTeacherRegularWindowForDay(targetDayOfWeek);
+            const effectiveTargetRoomId = targetRoomOverrideId || targetTemplateRoomId || regularRoomId;
+            const isCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
+
+            if (!isCancelled && effectiveTargetRoomId) {
+              const newBookingKey = `${effectiveTargetRoomId}_${change.date}_${change.start_time.substring(0, 5)}`;
+              if (!processedBookings.has(`ins_${newBookingKey}`)) {
+                processedBookings.add(`ins_${newBookingKey}`);
+                const startMins = timeToMinutes(change.start_time);
+                const duration = change.duration || 30;
+                const endMins = startMins + duration;
+                const eh = Math.floor(endMins / 60);
+                const em = endMins % 60;
+                const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+                const studentName = `${change.student?.first_name || ''} ${maskLastName(change.student?.last_name, showRealNames)}`.trim() || 'Schüler';
+
+                await supabase.from('room_bookings').insert({
+                  school_id: schoolId,
+                  room_id: effectiveTargetRoomId,
+                  booked_by: userId,
+                  date: change.date,
+                  start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
+                  end_time: endTimeStr,
+                  title: `Unterricht: ${studentName} (Verschoben)`
+                });
+              }
+            }
+
+            // Revisionssicheres Audit-Log via log_application_audit_event
+            if (savedOccId) {
+              await supabase.rpc('log_application_audit_event', {
+                p_school_id: schoolId,
+                p_action: 'RESCHEDULE_LESSON',
+                p_table_name: 'schedule_occurrences',
+                p_record_id: savedOccId,
+                p_details: {
+                  occurrence_id: savedOccId,
+                  student_id: targetStudentId,
+                  teacher_id: userId,
+                  new_date: change.date,
+                  new_start_time: change.start_time,
+                  original_date: origDateStr,
+                  room_id: effectiveTargetRoomId
+                }
+              }).then();
+            }
+
+            window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          } catch (bookingErr) {
+            console.warn('Error syncing room booking in fallback:', bookingErr);
+          }
+
+          // Fallback DM notifications
+          try {
+            if (targetStudentId) {
+              let notificationMessage = '';
+              const origDate = new Date(origDateStr);
+              const origDayLabel = DAYS_DE[origDate.getDay()];
+              const origTimeLabel = (origTimeStr || change.start_time).substring(0, 5);
+              const newDate = new Date(change.date);
+              const newDayLabel = DAYS_DE[newDate.getDay()];
+              const newTimeLabel = change.start_time.substring(0, 5);
+
+              const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+              const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
+              const shortNewDay = newDayLabel.substring(0, 2) + '.';
+              const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
+
+              notificationMessage = `Dein Termin wurde verschoben: ${shortOrigDay} ${shortOrigDate} ${origTimeLabel} Uhr -> ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin.`;
+
+              const validOccRef = savedOccId || change.id;
               await supabase.from('campus_direct_messages').insert({
+                school_id: schoolId,
                 sender_id: userId,
-                recipient_id: change.student_id,
+                recipient_id: targetStudentId,
                 content: notificationMessage,
-                occurrence_id: targetOccId,
+                occurrence_id: validOccRef,
                 is_system: true,
-                message_type: isReset ? 'cancellation_reset' : 'reschedule_notification'
+                message_type: 'reschedule_notification'
+              });
+
+              await supabase.from('notifications').insert({
+                user_id: targetStudentId,
+                title: 'Terminänderung',
+                message: notificationMessage,
+                metadata: { occurrence_id: validOccRef, type: 'rescheduled' }
               });
 
               try {
-                const { data: studentProfile } = await supabase
-                  .from('users')
-                  .select('is_campus_active, first_name')
-                  .eq('id', change.student_id)
-                  .single();
-
-                if (studentProfile && studentProfile.is_campus_active) {
-                  let pushTitle = 'Terminänderung';
-                  if (['cancelled', 'canceled_by_student'].includes(change.status)) {
-                    pushTitle = 'Unterricht fällt aus';
-                  } else if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
-                    pushTitle = 'Termin zurückgesetzt';
-                  } else {
-                    pushTitle = 'Terminänderung';
+                await supabase.functions.invoke('send-push', {
+                  body: {
+                    userId: targetStudentId,
+                    title: 'Terminänderung',
+                    body: notificationMessage,
+                    url: '/',
+                    notificationId: null
                   }
-
-                  const { data: dbNotif } = await supabase
-                    .from('notifications')
-                    .insert({
-                      user_id: change.student_id,
-                      title: pushTitle,
-                      message: notificationMessage,
-                      metadata: { occurrence_id: change.id, type: ['cancelled', 'canceled_by_student'].includes(change.status) ? 'cancelled' : 'rescheduled' }
-                    })
-                    .select('id')
-                    .single();
-
-                  await supabase.functions.invoke('send-push', {
-                    body: {
-                      userId: change.student_id,
-                      title: pushTitle,
-                      body: notificationMessage,
-                      url: '/',
-                      notificationId: dbNotif ? dbNotif.id : null
-                    }
-                  });
-                  console.log('[Push] Sent real-time push to student:', change.student_id);
-                }
-              } catch (pushErr) {
-                console.error('Failed to send real-time push:', pushErr);
-              }
+                });
+              } catch (e) {}
             }
+          } catch (dmErr) {
+            console.warn('Fallback DM notify fail:', dmErr);
           }
-        } catch (dmErr) {
-          console.warn('DM notify fail:', dmErr);
         }
       }
 
@@ -2635,7 +2628,7 @@ export function ScheduleCalendarViewDesktop({
           try {
             const spuriousBookings = rbList.filter((b: any) => {
               if (b.booked_by !== userId) return false;
-              if (!b.title || !b.title.startsWith('Unterricht: ')) return false;
+              if (!b.title || !b.title.startsWith('Unterricht: ') || b.title.includes('(Verschoben)')) return false;
               const bDate = new Date(b.date + 'T00:00:00');
               const bDayOfWeek = bDate.getDay() || 7;
               const { regularRoomId, regMin, regMax } = getTeacherRegularWindowForDay(bDayOfWeek);
@@ -3129,7 +3122,12 @@ export function ScheduleCalendarViewDesktop({
 
           // Master Template Reconciliation (Self-Healing Orphan Guard):
           // Check if this DB occurrence is an unmodified lesson (no deliberate one-off reschedule)
-          const isRescheduled = Boolean(occ.original_date && occ.original_date !== occ.date);
+          const isRescheduled = Boolean(
+            (occ.original_date && occ.original_date !== occ.date) ||
+            (occ.original_start_time && occ.original_start_time.substring(0, 5) !== (occ.start_time || '').substring(0, 5)) ||
+            ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled'].includes(occ.status) ||
+            occ.is_moved
+          );
           if (!isRescheduled) {
             const masterSlot = getMasterScheduleSlotForStudent(occ);
             if (masterSlot) {
@@ -5219,6 +5217,9 @@ export function ScheduleCalendarViewDesktop({
       await persistChangesDirectly(changes);
       setPendingChanges({});
       await loadOccurrences();
+      // 🏛️ Autoritativer Broadcast nach erfolgreicher Datenbank-Persistierung
+      window.dispatchEvent(new Event('groovelab_schedule_changed'));
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
     } catch (err: any) {
       console.error("Save error:", err);
       await showAlert("Fehler beim Speichern der Änderungen: " + (err.message || err));
@@ -6054,6 +6055,7 @@ export function ScheduleCalendarViewDesktop({
                         {isRoomPopoverOpen && (
                           <div
                             role="dialog"
+                            aria-modal="true"
                             aria-label="Weiteren Raum auswählen"
                             style={{
                               position: 'absolute',
@@ -11091,6 +11093,10 @@ return (
                   setPendingChanges({});
                   setSwapLinks([]);
                   undoStackRef.current = [];
+                  try {
+                    localStorage.removeItem('groovelab_pending_schedule_changes');
+                    if (userId) localStorage.removeItem(`groovelab_pending_schedule_changes_${userId}`);
+                  } catch (e) {}
                 }}
                 style={{
                   background: 'transparent',

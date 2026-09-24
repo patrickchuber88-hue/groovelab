@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import { formatTeacherFullName, maskLastName } from "../../utils/nameHelper";
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { AvatarImage } from "../common/AvatarImage";
+import { StudioAvatar } from "../StudioAvatar";
 import { normalizeStationsForBlueprint } from "../../constants/groovelabLayoutDefaults";
 
 const TEACHER_INSTRUMENT_ICONS: Record<string, any> = new Proxy({}, {
@@ -243,12 +244,24 @@ const getCompressedRoomCoordinates = (rStations: any[], aspect: number): Compres
 };
 
 
-const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName, activePlatform }: { 
-  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string, activePlatform?: string
+const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName, activePlatform, currentUser }: { 
+  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string, activePlatform?: string, currentUser?: any
 }) => {
   const stationName = customName || sess?.stations?.name || `iPad ${num}`;
   const isActive = !!sess;
   
+  const effectiveStationUser = useMemo(() => {
+    if (isMe && currentUser) {
+      return {
+        ...sess?.users,
+        ...currentUser,
+        photo_url: currentUser.photo_url || sess?.users?.photo_url,
+        avatar_url: currentUser.avatar_url || sess?.users?.avatar_url
+      };
+    }
+    return sess?.users;
+  }, [sess?.users, isMe, currentUser]);
+
   const activeMins = useMemo(() => {
     if (!sess?.check_in_time) return 0;
     const mins = Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000);
@@ -265,16 +278,16 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         className="glass-panel" 
         role={isActive ? "button" : undefined}
         tabIndex={isActive ? 0 : -1}
-        aria-label={isActive ? `Station ${stationName} öffnen: ${sess?.users?.first_name || ''} ${sess?.users?.last_name || ''} (${inst})` : `Station ${stationName} (${inst}, nicht belegt)`}
+        aria-label={isActive ? `Station ${stationName} öffnen: ${effectiveStationUser?.first_name || sess?.users?.first_name || ''} ${effectiveStationUser?.last_name || sess?.users?.last_name || ''} (${inst})` : `Station ${stationName} (${inst}, nicht belegt)`}
         onKeyDown={(e) => {
           if (isActive && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault();
-            onProfileSelect(sess.users);
+            onProfileSelect(effectiveStationUser || sess.users);
           }
         }}
         onClick={() => {
           if (isActive) {
-            onProfileSelect(sess.users);
+            onProfileSelect(effectiveStationUser || sess.users);
           }
         }}
         style={{ 
@@ -361,7 +374,12 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               marginBottom: '4px',
               transition: 'all 0.3s ease'
             }}>
-              <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
+              <StudioAvatar 
+                src={effectiveStationUser?.avatar_url || effectiveStationUser?.photo_url} 
+                user={effectiveStationUser} 
+                activePlatform={activePlatform} 
+                style={{ width: '100%', height: '100%', borderRadius: '22px' }}
+              />
             </div>
             <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
@@ -373,7 +391,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}>
-                {sess.users?.first_name}
+                {effectiveStationUser?.first_name || sess.users?.first_name}
               </div>
             </div>
           </div>
@@ -387,10 +405,14 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   return (
     prev.sess?.id === next.sess?.id &&
     prev.sess?.users?.photo_url === next.sess?.users?.photo_url &&
+    prev.sess?.users?.avatar_url === next.sess?.users?.avatar_url &&
     prev.sess?.users?.first_name === next.sess?.users?.first_name &&
     prev.sess?.songs?.title === next.sess?.songs?.title &&
     !!prev.sess === !!next.sess &&
-    prev.isMe === next.isMe
+    prev.isMe === next.isMe &&
+    prev.currentUser?.avatar_url === next.currentUser?.avatar_url &&
+    prev.currentUser?.photo_url === next.currentUser?.photo_url &&
+    prev.hasHelpRequest === next.hasHelpRequest
   );
 });
 
@@ -705,6 +727,53 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
     const kiosk = stations.filter(s => s.room_id === selectedRoomId && !s.name.toLowerCase().includes('lehrer') && !s.name.toLowerCase().includes('teacher'));
     return adjustPositions(kiosk, 586);
   }, [stations, selectedRoomId]);
+
+  // Memoize matching band formations to support both song collections (with formations array) and flat formation objects
+  const displayedFormations = useMemo(() => {
+    if (!Array.isArray(wallSongs) || wallSongs.length === 0) return [];
+
+    const list: any[] = [];
+    wallSongs.forEach((item: any, songIdx: number) => {
+      if (!item) return;
+
+      if (Array.isArray(item.formations) && item.formations.length > 0) {
+        item.formations.forEach((f: any, fIdx: number) => {
+          list.push({
+            id: f.id || `${item.id || item.song_id || 'song'}_form_${fIdx}`,
+            groupKey: f.id,
+            song_id: item.song_id || item.id,
+            song: {
+              id: item.song_id || item.id,
+              title: item.title || item.song?.title || 'Unbekannter Song',
+              artist: item.artist || item.song?.artist || 'Unbekannter Künstler',
+              instrumentation: item.instrumentation || item.song?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 }
+            },
+            members: Array.isArray(f.members) ? f.members : [],
+            level: f.level || item.level || 'original',
+            isComplete: f.isComplete
+          });
+        });
+      } else {
+        list.push({
+          id: item.id || `item_${songIdx}`,
+          groupKey: item.groupKey || item.id,
+          song_id: item.song_id || item.song?.id || item.id,
+          song: {
+            id: item.song_id || item.song?.id || item.id,
+            title: item.song?.title || item.title || 'Unbekannter Song',
+            artist: item.song?.artist || item.artist || 'Unbekannter Künstler',
+            instrumentation: item.song?.instrumentation || item.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 }
+          },
+          members: Array.isArray(item.members) ? item.members : [],
+          missingInstruments: Array.isArray(item.missingInstruments) ? item.missingInstruments : undefined,
+          level: item.level || 'original',
+          isComplete: item.isComplete
+        });
+      }
+    });
+
+    return list;
+  }, [wallSongs]);
 
   return (
         <div id="tour-teacher-livelab" className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`} style={{ position: 'relative' }}>
@@ -1041,7 +1110,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
                           const hasHelp = helpRequests.some(r => r.station_id === station.id);
                           const isMe = sess?.user_id === userId;
-                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
+                          const effectiveSessUser = isMe && teacher ? { ...sess?.users, ...teacher, photo_url: teacher.photo_url || sess?.users?.photo_url, avatar_url: teacher.avatar_url || sess?.users?.avatar_url } : sess?.users;
+                          const studentName = effectiveSessUser ? `${effectiveSessUser.first_name} ${maskLastName(effectiveSessUser.last_name, showRealNames)}` : '';
 
                           return (
                             <div
@@ -1060,8 +1130,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 minWidth: 0
                               }}
                               onClick={() => {
-                                if (isActive && sess.users) {
-                                  setSelectedStudentProfile(sess.users);
+                                if (isActive && (effectiveSessUser || sess.users)) {
+                                  setSelectedStudentProfile(effectiveSessUser || sess.users);
                                 }
                               }}
                             >
@@ -1089,7 +1159,12 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 {isActive ? (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', minWidth: 0 }}>
                                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${instColor}`, flexShrink: 0 }}>
-                                      <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
+                                      <StudioAvatar 
+                                        src={effectiveSessUser?.avatar_url || effectiveSessUser?.photo_url} 
+                                        user={effectiveSessUser} 
+                                        activePlatform={activePlatform} 
+                                        style={{ width: '100%', height: '100%', borderRadius: '12px' }}
+                                      />
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                       <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1858,6 +1933,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 onLogout={handleLogoutStudent}
                                 hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
                                 activePlatform={activePlatform}
+                                currentUser={teacher}
                               />
                             </div>
                           );
@@ -2041,6 +2117,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             onLogout={handleLogoutStudent}
                             hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
                             activePlatform={activePlatform}
+                            currentUser={teacher}
                           />
                         </div>
                       );
@@ -2064,6 +2141,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             onLogout={handleLogoutStudent}
                             hasHelpRequest={helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id)}
                             activePlatform={activePlatform}
+                            currentUser={teacher}
                           />
                         </div>
                       );
@@ -2297,9 +2375,9 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                   <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Band-Matching</h3>
                 </div>
                
-                {wallSongs.length > 0 ? (
+                {displayedFormations.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                     {wallSongs.map((form: any, fIdx: number) => {
+                     {displayedFormations.map((form: any, fIdx: number) => {
                        const instReq = form.song?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 };
                        
                        const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
@@ -2322,13 +2400,37 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                          return renderInstrumentIcon(inst);
                        };
 
+                       const formMembers = Array.isArray(form.members) ? form.members : [];
+
+                       const missingInstruments: string[] = Array.isArray(form.missingInstruments)
+                         ? form.missingInstruments
+                         : allRequired.filter(item => {
+                             const isFilled = formMembers.some((m: any) => {
+                               const normM = normalizeInstrument(m?.instrument);
+                               const normTarget = normalizeInstrument(item.instrument);
+                               const mPart = m?.part_number || 1;
+                               return normM === normTarget && mPart === item.part;
+                             });
+                             return !isFilled;
+                           }).map(item => item.instrument);
+
+                       const uniqueMissing = Array.from(new Set(missingInstruments));
+
                        return (
-                          <div key={form.id} 
+                          <div key={form.id || fIdx} 
                             onClick={() => {
                               if (viewMode === 'student' && onTabChange) {
                                 onTabChange('matching');
                               }
                             }}
+                            role={viewMode === 'student' ? 'button' : undefined}
+                            tabIndex={viewMode === 'student' ? 0 : undefined}
+                            onKeyDown={viewMode === 'student' ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (onTabChange) onTabChange('matching');
+                              }
+                            } : undefined}
                             style={{ 
                               background: 'white', 
                               padding: '20px', 
@@ -2342,8 +2444,6 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               cursor: viewMode === 'student' ? 'pointer' : 'default',
                               transition: 'all 0.2s ease-in-out'
                             }}
-                            
-                            
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <div style={{ flex: 1 }}>
@@ -2355,7 +2455,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   margin: '0 0 4px 0',
                                   letterSpacing: '-0.02em'
                                 }}>
-                                  {form.song?.title}
+                                  {form.song?.title || 'Unbekannter Song'}
                                 </h4>
                                 <div style={{ 
                                   fontSize: '0.7rem', 
@@ -2364,7 +2464,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   textTransform: 'uppercase', 
                                   letterSpacing: '0.05em'
                                 }}>
-                                  {form.song?.artist}
+                                  {form.song?.artist || 'Unbekannter Künstler'}
                                 </div>
                               </div>
                               <div style={{ 
@@ -2388,10 +2488,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 const part = item.part;
                                 
                                 // Accurate instrument-based and part-based fill check
-                                const isFilled = form.members.some((m: any) => {
-                                  const normM = normalizeInstrument(m.instrument);
+                                const isFilled = formMembers.some((m: any) => {
+                                  const normM = normalizeInstrument(m?.instrument);
                                   const normTarget = normalizeInstrument(inst);
-                                  const mPart = m.part_number || 1;
+                                  const mPart = m?.part_number || 1;
                                   return normM === normTarget && mPart === part;
                                 });
                                 
@@ -2422,19 +2522,19 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               })}
                             </div>
 
-                            {form.missingInstruments.length > 0 ? (
+                            {uniqueMissing.length > 0 ? (
                               <div style={{ 
                                 fontSize: '0.75rem', 
                                 fontWeight: 1000, 
                                 color: '#eab308', 
-                                textTransform: 'uppercase',
+                                textTransform: 'uppercase', 
                                 letterSpacing: '0.08em'
                               }}>
-                                GESUCHT: {form.missingInstruments.join(', ').toUpperCase()}
+                                GESUCHT: {uniqueMissing.join(', ').toUpperCase()}
                               </div>
                             ) : (
                              (() => {
-                               const mySlot = viewMode === 'student' && form.members?.find((m: any) => m.user_id === userId);
+                               const mySlot = viewMode === 'student' && formMembers.find((m: any) => m?.user_id === userId);
                                if (mySlot) {
                                  return (
                                    <button
@@ -2473,7 +2573,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                    fontSize: '0.75rem', 
                                    fontWeight: 1000, 
                                    color: '#34a853', 
-                                   textTransform: 'uppercase',
+                                   textTransform: 'uppercase', 
                                    letterSpacing: '0.08em',
                                    display: 'flex',
                                    alignItems: 'center',
@@ -2900,20 +3000,25 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     return;
                   }
                   if (window.confirm(`Möchtest du alle ${studentSessions.length} Schüler im aktuellen Raum auschecken?`)) {
-                    const now = new Date().toISOString();
-                    const sessionIds = studentSessions.map(s => s.id);
-                    
-                    const { error } = await supabase
-                      .from('sessions')
-                      .update({ check_out_time: now })
-                      .in('id', sessionIds);
-                    
-                    if (error) {
-                      setToastMessage('Fehler beim Ausloggen: ' + error.message);
-                    } else {
-                      setActiveSessions(prev => prev.filter(s => !sessionIds.includes(s.id)));
-                      setToastMessage(`${sessionIds.length} Schüler erfolgreich ausgecheckt.`);
-                      fetchData();
+                    try {
+                      const now = new Date().toISOString();
+                      const sessionIds = studentSessions.map(s => s.id);
+                      
+                      const { error } = await supabase
+                        .from('sessions')
+                        .update({ check_out_time: now })
+                        .in('id', sessionIds);
+                      
+                      if (error) {
+                        setToastMessage('Fehler beim Ausloggen: ' + error.message);
+                      } else {
+                        setActiveSessions(prev => prev.filter(s => !sessionIds.includes(s.id)));
+                        setToastMessage(`${sessionIds.length} Schüler erfolgreich ausgecheckt.`);
+                        fetchData();
+                      }
+                    } catch (err: any) {
+                      console.error("Fehler beim Massen-Auschecken:", err);
+                      setToastMessage("Fehler beim Ausloggen: " + (err.message || String(err)));
                     }
                   }
                 }}

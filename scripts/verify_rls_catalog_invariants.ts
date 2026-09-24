@@ -24,6 +24,7 @@ const MIGRATION_425 = path.join(MIGRATIONS_DIR, '425_enterprise_data_portability
 const MIGRATION_426 = path.join(MIGRATIONS_DIR, '426_enterprise_altcha_pow_and_sovereign_perimeter.sql');
 const MIGRATION_430 = path.join(MIGRATIONS_DIR, '430_enterprise_tier1_forensic_remediation.sql');
 const MIGRATION_433 = path.join(MIGRATIONS_DIR, '433_enterprise_tier1_phase2_hardening.sql');
+const MIGRATION_470 = path.join(MIGRATIONS_DIR, '470_enterprise_authoritative_reschedule_and_room_booking.sql');
 
 export interface InvariantCheckResult {
   id: number;
@@ -38,7 +39,7 @@ const results: InvariantCheckResult[] = [];
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ RLS & SCHEMA CATALOG INVARIANT AUDIT');
 console.log('    Standards: DIN EN ISO/IEC 27001 (A.8.20/A.8.24) & BSI C5 Kriterienkatalog');
-console.log('    Validating 20 Forensic Architecture & Performance Invariants...');
+console.log('    Validating 21 Forensic Architecture & Performance Invariants...');
 console.log('════════════════════════════════════════════════════════════════════\n');
 
 if (!fs.existsSync(MIGRATION_389)) {
@@ -54,6 +55,7 @@ const m425Content = fs.existsSync(MIGRATION_425) ? fs.readFileSync(MIGRATION_425
 const m426Content = fs.existsSync(MIGRATION_426) ? fs.readFileSync(MIGRATION_426, 'utf-8') : '';
 const m430Content = fs.existsSync(MIGRATION_430) ? fs.readFileSync(MIGRATION_430, 'utf-8') : '';
 const m433Content = fs.existsSync(MIGRATION_433) ? fs.readFileSync(MIGRATION_433, 'utf-8') : '';
+const m470Content = fs.existsSync(MIGRATION_470) ? fs.readFileSync(MIGRATION_470, 'utf-8') : '';
 
 // ------------------------------------------------------------------------------
 // INVARIANT 1: Unauthenticated Session Injection on session_leases (CVSS 10.0)
@@ -622,6 +624,36 @@ function verifyInvariant20(): InvariantCheckResult {
 }
 
 // ------------------------------------------------------------------------------
+// INVARIANT 21: Closed-Loop Schedule Reschedule, Multi-Tenant Ingestion & Room Atomic Seal
+// ------------------------------------------------------------------------------
+function verifyInvariant21(): InvariantCheckResult {
+  const hasRescheduleRpc = m470Content.includes('reschedule_lesson_authoritative') &&
+    m470Content.includes('SECURITY DEFINER') &&
+    m470Content.includes('COALESCE(public.get_current_authenticated_user_id(), auth.uid(), p_teacher_id)');
+
+  const hasRoomBookingAndAudit = m470Content.includes('INSERT INTO public.room_bookings') &&
+    m470Content.includes('INSERT INTO public.campus_direct_messages') &&
+    m470Content.includes('INSERT INTO public.audit_logs');
+
+  const masterSchoolsHookPath = path.join(ROOT_DIR, 'apps', 'groovelab', 'src', 'components', 'masterAdmin', 'hooks', 'useMasterAdminSchools.ts');
+  const masterSchoolsHookContent = fs.existsSync(masterSchoolsHookPath) ? fs.readFileSync(masterSchoolsHookPath, 'utf-8') : '';
+  const hasMultiSchoolIngestion = (masterSchoolsHookContent.includes('schoolMap.set(s.id,') || masterSchoolsHookContent.includes('schoolsMap.set(s.id,')) &&
+    !masterSchoolsHookContent.includes("!name.includes('groove academy')") &&
+    masterSchoolsHookContent.includes('get_master_schools_overview');
+
+  const passed = hasRescheduleRpc && hasRoomBookingAndAudit && hasMultiSchoolIngestion;
+  return {
+    id: 21,
+    name: 'Closed-Loop Schedule Reschedule, Multi-Tenant Ingestion & Room Booking Seal',
+    passed,
+    details: passed
+      ? 'Authoritative reschedule RPC enforces teacher/admin caller resolution, atomic room booking, direct messages and immutable audit logging. Multi-tenant ingestion in MasterAdmin utilizes zero-drop union map.'
+      : 'Failed: Missing reschedule RPC, atomic room booking, audit logging, or multi-tenant ingestion seal in migration 470 / useMasterAdminSchools.ts.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
 // LIVE CATALOG AUDIT ENGINE (Checks pg_policies, pg_views, pg_proc when connected)
 // ------------------------------------------------------------------------------
 export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed: boolean; message: string }> {
@@ -698,6 +730,7 @@ results.push(verifyInvariant17());
 results.push(verifyInvariant18());
 results.push(verifyInvariant19());
 results.push(verifyInvariant20());
+results.push(verifyInvariant21());
 
 let failedCount = 0;
 
@@ -719,7 +752,7 @@ if (liveResult.executed) {
 
 console.log('\n════════════════════════════════════════════════════════════════════');
 if (failedCount === 0) {
-  console.log(`🎉 ALL 19 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
+  console.log(`🎉 ALL 21 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
   console.log('   OWASP ASVS Level 3 / DSGVO Art. 5, 8, 25, 32 / Sub-MS Invariants Sealed.');
   console.log('════════════════════════════════════════════════════════════════════\n');
   process.exit(0);

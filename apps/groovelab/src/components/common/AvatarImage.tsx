@@ -96,56 +96,82 @@ export const AvatarImage = React.memo(({
       if (isExplicitTeacher) {
         return resolveGrooveLabTeacherAvatar(targetUser, src);
       }
-      const isStudent = src && (
-        src.includes("student_") ||
-        src.includes("bandstyle_") ||
-        src.includes("teen_") ||
-        src.includes("avatar_boy") ||
-        src.includes("avatar_girl")
-      );
-      const isInstrument = !isStudent && src && (
-        src.includes("avatar.png") || 
-        src.includes("avatar_new") ||
-        src.includes("_avatar") ||
-        src.includes("guitar_avatar") || 
-        src.includes("gitarre_avatar") || 
-        src.includes("ebass_avatar") || 
-        src.includes("egitarre_avatar") || 
-        src.includes("kontrabass_avatar") || 
-        src.includes("bass_avatar") || 
-        src.includes("drums_avatar") || 
-        src.includes("schlagzeug_avatar") || 
-        src.includes("piano_avatar") || 
-        src.includes("klavier_avatar") || 
-        src.includes("vocals_avatar") || 
-        src.includes("gesang_avatar") || 
-        src.includes("trumpet_avatar") || 
-        src.includes("trompete_avatar") || 
-        src.includes("trombone_avatar") || 
-        src.includes("posaune_avatar") || 
-        src.includes("horn_avatar") || 
-        src.includes("cello_avatar") || 
-        src.includes("violin_avatar") || 
-        src.includes("violine_avatar") || 
-        src.includes("clarinet_avatar") || 
-        src.includes("klarinette_avatar") || 
-        src.includes("flute_avatar") || 
-        src.includes("querfloete_avatar") || 
-        src.includes("saxophone_avatar") || 
-        src.includes("saxophon_avatar") || 
-        src.includes("blockfloete_avatar") || 
-        src.includes("bariton_avatar") || 
-        src.includes("oboe_avatar")
-      );
       if (r === "admin" || r === "secretary") {
         return (src && src !== "/campus_login_hero.png") ? src : "/avatar_ghost.jpg";
       }
-      if (!src || isInstrument || src === "/avatar_ghost.jpg" || src === "/campus_login_hero.png") {
-        return "/avatar_ghost.jpg";
+
+      // Student Resolution in GrooveLab
+      const effectiveSrc = (src === "/campus_login_hero.png") ? null : src;
+      const userPhoto = (targetUser?.photo_url === "/campus_login_hero.png") ? null : targetUser?.photo_url;
+      const userAvatar = (targetUser?.avatar_url === "/campus_login_hero.png") ? null : targetUser?.avatar_url;
+
+      const candidate = effectiveSrc || userPhoto || userAvatar;
+
+      const isStudentMusicianAvatar = candidate && (
+        candidate.includes("student_") ||
+        candidate.includes("bandstyle_") ||
+        candidate.includes("teen_") ||
+        candidate.includes("avatar_boy") ||
+        candidate.includes("avatar_girl") ||
+        candidate.startsWith("http://") ||
+        candidate.startsWith("https://") ||
+        candidate.startsWith("data:") ||
+        candidate.startsWith("blob:")
+      );
+
+      const isInstrument = candidate && (
+        candidate.includes("avatar.png") || 
+        candidate.includes("avatar_new") ||
+        candidate.includes("_avatar") ||
+        candidate.includes("guitar_avatar") || 
+        candidate.includes("gitarre_avatar") || 
+        candidate.includes("ebass_avatar") || 
+        candidate.includes("egitarre_avatar") || 
+        candidate.includes("kontrabass_avatar") || 
+        candidate.includes("bass_avatar") || 
+        candidate.includes("drums_avatar") || 
+        candidate.includes("schlagzeug_avatar") || 
+        candidate.includes("piano_avatar") || 
+        candidate.includes("klavier_avatar") || 
+        candidate.includes("vocals_avatar") || 
+        candidate.includes("gesang_avatar") || 
+        candidate.includes("trumpet_avatar") || 
+        candidate.includes("trompete_avatar") || 
+        candidate.includes("trombone_avatar") || 
+        candidate.includes("posaune_avatar") || 
+        candidate.includes("horn_avatar") || 
+        candidate.includes("cello_avatar") || 
+        candidate.includes("violin_avatar") || 
+        candidate.includes("violine_avatar") || 
+        candidate.includes("clarinet_avatar") || 
+        candidate.includes("klarinette_avatar") || 
+        candidate.includes("flute_avatar") || 
+        candidate.includes("querfloete_avatar") || 
+        candidate.includes("saxophone_avatar") || 
+        candidate.includes("saxophon_avatar") || 
+        candidate.includes("blockfloete_avatar") || 
+        candidate.includes("bariton_avatar") || 
+        candidate.includes("oboe_avatar")
+      );
+
+      if (isStudentMusicianAvatar) {
+        return candidate;
       }
+
+      if (candidate && !isInstrument && candidate !== "/avatar_ghost.jpg") {
+        return candidate;
+      }
+
+      // Default Didactic Student Musician Avatar
+      return getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, r);
     }
-    if (hasError || !src || (activePlat === "groovelab" && src === "/campus_login_hero.png")) return "/avatar_ghost.jpg";
-    return src;
+    if (hasError) {
+      if (r === "student") {
+        return getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, "student");
+      }
+      return "/avatar_ghost.jpg";
+    }
+    return src || getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, r);
   }, [src, hasError, user, resolvedInstrument, activePlatform]);
 
   const handleClick = (e: React.MouseEvent) => {

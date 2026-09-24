@@ -3155,7 +3155,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             borderRadius: '12px',
                             border: 'none',
                             background: '#eab308',
-                            color: '#ffffff',
+                            color: '#0f172a',
                             fontWeight: 800,
                             fontSize: '0.84rem',
                             cursor: 'pointer',

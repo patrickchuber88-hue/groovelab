@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, Check, Compass, Headphones, Lightbulb, Music, Rocket, Star, X } from "lucide-react";
+import { getSongColor } from "../studentDateUtils";
 import { PreFlightAudioPlayerSection } from "../../campus/ZenPlayAlongDock";
 
 export interface StudentJuniorPreFlightModalProps {
@@ -214,6 +215,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {missionInfo.songs.map((s: any, sIdx: number) => {
                 const cleanT = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                const songColor = getSongColor(cleanT);
                 return (
                   <div key={`pre-s-${sIdx}`} style={{
                     background: '#ffffff',
@@ -229,11 +231,12 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                       width: '28px',
                       height: '28px',
                       borderRadius: '8px',
-                      background: '#ede9fe',
+                      background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#7c3aed',
+                      color: songColor.text || '#0f172a',
+                      boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
                       flexShrink: 0
                     }}>
                       <Music size={15} strokeWidth={2.4} />

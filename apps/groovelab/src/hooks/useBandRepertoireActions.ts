@@ -436,15 +436,29 @@ export function useBandRepertoireActions({
       
       // Open the gateway celebration UI IMMEDIATELY for the founder
       console.log('[Founding] Opening Celebration Gateway UI...');
+      const targetInst = target.instrumentation || target.songs?.instrumentation || target.band_songs?.[0]?.songs?.instrumentation;
+      const targetSongTitle = target.title || target.songs?.title || 'Dein Song';
+      const targetSongId = target.song_id || target.songs?.id || target.id;
+
       setSelectedBandForGateway({ 
         ...newBand, 
-        songs: { title: target.title || target.songs?.title || 'Dein Song' }, 
+        songs: { 
+          id: targetSongId, 
+          title: targetSongTitle, 
+          instrumentation: targetInst 
+        }, 
+        instrumentation: targetInst,
         band_members: uniqueMembers.map((m: any) => ({
           ...m,
           role: m.user_id === user.id ? 'leader' : 'member'
         })),
         band_songs: [{
           ...bSong,
+          songs: {
+            id: targetSongId,
+            title: targetSongTitle,
+            instrumentation: targetInst
+          },
           band_song_slots: createdSlots
         }]
       });

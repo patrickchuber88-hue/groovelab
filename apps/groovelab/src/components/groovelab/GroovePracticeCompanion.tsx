@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X, Minus, Plus, Bell, Maximize2, Minimize2, Flame } from 'lucide-react';
+import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X, Minus, Plus, Bell, Maximize2, Minimize2, Flame, Timer, Drum, Guitar, Music2 } from 'lucide-react';
 import { ACOUSTIC_STUDIO_SAMPLES } from './AcousticDrumSamples';
 import { storeBlob } from '../../utils/blobStorage';
 import { 
@@ -998,12 +998,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const lastTransientTimeRef = useRef<number>(0);
   const calibratedThresholdRef = useRef<number>(0.045);
   const getInitialLatency = () => {
-    const saved = localStorage.getItem('groovelab_latency_offset');
-    if (saved) {
-      const parsed = parseInt(saved, 10);
-      if (!isNaN(parsed) && parsed > 0) return parsed;
-    }
-    return 140; // True round-trip hardware latency baseline for WebAudio
+    return UniversalLatencyEngine.getLatencyMs();
   };
   const calibratedLatencyOffsetRef = useRef<number>(getInitialLatency());
   const feedbackTimerRef = useRef<any>(null);
@@ -1013,25 +1008,19 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     onRhythmScoreUpdateRef.current = onRhythmScoreUpdate;
   }, [onRhythmScoreUpdate]);
 
+  // 🔄 Cross-Module Realtime Latency Sync
+  useEffect(() => {
+    return UniversalLatencyEngine.subscribe((newMs) => {
+      calibratedLatencyOffsetRef.current = newMs;
+    });
+  }, []);
+
   useEffect(() => {
     if (activeSongContext?.targetBpm) {
       setBpm(activeSongContext.targetBpm);
-      const isCalibrated = localStorage.getItem('groovelab_latency_calibrated') === 'true';
-      if (!isCalibrated) {
-        handleStartCalibration();
-      } else {
-        setRhythmCoachActive(true);
-      }
+      setRhythmCoachActive(true);
     }
   }, [activeSongContext]);
-
-  // 🎛️ Exact Loopstation Cubase Auto-Einmessung States
-  const [isLoopstationCalibrating, setIsLoopstationCalibrating] = useState(false);
-  const [loopstationPhaseState, setLoopstationPhaseState] = useState<'idle' | 'ambient' | 'clicks' | 'result'>('idle');
-  const [loopstationClickCount, setLoopstationClickCount] = useState<number>(0);
-  const [loopstationMicLevel, setLoopstationMicLevel] = useState<number>(0);
-  const [loopstationLatencyResult, setLoopstationLatencyResult] = useState<number>(140);
-  const loopstationStreamRef = useRef<MediaStream | null>(null);
 
   // 🎙️ Instrument 3-Tone Einpegeln States
   const [liveMicLevelPct, setLiveMicLevelPct] = useState<number>(0);
@@ -1039,13 +1028,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const [instrumentToneDoneText, setInstrumentToneDoneText] = useState<string | null>(null);
   const [isInstrumentCalibrating, setIsInstrumentCalibrating] = useState<boolean>(false);
 
-  // Toggle Rhythm Coach with Forced Initial Calibration Guard
+  // Toggle Rhythm Coach with SSOT Latency Support
   const toggleRhythmCoach = () => {
-    const isCalibrated = localStorage.getItem('groovelab_latency_calibrated') === 'true';
-    if (!rhythmCoachActive && !isCalibrated) {
-      handleStartCalibration(true);
-      return;
-    }
     const next = !rhythmCoachActive;
     setRhythmCoachActive(next);
     if (next) {
@@ -1054,215 +1038,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   };
 
   // Smart Cascade Calibration Handler
-  const handleStartCalibration = (forceLoopstationCheck: boolean = false) => {
+  const handleStartCalibration = (_forceLoopstationCheck: boolean = false) => {
     setSelectedStyle('metronome');
-    const isForce = typeof forceLoopstationCheck === 'boolean' ? forceLoopstationCheck : false;
-    const isCalibrated = localStorage.getItem('groovelab_latency_calibrated') === 'true';
-
-    if (!isCalibrated || isForce) {
-      runLoopstationAutoCalibration();
-    } else {
-      runInstrumentToneCalibration();
-    }
+    runInstrumentToneCalibration();
   };
 
-  // Ref to hold step 1 ambient sound timer
-  const ambientToneTimerRef = useRef<any>(null);
-  const calibrationAudioCtxRef = useRef<AudioContext | null>(null);
-  const calibrationAnalyserRef = useRef<AnalyserNode | null>(null);
-
-  // 1️⃣ Loopstation Cubase 15 Pro Auto-Einmessung Engine
+  // 1️⃣ SSOT Latency Engine Sync
   const runLoopstationAutoCalibration = async () => {
-    setIsLoopstationCalibrating(true);
-    setLoopstationPhaseState('ambient');
-    setLoopstationClickCount(0);
-    setLoopstationMicLevel(0);
-
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      calibrationAudioCtxRef.current = audioCtx;
-
-      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
-      await stabilizeAudioStream(stream, 300);
-      loopstationStreamRef.current = stream;
-
-      const micSource = audioCtx.createMediaStreamSource(stream);
-
-      // 🎛️ DSP Biquad Bandpass Filter (1800Hz, Q=2.5)
-      // Filters out keyboard typing clicks, table thumps & ambient hum by 90%, isolating only metronome chirp frequencies
-      const bandpassFilter = audioCtx.createBiquadFilter();
-      bandpassFilter.type = 'bandpass';
-      bandpassFilter.frequency.setValueAtTime(1800, audioCtx.currentTime);
-      bandpassFilter.Q.setValueAtTime(2.5, audioCtx.currentTime);
-
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-
-      micSource.connect(bandpassFilter);
-      bandpassFilter.connect(analyser);
-      calibrationAnalyserRef.current = analyser;
-
-      const pcmData = new Float32Array(analyser.fftSize);
-
-      // 🎚️ 60 FPS Frequency-Selective Peak-Decay VU Envelope Follower
-      let animFrameId: number;
-      let peakRms = 0;
-
-      const updateMicLevel = () => {
-        if (!calibrationAudioCtxRef.current || calibrationAudioCtxRef.current.state === 'closed') return;
-
-        analyser.getFloatTimeDomainData(pcmData);
-        let sumSq = 0;
-        for (let i = 0; i < pcmData.length; i++) {
-          sumSq += pcmData[i] * pcmData[i];
-        }
-        const currentRms = Math.sqrt(sumSq / pcmData.length);
-
-        if (currentRms > peakRms) {
-          peakRms = currentRms;
-        } else {
-          peakRms = peakRms * 0.90; // Smooth VU decay
-        }
-
-        // Calibrated level formula for filtered metronome frequency band
-        const levelPct = Math.min(100, Math.round(Math.pow(peakRms, 0.40) * 1450));
-        setLoopstationMicLevel(levelPct);
-
-        animFrameId = requestAnimationFrame(updateMicLevel);
-      };
-
-      animFrameId = requestAnimationFrame(updateMicLevel);
-
-      // Play pleasant, comfortable metronome test chirp pulses (0.16 gain) every 400ms
-      if (ambientToneTimerRef.current) clearInterval(ambientToneTimerRef.current);
-      ambientToneTimerRef.current = setInterval(() => {
-        try {
-          if (audioCtx && audioCtx.state === 'running') {
-            const t = audioCtx.currentTime;
-            const freqs = [1200, 2400];
-            freqs.forEach(f => {
-              const osc = audioCtx.createOscillator();
-              const g = audioCtx.createGain();
-              osc.type = 'triangle';
-              osc.frequency.setValueAtTime(f, t);
-              g.gain.setValueAtTime(0.16, t);
-              g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-              osc.connect(g);
-              g.connect(audioCtx.destination);
-              osc.start(t);
-              osc.stop(t + 0.055);
-            });
-          }
-        } catch (_) {}
-      }, 400);
-    } catch (err) {
-      console.warn("Loopstation auto calibration error:", err);
-      setIsLoopstationCalibrating(false);
-      runInstrumentToneCalibration();
-    }
-  };
-
-  // Proceed from Schritt 1 to Schritt 2 (Metronom-Pings Latenz-Messung)
-  const proceedToStep2PingCalibration = async () => {
-    if (ambientToneTimerRef.current) {
-      clearInterval(ambientToneTimerRef.current);
-      ambientToneTimerRef.current = null;
-    }
-
-    const audioCtx = calibrationAudioCtxRef.current;
-    const analyser = calibrationAnalyserRef.current;
-    if (!audioCtx || !analyser || !loopstationStreamRef.current) return;
-
-    setLoopstationPhaseState('clicks');
-    const pcmData = new Float32Array(analyser.fftSize);
-    const dynamicPeakThreshold = 0.015;
-    const pingDeltas: number[] = [];
-
-    for (let pingIdx = 1; pingIdx <= 5; pingIdx++) {
-      setLoopstationClickCount(pingIdx);
-
-      const pingAudioTime = audioCtx.currentTime + 0.04;
-      const pingWallStart = performance.now();
-
-      const freqs = [1000, 2200, 3400]; // Multi-harmonic chirp burst
-      freqs.forEach(f => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(f, pingAudioTime);
-        gain.gain.setValueAtTime(0.33, pingAudioTime);
-        gain.gain.setValueAtTime(0.33, pingAudioTime + 0.035);
-        gain.gain.exponentialRampToValueAtTime(0.0001, pingAudioTime + 0.045);
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start(pingAudioTime);
-        osc.stop(pingAudioTime + 0.045);
-      });
-
-      // Capture mic peak window with high-precision performance.now() linked to AudioContext clock
-      let maxPeak = 0;
-      let peakWallTime = 0;
-
-      const sampleInterval = setInterval(() => {
-        analyser.getFloatTimeDomainData(pcmData);
-        const now = performance.now();
-        for (let i = 0; i < pcmData.length; i++) {
-          const absVal = Math.abs(pcmData[i]);
-          if (absVal > maxPeak) {
-            maxPeak = absVal;
-            peakWallTime = now;
-          }
-        }
-      }, 5);
-
-      await new Promise(r => setTimeout(r, 420));
-      clearInterval(sampleInterval);
-
-      if (maxPeak >= dynamicPeakThreshold && peakWallTime > pingWallStart) {
-        const delta = Math.round(peakWallTime - pingWallStart - 40);
-        if (delta > 20 && delta < 500) {
-          pingDeltas.push(delta);
-        }
-      }
-    }
-
-    // Stop mic stream
-    if (loopstationStreamRef.current) {
-      loopstationStreamRef.current.getTracks().forEach(t => t.stop());
-      loopstationStreamRef.current = null;
-    }
-
-    // Compute final calibrated offset using Cubase Median Outlier Filter
-    let finalOffsetMs = 0;
-    if (pingDeltas.length > 0) {
-      const sorted = [...pingDeltas].sort((a, b) => a - b);
-      let trimmed = sorted;
-      if (sorted.length >= 4) {
-        trimmed = sorted.slice(1, sorted.length - 1);
-      }
-      const medianAvg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
-      finalOffsetMs = Math.max(15, Math.min(450, Math.round(medianAvg)));
-    } else {
-      const baseLat = (audioCtx.baseLatency || 0.005) * 1000;
-      const outLat = (audioCtx.outputLatency || 0.020) * 1000;
-      finalOffsetMs = Math.round(baseLat + outLat + 95);
-    }
-
-    audioCtx.close();
-
-    setLoopstationLatencyResult(finalOffsetMs);
-    calibratedLatencyOffsetRef.current = finalOffsetMs;
-
-    // 🔗 Save shared latency calibration globally (Loopstation + Rhythmus-Coach sync)
-    try {
-      localStorage.setItem('groovelab_latency_offset', finalOffsetMs.toString());
-      localStorage.setItem('groovelab_latency_calibrated', 'true');
-    } catch (_) {}
-
-    setLoopstationPhaseState('result');
+    calibratedLatencyOffsetRef.current = UniversalLatencyEngine.getLatencyMs();
+    runInstrumentToneCalibration();
   };
 
   // 2️⃣ Instrument 3-Tone Einpegeln Engine
@@ -1504,6 +1288,35 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       setIsPlaying(true);
     }
   };
+
+  // 🎹 2027 Pro Studio Keyboard Shortcuts (Space: Play/Stop, T: Tap Tempo, ↑/↓: BPM)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleTogglePlay();
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        handleTapTempo();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        setBpm(prev => Math.min(240, prev + step));
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        setBpm(prev => Math.max(40, prev - step));
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isPlaying, isRecording, isCountingIn]);
 
   const startCountInAndRecord = async () => {
     try {
@@ -3730,187 +3543,145 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   </div>
                 </div>
               ) : (
-                /* Mechanical Metronome Container */
+                /* Freestanding Acoustic Precision Pendulum (Natural, Earthy, Organic Handcraft) */
                 <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <style>{`
                     @keyframes swing-anim {
-                      0% { transform: rotate(-12deg); }
-                      100% { transform: rotate(12deg); }
-                    }
-                    @keyframes rotate-key {
-                      0% { transform: rotate(0deg); }
-                      100% { transform: rotate(360deg); }
+                      0% { transform: rotate(-13deg); }
+                      100% { transform: rotate(13deg); }
                     }
                   `}</style>
 
-                  <svg width="118" height="140" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
+                  <svg width="124" height="142" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
                     <defs>
-                      {/* Walnut Wood Gradient */}
-                      <linearGradient id="walnutWood" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#6c472c" />
-                        <stop offset="40%" stopColor="#53331b" />
-                        <stop offset="85%" stopColor="#2f1d0f" />
-                        <stop offset="100%" stopColor="#1c1109" />
+                      {/* Natural Linen / Ivory Gauge Plate */}
+                      <linearGradient id="naturalGauge" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#faf7f2" />
+                        <stop offset="100%" stopColor="#f3eee3" />
                       </linearGradient>
-                      {/* Wood Shadow Overlay */}
-                      <radialGradient id="woodGlow" cx="50%" cy="40%" r="60%">
-                        <stop offset="0%" stopColor="#ffe5d9" stopOpacity="0.08" />
-                        <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
+                      {/* Brushed Brass Rod */}
+                      <linearGradient id="brushedBrass" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#fef08a" />
+                        <stop offset="45%" stopColor="#eab308" />
+                        <stop offset="85%" stopColor="#ca8a04" />
+                        <stop offset="100%" stopColor="#a16207" />
+                      </linearGradient>
+                      {/* Warm Amber Pivot Glow */}
+                      <radialGradient id="pivotGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#facc15" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#ca8a04" stopOpacity="0" />
                       </radialGradient>
-                      {/* Hollow Interior Shadow */}
-                      <linearGradient id="interiorChamber" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#19110d" />
-                        <stop offset="100%" stopColor="#060403" />
-                      </linearGradient>
-                      {/* Ivory scale Plate */}
-                      <linearGradient id="ivoryPlate" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#fbf9f4" />
-                        <stop offset="100%" stopColor="#e5decb" />
-                      </linearGradient>
-                      {/* Steel Pendulum Rod */}
-                      <linearGradient id="steelRod" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#f3f4f6" />
-                        <stop offset="50%" stopColor="#9ca3af" />
-                        <stop offset="100%" stopColor="#d1d5db" />
-                      </linearGradient>
-                      {/* Brass Gold Gradient */}
-                      <linearGradient id="brassGold" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#ffe066" />
-                        <stop offset="35%" stopColor="#e5c142" />
-                        <stop offset="75%" stopColor="#b58e17" />
-                        <stop offset="100%" stopColor="#7a5b08" />
-                      </linearGradient>
-                      {/* Soft Casing Drop Shadow */}
-                      <filter id="casingShadow" x="-20%" y="-10%" width="140%" height="130%">
-                        <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000000" floodOpacity="0.32" />
+                      {/* Soft Organic Shadow */}
+                      <filter id="organicShadow" x="-20%" y="-10%" width="140%" height="130%">
+                        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#451a03" floodOpacity="0.08" />
                       </filter>
                     </defs>
 
-                    {/* Side Winding Key */}
-                    <g style={{
-                      transformOrigin: '138px 145px',
-                      transform: 'rotate(25deg)',
-                      transition: 'transform 0.2s ease-out'
-                    }}>
-                      <rect x="136" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
-                      <path d="M 144 145 C 144 138, 158 138, 158 145 C 158 152, 144 152, 144 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
-                      <circle cx="144" cy="145" r="1.8" fill="#5a3d00" />
+                    {/* Warm Natural Scale Plate (Organic Rounded Arch) */}
+                    <rect 
+                      x="48" 
+                      y="18" 
+                      width="84" 
+                      height="176" 
+                      rx="24" 
+                      fill="url(#naturalGauge)" 
+                      stroke="#e7e0d2" 
+                      strokeWidth="1.2"
+                      filter="url(#organicShadow)"
+                    />
+
+                    {/* Laser-Engraved Tempo Scale Markings */}
+                    <g fill="#78716c" opacity="0.75" fontFamily="SF Mono, Menlo, monospace" fontSize="5.5" fontWeight="600">
+                      <line x1="90" y1="36" x2="90" y2="168" stroke="#d6cebe" strokeWidth="0.8" strokeDasharray="1 3" />
+                      
+                      <line x1="82" y1="52" x2="98" y2="52" stroke="#a8a29e" strokeWidth="0.8" />
+                      <text x="76" y="54" textAnchor="end">40</text>
+                      <text x="104" y="54" textAnchor="start">Largo</text>
+
+                      <line x1="84" y1="75" x2="96" y2="75" stroke="#a8a29e" strokeWidth="0.8" />
+                      <text x="78" y="77" textAnchor="end">80</text>
+                      <text x="102" y="77" textAnchor="start">Adagio</text>
+
+                      <line x1="82" y1="98" x2="98" y2="98" stroke="#a8a29e" strokeWidth="0.8" />
+                      <text x="76" y="100" textAnchor="end">120</text>
+                      <text x="104" y="100" textAnchor="start">Andante</text>
+
+                      <line x1="84" y1="121" x2="96" y2="121" stroke="#a8a29e" strokeWidth="0.8" />
+                      <text x="78" y="123" textAnchor="end">160</text>
+                      <text x="102" y="123" textAnchor="start">Allegro</text>
+
+                      <line x1="82" y1="144" x2="98" y2="144" stroke="#a8a29e" strokeWidth="0.8" />
+                      <text x="76" y="146" textAnchor="end">200</text>
+                      <text x="104" y="146" textAnchor="start">Presto</text>
                     </g>
 
-                    {/* 3D Pyramid Casing (Walnut Wood) */}
-                    <path 
-                      d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
-                      fill="url(#walnutWood)" 
-                      stroke="#2f1d0f" 
-                      strokeWidth="2.5" 
-                      filter="url(#casingShadow)"
-                    />
-                    <path 
-                      d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
-                      fill="url(#woodGlow)" 
-                      style={{ mixBlendMode: 'multiply' }}
-                    />
-
-                    {/* Golden Casing Trim Line */}
-                    <path 
-                      d="M 90 18 L 29 191 C 32 195, 36 197, 42 197 L 138 197 C 144 197, 148 195, 151 191 Z" 
-                      fill="none" 
-                      stroke="#e5c142" 
-                      strokeWidth="1.2" 
-                      opacity="0.32"
-                    />
-
-                    {/* Hollow Interior Chamber */}
-                    <path 
-                      d="M 78 35 L 102 35 L 138 188 L 42 188 Z" 
-                      fill="url(#interiorChamber)" 
-                      stroke="#19110d" 
-                      strokeWidth="1.5"
-                    />
-
-                    {/* Ivory scale Plate */}
-                    <path 
-                      d="M 80 40 L 100 40 L 134 184 L 46 184 Z" 
-                      fill="url(#ivoryPlate)" 
-                      stroke="#b5ad9e"
-                      strokeWidth="0.5"
-                    />
-
-                    {/* Detailed Scale Lines and Tempo Markings */}
-                    <g fill="#1d1d1f" opacity="0.65" fontFamily="Georgia, serif" fontSize="5.5" fontWeight="bold">
-                      <line x1="90" y1="45" x2="90" y2="175" stroke="#1d1d1f" strokeWidth="0.8" opacity="0.25" />
-                      <line x1="82" y1="65" x2="98" y2="65" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                      <text x="76" y="67" textAnchor="end">40</text>
-                      <text x="104" y="67" textAnchor="start">Largo</text>
-                      <line x1="80" y1="83" x2="100" y2="83" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                      <text x="74" y="85" textAnchor="end">80</text>
-                      <text x="106" y="85" textAnchor="start">Adagio</text>
-                      <line x1="78" y1="101" x2="102" y2="101" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                      <text x="72" y="103" textAnchor="end">120</text>
-                      <text x="108" y="103" textAnchor="start">Andante</text>
-                      <line x1="76" y1="119" x2="104" y2="119" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                      <text x="70" y="121" textAnchor="end">160</text>
-                      <text x="110" y="121" textAnchor="start">Allegro</text>
-                      <line x1="74" y1="137" x2="106" y2="137" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                      <text x="68" y="139" textAnchor="end">200</text>
-                      <text x="112" y="139" textAnchor="start">Presto</text>
-                      <line x1="72" y1="155" x2="108" y2="155" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                      <text x="66" y="157" textAnchor="end">240</text>
-                      <text x="114" y="157" textAnchor="start">Prestiss</text>
-                    </g>
-
-                    {/* Pendulum Shadow Group */}
+                    {/* Subtle Organic Pendulum Shadow */}
                     <g style={{
-                      transformOrigin: '87px 180px',
+                      transformOrigin: '88px 178px',
                       transform: isPlaying ? 'none' : 'rotate(0deg)',
                       animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
                       transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
-                      opacity: 0.22
+                      opacity: 0.12
                     }}>
-                      <line x1="87" y1="180" x2="87" y2="40" stroke="#000000" strokeWidth="3.5" strokeLinecap="round" />
+                      <line x1="88" y1="178" x2="88" y2="34" stroke="#451a03" strokeWidth="3" strokeLinecap="round" />
                       <rect 
                         x="77" 
-                        y={40 + ((240 - bpm) / (240 - 40)) * 115} 
-                        width="20" 
-                        height="15" 
-                        rx="2" 
-                        fill="#000000" 
+                        y={36 + ((240 - bpm) / (240 - 40)) * 105} 
+                        width="22" 
+                        height="16" 
+                        rx="3" 
+                        fill="#451a03" 
                       />
                     </g>
 
-                    {/* Pendulum Group */}
+                    {/* Handcrafted Brushed Brass Pendulum Rod & Slider Weight */}
                     <g style={{
-                      transformOrigin: '90px 180px',
+                      transformOrigin: '90px 178px',
                       transform: isPlaying ? 'none' : 'rotate(0deg)',
                       animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
                       transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
                     }}>
-                      <line x1="90" y1="180" x2="90" y2="40" stroke="url(#steelRod)" strokeWidth="3" strokeLinecap="round" />
+                      <line x1="90" y1="178" x2="90" y2="32" stroke="url(#brushedBrass)" strokeWidth="2.8" strokeLinecap="round" />
+                      
+                      {/* Sliding Brass Weight */}
                       <rect 
-                        x="80" 
-                        y={40 + ((240 - bpm) / (240 - 40)) * 115} 
-                        width="20" 
-                        height="15" 
-                        rx="2" 
-                        fill="url(#brassGold)" 
-                        stroke="#856404" 
-                        strokeWidth="1.2" 
-                        style={{ transition: 'y 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                        x="78" 
+                        y={36 + ((240 - bpm) / (240 - 40)) * 105} 
+                        width="24" 
+                        height="16" 
+                        rx="3" 
+                        fill="url(#brushedBrass)" 
+                        stroke="#92400e" 
+                        strokeWidth="1" 
+                        style={{ transition: 'y 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                      />
+                      {/* Center Indicator Line on Weight */}
+                      <line 
+                        x1="81" 
+                        y1={36 + ((240 - bpm) / (240 - 40)) * 105 + 8} 
+                        x2="99" 
+                        y2={36 + ((240 - bpm) / (240 - 40)) * 105 + 8} 
+                        stroke="#78350f" 
+                        strokeWidth="0.9" 
+                        style={{ transition: 'y 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
                       />
                       <circle 
                         cx="90" 
-                        cy={40 + ((240 - bpm) / (240 - 40)) * 115 + 7.5} 
-                        r="2.5" 
-                        fill="url(#brassGold)" 
-                        stroke="#5a3d00" 
+                        cy={36 + ((240 - bpm) / (240 - 40)) * 105 + 8} 
+                        r="2.2" 
+                        fill="#fef08a" 
+                        stroke="#92400e" 
                         strokeWidth="0.8" 
-                        style={{ transition: 'cy 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                        style={{ transition: 'cy 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
                       />
                     </g>
 
-                    {/* Brass Lager / Pivot Cap */}
-                    <circle cx="90" cy="180" r="7.5" fill="url(#brassGold)" stroke="#5a3d00" strokeWidth="1.5" />
-                    <circle cx="90" cy="180" r="2.5" fill="#423000" />
+                    {/* Acoustic Pivot Cap (Brushed Brass) with Beat 1 Glow */}
+                    {isPlaying && (
+                      <circle cx="90" cy="178" r="14" fill="url(#pivotGlow)" opacity="0.8" />
+                    )}
+                    <circle cx="90" cy="178" r="7" fill="url(#brushedBrass)" stroke="#78350f" strokeWidth="1.2" />
+                    <circle cx="90" cy="178" r="2.2" fill="#451a03" />
                   </svg>
                 </div>
               )}
@@ -4067,82 +3838,119 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   </button>
                 </div>
 
-                {/* All-in-One Tier- & Tempo-Kapsel mit eindeutigem '▾' Indikator */}
-                {(() => {
-                  const animalInfo = bpm <= 75
-                    ? { emoji: '🐢', name: 'Leo', desc: 'Gemütlich', bg: '#dcfce7', border: '#86efac', text: '#166534' }
-                    : bpm <= 110
-                    ? { emoji: '🐕', name: 'Bello', desc: 'Spazieren', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
-                    : bpm <= 155
-                    ? { emoji: '🐇', name: 'Flitzi', desc: 'Schwungvoll', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
-                    : { emoji: '🐆', name: 'Gepard', desc: 'Turbo', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
+                {/* All-in-One Tier- & Tempo-Kapsel mit direktem [TAP] Tempo Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {(() => {
+                    const animalInfo = bpm <= 75
+                      ? { emoji: '🐢', name: 'Leo', desc: 'Gemütlich', bg: '#dcfce7', border: '#86efac', text: '#166534' }
+                      : bpm <= 110
+                      ? { emoji: '🐕', name: 'Bello', desc: 'Spazieren', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
+                      : bpm <= 155
+                      ? { emoji: '🐇', name: 'Flitzi', desc: 'Schwungvoll', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
+                      : { emoji: '🐆', name: 'Gepard', desc: 'Turbo', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
 
-                  const isBeatBounce = isPlaying && (activeBeatIndex !== null);
+                    const isBeatBounce = isPlaying && (activeBeatIndex !== null);
 
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTempoDeck(prev => !prev);
-                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                          try { navigator.vibrate(15); } catch (_) {}
-                        }
-                      }}
-                      aria-expanded={showTempoDeck}
-                      aria-haspopup="dialog"
-                      aria-label={`Tempo-Feineinstellung öffnen (Slider, Tap & Tasten): ${bpm} BPM, ${animalInfo.name}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: effectiveUiLevel === 'junior' ? animalInfo.bg : '#fefce8',
-                        border: `1.5px solid ${effectiveUiLevel === 'junior' ? animalInfo.border : '#fde047'}`,
-                        padding: '5px 12px 5px 14px',
-                        borderRadius: '100px',
-                        transform: isBeatBounce ? 'scale(1.08)' : 'scale(1)',
-                        transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
-                        boxShadow: isBeatBounce 
-                          ? `0 0 12px ${animalInfo.border}` 
-                          : (showTempoDeck ? '0 0 0 3px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.05)'),
-                        cursor: 'pointer',
-                        touchAction: 'manipulation'
-                      }}
-                      title="Klicken für Tempo-Feineinstellung (Schieberegler, Tap & Schnelltasten)"
-                    >
-                      {effectiveUiLevel === 'junior' ? (
-                        <>
-                          <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: animalInfo.text, whiteSpace: 'nowrap' }}>
-                            {animalInfo.name} • {animalInfo.desc}
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTempoDeck(prev => !prev);
+                          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                            try { navigator.vibrate(15); } catch (_) {}
+                          }
+                        }}
+                        aria-expanded={showTempoDeck}
+                        aria-haspopup="dialog"
+                        aria-label={`Tempo-Feineinstellung öffnen (Slider, Tap & Tasten): ${bpm} BPM, ${animalInfo.name}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          background: effectiveUiLevel === 'junior' ? animalInfo.bg : '#fefce8',
+                          border: `1.5px solid ${effectiveUiLevel === 'junior' ? animalInfo.border : '#fde047'}`,
+                          padding: '5px 12px 5px 14px',
+                          borderRadius: '100px',
+                          transform: isBeatBounce ? 'scale(1.08)' : 'scale(1)',
+                          transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
+                          boxShadow: isBeatBounce 
+                            ? `0 0 12px ${animalInfo.border}` 
+                            : (showTempoDeck ? '0 0 0 3px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.05)'),
+                          cursor: 'pointer',
+                          touchAction: 'manipulation'
+                        }}
+                        title="Klicken für Tempo-Feineinstellung (Schieberegler, Tap & Schnelltasten)"
+                      >
+                        {effectiveUiLevel === 'junior' ? (
+                          <>
+                            <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 900, color: animalInfo.text, whiteSpace: 'nowrap' }}>
+                              {animalInfo.name} • {animalInfo.desc}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#854d0e', whiteSpace: 'nowrap' }}>
+                            {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
                           </span>
-                        </>
-                      ) : (
-                        <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#854d0e', whiteSpace: 'nowrap' }}>
-                          {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
+                        )}
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          background: showTempoDeck ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)',
+                          color: effectiveUiLevel === 'junior' ? animalInfo.text : '#854d0e',
+                          fontSize: '0.70rem',
+                          fontWeight: 900,
+                          marginLeft: '2px',
+                          lineHeight: 1,
+                          transform: showTempoDeck ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.15s ease'
+                        }}>
+                          ▾
                         </span>
-                      )}
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: showTempoDeck ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)',
-                        color: effectiveUiLevel === 'junior' ? animalInfo.text : '#854d0e',
-                        fontSize: '0.70rem',
-                        fontWeight: 900,
-                        marginLeft: '2px',
-                        lineHeight: 1,
-                        transform: showTempoDeck ? 'rotate(180deg)' : 'none',
-                        transition: 'transform 0.15s ease'
-                      }}>
-                        ▾
-                      </span>
-                    </button>
-                  );
-                })()}
+                      </button>
+                    );
+                  })()}
+
+                  {/* ⚡ DIRECT TAP-TEMPO BUTTON (Organisch & Taktil) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTapTempo();
+                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                        try { navigator.vibrate(20); } catch (_) {}
+                      }
+                    }}
+                    aria-label="Tempo einklopfen (Tap oder Taste T)"
+                    title="Tempo im Takt antippen oder Taste 'T' drücken"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      padding: '5px 12px',
+                      borderRadius: '100px',
+                      cursor: 'pointer',
+                      fontSize: '0.76rem',
+                      fontWeight: 900,
+                      color: '#475569',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      transition: 'all 0.12s ease',
+                      touchAction: 'manipulation'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <Zap size={13} style={{ color: '#d97706' }} />
+                    <span style={{ letterSpacing: '0.04em' }}>TAP</span>
+                  </button>
+                </div>
               </div>
 
               {/* Apple-Grade Floating Tempo-Popover Deck */}
@@ -4168,6 +3976,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   {/* Popover Card */}
                   <div
                     role="dialog"
+                    aria-modal="true"
                     aria-label="Tempo-Feineinstellung"
                     style={{
                       position: 'absolute',
@@ -4518,10 +4327,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     transition: 'all 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     position: 'relative'
                   }}
-                  title={`Schlag ${idx + 1}: ${isAccent ? 'Betont (Laut)' : isGhost ? 'Leise (Gedämpft)' : isMute ? 'Stumm' : 'Normal'} – Antippen zum Wechseln`}
+                  title={`Schlag ${idx + 1}: ${isAccent ? 'Akzent (Betont)' : isGhost ? 'Gedämpft' : isMute ? 'Stumm' : 'Normal'} – Antippen zum Wechseln`}
                 >
-                  <span style={{ fontSize: '0.60rem', fontWeight: 900, lineHeight: 1, marginBottom: '2px' }}>
-                    {isAccent ? '👑' : isGhost ? '•' : isMute ? '✕' : ''}
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, lineHeight: 1, marginBottom: '2px' }}>
+                    {isAccent ? '▲' : isGhost ? '•' : isMute ? '✕' : ''}
                   </span>
                   <span>{idx + 1}</span>
                 </button>
@@ -4586,10 +4395,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 border: '1px solid #e2e8f0'
               }}>
                 {[
-                  { id: '1', label: '♩ Viertel' },
-                  { id: '2', label: '♫ Achtel' },
-                  { id: '3', label: '3er Triolen' },
-                  { id: '4', label: '𝅘𝅥𝅯𝅘𝅥𝅯 16tel' }
+                  { id: '1', label: '1/4 Viertel' },
+                  { id: '2', label: '1/8 Achtel' },
+                  { id: '3', label: 'Triolen' },
+                  { id: '4', label: '1/16 16tel' }
                 ].map(subOpt => (
                   <button
                     key={subOpt.id}
@@ -4733,9 +4542,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               style={{
                 flex: 1,
                 minHeight: '52px',
-                background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#fef2f2'),
-                color: isRecording || isCountingIn ? '#ffffff' : '#dc2626',
-                border: isRecording ? '2px solid #ef4444' : (isCountingIn ? '2px solid #d97706' : '1.5px solid #fecaca'),
+                background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#1e293b'),
+                color: '#ffffff',
+                border: isRecording ? '2px solid #ef4444' : (isCountingIn ? '2px solid #d97706' : '1.5px solid #334155'),
                 borderRadius: '16px',
                 padding: '10px 12px',
                 fontSize: '0.92rem',
@@ -4744,8 +4553,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55)' : '0 2px 8px rgba(220, 38, 38, 0.08)',
+                gap: '8px',
+                boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55)' : '0 2px 8px rgba(0, 0, 0, 0.12)',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -4761,7 +4570,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 </>
               ) : (
                 <>
-                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#dc2626' }} />
+                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)' }} />
                   <span>Aufnahme</span>
                 </>
               )}
@@ -5306,10 +5115,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             gap: '12px'
           }}>
             {[
-              { id: 'metronome', label: 'Metronom Klick', desc: 'Klassischer Klick', icon: '⏱️' },
-              { id: 'rock', label: 'Rock & Pop', desc: 'Kräftiger Schlagzeug-Takt', icon: '🥁' },
-              { id: 'hiphop', label: 'Hip-Hop Pocket', desc: 'Lässiger Boom-Bap Takt', icon: '🎧' },
-              { id: 'singersongwriter', label: 'Liedermacher', desc: 'Akustik-Drum & Shaker', icon: '🎸' }
+              { id: 'metronome', label: 'Metronom Klick', desc: 'Klassischer Klick', icon: <Timer size={19} strokeWidth={2.2} /> },
+              { id: 'rock', label: 'Rock & Pop', desc: 'Kräftiger Schlagzeug-Takt', icon: <Drum size={19} strokeWidth={2.2} /> },
+              { id: 'hiphop', label: 'Hip-Hop Pocket', desc: 'Lässiger Boom-Bap Takt', icon: <Headphones size={19} strokeWidth={2.2} /> },
+              { id: 'singersongwriter', label: 'Liedermacher', desc: 'Akustik-Drum & Shaker', icon: <Guitar size={19} strokeWidth={2.2} /> }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -5345,7 +5154,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 >
                   <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{styleOpt.icon}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? '#0f172a' : '#b45309' }}>{styleOpt.icon}</span>
                       <span style={{ fontSize: '0.90rem', fontWeight: 950 }}>{styleOpt.label}</span>
                     </div>
                     {isSelected && (
@@ -5415,13 +5224,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               animation: 'fadeIn 0.15s ease'
             }}>
               {[
-                { id: 'swing', label: 'Jazz Swing', icon: '🎷', desc: 'Triolen-Swing' },
-                { id: 'latin', label: 'Latin Bossa', icon: '🪇', desc: 'Bossa-Nova' },
-                { id: 'funk', label: 'Funk Break', icon: '🕺', desc: 'Synkopiert' },
-                { id: 'reggae', label: 'Reggae One-Drop', icon: '🌴', desc: 'Offbeat' },
-                { id: 'walzer', label: 'Walzer (3/4)', icon: '💃', desc: 'Klassischer Takt' },
-                { id: 'ballad68', label: '6/8 Ballade', icon: '🌙', desc: 'Sanfter Beat' },
-                { id: 'disco', label: 'Disco (4-on-the-Floor)', icon: '🪩', desc: 'Tanz-Groove', spanFull: true }
+                { id: 'swing', label: 'Jazz Swing', icon: <Music2 size={16} strokeWidth={2.2} />, desc: 'Triolen-Swing' },
+                { id: 'latin', label: 'Latin Bossa', icon: <Activity size={16} strokeWidth={2.2} />, desc: 'Bossa-Nova' },
+                { id: 'funk', label: 'Funk Break', icon: <Zap size={16} strokeWidth={2.2} />, desc: 'Synkopiert' },
+                { id: 'reggae', label: 'Reggae One-Drop', icon: <Sliders size={16} strokeWidth={2.2} />, desc: 'Offbeat' },
+                { id: 'walzer', label: 'Walzer (3/4)', icon: <RotateCcw size={16} strokeWidth={2.2} />, desc: 'Klassischer Takt' },
+                { id: 'ballad68', label: '6/8 Ballade', icon: <Clock size={16} strokeWidth={2.2} />, desc: 'Sanfter Beat' },
+                { id: 'disco', label: 'Disco (4-on-the-Floor)', icon: <Sparkles size={16} strokeWidth={2.2} />, desc: 'Tanz-Groove', spanFull: true }
               ].map((styleOpt) => {
                 const isSelected = selectedStyle === styleOpt.id;
                 return (
@@ -5453,8 +5262,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       transition: 'all 0.12s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>{styleOpt.icon}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? '#0f172a' : '#64748b' }}>{styleOpt.icon}</span>
                       <span>{styleOpt.label}</span>
                     </div>
                     {isSelected && (
@@ -5572,7 +5381,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       <Volume2 size={14} color="#0f172a" />
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>Master-Lautstärke</span>
                       {volMaster > 100 && (
-                        <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#eab308', color: '#ffffff' }}>
+                        <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#eab308', color: '#0f172a' }}>
                           BOOST
                         </span>
                       )}
@@ -5703,238 +5512,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         </div>
       </div>
 
-      {/* 🎛️ Exact Loopstation Cubase 15 Pro Auto-Einmessung Modal */}
-      {isLoopstationCalibrating && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 99999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            padding: '32px 28px',
-            maxWidth: '380px',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            gap: '18px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
-          }}>
-            <div style={{
-              background: loopstationPhaseState === 'result' ? '#fefce8' : '#e0e7ff',
-              color: loopstationPhaseState === 'result' ? '#ca8a04' : '#4f46e5',
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: loopstationPhaseState === 'result' ? '0 6px 18px rgba(234, 179, 8, 0.25)' : '0 6px 18px rgba(79, 70, 229, 0.25)',
-              transition: 'all 0.3s ease'
-            }}>
-              {loopstationPhaseState === 'result' ? <CheckCircle2 size={28} /> : <Zap size={28} style={{ animation: 'pulse 1.5s infinite' }} />}
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{
-                fontSize: '0.62rem',
-                fontWeight: 900,
-                color: '#4f46e5',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase'
-              }}>
-                Cubase 15 Pro Auto-Einmessung (Loopstation Modus)
-              </div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
-                {loopstationPhaseState === 'ambient' && "1/3: Geräte-Lautstärke & Raumpegel einpegeln..."}
-                {loopstationPhaseState === 'clicks' && `2/3: Metronom-Töne Auto-Einmessung (${loopstationClickCount}/5)...`}
-                {loopstationPhaseState === 'result' && "Latenz Erfolgreich Ermittelt! 🎯 (Weiter zu Schritt 3)"}
-              </h3>
-              <p style={{ fontSize: '0.78rem', color: '#86868b', lineHeight: 1.4, margin: 0 }}>
-                {loopstationPhaseState === 'ambient' && "Messung der Hintergrundgeräusche deines Mikrofons. Bitte Lautstärke auf normale Übe-Lautstärke stellen."}
-                {loopstationPhaseState === 'clicks' && "Empfange akustische Metronom-Impulse über Lautsprecher/Mikrofon..."}
-                {loopstationPhaseState === 'result' && "Hardware-Latenz für Loopstation & Rhythmus-Coach exakt im System gespeichert."}
-              </p>
-            </div>
-
-            {loopstationPhaseState !== 'result' ? (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  background: '#f1f5f9',
-                  borderRadius: '4px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    height: '100%',
-                    width: loopstationPhaseState === 'ambient' ? '20%' : `${20 + (loopstationClickCount / 5) * 80}%`,
-                    background: 'linear-gradient(90deg, #eab308 0%, #4f46e5 100%)',
-                    borderRadius: '4px',
-                    transition: 'width 0.3s ease'
-                  }} />
-                </div>
-                {loopstationPhaseState === 'ambient' && (
-                  <div style={{
-                    width: '100%',
-                    background: '#0f172a',
-                    borderRadius: '14px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    marginTop: '4px'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800 }}>
-                      <span style={{ color: '#94a3b8' }}>Geräte-Lautstärke Pegel</span>
-                      <span style={{ color: '#ca8a04', background: 'rgba(234, 179, 8, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
-                        🎯 Ziel: Optimale Zone (35-75%)
-                      </span>
-                    </div>
-
-                    <div style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '16px',
-                      background: '#1e293b',
-                      borderRadius: '6px',
-                      overflow: 'hidden'
-                    }}>
-                      {/* Target Level Window (35% to 75%) */}
-                      <div style={{
-                        position: 'absolute',
-                        left: '35%',
-                        width: '40%',
-                        top: 0,
-                        bottom: 0,
-                        background: 'rgba(234, 179, 8, 0.25)',
-                        borderLeft: '1.5px dashed #eab308',
-                        borderRight: '1.5px dashed #eab308'
-                      }} />
-
-                      {/* Live VU Meter Level Bar */}
-                      <div style={{
-                        height: '100%',
-                        width: `${Math.min(100, loopstationMicLevel)}%`,
-                        background: loopstationMicLevel > 80 ? '#ef4444' : (loopstationMicLevel >= 30 ? '#eab308' : '#3b82f6'),
-                        borderRadius: '6px',
-                        transition: 'width 0.05s ease-out'
-                      }} />
-                    </div>
-                    <span style={{ fontSize: '0.60rem', color: '#94a3b8', textAlign: 'center', fontWeight: 700 }}>
-                      💡 Bitte stelle die Lautsprecher-Lautstärke deines Geräts so ein, dass der Pegel im optimalen Bereich liegt.
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '16px 20px',
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800 }}>ERMITTELTE HARDWARE-LATENZ</span>
-                <span style={{ fontSize: '1.8rem', color: '#ca8a04', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
-                  +{loopstationLatencyResult} ms
-                </span>
-                <span style={{ fontSize: '0.62rem', color: '#854d0e', background: '#fefce8', border: '1px solid #fde047', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
-                  🎯 100% Sample-Genau Kalibriert (DSP Matrix)
-                </span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '4px' }}>
-              {loopstationPhaseState === 'ambient' && (
-                <button
-                  type="button"
-                  onClick={() => proceedToStep2PingCalibration()}
-                  className="tactile-btn"
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                    color: '#0f172a',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '14px',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 6px 18px rgba(234, 179, 8, 0.3)'
-                  }}
-                >
-                  Lautstärke ist eingestellt ➔ Weiter zu Schritt 2 (Latenz Messen) 🚀
-                </button>
-              )}
-
-              {loopstationPhaseState === 'result' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsLoopstationCalibrating(false);
-                    runInstrumentToneCalibration();
-                  }}
-                  className="tactile-btn"
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                    color: '#0f172a',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '14px',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 6px 18px rgba(234, 179, 8, 0.3)'
-                  }}
-                >
-                  Latenz Übernehmen & Weiter zu Schritt 3 🚀
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (ambientToneTimerRef.current) clearInterval(ambientToneTimerRef.current);
-                  if (loopstationStreamRef.current) {
-                    loopstationStreamRef.current.getTracks().forEach(t => t.stop());
-                    loopstationStreamRef.current = null;
-                  }
-                  setIsLoopstationCalibrating(false);
-                }}
-                className="tactile-btn"
-                style={{
-                  width: '100%',
-                  background: '#f1f5f9',
-                  color: '#64748b',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '10px',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 🎙️ Instrument 3-Tone Einpegeln Modal */}
       {isInstrumentCalibrating && (

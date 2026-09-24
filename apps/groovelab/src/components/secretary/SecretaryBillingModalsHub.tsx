@@ -2225,7 +2225,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                           }
                           setShowCancelModal(false);
 
-                          // 2. Automatischer PDF-Kündigungsbeleg gem. § 312k Abs. 4 BGB
+                          // 2. Automatischer PDF-Kündigungsbeleg gem. BGB 312k Abs. 4
                           downloadCancellationReceiptPdf({
                             cancellationId: generatedId,
                             cancelledAt: new Date(),
@@ -2461,7 +2461,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
 
                     setShowModuleUpgradeModal(false);
 
-                    // 3. Generate and download PDF receipt gem. § 311/312i BGB
+                    // 3. Generate and download PDF receipt gem. BGB 311/312i
                     await downloadUpgradeConfirmationPdf({
                       upgradeId: genUpgradeId,
                       targetModule: upgradeTargetModule,

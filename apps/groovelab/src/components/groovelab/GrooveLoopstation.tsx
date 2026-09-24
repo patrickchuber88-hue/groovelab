@@ -321,7 +321,6 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [activeDeviceName, setActiveDeviceName] = useState<string>('Standard Audio');
   const [activeDeviceHash, setActiveDeviceHash] = useState<string>('default');
   const [isDeviceCalibrated, setIsDeviceCalibrated] = useState<boolean>(true);
-  const [showCalibrationPromptModal, setShowCalibrationPromptModal] = useState<boolean>(false);
 
   const getAudioDeviceFingerprint = async (): Promise<{ hash: string, name: string }> => {
     let deviceName = 'Audio-Gerät';
@@ -368,13 +367,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       }
     }
     const globalSaved = localStorage.getItem('groovelab_sync_offset_ms');
-    if (globalSaved !== null) {
-      setIsDeviceCalibrated(true);
-    } else {
-      setIsDeviceCalibrated(true);
-      // 🎯 Goldstandard: Standardmäßig unaufdringlicher Latenzausgleich aktiv; kein blockierendes Zwangs-Modal beim Start
-      setShowCalibrationPromptModal(false);
-    }
+    setIsDeviceCalibrated(true);
   };
 
   useEffect(() => {
@@ -402,32 +395,14 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   useEffect(() => {
     loopstationMetronomeVolumeRef.current = loopstationMetronomeVolume;
   }, [loopstationMetronomeVolume]);
-  const [isCalibratingLatency, setIsCalibratingLatency] = useState(false);
-  const [calibrationPhaseState, setCalibrationPhaseState] = useState<'idle' | 'ambient' | 'clicks' | 'result'>('idle');
-  const [calibrationClickCount, setCalibrationClickCount] = useState<number>(0);
-  const [calibrationMicLevel, setCalibrationMicLevel] = useState<number>(0);
-  const [calibrationRunIndex, setCalibrationRunIndex] = useState<number>(1);
-  const [calibrationRunResults, setCalibrationRunResults] = useState<number[]>([]);
   const [activeBeatPulse, setActiveBeatPulse] = useState<'downbeat' | 'upbeat' | null>(null);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [showCalibrationHelp, setShowCalibrationHelp] = useState(false);
-  const [autoLatencyResult, setAutoLatencyResult] = useState<number | null>(null);
   const [bounceBackupState, setBounceBackupState] = useState<{ tracks: Track[]; buffers: { [key: number]: AudioBuffer } } | null>(null);
   const [isBouncing, setIsBouncing] = useState(false);
   const [isPreviewingSound, setIsPreviewingSound] = useState(false);
   const previewTimeoutRef = useRef<any>(null);
   const metronomeBeatStepRef = useRef<number>(0);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showCalibrationPromptModal) setShowCalibrationPromptModal(false);
-        if (isCalibratingLatency) setIsCalibratingLatency(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCalibrationPromptModal, isCalibratingLatency]);
 
   const audioBufferToWav = (buffer: AudioBuffer): Blob => {
     const numChannels = buffer.numberOfChannels;
@@ -795,145 +770,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const runAutoCalibrationSequence = async () => {
-    // 🛡️ Lehrkräfte und didaktische Übungen im Aufgabenheft sind stets freigegeben (§ 73 UrhG / Art. 6 DSGVO)
-    if (!isTeacherSession && readOnly) {
-      const isStudentAudioDenied = student?.parent_allow_audio === false || 
-        ((student as any)?.parent_permissions?.allow_student_audio === false);
-      if (isStudentAudioDenied) {
-        alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil pausiert. Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
-        return;
-      }
-    }
-    setIsCalibratingLatency(true);
-    setCalibrationPhaseState('ambient');
-    setCalibrationClickCount(0);
-    setAutoLatencyResult(null);
-
-    try {
-      await initAudio();
-      const ctx = audioContextRef.current;
-      if (!ctx) throw new Error("AudioContext not ready");
-
-      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
-      await stabilizeAudioStream(stream, 300);
-      calibrationStreamRef.current = stream;
-
-      const micSource = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      micSource.connect(analyser);
-
-      const pcmData = new Float32Array(analyser.fftSize);
-
-      // Phase 1: Ambient noise floor measurement for 1.2 seconds
-      let ambientRmsSum = 0;
-      let ambientCount = 0;
-      const ambientCheckInterval = setInterval(() => {
-        analyser.getFloatTimeDomainData(pcmData);
-        let sumSq = 0;
-        for (let i = 0; i < pcmData.length; i++) {
-          sumSq += pcmData[i] * pcmData[i];
-        }
-        const rms = Math.sqrt(sumSq / pcmData.length);
-        ambientRmsSum += rms;
-        ambientCount++;
-        const levelPct = Math.min(100, Math.round(rms * 400));
-        setCalibrationMicLevel(levelPct);
-      }, 50);
-
-      await new Promise(r => setTimeout(r, 1200));
-      clearInterval(ambientCheckInterval);
-
-      const baselineNoiseFloor = ambientCount > 0 ? (ambientRmsSum / ambientCount) : 0.005;
-      const dynamicPeakThreshold = Math.max(0.008, baselineNoiseFloor * 1.5);
-
-      // Phase 2: Multi-Harmonic Chirp Impulse Pings (5 Pings with AudioContext Hardware Clock & Median Filtering)
-      setCalibrationPhaseState('clicks');
-      const pingDeltas: number[] = [];
-
-      for (let pingIdx = 1; pingIdx <= 5; pingIdx++) {
-        setCalibrationClickCount(pingIdx);
-
-        const pingAudioTime = ctx.currentTime + 0.04;
-        const pingWallStart = performance.now();
-
-        const freqs = [1000, 2200, 3400]; // Multi-harmonic chirp burst
-        freqs.forEach(f => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(f, pingAudioTime);
-          gain.gain.setValueAtTime(0.33, pingAudioTime);
-          gain.gain.setValueAtTime(0.33, pingAudioTime + 0.035);
-          gain.gain.exponentialRampToValueAtTime(0.0001, pingAudioTime + 0.045);
-
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-
-          osc.start(pingAudioTime);
-          osc.stop(pingAudioTime + 0.045);
-        });
-
-        // Capture mic peak window with high-precision performance.now() linked to AudioContext clock
-        let maxPeak = 0;
-        let peakWallTime = 0;
-
-        const sampleInterval = setInterval(() => {
-          analyser.getFloatTimeDomainData(pcmData);
-          const now = performance.now();
-          for (let i = 0; i < pcmData.length; i++) {
-            const absVal = Math.abs(pcmData[i]);
-            if (absVal > maxPeak) {
-              maxPeak = absVal;
-              peakWallTime = now;
-            }
-          }
-        }, 5);
-
-        await new Promise(r => setTimeout(r, 420));
-        clearInterval(sampleInterval);
-
-        if (maxPeak >= dynamicPeakThreshold && peakWallTime > pingWallStart) {
-          const delta = Math.round(peakWallTime - pingWallStart - 40);
-          if (delta > 20 && delta < 500) {
-            pingDeltas.push(delta);
-          }
-        }
-      }
-
-      // Stop mic stream
-      stream.getTracks().forEach(t => t.stop());
-      calibrationStreamRef.current = null;
-
-      // Compute final calibrated offset using Cubase Median Outlier Filter
-      let finalOffsetMs = 180;
-      if (pingDeltas.length > 0) {
-        const sorted = [...pingDeltas].sort((a, b) => a - b);
-        let trimmed = sorted;
-        if (sorted.length >= 4) {
-          trimmed = sorted.slice(1, sorted.length - 1);
-        }
-        const medianAvg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
-        finalOffsetMs = Math.round(medianAvg);
-      } else {
-        const driverOut = (ctx.outputLatency || 0.025) * 1000;
-        finalOffsetMs = Math.round(driverOut + 155);
-      }
-
-      setAutoLatencyResult(finalOffsetMs);
-      setSyncOffsetMs(finalOffsetMs);
-      updateLatencyInDb(finalOffsetMs);
-      setIsDeviceCalibrated(true);
-      setCalibrationPhaseState('result');
-
-    } catch (err) {
-      console.error("Auto calibration error:", err);
-      const fallbackOffset = 185;
-      setAutoLatencyResult(fallbackOffset);
-      setSyncOffsetMs(fallbackOffset);
-      updateLatencyInDb(fallbackOffset);
-      setIsDeviceCalibrated(true);
-      setCalibrationPhaseState('result');
+    // 🎯 SSOT: Latenz aus der zentralen UniversalLatencyEngine beziehen
+    const currentMs = UniversalLatencyEngine.getLatencyMs();
+    setSyncOffsetMs(currentMs);
+    setIsDeviceCalibrated(true);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('campus_open_audio_settings'));
     }
   };
 
@@ -5116,19 +4958,24 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
             {/* Prominent Latency Calibration Quick-Control Pill */}
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('campus_open_audio_settings'));
+                  }
+                }
+              }}
               onClick={() => {
-                const confirmReCalib = window.confirm("Automatische Cubase Latenz-Einmessung neu starten?");
-                if (!confirmReCalib) return;
-                isManualLatencyAdjustmentRef.current = false;
-                localStorage.removeItem('groovelab_latency_calibrated');
-                localStorage.removeItem('groovelab_sync_offset_ms');
-                setIsDeviceCalibrated(false);
-                runAutoCalibrationSequence();
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('campus_open_audio_settings'));
+                }
               }}
               style={{
                 flex: 1.2,
-                background: isDeviceCalibrated ? 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fef08a 100%)',
-                border: isDeviceCalibrated ? '1.5px solid #a7f3d0' : '1.5px solid #fde047',
+                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                border: '1.5px solid #a7f3d0',
                 borderRadius: '12px',
                 padding: '8px 12px',
                 cursor: 'pointer',
@@ -5137,23 +4984,24 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 justifyContent: 'space-between',
                 gap: '8px',
                 transition: 'all 0.25s ease',
-                boxShadow: isDeviceCalibrated ? '0 2px 8px rgba(52, 168, 83, 0.12)' : '0 2px 8px rgba(217, 119, 6, 0.12)'
+                boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)'
               }}
               className="hover-scale-mini tactile-btn"
-              title="Klicken, um automatische Cubase Latenz-Einmessung neu zu starten"
+              title="Klicken, um Audio- & Latenzeinstellungen zu öffnen"
+              aria-label={`Latenz-Ausgleich synchronisiert mit ${syncOffsetMs} Millisekunden`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={13} style={{ color: isDeviceCalibrated ? '#34a853' : '#d97706' }} />
+                <Zap size={13} style={{ color: '#34a853' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isDeviceCalibrated ? '#1b5e20' : '#b45309' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1b5e20' }}>
                     Latenz-Ausgleich
                   </span>
-                  <span style={{ fontSize: '0.50rem', color: isDeviceCalibrated ? '#2e7d32' : '#d97706', fontWeight: 700 }}>
-                    {isDeviceCalibrated ? '🎯 Kalibriert' : '⚡ Auto-Einmessen'}
+                  <span style={{ fontSize: '0.50rem', color: '#2e7d32', fontWeight: 700 }}>
+                    🎯 Synchronisiert
                   </span>
                 </div>
               </div>
-              <span style={{ fontSize: '0.64rem', color: isDeviceCalibrated ? '#34a853' : '#d97706', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
+              <span style={{ fontSize: '0.64rem', color: '#34a853', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
                 {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
               </span>
             </div>
@@ -5525,27 +5373,32 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '0.52rem', color: '#1d1d1f', fontWeight: 800, letterSpacing: '0.04em' }}>LATENZ-AUSGLEICH</span>
                       <span 
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new CustomEvent('campus_open_audio_settings'));
+                            }
+                          }
+                        }}
                         onClick={() => {
-                          const confirmReCalib = window.confirm("Automatische Cubase Latenz-Einmessung neu starten?");
-                          if (!confirmReCalib) return;
-                          isManualLatencyAdjustmentRef.current = false;
-                          localStorage.removeItem('groovelab_latency_calibrated');
-                          localStorage.removeItem('groovelab_sync_offset_ms');
-                          setIsDeviceCalibrated(false);
-                          runAutoCalibrationSequence();
+                          if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('campus_open_audio_settings'));
+                          }
                         }}
                         style={{
                           fontSize: '0.58rem',
                           fontWeight: 800,
                           padding: '4px 9px',
                           borderRadius: '6px',
-                          background: isDeviceCalibrated ? '#e6f4ea' : '#fef3c7',
-                          color: isDeviceCalibrated ? '#34a853' : '#d97706',
+                          background: '#e6f4ea',
+                          color: '#34a853',
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
-                          border: isDeviceCalibrated ? '1.5px solid #a7f3d0' : '1.5px solid #fef08a',
+                          border: '1.5px solid #a7f3d0',
                           boxShadow: '0 1.5px 4px rgba(0,0,0,0.03)',
                           transition: 'all 0.15s ease',
                           minHeight: '24px',
@@ -5553,9 +5406,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                           WebkitUserSelect: 'none'
                         }}
                         className="hover-scale-mini tactile-btn"
-                        title="Klicken, um automatische Latenz-Einmessung neu zu starten"
+                        title="Klicken, um Audio- & Latenzeinstellungen zu öffnen"
+                        aria-label="Latenz-Ausgleich synchronisiert. Klicken zum Einstellen."
                       >
-                        {isDeviceCalibrated ? '🎯 Kalibriert (Neu einmessen)' : '⚡ Auto-Einmessen'}
+                        🎯 Synchronisiert
                       </span>
                     </div>
                     <span style={{ fontSize: '0.58rem', color: '#334155', fontWeight: 800, fontFamily: 'SF Mono, monospace', background: '#ffffff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
@@ -6271,284 +6125,6 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       </div>
       )}
 
-        {showCalibrationPromptModal && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="calibration-prompt-modal-title"
-            style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.45)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px'
-          }}>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(40px)',
-              WebkitBackdropFilter: 'blur(40px)',
-              border: '1px solid rgba(255, 255, 255, 0.6)',
-              borderRadius: '24px',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.8)',
-              padding: '28px',
-              maxWidth: '420px',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              gap: '16px'
-            }}>
-              <div style={{
-                background: '#fef3c7',
-                color: '#d97706',
-                width: '52px',
-                height: '52px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 6px 16px rgba(217, 119, 6, 0.2)'
-              }}>
-                <Sliders size={26} />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <h3 id="calibration-prompt-modal-title" style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
-                  Audio-Kalibrierung erforderlich
-                </h3>
-                <p style={{ fontSize: '0.78rem', color: '#86868b', lineHeight: 1.4, margin: 0 }}>
-                  Für ein 100% sample-genaues Loop-Ergebnis müssen wir einmalig die Hardware-Latenz deines Mikrofons ({activeDeviceName}) messen.
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCalibrationPromptModal(false)}
-                  className="tactile-btn"
-                  style={{
-                    flex: 1,
-                    background: '#f5f5f7',
-                    color: '#86868b',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Abbrechen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCalibrationPromptModal(false);
-                    runAutoCalibrationSequence();
-                  }}
-                  className="tactile-btn"
-                  style={{
-                    flex: 1.5,
-                    background: '#34a853',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    fontSize: '0.76rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)'
-                  }}
-                >
-                  Jetzt kalibrieren 🎯
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isCalibratingLatency && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="calibration-running-title"
-            style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.55)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
-            zIndex: 110,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px'
-          }}>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.96)',
-              backdropFilter: 'blur(40px)',
-              WebkitBackdropFilter: 'blur(40px)',
-              border: '1px solid rgba(255, 255, 255, 0.8)',
-              borderRadius: '24px',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.9)',
-              padding: '28px',
-              maxWidth: '440px',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              gap: '18px'
-            }}>
-              <div style={{
-                background: calibrationPhaseState === 'result' ? '#e6f4ea' : '#e0e7ff',
-                color: calibrationPhaseState === 'result' ? '#34a853' : '#4f46e5',
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: calibrationPhaseState === 'result' ? '0 6px 18px rgba(52, 168, 83, 0.25)' : '0 6px 18px rgba(79, 70, 229, 0.25)',
-                transition: 'all 0.3s ease'
-              }}>
-                {calibrationPhaseState === 'result' ? <CheckCircle2 size={28} /> : <Zap size={28} className="animate-pulse" />}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{
-                  fontSize: '0.62rem',
-                  fontWeight: 900,
-                  color: '#4f46e5',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase'
-                }}>
-                  Cubase 15 Pro Auto-Einmessung
-                </div>
-                <h3 id="calibration-running-title" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
-                  {calibrationPhaseState === 'ambient' && "1/3: Umgebungs-Check..."}
-                  {calibrationPhaseState === 'clicks' && `2/3: Akustische Pings (${calibrationClickCount}/5)...`}
-                  {calibrationPhaseState === 'result' && "3/3: Einmessung Erfolgreich! 🎯"}
-                </h3>
-                <p style={{ fontSize: '0.78rem', color: '#86868b', lineHeight: 1.4, margin: 0 }}>
-                  {calibrationPhaseState === 'ambient' && `Messung der Hintergrundgeräusche deines Mikrofons (${activeDeviceName}). Bitte kurz leise sein.`}
-                  {calibrationPhaseState === 'clicks' && "Empfange akustische Impuls-Signale über Lautsprecher/Mikrofon..."}
-                  {calibrationPhaseState === 'result' && `Hardware-Latenz für ${activeDeviceName} exakt ermittelt & abgespeichert.`}
-                </p>
-              </div>
-
-              {/* Progress Bar & Visual Level Indicator */}
-              {calibrationPhaseState !== 'result' ? (
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-                  <div style={{
-                    width: '100%',
-                    height: '8px',
-                    background: '#f1f5f9',
-                    borderRadius: '4px',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      height: '100%',
-                      width: calibrationPhaseState === 'ambient' ? '20%' : `${20 + (calibrationClickCount / 5) * 80}%`,
-                      background: 'linear-gradient(90deg, #34a853 0%, #4f46e5 100%)',
-                      borderRadius: '4px',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                  {calibrationPhaseState === 'ambient' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
-                      <Volume2 size={14} /> Pegel: {calibrationMicLevel}%
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{
-                  background: '#f8fafc',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '16px',
-                  padding: '16px 20px',
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800 }}>ERMITTELTE HARDWARE-LATENZ</span>
-                  <span style={{ fontSize: '1.8rem', color: '#34a853', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
-                    +{autoLatencyResult || syncOffsetMs} ms
-                  </span>
-                  <span style={{ fontSize: '0.62rem', color: '#166534', background: '#d1fae5', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
-                    🎯 100% Sample-Genau Kalibriert (DSP Matrix)
-                  </span>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '4px' }}>
-                {calibrationPhaseState === 'result' ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsCalibratingLatency(false)}
-                    className="tactile-btn"
-                    style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '14px',
-                      padding: '14px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      boxShadow: '0 6px 18px rgba(52, 168, 83, 0.3)'
-                    }}
-                  >
-                    Einmessung Übernehmen & Fertig 🚀
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (calibrationStreamRef.current) {
-                        calibrationStreamRef.current.getTracks().forEach(t => t.stop());
-                        calibrationStreamRef.current = null;
-                      }
-                      setIsCalibratingLatency(false);
-                    }}
-                    className="tactile-btn"
-                    style={{
-                      width: '100%',
-                      background: '#f1f5f9',
-                      color: '#64748b',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '12px',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Einmessung Abbrechen
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
     </div>
   );
 };

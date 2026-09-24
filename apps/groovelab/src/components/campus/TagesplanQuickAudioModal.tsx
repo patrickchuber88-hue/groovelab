@@ -10,6 +10,7 @@ import { saveOfflineAudioRecord, removeOfflineAudioRecord } from '../../utils/of
 import { notifyOfflineListeners } from '../../services/offlineSyncService';
 import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../domain/stickersAndTresor';
 import { isUUID } from '../../utils/uuidValidator';
+import { useDictationInput } from '../../hooks/useVoiceToText';
 
 interface RecordedClip {
   id: string;
@@ -108,10 +109,31 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   );
   const maxRecordSeconds = isTresorActive ? 420 : 60;
 
-  // --- Dictation / Note State ---
-  const [isDictating, setIsDictating] = useState(false);
+  // --- Dictation / Note State & Canonical Engine ---
   const [dictatedText, setDictatedText] = useState('');
-  const recognitionRef = useRef<any>(null);
+  const stopDictationRef = useRef<(() => void) | null>(null);
+
+  const {
+    isListening: isDictating,
+    startListening: startDictationHook,
+    stopListening: stopDictationHook,
+  } = useDictationInput({
+    value: dictatedText,
+    onChange: setDictatedText,
+    onStart: () => stopHardware(false)
+  });
+
+  stopDictationRef.current = stopDictationHook;
+
+  const handleStartDictation = async () => {
+    const hasPermission = await requestMicrophonePermissionOnce();
+    if (!hasPermission) return;
+    startDictationHook();
+  };
+
+  const handleStopDictation = () => {
+    stopDictationHook();
+  };
 
   // --- Multi-Audio Recording State & Anti-Double Locks ---
   const [isRecording, setIsRecording] = useState(false);
@@ -467,7 +489,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     setAudioLevel(0);
   };
 
-  const stopHardware = () => {
+  const stopHardware = (includeDictation = true) => {
     isStartingRecordRef.current = false;
     isRecordingRef.current = false;
     hasStoppedCurrentRecordingRef.current = true;
@@ -499,15 +521,14 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     setActivePlayingClipId(null);
     setPlaybackProgress(0);
 
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-      recognitionRef.current = null;
-    }
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       try { audioCtxRef.current.close(); } catch {}
       audioCtxRef.current = null;
     }
-    setIsDictating(false);
+
+    if (includeDictation) {
+      stopDictationRef.current?.();
+    }
   };
 
   useEffect(() => {
@@ -524,53 +545,6 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   }, []);
 
   if (!isOpen || !student) return null;
-
-  // 1. DICTATION LOGIC
-  const handleStartDictation = async () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
-    const hasPermission = await requestMicrophonePermissionOnce();
-    if (!hasPermission) return;
-
-    try {
-      stopHardware();
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'de-DE';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      recognition.onresult = (event: any) => {
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) final += event.results[i][0].transcript;
-        }
-        if (final) {
-          setDictatedText(prev => capitalizeFirstLetter((prev + ' ' + final).trim()));
-        }
-      };
-
-      recognition.onerror = (err: any) => {
-        if (err?.error === 'not-allowed') {
-          localStorage.removeItem('campus_microphone_permission_granted');
-        }
-        setIsDictating(false);
-      };
-      recognition.onend = () => setIsDictating(false);
-
-      recognitionRef.current = recognition;
-      recognition.start();
-      setIsDictating(true);
-    } catch (err) {
-      setIsDictating(false);
-    }
-  };
-
-  const handleStopDictation = () => {
-    if (recognitionRef.current) try { recognitionRef.current.stop(); } catch {}
-    setIsDictating(false);
-  };
 
   const handleAppendPhrase = (phrase: string) => {
     setDictatedText(prev => {

@@ -31,6 +31,7 @@ export interface CampusDesktopSidebarProps {
   user: any;
   school: any;
   activePlatform: 'campus' | 'groovelab' | 'ensembles' | string;
+  setActivePlatform?: (platform: any) => void;
   activeStudentTab: string;
   setActiveStudentTab: (tab: string) => void;
   activeWorkspace?: string | null;
@@ -58,6 +59,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
   user,
   school,
   activePlatform,
+  setActivePlatform,
   activeStudentTab,
   setActiveStudentTab,
   activeWorkspace,
@@ -80,51 +82,195 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
   supabase,
   setParentPermissionsVersion
 }) => {
+  const isGrooveLabBooked = Boolean(
+    (school ? (school.has_groovelab_subscription || !school.is_billing_booked || school.subscription_bypass) : true) &&
+    (user?.is_groovelab_active || user?.role === 'admin' || user?.role === 'secretary')
+  );
+
   return (
     <aside className="sidebar-nav" style={{ display: windowWidth >= 1024 ? 'flex' : 'none' }}>
-      <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {activePlatform === 'campus' ? (
-          <>
-            <div style={{ 
-              width: '42px', 
-              height: '42px', 
-              background: 'rgba(52, 168, 83, 0.08)', 
-              borderRadius: '12px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)'
-            }}>
-              <GraduationCap size={24} color="#34a853" strokeWidth={3} />
-            </div>
-            <div style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: 900, 
-              color: '#34a853',
-              letterSpacing: '-0.02em'
-            }}>Campus</div>
-          </>
+      <div className="sidebar-logo" style={{ padding: '6px 0px 8px 0px', width: '100%' }}>
+        {isGrooveLabBooked && setActivePlatform ? (
+          <div
+            role="tablist"
+            aria-label="Plattformauswahl"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: '#f1f5f9',
+              padding: '3px',
+              borderRadius: '11px',
+              border: '1px solid #e2e8f0',
+              width: '100%',
+              height: '36px',
+              gap: '2px',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* Campus Segment */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePlatform === 'campus'}
+              onClick={() => {
+                if (activePlatform !== 'campus') {
+                  setActivePlatform('campus');
+                  const rawCampusTab = sessionStorage.getItem('campus_active_tab');
+                  const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
+                  setActiveStudentTab(startTab);
+                  sessionStorage.setItem('campus_active_tab', startTab);
+                }
+              }}
+              style={{
+                flex: 1,
+                height: '28px',
+                borderRadius: '8px',
+                border: 'none',
+                background: activePlatform === 'campus' ? '#34a853' : 'transparent',
+                color: activePlatform === 'campus' ? '#ffffff' : '#64748b',
+                fontWeight: activePlatform === 'campus' ? 800 : 650,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: activePlatform === 'campus' ? '0 2px 8px rgba(52, 168, 83, 0.32)' : 'none',
+                outline: 'none',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                letterSpacing: '-0.01em',
+                userSelect: 'none'
+              }}
+              className="hover-scale-mini"
+              title="Zu Campus Studio wechseln"
+            >
+              <GraduationCap 
+                size={14} 
+                color={activePlatform === 'campus' ? '#ffffff' : 'rgba(52, 168, 83, 0.70)'} 
+                strokeWidth={2.4} 
+              />
+              <span>Campus</span>
+              {activePlatform === 'campus' && (
+                <span style={{
+                  width: '4px',
+                  height: '4px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  boxShadow: '0 0 5px rgba(255, 255, 255, 0.9)',
+                  flexShrink: 0
+                }} />
+              )}
+            </button>
+
+            {/* GrooveLab Segment */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePlatform === 'groovelab'}
+              onClick={() => {
+                if (activePlatform !== 'groovelab') {
+                  if (user?.role === 'teacher') {
+                    sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                  }
+                  setActivePlatform('groovelab');
+                  const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+                  if (isStaff) {
+                    sessionStorage.setItem('groovelab_location_mode', 'lab');
+                  }
+                  setActiveStudentTab('live');
+                  sessionStorage.setItem('groovelab_active_tab', 'live');
+                  localStorage.setItem('groovelab_active_tab', 'live');
+                }
+              }}
+              style={{
+                flex: 1,
+                height: '28px',
+                borderRadius: '8px',
+                border: 'none',
+                background: activePlatform === 'groovelab' ? '#facc15' : 'transparent',
+                color: activePlatform === 'groovelab' ? '#0f172a' : '#64748b',
+                fontWeight: activePlatform === 'groovelab' ? 800 : 650,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: activePlatform === 'groovelab' ? '0 2px 8px rgba(234, 179, 8, 0.35)' : 'none',
+                outline: 'none',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                letterSpacing: '-0.01em',
+                userSelect: 'none'
+              }}
+              className="hover-scale-mini"
+              title="Zu GrooveLab Studio wechseln"
+            >
+              <Music 
+                size={13} 
+                color={activePlatform === 'groovelab' ? '#0f172a' : 'rgba(202, 138, 4, 0.75)'} 
+                strokeWidth={2.4} 
+              />
+              <span>GrooveLab</span>
+              {activePlatform === 'groovelab' && (
+                <span style={{
+                  width: '4px',
+                  height: '4px',
+                  borderRadius: '50%',
+                  background: '#0f172a',
+                  boxShadow: '0 0 5px rgba(15, 23, 42, 0.5)',
+                  flexShrink: 0
+                }} />
+              )}
+            </button>
+          </div>
         ) : (
-          <>
-            <div style={{ 
-              width: '42px', 
-              height: '42px', 
-              background: '#fefce8', 
-              borderRadius: '12px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.1)'
-            }}>
-              <Music size={24} color="#eab308" strokeWidth={3} />
-            </div>
-            <div style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: 900, 
-              color: '#eab308',
-              letterSpacing: '-0.02em'
-            }}>GrooveLab</div>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {activePlatform === 'campus' ? (
+              <>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  background: 'rgba(52, 168, 83, 0.08)', 
+                  borderRadius: '12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)'
+                }}>
+                  <GraduationCap size={24} color="#34a853" strokeWidth={3} />
+                </div>
+                <div style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: 900, 
+                  color: '#34a853',
+                  letterSpacing: '-0.02em'
+                }}>Campus</div>
+              </>
+            ) : (
+              <>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  background: '#fefce8', 
+                  borderRadius: '12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(234, 179, 8, 0.1)'
+                }}>
+                  <Music size={24} color="#eab308" strokeWidth={3} />
+                </div>
+                <div style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: 900, 
+                  color: '#eab308',
+                  letterSpacing: '-0.02em'
+                }}>GrooveLab</div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -286,18 +432,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                     {renderParentStatusPill('events')}
                   </button>
                 )}
-                {(parentUnlocked || (showLeaderboard && isBoardAllowedForChild('campus_cup'))) && (
-                  <button 
-                    type="button"
-                    onClick={() => setActiveStudentTab('campus_cup')} 
-                    className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}
-                    style={{ opacity: parentUnlocked && !isBoardAllowedForChild('campus_cup') ? 0.72 : 1 }}
-                    title="Highlights & Fortschritt"
-                  >
-                    <Trophy size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.82rem', letterSpacing: '-0.02em' }}>Highlights &amp; Fortschritt</span>
-                    {renderParentStatusPill('campus_cup')}
-                  </button>
-                )}
+
 
                 {(parentUnlocked || isBoardAllowedForChild('messages')) && (
                   <button 

@@ -1,19 +1,19 @@
 import React, { lazy, Suspense } from 'react';
 import { ShieldCheck, User } from 'lucide-react';
 import { ErrorBoundary, DashboardLoader } from '../ui/ErrorBoundary';
-import { CampusStaffProfileView } from '../campus/CampusStaffProfileView';
-import { GrooveLabProfileView } from '../groovelab/GrooveLabProfileView';
-import { MessagesTabContainer } from '../messages/MessagesTabContainer';
-import { StudentPracticeRepertoireTabs } from '../groovelab/StudentPracticeRepertoireTabs';
-import { StudentBandMatchingSuite } from '../groovelab/StudentBandMatchingSuite';
-import { StudentLibraryTab } from '../groovelab/StudentLibraryTab';
-import { StudentTeamTab } from '../groovelab/StudentTeamTab';
 import { generateRandomBandName } from '../../utils/bandNameGenerator';
 
 const EnsembleDashboard = lazy(() => import('../EnsembleDashboard').then(m => ({ default: m.EnsembleDashboard })));
 const TeacherDashboard = lazy(() => import('../TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
 const StudentAvatarDashboard = lazy(() => import('../StudentAvatarDashboard').then(m => ({ default: m.StudentAvatarDashboard })));
 const AdminDashboard = lazy(() => import('../AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const CampusStaffProfileView = lazy(() => import('../campus/CampusStaffProfileView').then(m => ({ default: m.CampusStaffProfileView })));
+const GrooveLabProfileView = lazy(() => import('../groovelab/GrooveLabProfileView').then(m => ({ default: m.GrooveLabProfileView })));
+const MessagesTabContainer = lazy(() => import('../messages/MessagesTabContainer').then(m => ({ default: m.MessagesTabContainer })));
+const StudentPracticeRepertoireTabs = lazy(() => import('../groovelab/StudentPracticeRepertoireTabs').then(m => ({ default: m.StudentPracticeRepertoireTabs })));
+const StudentBandMatchingSuite = lazy(() => import('../groovelab/StudentBandMatchingSuite').then(m => ({ default: m.StudentBandMatchingSuite })));
+const StudentLibraryTab = lazy(() => import('../groovelab/StudentLibraryTab').then(m => ({ default: m.StudentLibraryTab })));
+const StudentTeamTab = lazy(() => import('../groovelab/StudentTeamTab').then(m => ({ default: m.StudentTeamTab })));
 
 export interface CampusMainContentRouterProps {
   windowWidth: number;
@@ -254,7 +254,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       flexDirection: 'column', 
       padding: windowWidth <= 768 
         ? (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) 4px') 
-        : '10px',
+        : (['homework', 'homework_book'].includes(activeStudentTab) ? '12px 16px' : (user?.role?.toLowerCase() === 'student' ? '20px 24px 32px 24px' : '10px')),
       scrollPaddingTop: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))' : undefined,
       scrollPaddingBottom: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px)))' : undefined,
       boxSizing: 'border-box',
@@ -504,54 +504,56 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       {/* Profile Tab */}
       {activeStudentTab === 'profile' && !(user.role?.toLowerCase() === 'student' && activePlatform === 'campus') && (
         <ErrorBoundary>
-          {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') && activePlatform === 'campus' ? (
-            /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
-            <CampusStaffProfileView
-              user={user}
-              teachers={teachers}
-              campusTeacherStats={campusTeacherStats}
-              activeWorkspace={activeWorkspace}
-              activePlatform={activePlatform}
-              onShowQr={() => setShowQR(true)}
-              onOpenPrivacy={() => setShowPrivacy(true)}
-              onOpenAgb={() => setShowAgb(true)}
-              onOpenCancellation={() => setShowCancellation(true)}
-              onOpenImpressum={() => setShowImpressum(true)}
-              onOpenAccessibility={() => setShowAccessibility(true)}
-            />
-          ) : (
-            /* --- GROOVELAB PROFILE LOOK (ORIGINAL) --- */
-            <GrooveLabProfileView
-              user={user}
-              setUser={setUser}
-              teachers={teachers}
-              userSongs={userSongs}
-              userBands={userBands}
-              allBands={allBands}
-              brandColor={brandColor}
-              activePlatform={activePlatform}
-              supabase={supabase}
-              fetchPlanningData={fetchPlanningData}
-              onChangeAvatar={() => {
-                setAvatarPickerType('teacher');
-                setShowAvatarPicker(true);
-              }}
-              onShowQr={() => setShowQR(true)}
-              onOpenBandProfile={(band: any) => {
-                setSelectedBandForProfile(band);
-                setShowBandProfile(true);
-              }}
-              onOpenPrivacy={() => setShowPrivacy(true)}
-              onOpenAgb={() => setShowAgb(true)}
-              onOpenCancellation={() => setShowCancellation(true)}
-              onOpenImpressum={() => setShowImpressum(true)}
-              onOpenAccessibility={() => setShowAccessibility(true)}
-              globalPlannedSlots={globalPlannedSlots}
-              plannedSlots={plannedSlots}
-              toggleSlot={toggleSlot}
-              loggedInUserId={loggedInUserId}
-            />
-          )}
+          <Suspense fallback={<DashboardLoader />}>
+            {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') && activePlatform === 'campus' ? (
+              /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
+              <CampusStaffProfileView
+                user={user}
+                teachers={teachers}
+                campusTeacherStats={campusTeacherStats}
+                activeWorkspace={activeWorkspace}
+                activePlatform={activePlatform}
+                onShowQr={() => setShowQR(true)}
+                onOpenPrivacy={() => setShowPrivacy(true)}
+                onOpenAgb={() => setShowAgb(true)}
+                onOpenCancellation={() => setShowCancellation(true)}
+                onOpenImpressum={() => setShowImpressum(true)}
+                onOpenAccessibility={() => setShowAccessibility(true)}
+              />
+            ) : (
+              /* --- GROOVELAB PROFILE LOOK (ORIGINAL) --- */
+              <GrooveLabProfileView
+                user={user}
+                setUser={setUser}
+                teachers={teachers}
+                userSongs={userSongs}
+                userBands={userBands}
+                allBands={allBands}
+                brandColor={brandColor}
+                activePlatform={activePlatform}
+                supabase={supabase}
+                fetchPlanningData={fetchPlanningData}
+                onChangeAvatar={() => {
+                  setAvatarPickerType('teacher');
+                  setShowAvatarPicker(true);
+                }}
+                onShowQr={() => setShowQR(true)}
+                onOpenBandProfile={(band: any) => {
+                  setSelectedBandForProfile(band);
+                  setShowBandProfile(true);
+                }}
+                onOpenPrivacy={() => setShowPrivacy(true)}
+                onOpenAgb={() => setShowAgb(true)}
+                onOpenCancellation={() => setShowCancellation(true)}
+                onOpenImpressum={() => setShowImpressum(true)}
+                onOpenAccessibility={() => setShowAccessibility(true)}
+                globalPlannedSlots={globalPlannedSlots}
+                plannedSlots={plannedSlots}
+                toggleSlot={toggleSlot}
+                loggedInUserId={loggedInUserId}
+              />
+            )}
+          </Suspense>
         </ErrorBoundary>
       )}
 
@@ -595,127 +597,140 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           width: '100%',
           height: '100%'
         }}>
-          <MessagesTabContainer
-            user={user}
-            activePlatform={activePlatform}
-            schoolUsers={schoolUsers}
-            campusMessages={campusMessages}
-            announcements={announcements}
-            studentMessages={studentMessages}
-            selectedCampusRecipient={selectedCampusRecipient}
-            setSelectedCampusRecipient={setSelectedCampusRecipient}
-            onSendCampusMessage={handleSendCampusMessage}
-            onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
-            onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
-            onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
-            onPostAnnouncement={async (title: any, message: any, targetType: any, targetUserIds: any) => {
-              setAnnouncementTitle(title);
-              setAnnouncementMessage(message);
-              setAnnouncementTarget(targetType as any);
-              setSelectedTargetUserIds(targetUserIds);
-              await handlePostAnnouncement({ preventDefault: () => {} } as any);
-            }}
-            onDeleteAnnouncement={handleDeleteAnnouncement}
-            onAcknowledgeMessage={handleAcknowledgeStudentMessage}
-          />
+          <Suspense fallback={<DashboardLoader />}>
+            <MessagesTabContainer
+              user={user}
+              activePlatform={activePlatform}
+              schoolUsers={schoolUsers}
+              campusMessages={campusMessages}
+              announcements={announcements}
+              studentMessages={studentMessages}
+              selectedCampusRecipient={selectedCampusRecipient}
+              setSelectedCampusRecipient={setSelectedCampusRecipient}
+              onSendCampusMessage={handleSendCampusMessage}
+              onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
+              onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
+              onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
+              onPostAnnouncement={async (title: any, message: any, targetType: any, targetUserIds: any) => {
+                setAnnouncementTitle(title);
+                setAnnouncementMessage(message);
+                setAnnouncementTarget(targetType as any);
+                setSelectedTargetUserIds(targetUserIds);
+                await handlePostAnnouncement({ preventDefault: () => {} } as any);
+              }}
+              onDeleteAnnouncement={handleDeleteAnnouncement}
+              onAcknowledgeMessage={handleAcknowledgeStudentMessage}
+            />
+          </Suspense>
         </div>
       )}
 
       {/* Practice & Repertoire Tabs */}
       {user.role?.toLowerCase() === 'student' && ['practice', 'repertoire'].includes(activeStudentTab) && (
-        <StudentPracticeRepertoireTabs
-          activeStudentTab={activeStudentTab as 'practice' | 'repertoire'}
-          user={user}
-          userSongs={userSongs}
-          practiceSongs={practiceSongs}
-          groupedPracticeSongs={groupedPracticeSongs}
-          groupedRepertoireSongs={groupedRepertoireSongs}
-          userBands={userBands}
-          brandColor={brandColor}
-          practiceSearchQuery={practiceSearchQuery}
-          setPracticeSearchQuery={setPracticeSearchQuery}
-          practiceSearchType={practiceSearchType as any}
-          setPracticeSearchType={setPracticeSearchType}
-          practiceAlphaFilter={practiceAlphaFilter}
-          setPracticeAlphaFilter={setPracticeAlphaFilter}
-          expandedSongId={expandedSongId}
-          setExpandedSongId={setExpandedSongId}
-          updateProgress={updateProgress}
-          handleSubmitForApproval={handleSubmitForApproval}
-          handleDeleteSong={handleDeleteSong}
-          onOpenPdfViewer={(song: any, folderUrl: any) => {
-            setActivePdfSong(song);
-            setActivePdfFolderUrl(folderUrl);
-          }}
-          isMobile={isMobile}
-        />
+        <Suspense fallback={<DashboardLoader />}>
+          <StudentPracticeRepertoireTabs
+            activeStudentTab={activeStudentTab as 'practice' | 'repertoire'}
+            user={user}
+            userSongs={userSongs}
+            practiceSongs={practiceSongs}
+            groupedPracticeSongs={groupedPracticeSongs}
+            groupedRepertoireSongs={groupedRepertoireSongs}
+            userBands={userBands}
+            brandColor={brandColor}
+            practiceSearchQuery={practiceSearchQuery}
+            setPracticeSearchQuery={setPracticeSearchQuery}
+            practiceSearchType={practiceSearchType as any}
+            setPracticeSearchType={setPracticeSearchType}
+            practiceAlphaFilter={practiceAlphaFilter}
+            setPracticeAlphaFilter={setPracticeAlphaFilter}
+            expandedSongId={expandedSongId}
+            setExpandedSongId={setExpandedSongId}
+            updateProgress={updateProgress}
+            handleSubmitForApproval={handleSubmitForApproval}
+            handleDeleteSong={handleDeleteSong}
+            onOpenPdfViewer={(song: any, folderUrl: any) => {
+              setActivePdfSong(song);
+              setActivePdfFolderUrl(folderUrl);
+            }}
+            isMobile={isMobile}
+          />
+        </Suspense>
       )}
 
       {/* Band Matching & Bands Tabs (Students) */}
       {['matching', 'bands'].includes(activeStudentTab) && user.role?.toLowerCase() === 'student' && (
-        <StudentBandMatchingSuite
-          activeStudentTab={activeStudentTab as 'matching' | 'bands'}
-          user={user}
-          brandColor={brandColor}
-          wallSongs={wallSongs}
-          userSongs={userSongs}
-          userBands={userBands}
-          allBands={allBands}
-          matchingLevelFilter={matchingLevelFilter}
-          setMatchingLevelFilter={setMatchingLevelFilter}
-          activeBandSubTab={activeBandSubTab}
-          setActiveBandSubTab={setActiveBandSubTab}
-          bandSearchText={bandSearchText}
-          setBandSearchText={setBandSearchText}
-          bandSearchLetter={bandSearchLetter || ''}
-          setBandSearchLetter={setBandSearchLetter}
-          onOpenBandProfile={(band: any) => {
-            setSelectedBandForProfile(band);
-            setShowBandProfile(true);
-          }}
-          onPreviewStudent={(student: any) => {
-            setSelectedStudentForPreview(student);
-          }}
-          onFoundBandFromSlot={(mySlot: any, song: any, form: any) => {
-            console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
-            setSuggestingSkill({
-              ...mySlot,
-              isLeader: true,
-              leaderName: 'Du',
-              song_id: song.song_id,
-              songs: { id: song.song_id, title: song.title },
-              formation_group: form.id,
-              members: form.members
-            });
-            if (!foundingName) setFoundingName(generateRandomBandName(foundingLanguage));
-          }}
-          onRefreshDashboard={(userId: any) => fetchDashboardData(userId)}
-          isMobile={isMobile}
-          width={width}
-        />
+        <Suspense fallback={<DashboardLoader />}>
+          <StudentBandMatchingSuite
+            activeStudentTab={activeStudentTab as 'matching' | 'bands'}
+            user={user}
+            brandColor={brandColor}
+            wallSongs={wallSongs}
+            userSongs={userSongs}
+            userBands={userBands}
+            allBands={allBands}
+            matchingLevelFilter={matchingLevelFilter}
+            setMatchingLevelFilter={setMatchingLevelFilter}
+            activeBandSubTab={activeBandSubTab}
+            setActiveBandSubTab={setActiveBandSubTab}
+            bandSearchText={bandSearchText}
+            setBandSearchText={setBandSearchText}
+            bandSearchLetter={bandSearchLetter || ''}
+            setBandSearchLetter={setBandSearchLetter}
+            onOpenBandProfile={(band: any) => {
+              setSelectedBandForProfile(band);
+              setShowBandProfile(true);
+            }}
+            onPreviewStudent={(student: any) => {
+              setSelectedStudentForPreview(student);
+            }}
+            onFoundBandFromSlot={(mySlot: any, song: any, form: any) => {
+              console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
+              setSuggestingSkill({
+                ...mySlot,
+                isLeader: true,
+                leaderName: 'Du',
+                song_id: song.song_id,
+                title: song.title,
+                artist: song.artist,
+                instrumentation: song.instrumentation,
+                songs: { id: song.song_id, title: song.title, instrumentation: song.instrumentation },
+                formation_group: form.id,
+                members: form.members
+              });
+              if (!foundingName) setFoundingName(generateRandomBandName(foundingLanguage));
+            }}
+            onRefreshDashboard={(userId: any) => fetchDashboardData(userId)}
+            isMobile={isMobile}
+            width={width}
+          />
+        </Suspense>
       )}
 
       {user.role?.toLowerCase() === 'student' && activeStudentTab === 'library' && (
-        <StudentLibraryTab
-          globalSongs={globalSongs}
-          userSongs={userSongs}
-          brandColor={brandColor}
-          onAddSongToRepertoire={handleAddSongToRepertoire}
-          isMobile={isMobile}
-        />
+        <Suspense fallback={<DashboardLoader />}>
+          <StudentLibraryTab
+            globalSongs={globalSongs}
+            userSongs={userSongs}
+            brandColor={brandColor}
+            onAddSongToRepertoire={handleAddSongToRepertoire}
+            isMobile={isMobile}
+          />
+        </Suspense>
       )}
 
       {/* Team Tab */}
       {user.role?.toLowerCase() === 'student' && activeStudentTab === 'team' && (
-        <StudentTeamTab
-          teachers={activePlatform === 'groovelab'
-            ? teachers.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
-            : teachers.filter((t: any) => t.is_campus_active !== false && t.isCampusActive !== false)
-          }
-          brandColor={brandColor}
-          onSelectTeacher={(t: any) => setSelectedTeacher(t)}
-          isMobile={isMobile}
-        />
+        <Suspense fallback={<DashboardLoader />}>
+          <StudentTeamTab
+            teachers={activePlatform === 'groovelab'
+              ? teachers.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
+              : teachers.filter((t: any) => t.is_campus_active !== false && t.isCampusActive !== false)
+            }
+            brandColor={brandColor}
+            onSelectTeacher={(t: any) => setSelectedTeacher(t)}
+            isMobile={isMobile}
+          />
+        </Suspense>
       )}
     </main>
   );

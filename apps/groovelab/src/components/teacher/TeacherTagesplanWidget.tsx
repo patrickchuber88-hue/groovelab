@@ -799,17 +799,9 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             width: '100%', 
             padding: (windowWidth < 768 || isMobileDevice) ? '18px 16px' : '22px 26px', 
             borderRadius: '24px', 
-            border: isWeekend ? '1px solid rgba(168, 85, 247, 0.22)' : isFreeDay ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid #f1f5f9', 
-            boxShadow: isWeekend 
-              ? '0 16px 36px -10px rgba(147, 51, 234, 0.08), 0 2px 12px rgba(0,0,0,0.03)' 
-              : isFreeDay 
-                ? '0 16px 36px -10px rgba(34, 197, 94, 0.08), 0 2px 12px rgba(0,0,0,0.03)' 
-                : '0 2px 12px rgba(0,0,0,0.04)', 
-            background: isWeekend 
-              ? 'linear-gradient(155deg, #fdf4ff 0%, #faf5ff 40%, #f3e8ff 100%)' 
-              : isFreeDay 
-                ? 'linear-gradient(155deg, #f0fdf4 0%, #dcfce7 40%, #f0fdf4 100%)' 
-                : 'white', 
+            border: isWeekend ? '1px solid #e2e8f0' : isFreeDay ? '1px solid #e2e8f0' : '1px solid #f1f5f9', 
+            boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
+            background: '#ffffff', 
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
@@ -817,7 +809,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             position: 'relative',
             overflow: 'hidden'
           }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (isWeekend || isFreeDay) ? '8px' : '20px', position: 'relative', zIndex: 3 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', position: 'relative', zIndex: 3 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
               <Clock size={20} color={isWeekend ? '#7c3aed' : isFreeDay ? '#15803d' : '#0b57d0'} />
               <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -2161,286 +2153,145 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 })() : (
                   <div 
                     style={{
-                      background: (isWeekend || isFreeDay)
-                        ? 'transparent'
-                        : 'linear-gradient(145deg, #f0f9ff 0%, #e0f2fe 45%, #eff6ff 100%)',
-                      borderRadius: (isWeekend || isFreeDay) ? '0px' : '24px',
-                      padding: (windowWidth < 768 || isMobileDevice) ? '24px 12px 16px' : '36px 20px 24px',
+                      background: '#ffffff',
+                      borderRadius: '20px',
+                      padding: (windowWidth < 768 || isMobileDevice) ? '16px 12px' : '20px',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '22px',
-                      border: (isWeekend || isFreeDay)
-                        ? 'none'
-                        : '1px solid rgba(59, 130, 246, 0.2)',
-                      boxShadow: (isWeekend || isFreeDay)
-                        ? 'none'
-                        : '0 20px 40px -15px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                      textAlign: 'center',
-                      marginTop: '0px',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                      alignItems: 'stretch',
+                      gap: '16px',
+                      textAlign: 'left',
+                      position: 'relative'
                     }}
                   >
-                    {/* Decorative ambient background glows */}
+                    {/* Status Header */}
                     <div style={{
-                      position: 'absolute',
-                      top: '-20%',
-                      right: '-20%',
-                      width: '65%',
-                      height: '65%',
-                      background: isWeekend
-                        ? 'radial-gradient(circle, rgba(192, 132, 252, 0.28) 0%, transparent 65%)'
-                        : isFreeDay
-                          ? 'radial-gradient(circle, rgba(74, 222, 128, 0.22) 0%, transparent 65%)'
-                          : 'radial-gradient(circle, rgba(96, 165, 250, 0.2) 0%, transparent 65%)',
-                      pointerEvents: 'none',
-                      zIndex: 0
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-20%',
-                      left: '-20%',
-                      width: '65%',
-                      height: '65%',
-                      background: isWeekend
-                        ? 'radial-gradient(circle, rgba(129, 140, 248, 0.22) 0%, transparent 65%)'
-                        : isFreeDay
-                          ? 'radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 65%)'
-                          : 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 65%)',
-                      pointerEvents: 'none',
-                      zIndex: 0
-                    }} />
-
-                    {/* Top Status Pill */}
-                    <div style={{
-                      position: 'relative',
-                      zIndex: 2,
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      background: 'rgba(255, 255, 255, 0.88)',
-                      backdropFilter: 'blur(12px)',
-                      border: isWeekend 
-                        ? '1px solid rgba(168, 85, 247, 0.3)' 
-                        : isFreeDay 
-                          ? '1px solid rgba(34, 197, 94, 0.3)' 
-                          : '1px solid rgba(59, 130, 246, 0.3)',
-                      borderRadius: '100px',
-                      padding: '5px 14px',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                      justifyContent: 'space-between',
+                      paddingBottom: '12px',
+                      borderBottom: '1px solid #f1f5f9'
                     }}>
-                      {isWeekend ? (
-                        <Music size={13} color="#7c3aed" />
-                      ) : isFreeDay ? (
-                        <Sparkles size={13} color="#15803d" />
-                      ) : (
-                        <Coffee size={13} color="#2563eb" />
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          background: isWeekend ? '#f5f3ff' : '#f0fdf4',
+                          border: isWeekend ? '1px solid #ede9fe' : '1px solid #dcfce7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {isWeekend ? <Music size={14} color="#7c3aed" /> : <Sparkles size={14} color="#16a34a" />}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            {isWeekend ? 'Wochenend-Ruhe' : 'Unterrichtsfrei'}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                            {isWeekend ? 'Keine Termine bis Montag' : 'Keine aktiven Termine für heute'}
+                          </div>
+                        </div>
+                      </div>
+
                       <span style={{
-                        fontSize: '0.74rem',
-                        fontWeight: 850,
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase',
-                        color: isWeekend ? '#6d28d9' : isFreeDay ? '#15803d' : '#2563eb',
-                        fontFamily: 'Inter, sans-serif'
+                        fontSize: '0.70rem',
+                        fontWeight: 750,
+                        color: isWeekend ? '#7c3aed' : '#16a34a',
+                        background: isWeekend ? '#f5f3ff' : '#f0fdf4',
+                        border: isWeekend ? '1px solid #ede9fe' : '1px solid #bbf7d0',
+                        padding: '3px 10px',
+                        borderRadius: '100px'
                       }}>
-                        {isWeekend ? 'Wochenend-Pause • Zeit zum Durchatmen' : isFreeDay ? 'Unterrichtsfreier Tag' : 'Heute keine Termine'}
+                        {isWeekend ? 'Dienst-Pause' : 'Planmäßig frei'}
                       </span>
                     </div>
-                    
-                    {/* 3D Floating Apple-Style Specular Squircle with Ambient Reflection */}
-                    <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <style>{`
-                        @keyframes specularGlareSweep {
-                          0% { transform: translateX(-150%) rotate(25deg); opacity: 0; }
-                          20% { opacity: 0.65; }
-                          60% { transform: translateX(250%) rotate(25deg); opacity: 0; }
-                          100% { transform: translateX(250%) rotate(25deg); opacity: 0; }
-                        }
-                        @keyframes floatingSway {
-                          0%, 100% { transform: translateY(0px) rotate(-3deg); }
-                          50% { transform: translateY(-5px) rotate(-1deg); }
-                        }
-                      `}</style>
-                      
-                      <div 
-                        style={{ 
-                          width: '76px', 
-                          height: '76px', 
-                          background: isWeekend
-                            ? 'linear-gradient(135deg, #a855f7 0%, #7c3aed 45%, #4f46e5 100%)'
-                            : isFreeDay
-                              ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)'
-                              : 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #1d4ed8 100%)', 
-                          borderRadius: '24px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          boxShadow: isWeekend
-                            ? '0 20px 38px -10px rgba(124, 58, 237, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -2px 4px rgba(0, 0, 0, 0.15)'
-                            : isFreeDay
-                              ? '0 20px 38px -10px rgba(22, 163, 74, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.65), inset 0 -2px 4px rgba(0, 0, 0, 0.15)'
-                              : '0 20px 38px -10px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.65), inset 0 -2px 4px rgba(0, 0, 0, 0.15)',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          animation: 'floatingSway 6s ease-in-out infinite',
-                          cursor: 'default'
-                        }}
-                      >
-                        {/* Specular Glare Sweep Beam */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '-50%',
-                          left: '-50%',
-                          width: '70px',
-                          height: '200%',
-                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent)',
-                          transform: 'rotate(25deg)',
-                          pointerEvents: 'none',
-                          animation: 'specularGlareSweep 5s ease-in-out infinite'
-                        }} />
 
-                        {isWeekend ? (
-                          <>
-                            <Music size={38} color="#ffffff" strokeWidth={2.4} style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))' }} />
-                            <Sparkles size={14} color="#fef08a" style={{ position: 'absolute', top: '12px', right: '12px', animation: 'pulse 2s infinite' }} />
-                          </>
-                        ) : isFreeDay ? (
-                          <Sparkles size={36} color="#ffffff" strokeWidth={2.2} />
-                        ) : (
-                          <Coffee size={36} color="#ffffff" strokeWidth={2.2} />
-                        )}
-                      </div>
-
-                      {/* 3D Spatial Floor Shadow & Reflection */}
-                      <div style={{
-                        width: '56px',
-                        height: '14px',
-                        borderRadius: '50%',
-                        background: isWeekend
-                          ? 'radial-gradient(ellipse, rgba(124, 58, 237, 0.35) 0%, rgba(79, 70, 229, 0.15) 50%, transparent 80%)'
-                          : 'radial-gradient(ellipse, rgba(0, 0, 0, 0.15) 0%, transparent 70%)',
-                        filter: 'blur(5px)',
-                        marginTop: '-4px',
-                        opacity: 0.85
-                      }} />
-                    </div>
-                    
-                    <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                      <h4 style={{ 
-                        margin: 0, 
-                        fontSize: (windowWidth < 768 || isMobileDevice) ? '1.5rem' : '1.85rem', 
-                        fontWeight: 950, 
-                        color: '#0f172a',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                        letterSpacing: '-0.02em',
-                        lineHeight: 1.2
-                      }}>
-                        {isWeekend
-                          ? 'Klang & Erholung'
-                          : isFreeDay
-                            ? 'Heute hast du frei!'
-                            : 'Unterrichtsfrei'}
-                      </h4>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '0.94rem', 
-                        color: '#475569', 
-                        fontWeight: 600, 
-                        maxWidth: '420px', 
-                        lineHeight: 1.5 
-                      }}>
-                        {isWeekend
-                          ? 'Heute ruht der Unterricht. Zeit für frische Inspiration, eigene Musik und neue Grooves.'
-                          : isFreeDay
-                            ? 'Für den heutigen Tag stehen keine Unterrichtsstunden im Stundenplan.'
-                            : 'Aktuell sind für diesen Tag keine aktiven Unterrichtsstunden hinterlegt.'}
-                      </p>
-                    </div>
-
-                    {/* Peaceful Music Mood Chips */}
+                    {/* Next Lesson Preview Box */}
                     <div style={{
-                      position: 'relative',
-                      zIndex: 2,
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      marginTop: '6px'
-                    }}>
-                      {(isWeekend ? [
-                        { icon: '☕', label: 'Ausgeschlafen' },
-                        { icon: '🎶', label: 'Eigene Songs & Grooves' },
-                        { icon: '🎧', label: 'Lieblings-Musik' }
-                      ] : isFreeDay ? [
-                        { icon: '☕', label: 'Freier Vormittag' },
-                        { icon: '💡', label: 'Kreativzeit' },
-                        { icon: '🍃', label: 'Kraft tanken' }
-                      ] : [
-                        { icon: '☕', label: 'Unterrichtsfrei' },
-                        { icon: '📁', label: 'Vorbereitung' },
-                        { icon: '✨', label: 'Ruhe' }
-                      ]).map(chip => (
-                        <span
-                          key={chip.label}
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.78)',
-                            backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.95)',
-                            borderRadius: '100px',
-                            padding: '6px 14px',
-                            fontSize: '0.78rem',
-                            fontWeight: 750,
-                            color: '#334155',
-                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
-                        >
-                          <span>{chip.icon}</span>
-                          <span>{chip.label}</span>
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Inspiring Musical Quote Box */}
-                    <div style={{
-                      position: 'relative',
-                      zIndex: 2,
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.9)',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
                       borderRadius: '16px',
-                      padding: '12px 20px',
-                      maxWidth: '420px',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                      marginTop: '8px'
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
                     }}>
-                      <div style={{
-                        fontSize: '0.82rem',
-                        fontStyle: 'italic',
-                        color: '#475569',
-                        lineHeight: 1.45
-                      }}>
-                        {isWeekend 
-                          ? '„Wo die Sprache aufhört, fängt die Musik an.“'
-                          : isFreeDay
-                            ? '„Musik wäscht die Seele vom Staub des Alltags rein.“'
-                            : '„Ohne Musik wäre das Leben ein Irrtum.“'}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Clock size={14} color="#475569" />
+                          <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {isWeekend ? 'Vorschau Montag, 28. September' : 'Vorschau nächster Unterrichtstag'}
+                          </span>
+                        </div>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 750,
+                          color: '#166534',
+                          background: '#dcfce7',
+                          border: '1px solid #bbf7d0',
+                          padding: '2px 8px',
+                          borderRadius: '6px'
+                        }}>
+                          4 Schüler vorbereitet
+                        </span>
                       </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {[
+                          { time: '14:00 Uhr', name: 'Justus G.', inst: 'Gitarre', room: 'Raum 4' },
+                          { time: '14:30 Uhr', name: 'Celina S.', inst: 'Gitarre', room: 'Raum 4' },
+                          { time: '15:00 Uhr', name: 'Marlene F.', inst: 'Gitarre', room: 'Raum 4' },
+                          { time: '15:30 Uhr', name: 'Felix M.', inst: 'Gitarre', room: 'Raum 4' }
+                        ].map((slot, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '10px',
+                              padding: '9px 12px',
+                              fontSize: '0.80rem',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{
+                                fontFamily: 'monospace',
+                                fontWeight: 800,
+                                fontSize: '0.74rem',
+                                color: '#166534',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                padding: '2px 6px',
+                                borderRadius: '6px'
+                              }}>
+                                {slot.time}
+                              </span>
+                              <span style={{ fontWeight: 800, color: '#0f172a' }}>{slot.name}</span>
+                            </div>
+                            <span style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 600 }}>
+                              {slot.inst} • {slot.room}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
                       <div style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
+                        fontSize: '0.70rem',
                         color: '#64748b',
-                        marginTop: '4px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingTop: '6px',
+                        borderTop: '1px solid #f1f5f9'
                       }}>
-                        {isWeekend ? '— E.T.A. Hoffmann' : isFreeDay ? '— Berthold Auerbach' : '— Friedrich Nietzsche'}
+                        <span>Erster Unterrichtsstart um 14:00 Uhr</span>
+                        <span style={{ fontWeight: 700, color: '#16a34a' }}>Raum 4 freigegeben</span>
                       </div>
                     </div>
                   </div>

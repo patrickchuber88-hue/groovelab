@@ -1748,6 +1748,115 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
             );
           }
 
+          if (isFreeDay) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.1) 100%)', 
+                    color: '#16a34a', 
+                    width: '38px', 
+                    height: '38px', 
+                    borderRadius: '12px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)'
+                  }}>
+                    <Check size={18} color="#16a34a" />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                      Tages-Kompass
+                    </h4>
+                    <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
+                      Schreibtisch frei • Vorbereitung &amp; Notizen
+                    </div>
+                  </div>
+                </div>
+
+                {/* Harmonized Zen Surface Card */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '20px',
+                  padding: '20px',
+                  color: '#1e293b',
+                  boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                      Keine anstehenden Aufgaben oder offene Schüleranfragen
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>
+                      Dienst-Ruhe aktiv bis zum nächsten planmäßigen Unterricht
+                    </span>
+                  </div>
+
+                  {/* Quick Action Links & Sync Badge */}
+                  <div style={{
+                    borderTop: '1px solid #f1f5f9',
+                    paddingTop: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    flexWrap: 'wrap'
+                  }}>
+                    {onOpenStudio ? (
+                      <button
+                        type="button"
+                        onClick={onOpenStudio}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '7px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 750,
+                          color: '#334155',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Music size={13} color="#64748b" />
+                        <span>GrooveLab Studio</span>
+                      </button>
+                    ) : <div />}
+
+                    <div style={{
+                      fontSize: '0.70rem',
+                      color: '#166534',
+                      fontWeight: 750,
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      padding: '4px 10px',
+                      borderRadius: '100px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <Check size={11} color="#16a34a" />
+                      <span>Alle Systeme synchron</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1766,29 +1875,23 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                 </div>
                 <div>
                   <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
-                    {isFreeDay ? 'Freier Tag' : 'Feierabend'}
+                    Feierabend
                   </h4>
                   <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
-                    {isFreeDay ? 'Ruhe & Inspiration' : 'Entspannung & Inspiration'}
+                    Entspannung &amp; Inspiration
                   </div>
                 </div>
               </div>
 
               {/* Premium Feierabend Wishing Card */}
               <div style={{
-                background: isFreeDay
-                  ? 'linear-gradient(135deg, rgba(240, 253, 244, 0.85) 0%, rgba(220, 252, 231, 0.4) 100%)'
-                  : 'linear-gradient(135deg, rgba(254, 243, 199, 0.2) 0%, rgba(253, 230, 138, 0.05) 100%)',
-                border: isFreeDay
-                  ? '1px solid rgba(34, 197, 94, 0.25)'
-                  : '1px solid rgba(245, 158, 11, 0.25)',
+                background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.2) 0%, rgba(253, 230, 138, 0.05) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
                 borderRadius: '20px',
                 padding: '24px 20px',
-                color: isFreeDay ? '#166534' : '#78350f',
+                color: '#78350f',
                 textAlign: 'center',
-                boxShadow: isFreeDay
-                  ? '0 10px 25px -5px rgba(34, 197, 94, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
-                  : '0 10px 25px -5px rgba(245, 158, 11, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+                boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                 position: 'relative',
                 overflow: 'hidden'
               }}>
@@ -1799,9 +1902,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                   left: '-50%',
                   width: '200%',
                   height: '200%',
-                  background: isFreeDay
-                    ? 'radial-gradient(circle, rgba(74, 222, 128, 0.18) 0%, transparent 60%)'
-                    : 'radial-gradient(circle, rgba(253, 224, 71, 0.15) 0%, transparent 60%)',
+                  background: 'radial-gradient(circle, rgba(253, 224, 71, 0.15) 0%, transparent 60%)',
                   pointerEvents: 'none',
                   zIndex: 0
                 }} />
@@ -1815,13 +1916,13 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
-                    color: isFreeDay ? '#15803d' : '#d97706',
+                    color: '#d97706',
                     fontFamily: "'Plus Jakarta Sans', sans-serif"
                   }}>
-                    <Sparkles size={20} color={isFreeDay ? '#15803d' : '#d97706'} />
-                    <span>{isFreeDay ? 'Genieße deinen freien Tag!' : 'Schönen Feierabend!'}</span>
+                    <Sparkles size={20} color="#d97706" />
+                    <span>Schönen Feierabend!</span>
                   </div>
-                  <div style={{ fontSize: '0.86rem', fontWeight: 600, color: isFreeDay ? '#166534' : '#4b5563', lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#4b5563', lineHeight: '1.5' }}>
                     {dailyWish}
                   </div>
                 </div>

@@ -122,7 +122,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
               letterSpacing: '0.05em',
               fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
             }}>
-              Deine Meisterwerke
+              Meine Meisterwerke
             </span>
           </div>
 

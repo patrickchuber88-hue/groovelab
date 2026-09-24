@@ -8750,7 +8750,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                       setEditingBreak(null);
                     }}
                     style={{
-                      flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#ffffff',
+                      flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#0f172a',
                       border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(234,179,8,0.3)'
                     }}
                   >

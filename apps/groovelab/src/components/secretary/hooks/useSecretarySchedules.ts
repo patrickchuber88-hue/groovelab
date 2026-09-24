@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { logApplicationAudit } from '../../../services/auditLogService';
+import { parseTime } from '../../../domain/schedule/scheduleBoardTypes';
 
 export interface PendingSchedule {
   id: string;
@@ -813,6 +814,160 @@ export function useSecretarySchedules({
             }
           }
         }
+      }
+
+      // 🛡️ 1. Automatic Room Bookings Synchronization (Enterprise Closed-Loop Lifecycle)
+      try {
+        const bookingsToInsert: any[] = [];
+        const processedBookingKeys = new Set<string>();
+        const targetTeacherIds = Array.from(new Set(plansToProcess.map(p => p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '').filter(Boolean)));
+
+        if (targetTeacherIds.length > 0) {
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+
+          await supabase
+            .from('room_bookings')
+            .delete()
+            .eq('school_id', schoolId)
+            .in('booked_by', targetTeacherIds)
+            .gte('date', todayStr);
+
+          plansToProcess.forEach(plan => {
+            const targetRoomId = isValidUuid(plan.roomId) ? plan.roomId : null;
+            if (!targetRoomId || !plan.teacherId) return;
+            const cleanTId = plan.teacherId.replace(/^teacher-/i, '');
+
+            (plan.slots || []).forEach((slot: any) => {
+              if (slot.isBreak) return;
+              const rawTime = slot.time_slot || slot.startTime || '14:00';
+              const [sh, sm] = parseTime(rawTime);
+              const startMins = sh * 60 + sm;
+              const duration = slot.duration ? (parseInt(String(slot.duration), 10) || 30) : 30;
+              const endMins = startMins + duration;
+              const eh = Math.floor(endMins / 60);
+              const em = endMins % 60;
+              const startTimeStr = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}:00`;
+              const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+
+              const current = new Date(today);
+              current.setHours(0, 0, 0, 0);
+              const currentDay = current.getDay() || 7;
+              const diff = plan.dayOfWeek - currentDay;
+              const targetDate = new Date(current);
+              targetDate.setDate(current.getDate() + diff);
+              if (targetDate < new Date(today.setHours(0, 0, 0, 0))) {
+                targetDate.setDate(targetDate.getDate() + 7);
+              }
+
+              const bookingHorizon = new Date(today.getTime() + 8 * 7 * 24 * 60 * 60 * 1000);
+              while (targetDate <= bookingHorizon) {
+                const ty = targetDate.getFullYear();
+                const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const td = String(targetDate.getDate()).padStart(2, '0');
+                const dateStr = `${ty}-${tm}-${td}`;
+                const key = `${targetRoomId}_${dateStr}_${startTimeStr}`;
+
+                if (!processedBookingKeys.has(key)) {
+                  processedBookingKeys.add(key);
+                  const sTitle = slot.student_name || 'Schüler';
+                  bookingsToInsert.push({
+                    school_id: schoolId,
+                    room_id: targetRoomId,
+                    booked_by: cleanTId,
+                    date: dateStr,
+                    start_time: startTimeStr,
+                    end_time: endTimeStr,
+                    title: `Unterricht: ${sTitle}`,
+                    status: 'approved',
+                    is_confirmed: true
+                  });
+                }
+                targetDate.setDate(targetDate.getDate() + 7);
+              }
+            });
+          });
+
+          if (bookingsToInsert.length > 0) {
+            const bChunkSize = 250;
+            for (let i = 0; i < bookingsToInsert.length; i += bChunkSize) {
+              const chunk = bookingsToInsert.slice(i, i + bChunkSize);
+              await supabase.from('room_bookings').insert(chunk);
+            }
+            window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          }
+        }
+      } catch (roomErr) {
+        console.warn('[useSecretarySchedules] Room bookings synchronization note:', roomErr);
+      }
+
+      // 🛡️ 2. Student Notification Pipeline (Enterprise Closed-Loop Lifecycle)
+      try {
+        const studentNotificationPromises: any[] = [];
+        const notifiedStudentIds = new Set<string>();
+        const dayNamesMap: Record<number, string> = { 1: 'Montag', 2: 'Dienstag', 3: 'Mittwoch', 4: 'Donnerstag', 5: 'Freitag', 6: 'Samstag', 7: 'Sonntag' };
+
+        plansToProcess.forEach(plan => {
+          const dayName = dayNamesMap[plan.dayOfWeek] || 'Unterrichtstag';
+          const roomObj = rooms.find(r => r.id === plan.roomId);
+          const roomName = roomObj ? roomObj.name : 'Musikschule';
+          const cleanTId = plan.teacherId ? plan.teacherId.replace(/^teacher-/i, '') : null;
+
+          (plan.slots || []).forEach((slot: any) => {
+            if (slot.isBreak) return;
+            const targetStudents = (slot.isGroup && slot.groupStudents && slot.groupStudents.length > 0)
+              ? slot.groupStudents
+              : [{ id: slot.student_id, first_name: slot.student_name || 'Schüler' }];
+
+            targetStudents.forEach((st: any) => {
+              const cleanStId = isValidUuid(st.id) ? st.id : null;
+              if (!cleanStId || notifiedStudentIds.has(cleanStId)) return;
+              notifiedStudentIds.add(cleanStId);
+
+              const timeLabel = (slot.time_slot || slot.startTime || '').substring(0, 5);
+              const fName = (st.first_name || 'Schüler').split(' ')[0];
+              const notifMsg = `Hallo ${fName}, dein neuer Unterrichtstermin wurde genehmigt: Jeden ${dayName} um ${timeLabel} Uhr in ${roomName}.`;
+
+              studentNotificationPromises.push(
+                supabase.from('campus_direct_messages').insert({
+                  school_id: schoolId,
+                  sender_id: cleanTId,
+                  recipient_id: cleanStId,
+                  content: notifMsg,
+                  is_system: true,
+                  message_type: 'schedule_approved',
+                  is_read: false
+                })
+              );
+
+              studentNotificationPromises.push(
+                supabase.from('notifications').insert({
+                  user_id: cleanStId,
+                  title: '✅ Neuer Unterrichtstermin',
+                  message: notifMsg,
+                  metadata: { type: 'schedule_approved', day_of_week: plan.dayOfWeek, time_slot: timeLabel }
+                })
+              );
+
+              studentNotificationPromises.push(
+                supabase.functions.invoke('send-push', {
+                  body: {
+                    userId: cleanStId,
+                    title: '✅ Neuer Unterrichtstermin',
+                    body: notifMsg,
+                    url: '/'
+                  }
+                }).catch(() => {})
+              );
+            });
+          });
+        });
+
+        if (studentNotificationPromises.length > 0) {
+          await Promise.allSettled(studentNotificationPromises);
+        }
+      } catch (notifErr) {
+        console.warn('[useSecretarySchedules] Student notification pipeline note:', notifErr);
       }
 
       // Resolve any pending schedule submission alerts for affected teachers

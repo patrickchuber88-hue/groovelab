@@ -66,6 +66,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   // 3. Pricing Domain Hook
   const pricing = useMasterAdminPricing({
     onNotify: modalStates.showToast,
+    schools: schools.schools,
+    schoolStats: schools.schoolStats,
   });
 
   // 4. Operator Domain Hook
@@ -630,6 +632,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {activePortalTab === 'pricing' && (
             <div role="tabpanel" id="master-panel-pricing" aria-labelledby="master-tab-pricing" tabIndex={0}>
               <PricingTab
+                activeCurrency={pricing.activeCurrency}
+                setActiveCurrency={pricing.setActiveCurrency}
+                liveKpiStats={pricing.liveKpiStats}
                 priceCampus={pricing.priceCampus}
                 setPriceCampus={pricing.setPriceCampus}
                 priceGroovelab={pricing.priceGroovelab}

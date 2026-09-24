@@ -1,0 +1,93 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "campus-groovelab-forensic-ebpf-guard"
+  annotations:
+    description: "Chirurgische eBPF Syscall-Auditierung für Campus-Groovelab (Zero Alert Fatigue / BSI IT-Grundschutz)"
+    version: "2027.1"
+spec:
+  kprobes:
+    # ── REGEL 1: PostgreSQL Data Directory Shield ──
+    # Überwacht unbefugte Dateizugriffe auf das Datenbank-Verzeichnis
+    # Schlägt Alarm, wenn ein Binärcode außerhalb des offiziellen Postgres-Stacks zugreift
+    - call: "fd_install"
+      syscall: false
+      return: false
+      args:
+        - index: 0
+          type: "int" # fd
+        - index: 1
+          type: "file" # file pointer
+      selectors:
+        - matchArgs:
+            - index: 1
+              operator: "Prefix"
+              values:
+                - "/var/lib/postgresql"
+                - "/var/lib/docker/volumes/supabase"
+          matchNamespaces:
+            - namespace: "default"
+              operator: "In"
+              values: ["default"]
+          matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/lib/postgresql/15/bin/postgres"
+                - "/usr/lib/postgresql/16/bin/postgres"
+                - "/usr/local/bin/postgres"
+                - "/bin/tar" # Für geplante Backup-Archive
+          matchActions:
+            - action: Sigkill # Sofortige Terminierung unbefugter Prozesse
+            - action: Post
+              rateLimit: "1m"
+
+    # ── REGEL 2: Database Container Rogue Egress Guard ──
+    # Überwacht unerwartete ausgehende TCP-Sockets (connect Syscall) aus dem DB-Prozess
+    # PostgreSQL darf niemals unkontrolliert initiierte Verbindungen ins offene Internet aufbauen
+    - call: "sys_enter_connect"
+      syscall: true
+      args:
+        - index: 0
+          type: "int" # socket fd
+        - index: 1
+          type: "sockaddr" # remote destination
+      selectors:
+        - matchBinaries:
+            - operator: "In"
+              values:
+                - "/usr/lib/postgresql/15/bin/postgres"
+                - "/usr/lib/postgresql/16/bin/postgres"
+                - "/usr/local/bin/postgres"
+          matchActions:
+            - action: Post
+              rateLimit: "10s"
+
+    # ── REGEL 3: Host Perimeter Configuration File Integrity ──
+    # Überwacht Schreib- und Modifikationsversuche an kritischen Perimeter-Konfigurationen
+    - call: "sys_enter_openat"
+      syscall: true
+      args:
+        - index: 1
+          type: "string" # filename
+        - index: 2
+          type: "int" # flags (O_WRONLY | O_RDWR | O_CREAT | O_TRUNC)
+      selectors:
+        - matchArgs:
+            - index: 1
+              operator: "Prefix"
+              values:
+                - "/etc/nginx/"
+                - "/etc/ssh/sshd_config"
+            - index: 2
+              operator: "Mask"
+              values:
+                - "3" # O_WRONLY (1) or O_RDWR (2)
+          matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/bin/certbot"
+                - "/usr/bin/nano"
+                - "/usr/bin/vim"
+          matchActions:
+            - action: Post
+              rateLimit: "5s"

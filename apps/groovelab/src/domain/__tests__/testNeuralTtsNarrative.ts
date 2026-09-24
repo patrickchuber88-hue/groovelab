@@ -143,7 +143,53 @@ function runTests() {
   if (!t8.startsWith('Hallo! Hier ist deine Hausaufgabe für diese Woche.')) {
     throw new Error('Test 8 Failed: Initial must be completely omitted from speech greeting');
   }
-  console.log('✅ Test 8 Passed!\n');
+  // Test 9: 1% Goldstandard Pages & Audio Recordings & Student Name
+  const t9 = buildContinuousHomeworkNarrative({
+    studentFirstName: 'Paul',
+    teacherName: 'Florian Huber',
+    books: [
+      { title: 'Modern Drumming 1', pages: [14, 15], notes: ['Seite 14: Übung 3 und 4 mit Metronom'] }
+    ],
+    songs: [
+      { title: 'Billie Jean', artist: 'Michael Jackson', note: 'Vers und Chorus' }
+    ],
+    audioRecordings: [
+      { label: 'Play-Along Halbplayback' }
+    ],
+    studentQuestion: 'Wie spiele ich Takt 16?'
+  });
+  console.log('Test 9 (1% Goldstandard Pages, Audio & Student Name):');
+  console.log(t9);
+  if (!t9.startsWith('Hallo Paul! Hier sind deine Aufgaben für diese Woche von deiner Lehrkraft Florian Huber.')) {
+    throw new Error('Test 9 Failed: Expected personalized student and teacher greeting');
+  }
+  if (!t9.includes('auf den Seiten 14 und fünfzehn.')) {
+    throw new Error('Test 9 Failed: Expected pages to be properly read out from pages property');
+  }
+  if (!t9.includes('Zum Mitspielen gibt es die Aufnahme Play Along Halbplayback.')) {
+    throw new Error('Test 9 Failed: Expected natural audio sentence "Zum Mitspielen gibt es die Aufnahme Play Along Halbplayback."');
+  }
+  if (t9.includes('Zu deiner Frage') || t9.includes('Takt 16')) {
+    throw new Error('Test 9 Failed: Student question must NOT be spoken in the audio TTS stream');
+  }
+  console.log('✅ Test 9 Passed!\n');
+
+  // Test 10: 0.1% Goldstandard Audio Deduping & Natural Grammar ('Aufnahme #1' -> 'Aufnahme 1')
+  const t10 = buildContinuousHomeworkNarrative({
+    songs: [{ title: 'Song X' }],
+    audioRecordings: [
+      { label: 'Aufnahme #1' }
+    ]
+  });
+  console.log('Test 10 (0.1% Audio Deduping):');
+  console.log(t10);
+  if (!t10.includes('Zum Mitspielen gibt es Aufnahme 1.')) {
+    throw new Error('Test 10 Failed: Expected deduped audio sentence "Zum Mitspielen gibt es Aufnahme 1."');
+  }
+  if (t10.includes('Aufnahme Aufnahme') || t10.includes('deine Aufnahme')) {
+    throw new Error('Test 10 Failed: Found repetitive phrase in audio section');
+  }
+  console.log('✅ Test 10 Passed!\n');
 
   console.log('🎉 ALL NEURAL TTS NARRATIVE TESTS PASSED WITH FLYING COLORS!');
 }

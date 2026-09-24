@@ -1,100 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { Mic } from 'lucide-react';
-import { requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
+import { useVoiceToText } from '../../hooks/useVoiceToText';
 
 export const SpeechDictationButton: React.FC<{
   onTranscript: (text: string) => void;
   title?: string;
   size?: 'sm' | 'md';
 }> = ({ onTranscript, title = "Diktieren", size = 'sm' }) => {
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
-
-  // 🛡️ Hardware-Sicherheit: Automatische Hard-Termination bei Tab-Wechsel oder Unmount
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        if (recognitionRef.current) {
-          try { recognitionRef.current.abort(); } catch {}
-        }
-        setIsListening(false);
+  const { isListening, toggleListening, error } = useVoiceToText({
+    onResult: (text) => {
+      if (text && text.trim()) {
+        onTranscript(text.trim());
       }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch {}
-      }
-    };
-  }, []);
-
-  const toggleListening = async () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Spracherkennung wird von Ihrem Browser leider nicht unterstützt (empfohlen: Google Chrome, Safari oder Microsoft Edge).");
-      return;
     }
-
-    if (isListening) {
-      setIsListening(false);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
-      return;
-    }
-
-    // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
-    const hasPermission = await requestMicrophonePermissionOnce();
-    if (!hasPermission) {
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'de-DE';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-
-      recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript;
-          }
-        }
-        if (!transcript && event.results?.[0]?.[0]?.transcript) {
-          transcript = event.results[0][0].transcript;
-        }
-        if (transcript && transcript.trim()) {
-          onTranscript(transcript.trim());
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn("[SpeechDictation] Error:", event.error);
-        if (event.error === 'not-allowed') {
-          localStorage.removeItem('campus_microphone_permission_granted');
-        }
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e) {
-      console.error("[SpeechDictation] Start failed:", e);
-      setIsListening(false);
-    }
-  };
+  });
 
   return (
     <button
@@ -126,7 +45,7 @@ export const SpeechDictationButton: React.FC<{
         </>
       ) : (
         <>
-          <Mic size={size === 'sm' ? 12 : 14} style={{ color: '#0284c7' }} />
+          <Mic size={size === 'sm' ? 12 : 14} style={{ color: 'currentColor' }} />
           <span>{title}</span>
         </>
       )}

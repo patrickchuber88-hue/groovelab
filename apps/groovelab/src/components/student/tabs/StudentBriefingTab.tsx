@@ -16,8 +16,14 @@ import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
 import { buildContinuousHomeworkNarrative } from '../../../services/neuralTtsService';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../studentAvatars.constants';
-import { getSimulatedNow, toLocalYYYYMMDD, getISOWeekRaw, getISOWeek, getItemWeek, getLehrwerkColor } from '../studentDateUtils';
+import { getSimulatedNow, toLocalYYYYMMDD, getISOWeekRaw, getISOWeek, getItemWeek, getLehrwerkColor, getSongColor } from '../studentDateUtils';
 import { playTriumphantXpChime, animateXpCountUp, CAMPUS_XP_EFFECTS_CSS } from '../../../utils/campusXpEffects';
+import { supabase } from '../../../lib/supabase';
+import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
+import { useDictationInput } from '../../../hooks/useVoiceToText';
+import { StudentBriefingModalsHub } from './briefing/StudentBriefingModalsHub';
+import { StudentBriefingRightSidebar } from './briefing/StudentBriefingRightSidebar';
+import { deriveActiveHomeworkSummary, deriveJuniorHomeworkSummary } from './briefing/homeworkSummaryHelper';
 
 export interface StudentBriefingTabProps {
   studentId: string;
@@ -411,6 +417,49 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     return { key, label: activeWeeklyFocusKey, icon: '🎯', color: '#b45309', bg: '#fef3c7', border: '#fde047' };
   }, [activeWeeklyFocusKey]);
 
+  // ⚡ 0.1% Goldstandard: Memoized Homework Summary (Eliminates sync localStorage blocking queries & JSON parsing)
+  const currentWeekIso = useMemo(() => getISOWeek(getSimulatedNow()), []);
+  const memoizedHomeworkSummary = useMemo(() => {
+    return deriveActiveHomeworkSummary({
+      effectiveId: props.studentId || studentUser?.id,
+      studentId: props.studentId || studentUser?.id,
+      localProgress,
+      lehrwerke,
+      progressItems,
+      activeSongSkills,
+      assignedCampusSongs,
+      currentWeekStr: currentWeekIso
+    });
+  }, [
+    props.studentId,
+    studentUser?.id,
+    localProgress,
+    lehrwerke,
+    progressItems,
+    activeSongSkills,
+    assignedCampusSongs,
+    currentWeekIso
+  ]);
+
+  const memoizedJuniorHomework = useMemo(() => {
+    return deriveJuniorHomeworkSummary({
+      studentId: props.studentId || studentUser?.id,
+      localProgress,
+      lehrwerke,
+      progressItems,
+      activeSongSkills,
+      assignedCampusSongs
+    });
+  }, [
+    props.studentId,
+    studentUser?.id,
+    localProgress,
+    lehrwerke,
+    progressItems,
+    activeSongSkills,
+    assignedCampusSongs
+  ]);
+
   // 🎯 Didaktische 3-Stufen-Reflexion für Hausaufgaben (🟢 Läuft super / 🟡 Noch wackelig / 🔴 Brauche Hilfe)
   const [taskReflections, setTaskReflections] = useState<Record<string, { status: 'super' | 'wackelig' | 'hilfe'; timestamp: string; label?: string }>>(() => {
     if (typeof window === 'undefined') return {};
@@ -598,6 +647,392 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     );
   };
 
+  // 📅 1% Goldstandard: Termin-Aktions & Detail-Modal (Sichere Absage & Shoutbox)
+  const [selectedAppointmentForDetail, setSelectedAppointmentForDetail] = useState<any | null>(null);
+  const [showCancelConfirmStep, setShowCancelConfirmStep] = useState<boolean>(false);
+
+  // 🎧 1% Goldstandard: Aufnahmen-Modal (Studio Audio-Player)
+  const [showRecordingsModal, setShowRecordingsModal] = useState<boolean>(false);
+  const [recordingsModalTracks, setRecordingsModalTracks] = useState<any[]>([]);
+  const [activeRecordingTrack, setActiveRecordingTrack] = useState<any | null>(null);
+
+  // ❓ 0.1% Goldstandard Single Source of Truth for Student Question
+  const [activeStudentQuestion, setActiveStudentQuestion] = useState<string>(() => {
+    const effectiveId = props.studentId || studentUser?.id;
+    if (!effectiveId) return '';
+    try {
+      const directQ = localStorage.getItem(`campus_student_question_${effectiveId}`);
+      if (directQ) return directQ.trim();
+      const rawNotes = localStorage.getItem(`campus_homework_notes_${effectiveId}`);
+      if (rawNotes) {
+        const list = JSON.parse(rawNotes);
+        if (Array.isArray(list)) {
+          const found = list.find((n: any) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+          if (found) {
+            if (found.startsWith('STUDENT_QUESTION:')) {
+              const withoutPrefix = found.replace(/^STUDENT_QUESTION:/, '');
+              const pipeIdx = withoutPrefix.indexOf('|');
+              return pipeIdx !== -1 ? withoutPrefix.slice(pipeIdx + 1).trim() : withoutPrefix.trim();
+            }
+            return found.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+          }
+        }
+      }
+    } catch {}
+    return '';
+  });
+
+  // ❓ 1% Goldstandard: Schülerfrage mit kompakter Maske & Diktierfunktion (Speech-to-Text)
+  const [showQuestionModal, setShowQuestionModal] = useState<boolean>(false);
+  const [questionInput, setQuestionInput] = useState<string>(() => {
+    const effectiveId = props.studentId || studentUser?.id;
+    if (!effectiveId) return '';
+    try {
+      const draft = localStorage.getItem(`campus_student_question_draft_${effectiveId}`);
+      if (draft !== null && draft !== undefined) return draft;
+      const directQ = localStorage.getItem(`campus_student_question_${effectiveId}`);
+      if (directQ) return directQ.trim();
+    } catch {}
+    return '';
+  });
+  const [isSavingQuestion, setIsSavingQuestion] = useState<boolean>(false);
+  const [questionToast, setQuestionToast] = useState<string | null>(null);
+
+  // 🔄 Real-time Draft & Typing Synchronizer
+  const handleQuestionInputChange = useCallback((newVal: string) => {
+    setQuestionInput(newVal);
+    const effectiveId = props.studentId || studentUser?.id;
+    if (effectiveId) {
+      try {
+        localStorage.setItem(`campus_student_question_draft_${effectiveId}`, newVal);
+      } catch {}
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_student_question_draft_updated', {
+          detail: { studentId: effectiveId, text: newVal }
+        }));
+      }
+    }
+  }, [props.studentId, studentUser?.id]);
+
+  // 🎙️ 0.1% Goldstandard Universal Dictation Engine
+  const { isListening: isListeningSpeech, toggleListening: toggleSpeechRecognition } = useDictationInput({
+    value: questionInput,
+    onChange: handleQuestionInputChange,
+    onError: (err) => {
+      setQuestionToast('Diktierfunktion: ' + err);
+      setTimeout(() => setQuestionToast(null), 3500);
+    }
+  });
+
+  const openQuestionModal = useCallback(() => {
+    const effectiveId = props.studentId || studentUser?.id;
+    let textToUse = activeStudentQuestion || '';
+    if (effectiveId) {
+      try {
+        const draft = localStorage.getItem(`campus_student_question_draft_${effectiveId}`);
+        if (draft !== null && draft !== undefined) {
+          textToUse = draft;
+        } else {
+          const directQ = localStorage.getItem(`campus_student_question_${effectiveId}`);
+          if (directQ) textToUse = directQ.trim();
+        }
+      } catch {}
+    }
+    setQuestionInput(textToUse);
+    setShowQuestionModal(true);
+  }, [props.studentId, studentUser?.id, activeStudentQuestion]);
+
+  // 🛰️ Cross-Tab & Cross-Component Real-Time Question & Draft Listener
+  useEffect(() => {
+    const effectiveId = props.studentId || studentUser?.id;
+    if (!effectiveId) return;
+
+    const handleQuestionUpdated = (e: any) => {
+      const detailId = e?.detail?.studentId;
+      if (detailId && String(detailId) !== String(effectiveId)) return;
+      let q = typeof e?.detail?.question === 'string' ? e.detail.question.trim() : null;
+      if (q === null) {
+        try {
+          const directQ = localStorage.getItem(`campus_student_question_${effectiveId}`);
+          if (directQ !== null) {
+            q = directQ.trim();
+          } else {
+            const rawNotes = localStorage.getItem(`campus_homework_notes_${effectiveId}`);
+            if (rawNotes) {
+              const list = JSON.parse(rawNotes);
+              if (Array.isArray(list)) {
+                const found = list.find((n: any) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                if (found) {
+                  if (found.startsWith('STUDENT_QUESTION:')) {
+                    const withoutPrefix = found.replace(/^STUDENT_QUESTION:/, '');
+                    const pipeIdx = withoutPrefix.indexOf('|');
+                    q = pipeIdx !== -1 ? withoutPrefix.slice(pipeIdx + 1).trim() : withoutPrefix.trim();
+                  } else {
+                    q = found.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+      const finalQ = q || '';
+      setActiveStudentQuestion(finalQ);
+      setQuestionInput(finalQ);
+    };
+
+    const handleDraftUpdated = (e: any) => {
+      const detailId = e?.detail?.studentId;
+      if (detailId && String(detailId) !== String(effectiveId)) return;
+      if (typeof e?.detail?.text === 'string') {
+        setQuestionInput(e.detail.text);
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === `campus_student_question_${effectiveId}` || e.key === `campus_homework_notes_${effectiveId}`) {
+        handleQuestionUpdated({ detail: { studentId: effectiveId } });
+      } else if (e.key === `campus_student_question_draft_${effectiveId}`) {
+        if (typeof e.newValue === 'string') {
+          setQuestionInput(e.newValue);
+        }
+      }
+    };
+
+    window.addEventListener('campus_student_question_updated', handleQuestionUpdated);
+    window.addEventListener('campus_homework_notes_updated', handleQuestionUpdated);
+    window.addEventListener('campus_student_question_draft_updated', handleDraftUpdated);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('campus_student_question_updated', handleQuestionUpdated);
+      window.removeEventListener('campus_homework_notes_updated', handleQuestionUpdated);
+      window.removeEventListener('campus_student_question_draft_updated', handleDraftUpdated);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [props.studentId, studentUser?.id]);
+
+  const handleSaveQuestion = useCallback(async (textToSave: string) => {
+    const effectiveId = props.studentId || studentUser?.id;
+    if (!effectiveId) return;
+    const trimmed = textToSave.trim();
+    setIsSavingQuestion(true);
+    try {
+      const isoNow = new Date().toISOString();
+      const tag = trimmed ? `STUDENT_QUESTION:${isoNow}|${trimmed}` : '';
+
+      // 1. Update localStorage cache
+      const cacheKey = `campus_homework_notes_${effectiveId}`;
+      let cachedList: any[] = [];
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) cachedList = JSON.parse(raw);
+      } catch {}
+
+      const filtered = (Array.isArray(cachedList) ? cachedList : []).filter(
+        (n: any) => typeof n === 'string' && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:')
+      );
+
+      const updatedList = tag ? [tag, ...filtered] : filtered;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(updatedList));
+        if (trimmed) {
+          localStorage.setItem(`campus_student_question_${effectiveId}`, trimmed);
+        } else {
+          localStorage.removeItem(`campus_student_question_${effectiveId}`);
+        }
+        localStorage.removeItem(`campus_student_question_draft_${effectiveId}`);
+      } catch {}
+
+      // Update active states
+      setActiveStudentQuestion(trimmed);
+      setQuestionInput(trimmed);
+
+      // 2. Call Supabase RPC
+      if (trimmed) {
+        const { error } = await supabase.rpc('save_student_homework_question', {
+          p_student_id: effectiveId,
+          p_question_text: trimmed
+        });
+        if (error) {
+          console.warn('[save_student_homework_question] fallback notice:', error);
+        }
+      } else {
+        const { error } = await supabase.rpc('resolve_student_homework_question', {
+          p_student_id: effectiveId
+        });
+        if (error) {
+          console.warn('[resolve_student_homework_question] fallback notice:', error);
+        }
+      }
+
+      // 3. Dispatch real-time events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_student_question_updated', {
+          detail: { studentId: effectiveId, question: trimmed }
+        }));
+        window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', {
+          detail: { studentId: effectiveId }
+        }));
+      }
+
+      setQuestionToast(trimmed ? 'Frage für deine Stunde gespeichert! ✨' : 'Frage gelöscht.');
+      setTimeout(() => setQuestionToast(null), 3000);
+      setShowQuestionModal(false);
+    } catch (err) {
+      console.error('[handleSaveQuestion] Error:', err);
+      setQuestionToast('Fehler beim Speichern der Frage.');
+      setTimeout(() => setQuestionToast(null), 3000);
+    } finally {
+      setIsSavingQuestion(false);
+    }
+  }, [props.studentId, studentUser?.id]);
+
+  // 🎧 Audio-Quickie In-Place Mini-Player State
+  const [quickieAudioUrl, setQuickieAudioUrl] = useState<string | null>(null);
+  const [quickiePlaying, setQuickiePlaying] = useState<boolean>(false);
+  const [quickieCurrentTime, setQuickieCurrentTime] = useState<number>(0);
+  const [quickieDuration, setQuickieDuration] = useState<number>(0);
+  const quickieAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleQuickieAudio = useCallback((url: string) => {
+    if (!url) return;
+    if (quickieAudioUrl === url) {
+      if (quickiePlaying) {
+        quickieAudioRef.current?.pause();
+        setQuickiePlaying(false);
+      } else {
+        quickieAudioRef.current?.play().then(() => setQuickiePlaying(true)).catch(e => {
+          console.warn('[AudioQuickie] play blocked:', e);
+          setQuickiePlaying(false);
+        });
+      }
+    } else {
+      setQuickieAudioUrl(url);
+      setQuickiePlaying(true);
+      if (quickieAudioRef.current) {
+        quickieAudioRef.current.src = url;
+        quickieAudioRef.current.play().then(() => setQuickiePlaying(true)).catch(e => {
+          console.warn('[AudioQuickie] play blocked:', e);
+          setQuickiePlaying(false);
+        });
+      }
+    }
+  }, [quickieAudioUrl, quickiePlaying]);
+
+  const formatQuickieDuration = (secs?: number | null) => {
+    if (!secs || isNaN(secs)) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // ⭕ 1% Apple-Fitness-Style Radial Wow-Gauge (104px SVG mit zentrierter Minutenzahl / Checkmark)
+  const renderCircularGauge = (
+    progressPercent: number, 
+    isGoalAchieved: boolean,
+    size = 104,
+    stroke = 10,
+    todayMins = 0,
+    requiredMins = 15
+  ) => {
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const clampedPercent = Math.min(100, Math.max(0, progressPercent));
+    const strokeDashoffset = circumference * (1 - clampedPercent / 100);
+
+    const gradientId = `ring-grad-${size}-${isGoalAchieved ? 'done' : 'prog'}`;
+    const startColor = isGoalAchieved ? '#22c55e' : '#6366f1';
+    const stopColor = isGoalAchieved ? '#16a34a' : '#8b5cf6';
+    const glowColor = isGoalAchieved ? 'rgba(34, 197, 94, 0.45)' : 'rgba(99, 102, 241, 0.4)';
+
+    return (
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={startColor} />
+              <stop offset="100%" stopColor={stopColor} />
+            </linearGradient>
+          </defs>
+          {/* Background Track */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="#e2e8f0"
+            strokeWidth={stroke}
+            opacity={0.8}
+          />
+          {/* Animated Progress Arc */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={`url(#${gradientId})`}
+            strokeWidth={stroke}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            style={{
+              transition: 'stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+              filter: `drop-shadow(0 0 6px ${glowColor})`
+            }}
+          />
+        </svg>
+        {/* Center Label: Apple Watch Fitness Ring Style */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none'
+        }}>
+          {isGoalAchieved ? (
+            <Check size={size >= 120 ? 38 : size >= 90 ? 30 : 20} strokeWidth={3.5} color="#16a34a" />
+          ) : size >= 90 ? (
+            <div style={{ textAlign: 'center', lineHeight: 1.05 }}>
+              <div style={{
+                fontSize: size >= 120 ? '1.85rem' : '1.25rem',
+                fontWeight: 950,
+                color: '#0f172a',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                letterSpacing: '-0.03em'
+              }}>
+                {todayMins}
+              </div>
+              <div style={{
+                fontSize: size >= 120 ? '0.72rem' : '0.62rem',
+                fontWeight: 850,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                marginTop: size >= 120 ? '3px' : '2px',
+                letterSpacing: '0.04em'
+              }}>
+                / {requiredMins} Min.
+              </div>
+            </div>
+          ) : (
+            <span style={{
+              fontSize: size >= 74 ? '1.05rem' : '0.90rem',
+              fontWeight: 950,
+              color: '#0f172a',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              letterSpacing: '-0.02em',
+              lineHeight: 1
+            }}>
+              {progressPercent}%
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
       <div style={{ display: activeTab === 'briefing' ? 'block' : 'none' }}>
         {activeTab === 'briefing' && (() => {
@@ -616,110 +1051,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
           <style>{CAMPUS_XP_EFFECTS_CSS}</style>
           
-          {/* Floating Right-Edge Toggle Button when Collapsed (Desktop only, for Teen / Pro) */}
-          {isRightSidebarCollapsed && studentUiLevel !== 'junior' && !isMobile && (
-            <button
-              onClick={() => handleToggleRightSidebar(false)}
-              style={{
-                position: 'fixed',
-                right: '0px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 99,
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '1.5px solid #bbf7d0',
-                borderRight: 'none',
-                borderRadius: '16px 0 0 16px',
-                padding: '14px 10px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '10px',
-                cursor: 'pointer',
-                boxShadow: '-4px 0 20px rgba(52, 168, 83, 0.2)',
-                color: '#15803d',
-                fontWeight: 900,
-                fontSize: '0.7rem',
-                transition: 'all 0.2s ease-in-out'
-              }}
-              className="hover-scale"
-              title="Termine & Mitteilungen ausklappen"
-            >
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ChevronLeft size={18} color="#15803d" />
-                {(hasSidebarAppointmentAlerts || hasSidebarFeedAlerts) && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-6px',
-                    right: '-6px',
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
-                    border: '2px solid #ffffff',
-                    boxShadow: `0 0 8px ${hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853'}`,
-                    animation: 'pulse 1.5s infinite'
-                  }} />
-                )}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  background: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-                }}>
-                  <Calendar size={15} color="#15803d" />
-                </div>
-                
-                {sidebarTotalAlertsCount > 0 && (
-                  <span style={{
-                    background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
-                    color: '#ffffff',
-                    fontSize: '0.65rem',
-                    fontWeight: 950,
-                    padding: '2px 6px',
-                    borderRadius: '100px',
-                    minWidth: '16px',
-                    textAlign: 'center',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-                  }}>
-                    {sidebarTotalAlertsCount}
-                  </span>
-                )}
-              </div>
-
-              <span style={{ 
-                writingMode: 'vertical-rl', 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.08em', 
-                fontSize: '0.68rem',
-                fontWeight: 900,
-                color: '#166534',
-                marginTop: '2px'
-              }}>
-                Termine & Mitteilungen
-              </span>
-            </button>
-          )}
-
           {/* MAIN LAYOUT (Full-width for Junior Level 1 or when Right Sidebar is Collapsed, 2-column when Open) */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: (isMobile || studentUiLevel === 'junior' || isRightSidebarCollapsed) ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 340px', 
             gap: isRightSidebarCollapsed ? '0px' : '32px', 
-            paddingRight: (isRightSidebarCollapsed && studentUiLevel !== 'junior' && !isMobile) ? '56px' : '0px',
+            paddingRight: '0px',
             alignItems: 'start',
             boxSizing: 'border-box',
             width: '100%',
             minWidth: 0,
             overflowX: 'clip',
-            transition: 'grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            transition: 'grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
             
             {/* MAIN COLUMN */}
@@ -1005,14 +1348,19 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           }} />
                           <img 
                             src={resolveCampusStudentAvatar({ ...studentUser, instrument: studentInstrumentName || studentUser?.instrument })} 
-                            alt="" 
+                            alt={studentUser?.first_name ? `${studentUser.first_name} Avatar` : "Musiker Instrument"} 
+                            width={190}
+                            height={160}
+                            loading="eager"
+                            decoding="async"
                             style={{ 
                               width: '100%', 
                               height: '100%', 
                               objectFit: 'cover',
                               zIndex: 2,
                               transform: 'scale(1.06)',
-                              transition: 'transform 0.5s ease'
+                              transition: 'transform 0.5s ease',
+                              aspectRatio: isMobile ? '16/9' : '190/160'
                             }} 
                             className="hover-zoom"
                           />
@@ -1084,24 +1432,72 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                             return (
                               <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                {/* 1. Next Lesson Status Badge */}
-                                <div style={{ 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
-                                  color: isCanceled ? '#dc2626' : '#2e7d32', 
-                                  padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
-                                  minHeight: isMusicStandMode ? '44px' : '38px', 
-                                  boxSizing: 'border-box',
-                                  borderRadius: '14px', 
-                                  fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
-                                  fontWeight: 850, 
-                                  border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.2)'
-                                }}>
-                                  <Calendar size={isMusicStandMode ? 16 : 14} color={isCanceled ? '#dc2626' : '#34a853'} />
-                                  <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Musikstunde: ${lessonText}`}</span>
-                                </div>
+                                {/* 1. Next Lesson Status & Action Button */}
+                                {nextOcc ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedAppointmentForDetail(nextOcc);
+                                      setShowCancelConfirmStep(false);
+                                    }}
+                                    style={{ 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '8px', 
+                                      background: isCanceled ? '#fee2e2' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
+                                      color: isCanceled ? '#dc2626' : '#2e7d32', 
+                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
+                                      minHeight: isMusicStandMode ? '44px' : '38px', 
+                                      boxSizing: 'border-box', 
+                                      borderRadius: '14px', 
+                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
+                                      fontWeight: 850, 
+                                      border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1.5px solid rgba(52, 168, 83, 0.2)',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                    className="hover-scale"
+                                    title="Nächste Musikstunde – Klicke für Details & Aktionen"
+                                  >
+                                    {(() => {
+                                      const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
+                                      if (isCanceled) {
+                                        return (
+                                          <>
+                                            {!isUnlocked ? <Lock size={isMusicStandMode ? 16 : 14} color="#dc2626" /> : <CalendarX size={isMusicStandMode ? 16 : 14} color="#dc2626" />}
+                                            <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
+                                          </>
+                                        );
+                                      }
+                                      return (
+                                        <>
+                                          <Calendar size={isMusicStandMode ? 16 : 14} color="#34a853" />
+                                          <span>Nächste Musikstunde: {lessonText}</span>
+                                        </>
+                                      );
+                                    })()}
+                                  </button>
+                                ) : (
+                                  <div style={{ 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '8px', 
+                                    background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
+                                    color: '#2e7d32', 
+                                    padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
+                                    minHeight: isMusicStandMode ? '44px' : '38px', 
+                                    boxSizing: 'border-box', 
+                                    borderRadius: '14px', 
+                                    fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
+                                    fontWeight: 850, 
+                                    border: '1.5px solid rgba(52, 168, 83, 0.2)'
+                                  }}>
+                                    <Calendar size={isMusicStandMode ? 16 : 14} color="#34a853" />
+                                    <span>Nächste Musikstunde: Demnächst</span>
+                                  </div>
+                                )}
 
                                 {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
                                 {teacherId && (
@@ -1172,57 +1568,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   </button>
                                 )}
 
-                                {/* 3. Absage / Reaktivieren Button (Master-PIN geschützt für Junior) */}
-                                {nextOcc && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (isCanceled) {
-                                        handleTriggerUndoCancelOccurrence(nextOcc);
-                                      } else {
-                                        handleTriggerCancelOccurrence(nextOcc);
-                                      }
-                                    }}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      background: isCanceled ? '#fee2e2' : '#ffffff',
-                                      color: isCanceled ? '#dc2626' : '#475569',
-                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px',
-                                      minHeight: isMusicStandMode ? '44px' : '38px',
-                                      boxSizing: 'border-box',
-                                      borderRadius: '14px',
-                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem',
-                                      fontWeight: 850,
-                                      border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    className="hover-scale"
-                                    title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren (Eltern-PIN)" : "Unterrichtstermin absagen"}
-                                  >
-                                    {(() => {
-                                      const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
-                                      if (isCanceled) {
-                                        return (
-                                          <>
-                                            {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
-                                            <span>{!isUnlocked ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen'}</span>
-                                          </>
-                                        );
-                                      }
-                                      return (
-                                        <>
-                                          {!isUnlocked ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
-                                          <span>{!isUnlocked ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
-                                        </>
-                                      );
-                                    })()}
-                                  </button>
-                                )}
 
                                 {/* 4. Wochenfokus / Musik-Stern Badge */}
                                 {weeklyFocusMeta && (
@@ -1272,212 +1617,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     const currentWeekStr = getISOWeek(getSimulatedNow());
                     const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
-                    {/* 1. Gather all active homework books & pages from localProgress */}
-                    const activeJuniorBooks: { title: string; pages: number[]; formattedPages: string; notes?: string[]; book?: any }[] = [];
-                    (Array.isArray(localProgress) ? localProgress : []).forEach((assignment: any) => {
-                      if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
-                      const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                      const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
-                      if (!bookTitle) return;
-                      const pages: number[] = [];
-                      const notes: string[] = [];
-                      Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                        if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                          const pNum = parseInt(pNumStr, 10);
-                          if (!isNaN(pNum) && !pages.includes(pNum)) pages.push(pNum);
-                          let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
-                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                            try {
-                              const parsed = JSON.parse(cleanNote);
-                              if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                              }
-                            } catch {}
-                          }
-                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                          if (cleanNote) {
-                            notes.push(`Seite ${pNum}: ${cleanNote}`);
-                          }
-                        }
-                      });
-                      if (pages.length > 0) {
-                        pages.sort((a, b) => a - b);
-                        const formattedPages = pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`;
-                        const existingBook = activeJuniorBooks.find(b => b.title.toLowerCase() === bookTitle.toLowerCase());
-                        if (existingBook) {
-                          existingBook.book = existingBook.book || book;
-                          pages.forEach(p => {
-                            if (!existingBook.pages.includes(p)) existingBook.pages.push(p);
-                          });
-                          existingBook.pages.sort((a, b) => a - b);
-                          existingBook.formattedPages = existingBook.pages.length === 1 
-                            ? `S. ${existingBook.pages[0]}` 
-                            : `S. ${existingBook.pages[0]}–${existingBook.pages[existingBook.pages.length - 1]}`;
-                          if (notes.length > 0) {
-                            existingBook.notes = Array.from(new Set([...(existingBook.notes || []), ...notes]));
-                          }
-                        } else {
-                          activeJuniorBooks.push({ title: bookTitle, pages, formattedPages, notes, book });
-                        }
-                      }
-                    });
-
-                    // 1b. Also incorporate Lehrwerke pages from progressItems (database rows)
-                    (progressItems || []).forEach((item: any) => {
-                      if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
-                      if (item.topic_name.includes(' - Seite ')) {
-                        const parts = item.topic_name.split(' - Seite ');
-                        const bookTitle = cleanTitle(parts[0].trim());
-                        const pageNum = parseInt(parts[1], 10);
-                        const book = lehrwerke.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
-                        const resolvedTitle = book?.title || bookTitle;
-                        if (!isNaN(pageNum)) {
-                          let cleanNote = item.homework_notes || item.teacher_notes || '';
-                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                            try {
-                              const parsed = JSON.parse(cleanNote);
-                              if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                              }
-                            } catch {}
-                          }
-                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                          const formattedNote = cleanNote ? `Seite ${pageNum}: ${cleanNote}` : '';
-
-                          const existingBook = activeJuniorBooks.find(b => (b.title || '').trim().toLowerCase() === resolvedTitle.trim().toLowerCase());
-                          if (existingBook) {
-                            if (!existingBook.pages.includes(pageNum)) {
-                              existingBook.pages.push(pageNum);
-                              existingBook.pages.sort((a, b) => a - b);
-                              existingBook.formattedPages = existingBook.pages.length === 1 
-                                ? `S. ${existingBook.pages[0]}` 
-                                : `S. ${existingBook.pages[0]}–${existingBook.pages[existingBook.pages.length - 1]}`;
-                            }
-                            if (formattedNote && !existingBook.notes?.includes(formattedNote)) {
-                              existingBook.notes = [...(existingBook.notes || []), formattedNote];
-                            }
-                          } else {
-                            activeJuniorBooks.push({
-                              title: resolvedTitle,
-                              pages: [pageNum],
-                              formattedPages: `S. ${pageNum}`,
-                              notes: formattedNote ? [formattedNote] : [],
-                              book
-                            });
-                          }
-                        }
-                      }
-                    });
-
-                    // 2. Songs & progress items
-                    const activeJuniorSongs: any[] = [];
-                    (progressItems || []).forEach(item => {
-                      if (item.topic_name.startsWith('Hausaufgabe KW ') || item.topic_name.includes(' - Seite ')) return;
-                      const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                      (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                      if (localHw === 'false') return;
-                      const isSongHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(item.is_current_homework) || Boolean(item.homework_notes) || Boolean(item.teacher_notes)));
-                      if (isSongHw) {
-                        const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                        if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                          let cleanNote = item.homework_notes || item.teacher_notes || '';
-                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                            try {
-                              const parsed = JSON.parse(cleanNote);
-                              if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                              }
-                            } catch {}
-                          }
-                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                          activeJuniorSongs.push({
-                            ...item,
-                            homework_notes: cleanNote
-                          });
-                        }
-                      }
-                    });
-
-                    (activeSongSkills || []).forEach((skill: any) => {
-                      const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
-                                      (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
-                                      (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
-
-                      const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(skill.is_current_homework) || Boolean(skill.homework_notes) || Boolean(skill.teacher_notes)));
-
-                      if (isHw) {
-                        const songArtist = skill.songs?.artist || skill.artist || '';
-                        const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                        const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                        const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                        const cleanT = cleanTitle(fullTitle);
-
-                        if (!activeJuniorSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                          let cleanNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
-                                           (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
-                                           (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
-                                           skill.homework_notes || skill.teacher_notes || '';
-                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                            try {
-                              const parsed = JSON.parse(cleanNote);
-                              if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                              }
-                            } catch {}
-                          }
-                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                          activeJuniorSongs.push({
-                            id: skill.id,
-                            song_id: skill.song_id || skill.songs?.id,
-                            topic_name: fullTitle,
-                            title: fullTitle,
-                            is_current_homework: true,
-                            status: 'IN_PROGRESS',
-                            homework_notes: cleanNote
-                          });
-                        }
-                      }
-                    });
-
-                    // Also check assignedCampusSongs for active homework
-                    (assignedCampusSongs || []).forEach((cSong: any) => {
-                      const localHw = localStorage.getItem(`song_hw_${studentId}_${cSong.id}`) ??
-                                      (cSong.song_id ? localStorage.getItem(`song_hw_${studentId}_${cSong.song_id}`) : null);
-                      const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
-                      if (isHw) {
-                        const songArtist = cSong.songs?.artist || cSong.artist || '';
-                        const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
-                        const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
-                        const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                        const cleanT = cleanTitle(fullTitle);
-
-                        if (!activeJuniorSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                          let cleanNote = localStorage.getItem(`song_note_${studentId}_${cSong.id}`) ||
-                                           (cSong.song_id ? localStorage.getItem(`song_note_${studentId}_${cSong.song_id}`) : '') ||
-                                           cSong.homework_notes || cSong.teacher_notes || '';
-                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                            try {
-                              const parsed = JSON.parse(cleanNote);
-                              if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                              }
-                            } catch {}
-                          }
-                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                          activeJuniorSongs.push({
-                            id: cSong.id,
-                            song_id: cSong.song_id || cSong.songs?.id,
-                            topic_name: fullTitle,
-                            title: fullTitle,
-                            is_current_homework: true,
-                            status: 'IN_PROGRESS',
-                            homework_notes: cleanNote
-                          });
-                        }
-                      }
-                    });
+                    // 1. Gather all active homework books & pages (Memoized 0.1% Goldstandard)
+                    const { activeJuniorBooks, activeJuniorSongs } = memoizedJuniorHomework;
 
                     let isBooksCarriedOver = false;
                     let isSongsCarriedOver = false;
@@ -2130,25 +2271,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                   Hausaufgaben
                                 </div>
-                                {isCarriedOverPlan && (
-                                  <div style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    background: '#f8fafc',
-                                    border: '1px solid #cbd5e1',
-                                    color: '#475569',
-                                    borderRadius: '100px',
-                                    padding: '2px 10px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 850,
-                                    letterSpacing: '0.01em',
-                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
-                                  }}>
-                                    <RotateCcw size={10} color="#64748b" strokeWidth={2.5} />
-                                    <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
-                                  </div>
-                                )}
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  fontSize: isMusicStandMode ? '0.78rem' : '0.74rem',
+                                  fontWeight: 800,
+                                  color: '#16a34a',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  <Music size={12} color="#16a34a" strokeWidth={2.4} />
+                                  <span>Dein Wochen-Fahrplan</span>
+                                </div>
                               </div>
                               
                               {/* Lehrwerke (harmonisiert wie im Teen-Widget) */}
@@ -2217,6 +2353,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 const songTitle = cleanTitle(s.topic_name || s.title || 'Song');
                                 const taskId = `song-${s.id || s.topic_name || s.title || idx}`;
                                 const refl = taskReflections[taskId]?.status;
+                                const songColor = getSongColor(songTitle);
                                 return (
                                   <div key={`j-s-${idx}`} style={{
                                     background: '#ffffff',
@@ -2233,11 +2370,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         width: '28px',
                                         height: '28px',
                                         borderRadius: '8px',
-                                        background: '#ede9fe',
+                                        background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#7c3aed',
+                                        color: songColor.text || '#0f172a',
+                                        boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
                                         flexShrink: 0
                                       }}>
                                         <Music size={14} strokeWidth={2.4} />
@@ -2268,34 +2406,65 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 );
                               })}
 
-                              {/* Zusätzliche Bemerkung / Notizen */}
+                              {/* Zusätzliche Bemerkung / Notizen (Aufbau wie Wochen-Fahrplan im Aufgaben Board) */}
                               {generalNotesList && generalNotesList.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: '#15803d', fontWeight: 850 }}>
-                                    <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                    <span>
-                                      {isPastNoteCarriedOver ? `Hinweise aus Vorwoche (${carriedOverWeekLabel || 'KW'}):` : 'Hinweise deiner Lehrkraft:'}
-                                    </span>
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
-                                    {generalNotesList.map((noteItem: string, nIdx: number) => (
-                                      <div key={`gn-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.86rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
-                                        {generalNotesList.length > 1 && <span style={{ color: '#16a34a', fontWeight: 800 }}>•</span>}
-                                        <span>{noteItem}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {generalNotesList.map((noteItem: string, nIdx: number) => (
+                                    <div key={`j-gn-${nIdx}`} style={{
+                                      background: '#ffffff',
+                                      border: '1px solid #f1f5f9',
+                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+                                      padding: '10px 14px',
+                                      borderRadius: '14px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '10px'
+                                    }}>
+                                      <div style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '8px',
+                                        background: '#dcfce7',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#15803d',
+                                        flexShrink: 0
+                                      }}>
+                                        <FileText size={14} strokeWidth={2.4} />
                                       </div>
-                                    ))}
-                                  </div>
+                                      <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {noteItem}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
 
-                              {/* Frage des Schülers für die Stunde */}
-                              {studentQuestionText && (
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#1e40af', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                  <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
-                                  <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
-                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
-                                </div>
-                              )}
+                              {/* Frage des Schülers für die Stunde (Gelber Text & Gelbe Kennzeichnung) */}
+                              {(() => {
+                                const displayedStudentQuestion = activeStudentQuestion || studentQuestionText;
+                                if (!displayedStudentQuestion) return null;
+                                return (
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    fontSize: '0.88rem',
+                                    padding: '8px 12px',
+                                    borderRadius: '12px',
+                                    background: '#fffdf0',
+                                    border: '1px solid #fde047',
+                                    boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
+                                  }}>
+                                    <HelpCircle size={14} style={{ color: '#ca8a04', flexShrink: 0 }} strokeWidth={2.5} />
+                                    <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#713f12', fontWeight: 700 }}>
+                                      „{displayedStudentQuestion}“
+                                    </span>
+                                  </div>
+                                );
+                              })()}
 
                               {/* Wenn weder noch */}
                               {activeJuniorBooks.length === 0 && activeJuniorSongs.length === 0 && (!generalNotesList || generalNotesList.length === 0) && (
@@ -2304,33 +2473,147 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </div>
                               )}
                             </div>
+                            {/* Audio-Quickie: In-Place Mini-Player falls Lehreraufnahme vorhanden */}
+                            {audioTracks && audioTracks.length > 0 && (
+                              <div style={{
+                                background: '#f8fafc',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '16px',
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                marginTop: '4px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                  <button
+                                    type="button"
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={quickieAudioUrl === audioTracks[0].url && quickiePlaying ? "Aufnahme pausieren" : "Aufnahme abspielen"}
+                                    onClick={(e) => { e.stopPropagation(); toggleQuickieAudio(audioTracks[0].url); }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleQuickieAudio(audioTracks[0].url); } }}
+                                    style={{
+                                      width: '36px',
+                                      height: '36px',
+                                      borderRadius: '50%',
+                                      background: quickieAudioUrl === audioTracks[0].url && quickiePlaying ? '#16a34a' : '#ffffff',
+                                      color: quickieAudioUrl === audioTracks[0].url && quickiePlaying ? '#ffffff' : '#16a34a',
+                                      border: '1.5px solid #bbf7d0',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      flexShrink: 0,
+                                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.15)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    {quickieAudioUrl === audioTracks[0].url && quickiePlaying ? (
+                                      <Pause size={16} fill="currentColor" />
+                                    ) : (
+                                      <Play size={16} fill="currentColor" style={{ marginLeft: '2px' }} />
+                                    )}
+                                  </button>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                      <Headphones size={12} color="#16a34a" />
+                                      <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        Vorspiel / Feedback
+                                      </span>
+                                    </div>
+                                    <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {audioTracks[0].label || 'Aufnahme deiner Lehrkraft'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                                  {quickieAudioUrl === audioTracks[0].url && quickieCurrentTime > 0 
+                                    ? `${formatQuickieDuration(quickieCurrentTime)} / ${formatQuickieDuration(quickieDuration || audioTracks[0].duration)}`
+                                    : formatQuickieDuration(audioTracks[0].duration)}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setShowJuniorHomeworkModal(true); }}
-                            style={{
-                              width: '100%',
-                              padding: isMusicStandMode ? '18px' : '16px',
-                              minHeight: '48px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
-                              color: '#ffffff',
-                              fontSize: isMusicStandMode ? '1.15rem' : '1.05rem',
-                              fontWeight: 950,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px',
-                              boxShadow: '0 6px 18px rgba(52, 168, 83, 0.28)'
-                            }}
-                            className="hover-scale"
-                          >
-                            <BookOpen size={isMusicStandMode ? 20 : 18} />
-                            <span>Hausaufgaben öffnen</span>
-                          </button>
+                          {/* 2-Button Action Footer */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '10px' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setShowJuniorHomeworkModal(true); }}
+                              style={{
+                                padding: isMusicStandMode ? '16px 14px' : '14px 12px',
+                                minHeight: '48px',
+                                borderRadius: '18px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
+                                color: '#ffffff',
+                                fontSize: isMusicStandMode ? '1.05rem' : '0.96rem',
+                                fontWeight: 950,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.28)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                              className="hover-scale"
+                            >
+                              <BookOpen size={isMusicStandMode ? 18 : 16} style={{ flexShrink: 0 }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Hausaufgaben</span>
+                            </button>
+
+                            {(() => {
+                              const displayedStudentQuestion = activeStudentQuestion || studentQuestionText;
+                              return (
+                                <button
+                                  type="button"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openQuestionModal();
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openQuestionModal();
+                                    }
+                                  }}
+                                  style={{
+                                    padding: isMusicStandMode ? '16px 12px' : '14px 10px',
+                                    minHeight: '48px',
+                                    borderRadius: '18px',
+                                    border: displayedStudentQuestion ? 'none' : '1.5px solid #fde047',
+                                    background: displayedStudentQuestion ? '#facc15' : '#fef9c3',
+                                    color: displayedStudentQuestion ? '#0f172a' : '#713f12',
+                                    fontSize: isMusicStandMode ? '1.05rem' : '0.96rem',
+                                    fontWeight: 950,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 0.2s',
+                                    boxShadow: displayedStudentQuestion ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none'
+                                  }}
+                                  className="hover-scale"
+                                  title={displayedStudentQuestion ? "Hinterlegte Frage bearbeiten" : "Frage für den Unterricht stellen"}
+                                  aria-label={displayedStudentQuestion ? "Hinterlegte Frage bearbeiten" : "Frage für den Unterricht stellen"}
+                                >
+                                  <HelpCircle size={isMusicStandMode ? 18 : 16} color="currentColor" style={{ flexShrink: 0 }} />
+                                  <span>{displayedStudentQuestion ? 'Frage aktiv' : 'Frage?'}</span>
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </div>
 
                         {/* HELDEN-KARTE 2: MEINE ÜBE-RAKETE (Schnellzugriff Übe-Pfad & Kosmische Mission) */}
@@ -4447,7 +4730,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           letterSpacing: '-0.02em',
                           color: 'white'
                         }}>
-                          {songStats.masteredCount}/{songStats.assignedCount}
+                          {songStats.assignedCount ? `${songStats.masteredCount}/${songStats.assignedCount}` : `${songStats.masteredCount || 0}`}
                         </span>
                         <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
                           Songs
@@ -4637,14 +4920,19 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     }}>
                       <img 
                         src={resolveCampusStudentAvatar({ ...studentUser, instrument: studentInstrumentName || studentUser?.instrument })} 
-                        alt="" 
+                        alt={studentUser?.first_name ? `${studentUser.first_name} Avatar` : "Musiker Instrument"} 
+                        width={190}
+                        height={160}
+                        loading="eager"
+                        decoding="async"
                         style={{ 
                           width: '100%', 
                           height: '100%', 
                           objectFit: 'cover',
                           zIndex: 2,
                           transform: 'scale(1.05)',
-                          transition: 'transform 0.5s ease'
+                          transition: 'transform 0.5s ease',
+                          aspectRatio: isMobile ? '16/9' : '190/160'
                         }} 
                         className="hover-zoom"
                       />
@@ -4665,6 +4953,48 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }}>
                           ⚡ TEEN LEVEL • 11–15 JAHRE
                         </div>
+
+                        {/* TOGGLE RIGHT SIDEBAR (Termine & News) */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRightSidebar(!isRightSidebarCollapsed)}
+                          style={{
+                            marginLeft: 'auto',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            padding: '7px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.84rem',
+                            fontWeight: 850,
+                            border: '1.5px solid #e2e8f0',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                          className="hover-scale"
+                          title={isRightSidebarCollapsed ? "Termine, Neuigkeiten & Mitteilungen einblenden" : "Seitenleiste ausblenden"}
+                          aria-label={isRightSidebarCollapsed ? "Termine und Neuigkeiten einblenden" : "Seitenleiste ausblenden"}
+                        >
+                          <Calendar size={15} color="#0284c7" />
+                          <span>Termine & News</span>
+                          {sidebarTotalAlertsCount > 0 && (
+                            <span style={{
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                              color: '#ffffff',
+                              fontSize: '0.68rem',
+                              fontWeight: 950,
+                              padding: '2px 7px',
+                              borderRadius: '100px',
+                              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
+                              letterSpacing: '-0.01em'
+                            }}>
+                              {sidebarTotalAlertsCount}
+                            </span>
+                          )}
+                        </button>
                       </div>
 
                       <h3 style={{ 
@@ -4729,24 +5059,72 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                         return (
                           <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            {/* 1. Next Lesson Status Badge */}
-                            <div style={{ 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '8px', 
-                              background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'rgba(52, 168, 83, 0.08)', 
-                              color: isCanceled ? '#dc2626' : '#34a853', 
-                              padding: '8px 16px', 
-                              minHeight: '38px',
-                              boxSizing: 'border-box',
-                              borderRadius: '12px', 
-                              fontSize: '0.78rem', 
-                              fontWeight: 800,
-                              border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1px solid rgba(52, 168, 83, 0.15)'
-                            }}>
-                              <Calendar size={14} color={isCanceled ? '#dc2626' : '#34a853'} />
-                              <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Session: ${lessonText}`}</span>
-                            </div>
+                            {/* 1. Next Lesson Status & Action Button */}
+                            {nextOcc ? (
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAppointmentForDetail(nextOcc);
+                                  setShowCancelConfirmStep(false);
+                                }}
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '8px', 
+                                  background: isCanceled ? '#fee2e2' : 'rgba(52, 168, 83, 0.08)', 
+                                  color: isCanceled ? '#dc2626' : '#2e7d32', 
+                                  padding: '8px 16px', 
+                                  minHeight: '38px', 
+                                  boxSizing: 'border-box', 
+                                  borderRadius: '12px', 
+                                  fontSize: '0.78rem', 
+                                  fontWeight: 800, 
+                                  border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1px solid rgba(52, 168, 83, 0.2)',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }}
+                                className="hover-scale"
+                                title="Nächste Session – Klicke für Details & Aktionen"
+                              >
+                                {(() => {
+                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
+                                  if (isCanceled) {
+                                    return (
+                                      <>
+                                        {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
+                                        <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
+                                      </>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      <Calendar size={14} color="#34a853" />
+                                      <span>Nächste Session: {lessonText}</span>
+                                    </>
+                                  );
+                                })()}
+                              </button>
+                            ) : (
+                              <div style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                background: 'rgba(52, 168, 83, 0.08)', 
+                                color: '#34a853', 
+                                padding: '8px 16px', 
+                                minHeight: '38px', 
+                                boxSizing: 'border-box', 
+                                borderRadius: '12px', 
+                                fontSize: '0.78rem', 
+                                fontWeight: 800, 
+                                border: '1px solid rgba(52, 168, 83, 0.15)'
+                              }}>
+                                <Calendar size={14} color="#34a853" />
+                                <span>Nächste Session: Demnächst</span>
+                              </div>
+                            )}
 
                             {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
                             {teacherId && (
@@ -4772,8 +5150,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   background: hasMessage ? '#fefce8' : '#ffffff', 
                                   color: hasMessage ? '#ca8a04' : '#475569', 
                                   padding: '8px 16px', 
-                                  minHeight: '38px',
-                                  boxSizing: 'border-box',
+                                  minHeight: '38px', 
+                                  boxSizing: 'border-box', 
                                   borderRadius: '14px', 
                                   fontSize: '0.80rem', 
                                   fontWeight: 900, 
@@ -4814,58 +5192,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
                                   </span>
                                 )}
-                              </button>
-                            )}
-
-                            {/* 3. Absage / Reaktivieren Button */}
-                            {nextOcc && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isCanceled) {
-                                    handleTriggerUndoCancelOccurrence(nextOcc);
-                                  } else {
-                                    handleTriggerCancelOccurrence(nextOcc);
-                                  }
-                                }}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  background: isCanceled ? '#fee2e2' : '#ffffff',
-                                  color: isCanceled ? '#dc2626' : '#475569',
-                                  padding: '8px 16px',
-                                  minHeight: '38px',
-                                  boxSizing: 'border-box',
-                                  borderRadius: '12px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
-                                  transition: 'all 0.2s'
-                                }}
-                                className="hover-scale"
-                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen"}
-                              >
-                                {(() => {
-                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
-                                  if (isCanceled) {
-                                    return (
-                                      <>
-                                        {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
-                                        <span>{!isUnlocked ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen'}</span>
-                                      </>
-                                    );
-                                  }
-                                  return (
-                                    <>
-                                      {!isUnlocked ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
-                                      <span>{!isUnlocked ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
-                                    </>
-                                  );
-                                })()}
                               </button>
                             )}
 
@@ -5238,285 +5564,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         return `S. ${ranges.join(', ')}`;
                       };
 
-                      // 1. Gather all active homework books & pages directly from localProgress (assigned Lehrwerke)
-                      const activeLehrwerkeMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
-
-                      (Array.isArray(localProgress) ? localProgress : []).forEach((assignment: any) => {
-                        const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
-                        if (!isStudentMatch || !assignment.pageStates) return;
-                        const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                        const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
-                        if (!bookTitle) return;
-
-                        Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                          if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                            const pageNum = parseInt(pNumStr, 10);
-                            if (!isNaN(pageNum)) {
-                              if (!activeLehrwerkeMap[bookTitle]) {
-                                activeLehrwerkeMap[bookTitle] = { pages: [] };
-                              }
-                              if (!activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
-                                let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
-                                if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
-                                  try {
-                                    const parsed = JSON.parse(cleanNote);
-                                    if (Array.isArray(parsed)) {
-                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                    }
-                                  } catch {}
-                                }
-                                cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                activeLehrwerkeMap[bookTitle].pages.push({
-                                  num: pageNum,
-                                  notes: cleanNote,
-                                  status: pState.status || 'homework'
-                                });
-                              }
-                            }
-                          }
-                        });
-                      });
-
-                      // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
-                      const otherActiveHWItems: any[] = [];
-                      (progressItems || []).forEach(item => {
-                        if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
-                        if (item.topic_name.includes(' - Seite ')) {
-                          const parts = item.topic_name.split(' - Seite ');
-                          const bookTitle = cleanTitle(parts[0].trim());
-                          const pageNum = parseInt(parts[1], 10);
-                          const book = lehrwerke.find(g => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
-                          const resolvedTitle = book?.title || bookTitle;
-                          if (!isNaN(pageNum)) {
-                            if (!activeLehrwerkeMap[resolvedTitle]) {
-                              activeLehrwerkeMap[resolvedTitle] = { pages: [] };
-                            }
-                            if (!activeLehrwerkeMap[resolvedTitle].pages.some(p => p.num === pageNum)) {
-                              let cleanNote = item.homework_notes || '';
-                              if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
-                                try {
-                                  const parsed = JSON.parse(cleanNote);
-                                  if (Array.isArray(parsed)) {
-                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                  }
-                                } catch {}
-                              }
-                              cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                              activeLehrwerkeMap[resolvedTitle].pages.push({
-                                num: pageNum,
-                                notes: cleanNote,
-                                status: item.status || 'homework'
-                              });
-                            }
-                          }
-                        } else {
-                          const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${item.id}`) ?? (item.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${item.song_id}`) : null)) : null;
-                          if (localHw !== 'false') {
-                            const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
-                            if (isSongHw) {
-                              const cleanT = cleanTitle((item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, ''));
-                              if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${item.id}`) || localStorage.getItem(`song_note_${effectiveId}_${item.song_id}`)) : '') ||
-                                                 item.homework_notes || '';
-                                if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                                  try {
-                                    const parsed = JSON.parse(cachedNote);
-                                    if (Array.isArray(parsed)) {
-                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                    }
-                                  } catch {}
-                                }
-                                cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                                otherActiveHWItems.push({
-                                  ...item,
-                                  homework_notes: cachedNote
-                                });
-                              }
-                            }
-                          }
-                        }
-                      });
-
-                      // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
-                      (activeSongSkills || []).forEach((skill: any) => {
-                        const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${skill.id}`) ??
-                                        (skill.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.song_id}`) : null) ??
-                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.songs.id}`) : null)) : null;
-
-                        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
-
-                        if (isHw) {
-                          const songArtist = skill.songs?.artist || skill.artist || '';
-                          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                          if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-                          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                          const cleanT = cleanTitle(fullTitle);
-
-                          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${skill.id}`) ||
-                                             (skill.song_id ? localStorage.getItem(`song_note_${effectiveId}_${skill.song_id}`) : '') ||
-                                             (skill.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${skill.songs.id}`) : '')) : '') ||
-                                             skill.homework_notes || '';
-                            if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                              try {
-                                const parsed = JSON.parse(cachedNote);
-                                if (Array.isArray(parsed)) {
-                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                }
-                              } catch {}
-                            }
-                            cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                            otherActiveHWItems.push({
-                              id: skill.id,
-                              song_id: skill.song_id || skill.songs?.id,
-                              topic_name: fullTitle,
-                              title: fullTitle,
-                              is_current_homework: true,
-                              status: 'IN_PROGRESS',
-                              homework_notes: cachedNote
-                            });
-                          }
-                        }
-                      });
-
-                      // Also incorporate student's assignedCampusSongs
-                      (assignedCampusSongs || []).forEach((cSong: any) => {
-                        const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${cSong.id}`) ??
-                                        (cSong.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.song_id}`) : null) ??
-                                        (cSong.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.songs.id}`) : null)) : null;
-
-                        const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
-
-                        if (isHw) {
-                          const songArtist = cSong.songs?.artist || cSong.artist || '';
-                          const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
-                          if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-                          const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
-                          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                          const cleanT = cleanTitle(fullTitle);
-
-                          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${cSong.id}`) ||
-                                             (cSong.song_id ? localStorage.getItem(`song_note_${effectiveId}_${cSong.song_id}`) : '') ||
-                                             (cSong.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${cSong.songs.id}`) : '')) : '') ||
-                                             cSong.homework_notes || cSong.teacher_notes || '';
-                            if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                              try {
-                                const parsed = JSON.parse(cachedNote);
-                                if (Array.isArray(parsed)) {
-                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                }
-                              } catch {}
-                            }
-                            cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                            otherActiveHWItems.push({
-                              id: cSong.id,
-                              song_id: cSong.song_id || cSong.songs?.id,
-                              topic_name: fullTitle,
-                              title: fullTitle,
-                              is_current_homework: true,
-                              status: 'IN_PROGRESS',
-                              homework_notes: cachedNote
-                            });
-                          }
-                        }
-                      });
-
-                      // 2b. 📦 Snapshot Hydration: Falls activeLehrwerkeMap oder otherActiveHWItems leer sind, aus jüngstem SNAPSHOT hydrieren
-                      if (Object.keys(activeLehrwerkeMap).length === 0 || otherActiveHWItems.length === 0) {
-                        const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
-                        allSnapshotCandidates.sort((a: any, b: any) => {
-                          const wA = getItemWeek(a);
-                          const wB = getItemWeek(b);
-                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
-                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
-                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
-                          return tB - tA;
-                        });
-
-                        for (const snapItem of allSnapshotCandidates) {
-                          const rawNotes = snapItem.homework_notes || snapItem.teacher_notes;
-                          if (!rawNotes) continue;
-                          let parsedSnapNotes: any = null;
-                          try {
-                            parsedSnapNotes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
-                          } catch {}
-                          if (!Array.isArray(parsedSnapNotes)) {
-                            if (typeof rawNotes === 'string' && rawNotes.includes('SNAPSHOT_')) {
-                              parsedSnapNotes = [rawNotes];
-                            } else {
-                              continue;
-                            }
-                          }
-
-                          if (Object.keys(activeLehrwerkeMap).length === 0) {
-                            const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
-                            if (snapLwEntry) {
-                              try {
-                                const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
-                                const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
-                                const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
-                                const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
-                                const parsedLw = JSON.parse(jsonStr);
-                                if (Array.isArray(parsedLw) && parsedLw.length > 0) {
-                                  parsedLw.forEach((lw: any) => {
-                                    const title = cleanTitle(lw.title || '');
-                                    const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
-                                    if (title && pages.length > 0 && !activeLehrwerkeMap[title]) {
-                                      activeLehrwerkeMap[title] = {
-                                        pages: pages.map((pNum: number) => ({
-                                          num: pNum,
-                                          notes: '',
-                                          status: 'homework'
-                                        }))
-                                      };
-                                      isBooksCarriedOver = true;
-                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
-                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
-                                    }
-                                  });
-                                }
-                              } catch (e) {
-                                console.warn('Error hydrating SNAPSHOT_LEHRWERKE in Teen:', e);
-                              }
-                            }
-                          }
-
-                          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
-                          if (snapSongEntry) {
-                            try {
-                              const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
-                              const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
-                              const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
-                              const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
-                              const parsedSongs = JSON.parse(jsonStr);
-                              if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
-                                parsedSongs.forEach((song: any) => {
-                                  const tName = cleanTitle(song.topic_name || song.title || '');
-                                  if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
-                                    otherActiveHWItems.push({
-                                      ...song,
-                                      topic_name: tName,
-                                      title: tName
-                                    });
-                                    isSongsCarriedOver = true;
-                                    const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
-                                    if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
-                                  }
-                                });
-                              }
-                            } catch (e) {
-                              console.warn('Error hydrating SNAPSHOT_SONGS in Teen:', e);
-                            }
-                          }
-
-                          if (Object.keys(activeLehrwerkeMap).length > 0 && otherActiveHWItems.length > 0) break;
-                        }
-                      }
+                      // 1. Memoized Active Homework & Books Collation (0.1% Goldstandard)
+                      const {
+                        activeLehrwerkeMap,
+                        otherActiveHWItems,
+                        isBooksCarriedOver: memoBooksCarriedOver,
+                        isSongsCarriedOver: memoSongsCarriedOver,
+                        carriedOverWeekLabel: memoCarriedOverWeekLabel
+                      } = memoizedHomeworkSummary;
+                      if (memoBooksCarriedOver) isBooksCarriedOver = true;
+                      if (memoSongsCarriedOver) isSongsCarriedOver = true;
+                      if (memoCarriedOverWeekLabel && !carriedOverWeekLabel) carriedOverWeekLabel = memoCarriedOverWeekLabel;
 
                       isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver || isBooksCarriedOver || isSongsCarriedOver;
 
@@ -5558,17 +5616,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                 <div style={{ 
-                                  background: '#f1f5f9', 
-                                  color: '#475569', 
-                                  width: '32px', 
-                                  height: '32px', 
-                                  borderRadius: '9px', 
+                                  background: 'rgba(22, 163, 74, 0.12)', 
+                                  color: '#16a34a', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '11px', 
                                   display: 'flex', 
                                   alignItems: 'center', 
                                   justifyContent: 'center',
                                   flexShrink: 0
                                 }}>
-                                  <BookOpen size={16} strokeWidth={2.2} />
+                                  <BookOpen size={17} strokeWidth={2.2} />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                                   <h4 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
@@ -5577,24 +5635,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
-                                    fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
-                                    fontWeight: 750,
-                                    color: '#64748b',
+                                    gap: '5px',
+                                    fontSize: isMusicStandMode ? '0.78rem' : '0.74rem',
+                                    fontWeight: 800,
+                                    color: '#16a34a',
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis'
                                   }}>
-                                    <span>Diese Woche</span>
-                                    {isCarriedOverPlan && (
-                                      <>
-                                        <span style={{ opacity: 0.4 }}>•</span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
-                                          <RotateCcw size={10} color="#64748b" strokeWidth={2.5} />
-                                          <span>Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
-                                        </span>
-                                      </>
-                                    )}
+                                    <Music size={12} color="#16a34a" strokeWidth={2.4} />
+                                    <span>Dein Wochen-Fahrplan</span>
                                   </div>
                                 </div>
                               </div>
@@ -5705,64 +5755,100 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     );
                                   })}
 
-                                  {otherActiveHWItems.map((item, idx) => (
-                                    <div key={`teen-song-${idx}`} style={{
-                                      background: '#ffffff',
-                                      border: '1px solid #f1f5f9',
-                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                      padding: '10px 14px',
-                                      borderRadius: '14px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}>
-                                      <div style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '8px',
-                                        background: '#ede9fe',
+                                  {otherActiveHWItems.map((item, idx) => {
+                                    const songTitle = cleanTitle(item.title || item.topic_name);
+                                    const songColor = getSongColor(songTitle);
+                                    return (
+                                      <div key={`teen-song-${idx}`} style={{
+                                        background: '#ffffff',
+                                        border: '1px solid #f1f5f9',
+                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+                                        padding: '10px 14px',
+                                        borderRadius: '14px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#7c3aed',
-                                        flexShrink: 0
+                                        gap: '10px'
                                       }}>
-                                        <Music size={14} strokeWidth={2.4} />
-                                      </div>
-                                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {cleanTitle(item.title || item.topic_name)}
-                                      </span>
-                                    </div>
-                                  ))}
-
-                                  {/* Zusätzliche Bemerkung / Notizen */}
-                                  {generalNotesList && generalNotesList.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: '#15803d', fontWeight: 850 }}>
-                                        <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                        <span>
-                                          {isPastNoteCarriedOver ? `Hinweise aus Vorwoche (${carriedOverWeekLabel || 'KW'}):` : 'Hinweise deiner Lehrkraft:'}
+                                        <div style={{
+                                          width: '28px',
+                                          height: '28px',
+                                          borderRadius: '8px',
+                                          background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: songColor.text || '#0f172a',
+                                          boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
+                                          flexShrink: 0
+                                        }}>
+                                          <Music size={14} strokeWidth={2.4} />
+                                        </div>
+                                        <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {songTitle}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
-                                        {generalNotesList.map((noteItem: string, nIdx: number) => (
-                                          <div key={`teen-gn-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.86rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
-                                            {generalNotesList.length > 1 && <span style={{ color: '#16a34a', fontWeight: 800 }}>•</span>}
-                                            <span>{noteItem}</span>
+                                    );
+                                  })}
+
+                                  {/* Zusätzliche Bemerkung / Notizen (Aufbau wie Wochen-Fahrplan im Aufgaben Board) */}
+                                  {generalNotesList && generalNotesList.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {generalNotesList.map((noteItem: string, nIdx: number) => (
+                                        <div key={`teen-gn-${nIdx}`} style={{
+                                          background: '#ffffff',
+                                          border: '1px solid #f1f5f9',
+                                          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+                                          padding: '10px 14px',
+                                          borderRadius: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px'
+                                        }}>
+                                          <div style={{
+                                            width: '28px',
+                                            height: '28px',
+                                            borderRadius: '8px',
+                                            background: '#dcfce7',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#15803d',
+                                            flexShrink: 0
+                                          }}>
+                                            <FileText size={14} strokeWidth={2.4} />
                                           </div>
-                                        ))}
-                                      </div>
+                                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {noteItem}
+                                          </span>
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
 
-                                  {/* Frage des Schülers für die Stunde */}
-                                  {studentQuestionText && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#1e40af', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
-                                      <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
-                                    </div>
-                                  )}
+                                  {/* Frage des Schülers für die Stunde (Gelber Text & Gelbe Kennzeichnung) */}
+                                  {(() => {
+                                    const displayedTeenQuestion = activeStudentQuestion || studentQuestionText;
+                                    if (!displayedTeenQuestion) return null;
+                                    return (
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '0.88rem',
+                                        padding: '8px 12px',
+                                        borderRadius: '12px',
+                                        background: '#fffdf0',
+                                        border: '1px solid #fde047',
+                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
+                                      }}>
+                                        <HelpCircle size={14} style={{ color: '#ca8a04', flexShrink: 0 }} strokeWidth={2.5} />
+                                        <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#713f12', fontWeight: 700 }}>
+                                          „{displayedTeenQuestion}“
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </>
                               ) : (
                                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -5770,31 +5856,120 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </div>
                               )}
                             </div>
+                            {/* Ausgelagertes Aufnahmen-Pill-Button */}
+                            {audioTracks && audioTracks.length > 0 && (
+                              <div style={{ marginTop: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveRecordingTrack(audioTracks[0]);
+                                    setRecordingsModalTracks(audioTracks);
+                                    setShowRecordingsModal(true);
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '5px 12px',
+                                    borderRadius: '100px',
+                                    background: '#f0fdf4',
+                                    border: '1.5px solid #bbf7d0',
+                                    color: '#15803d',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 850,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title="Aufnahmen deiner Lehrkraft öffnen"
+                                >
+                                  <Headphones size={13} color="currentColor" />
+                                  <span>{audioTracks.length === 1 ? '1 Aufnahme anhören' : `${audioTracks.length} Aufnahmen anhören`}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
 
-                          <button
-                            onClick={() => handleTabChangeLocal('homework_book')}
-                            style={{
-                              width: '100%',
-                              padding: '10px 14px',
-                              borderRadius: '14px',
-                              border: '1.5px solid #e2e8f0',
-                              background: '#f8fafc',
-                              color: '#0f172a',
-                              fontSize: '0.88rem',
-                              fontWeight: 900,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
-                              transition: 'all 0.2s'
-                            }}
-                            className="hover-scale"
-                          >
-                            <BookOpen size={14} color="#34a853" />
-                            <span>Alle Hausaufgaben ansehen →</span>
-                          </button>
+                          {/* 2-Button Action Footer */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleTabChangeLocal('homework_book')}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '14px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                color: '#ffffff',
+                                fontSize: '0.86rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s',
+                                minHeight: '44px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.28)'
+                              }}
+                              className="hover-scale"
+                              title="Alle Hausaufgaben ansehen"
+                            >
+                              <BookOpen size={15} color="currentColor" style={{ flexShrink: 0 }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Aufgaben ansehen →</span>
+                            </button>
+
+                            {(() => {
+                              const displayedTeenQuestion = activeStudentQuestion || studentQuestionText;
+                              return (
+                                <button
+                                  type="button"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openQuestionModal();
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openQuestionModal();
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '10px 14px',
+                                    borderRadius: '14px',
+                                    border: displayedTeenQuestion ? 'none' : '1.5px solid #e2e8f0',
+                                    background: displayedTeenQuestion ? '#facc15' : '#f8fafc',
+                                    color: displayedTeenQuestion ? '#0f172a' : '#475569',
+                                    fontSize: '0.86rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s',
+                                    minHeight: '44px',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: displayedTeenQuestion ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none'
+                                  }}
+                                  className="hover-scale"
+                                  title={displayedTeenQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
+                                  aria-label={displayedTeenQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
+                                >
+                                  <HelpCircle size={15} color="currentColor" style={{ flexShrink: 0 }} />
+                                  <span>{displayedTeenQuestion ? 'Frage aktiv' : 'Frage?'}</span>
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </div>
                       );
                     })()}
@@ -5936,8 +6111,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ 
-                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(251, 188, 5, 0.14)', 
-                                  color: isGoalAchieved ? '#16a34a' : '#d97706', 
+                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(124, 58, 237, 0.12)', 
+                                  color: isGoalAchieved ? '#16a34a' : '#7c3aed', 
                                   width: '34px', 
                                   height: '34px', 
                                   borderRadius: '11px', 
@@ -5971,50 +6146,26 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             </div>
 
-                            {/* Smart-Gauge: Kompakter horizontaler Fortschrittsbalken */}
+                            {/* 1% Apple-Fitness-Style Radial Wow-Gauge (126px) - Zentriert, ohne grauen Kasten */}
                             <div style={{
-                              background: '#f8fafc',
-                              border: '1px solid #f1f5f9',
-                              borderRadius: '14px',
-                              padding: '10px 14px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '6px'
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '12px',
+                              padding: '12px 0 6px 0',
+                              width: '100%'
                             }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', fontWeight: 750 }}>
-                                <span style={{ color: '#475569' }}>
-                                  Heute: <strong style={{ color: isGoalAchieved ? '#15803d' : '#0f172a' }}>{todayMins} von {requiredMins} Min.</strong>
-                                </span>
-                                <span style={{ color: isGoalAchieved ? '#15803d' : '#4f46e5', fontWeight: 900 }}>
-                                  {progressPercent}%
-                                </span>
-                              </div>
-                              <div style={{
-                                width: '100%',
-                                height: '7px',
-                                background: '#e2e8f0',
-                                borderRadius: '100px',
-                                overflow: 'hidden',
-                                position: 'relative'
-                              }}>
-                                <div style={{
-                                  width: `${progressPercent}%`,
-                                  height: '100%',
-                                  background: isGoalAchieved 
-                                    ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' 
-                                    : 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
-                                  borderRadius: '100px',
-                                  transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-                                }} />
+                              {renderCircularGauge(progressPercent, isGoalAchieved, 126, 12, todayMins, requiredMins)}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textAlign: 'center', width: '100%' }}>
+                                <div style={{ fontSize: '1.10rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  {isGoalAchieved ? 'Tagesziel erreicht' : 'Tagesfokus'}
+                                </div>
+                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: isGoalAchieved ? '#15803d' : '#64748b', lineHeight: 1.35 }}>
+                                  {isGoalAchieved ? 'Serie für heute gesichert' : `${Math.max(1, requiredMins - todayMins)} Min. bis zum Streak-Schutz`}
+                                </div>
                               </div>
                             </div>
-
-                            {/* Motivations-Text */}
-                            <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.84rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
-                              {isGoalAchieved 
-                                ? `Starke Leistung! Du hast deine ${requiredMins} Minuten für heute gemeistert und deinen Flammen-Streak gesichert. 🔥`
-                                : `Kurze Session, maximaler Fokus: Schon ${requiredMins} Minuten ${instPrep} sichern heute deinen Flammen-Streak. ⚡`}
-                            </p>
                           </div>
 
                           {/* CTA Button */}
@@ -6025,7 +6176,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               background: isGoalAchieved 
                                 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                                 : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
-                              color: 'white', 
+                              color: '#ffffff', 
                               border: 'none', 
                               borderRadius: '14px', 
                               padding: '14px 20px', 
@@ -6046,7 +6197,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }}
                             className="hover-scale"
                           >
-                            {isGoalAchieved ? <Check size={16} /> : <Play size={16} fill="white" />}
+                            {isGoalAchieved ? <Check size={16} /> : <Play size={15} fill="currentColor" color="currentColor" />}
                             <span>{isGoalAchieved ? 'Tagesziel erreicht • Session starten' : `${requiredMins} Min. Übe-Timer starten`}</span>
                           </button>
                         </div>
@@ -6093,20 +6244,35 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {/* Header: Title + Rules Button + Dynamic Tier Badge */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', fontWeight: 950, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  🔥 Flammen-Pfad
-                                </span>
-                                <button 
-                                  onClick={() => setShowRulesModal(true)}
-                                  style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.15s' }}
-                                  onMouseOver={e => e.currentTarget.style.color = '#64748b'}
-                                  onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
-                                  title="Spielregeln anzeigen"
-                                  aria-label="Spielregeln anzeigen"
-                                >
-                                  <HelpCircle size={14} />
-                                </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ 
+                                  background: isTier3Unlocked ? 'rgba(239, 68, 68, 0.12)' : 'rgba(249, 115, 22, 0.12)', 
+                                  color: isTier3Unlocked ? '#dc2626' : '#ea580c', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '11px', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Flame size={17} strokeWidth={2.2} fill={streak > 0 ? "currentColor" : "none"} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    Flammen-Pfad
+                                  </h4>
+                                  <button 
+                                    onClick={() => setShowRulesModal(true)}
+                                    style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.15s' }}
+                                    onMouseOver={e => e.currentTarget.style.color = '#64748b'}
+                                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                                    title="Spielregeln anzeigen"
+                                    aria-label="Spielregeln anzeigen"
+                                  >
+                                    <HelpCircle size={15} />
+                                  </button>
+                                </div>
                               </div>
                               <span style={{ 
                                 background: streak === 0 
@@ -6211,164 +6377,194 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             )}
 
-                            {/* SKILL-TREE: GESTRAFFTER ENERGIEFLUSS MIT MEHR RAUM FÜR DIE STUFEN */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
-                              {/* Background conduit */}
-                              <div style={{ position: 'absolute', left: '19px', top: '18px', bottom: '18px', width: '2px', background: '#e2e8f0', zIndex: 1, borderRadius: '4px' }} />
-                              {/* Glowing progression fill */}
-                              <div style={{ 
-                                position: 'absolute', 
-                                left: '19px', 
-                                top: '18px', 
-                                height: streak >= 9 ? '100%' : streak >= 4 ? '58%' : streak >= 1 ? '16%' : '0%', 
-                                width: '2px', 
-                                background: 'linear-gradient(to bottom, #f59e0b 0%, #f97316 50%, #ef4444 100%)', 
-                                zIndex: 1, 
-                                borderRadius: '4px',
-                                transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)' 
-                              }} />
+                            {/* CONDENSED ACTIVE TIER CARD & MILESTONE STEPPER */}
+                            {(() => {
+                              const isMeister = isTier3Unlocked;
+                              const isPower = !isMeister && isTier2Unlocked;
+                              const isStart = !isMeister && !isPower;
 
-                              {/* Stufe 1: Start-Funke */}
-                              {(() => {
-                                const isCurrentTier = isTier1Unlocked && !isTier2Unlocked;
-                                return (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px', 
-                                    background: isCurrentTier ? '#ffffff' : '#f8fafc', 
-                                    padding: '8px 12px', 
-                                    borderRadius: '14px', 
-                                    border: isCurrentTier ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(0,0,0,0.04)', 
-                                    boxShadow: isCurrentTier ? '0 3px 12px rgba(245, 158, 11, 0.14)' : 'none', 
-                                    zIndex: 2, 
-                                    opacity: isTier1Unlocked ? 1 : 0.7,
-                                    transition: 'all 0.25s ease'
-                                  }}>
+                              const tierTitle = isMeister ? 'Stufe 3: Meister-Feuer' : isPower ? 'Stufe 2: Power-Flamme' : 'Stufe 1: Start-Funke';
+                              const tierIcon = isMeister 
+                                ? <Crown size={16} color="#dc2626" fill="#ef4444" /> 
+                                : isPower 
+                                ? <Zap size={16} color="#ea580c" fill="#f97316" /> 
+                                : <Flame size={16} color={isTier1Unlocked ? '#d97706' : '#94a3b8'} fill={isTier1Unlocked ? '#f59e0b' : 'none'} />;
+                              const tierIconBg = isMeister ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : isPower ? 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)' : isTier1Unlocked ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' : '#e2e8f0';
+                              const tierBorder = isMeister ? '1.5px solid rgba(239, 68, 68, 0.45)' : isPower ? '1.5px solid rgba(249, 115, 22, 0.45)' : isTier1Unlocked ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(0,0,0,0.06)';
+                              const tierShadow = isMeister ? '0 3px 12px rgba(239, 68, 68, 0.15)' : isPower ? '0 3px 12px rgba(249, 115, 22, 0.15)' : isTier1Unlocked ? '0 3px 12px rgba(245, 158, 11, 0.12)' : 'none';
+                              const tierRequirement = isMeister ? `9+ Tage • ${heldenMins} Min. täglich` : isPower ? `4–8 Tage • ${mittlereMins} Min. täglich` : `1–3 Tage • ${kleineMins} Min. täglich`;
+                              const tierStatus = isMeister 
+                                ? '👑 Meister-Level aktiv! Volle Power!' 
+                                : isPower 
+                                ? `⚡ Aktiv • Noch ${Math.max(1, 9 - streak)} ${Math.max(1, 9 - streak) === 1 ? 'Tag' : 'Tage'} bis Meister-Feuer` 
+                                : (isTier1Unlocked 
+                                  ? `✨ Aktiv • Noch ${Math.max(1, 4 - streak)} ${Math.max(1, 4 - streak) === 1 ? 'Tag' : 'Tage'} bis Power-Flamme` 
+                                  : 'Bereit für deinen ersten Funken');
+
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div 
+                                    onClick={() => setShowRulesModal(true)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowRulesModal(true); }}
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '12px', 
+                                      background: '#ffffff', 
+                                      padding: '10px 14px', 
+                                      borderRadius: '14px', 
+                                      border: tierBorder, 
+                                      boxShadow: tierShadow, 
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title="Klicke hier, um alle Stufen und Regeln einzusehen"
+                                  >
                                     <div style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
+                                      width: '32px', 
+                                      height: '32px', 
                                       borderRadius: '50%', 
-                                      background: isTier1Unlocked ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' : '#e2e8f0', 
+                                      background: tierIconBg, 
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       justifyContent: 'center', 
-                                      flexShrink: 0, 
-                                      boxShadow: isTier1Unlocked ? '0 2px 6px rgba(245, 158, 11, 0.25)' : 'none'
+                                      flexShrink: 0 
                                     }}>
-                                      <Flame size={15} color={isTier1Unlocked ? '#d97706' : '#94a3b8'} fill={isTier1Unlocked ? '#f59e0b' : 'none'} />
+                                      {tierIcon}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', fontWeight: 950, color: isTier1Unlocked ? '#92400e' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Stufe 1: Start-Funke
+                                        <span style={{ fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', fontWeight: 950, color: '#0f172a' }}>
+                                          {tierTitle}
                                         </span>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 900, color: isTier1Unlocked ? '#b45309' : '#64748b', flexShrink: 0 }}>
-                                          1–3 Tage • {kleineMins} Min. täglich
+                                        <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', fontWeight: 850, color: '#64748b', flexShrink: 0 }}>
+                                          {tierRequirement}
                                         </span>
                                       </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isTier2Unlocked ? '#64748b' : isTier1Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
-                                        {isTier2Unlocked ? '✓ Gemeistert' : isTier1Unlocked ? '✨ Aktiv: Dein Funke brennt!' : 'Bereit für deinen ersten Funken'}
+                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isMeister ? '#dc2626' : isPower ? '#ea580c' : isTier1Unlocked ? '#d97706' : '#64748b', fontWeight: 800, marginTop: '2px' }}>
+                                        {tierStatus}
                                       </div>
                                     </div>
                                   </div>
-                                );
-                              })()}
 
-                              {/* Stufe 2: Power-Flamme */}
-                              {(() => {
-                                const isCurrentTier = isTier2Unlocked && !isTier3Unlocked;
-                                return (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px', 
-                                    background: isCurrentTier ? '#ffffff' : '#f8fafc', 
-                                    padding: '8px 12px', 
-                                    borderRadius: '14px', 
-                                    border: isCurrentTier ? '1.5px solid rgba(249, 115, 22, 0.45)' : '1px solid rgba(0,0,0,0.04)', 
-                                    boxShadow: isCurrentTier ? '0 3px 12px rgba(249, 115, 22, 0.16)' : 'none', 
-                                    zIndex: 2, 
-                                    opacity: isTier2Unlocked ? 1 : 0.7,
-                                    transition: 'all 0.25s ease'
+                                  {/* 3-Step Milestone Stepper as unified Segment Track */}
+                                  <div style={{
+                                    display: 'flex',
+                                    gap: '4px',
+                                    background: '#f1f5f9',
+                                    padding: '4px',
+                                    borderRadius: '14px',
+                                    border: '1px solid #e2e8f0'
                                   }}>
-                                    <div style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
-                                      borderRadius: '50%', 
-                                      background: isTier2Unlocked ? 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)' : '#e2e8f0', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      flexShrink: 0, 
-                                      boxShadow: isTier2Unlocked ? '0 2px 6px rgba(249, 115, 22, 0.25)' : 'none'
-                                    }}>
-                                      <Zap size={15} color={isTier2Unlocked ? '#ea580c' : '#94a3b8'} fill={isTier2Unlocked ? '#f97316' : 'none'} />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Stufe 2: Power-Flamme
-                                        </span>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 900, color: isTier2Unlocked ? '#c2410c' : '#64748b', flexShrink: 0 }}>
-                                          4–8 Tage • {mittlereMins} Min. täglich
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isTier3Unlocked ? '#64748b' : isTier2Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
-                                        {isTier3Unlocked ? '✓ Gemeistert' : isTier2Unlocked ? '⚡ Aktiv: Volle Power!' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
+                                    {[
+                                      { 
+                                        label: '1–3 T', 
+                                        name: 'Funke', 
+                                        active: streak >= 1, 
+                                        done: streak >= 4,
+                                        activeBg: '#facc15',
+                                        activeBorder: '#eab308',
+                                        activeColor: '#0f172a',
+                                        activeShadow: '0 2px 8px rgba(250, 204, 21, 0.35)',
+                                        doneBg: '#fef08a',
+                                        doneBorder: '#facc15',
+                                        doneColor: '#713f12'
+                                      },
+                                      { 
+                                        label: '4–8 T', 
+                                        name: 'Power', 
+                                        active: streak >= 4, 
+                                        done: streak >= 9,
+                                        activeBg: '#f97316',
+                                        activeBorder: '#ea580c',
+                                        activeColor: '#ffffff',
+                                        activeShadow: '0 2px 8px rgba(249, 115, 22, 0.35)',
+                                        doneBg: '#ffedd5',
+                                        doneBorder: '#f97316',
+                                        doneColor: '#9a3412'
+                                      },
+                                      { 
+                                        label: '9+ T', 
+                                        name: 'Meister', 
+                                        active: streak >= 9, 
+                                        done: streak >= 9,
+                                        activeBg: '#ef4444',
+                                        activeBorder: '#dc2626',
+                                        activeColor: '#ffffff',
+                                        activeShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                                        doneBg: '#fee2e2',
+                                        doneBorder: '#ef4444',
+                                        doneColor: '#991b1b'
+                                      }
+                                    ].map((step, idx) => {
+                                      const isCurrent = step.active && !step.done;
+                                      const bg = step.done ? step.doneBg : step.active ? step.activeBg : 'transparent';
+                                      const border = step.done ? `1px solid ${step.doneBorder}` : step.active ? `1px solid ${step.activeBorder}` : '1px solid transparent';
+                                      const textColor = step.done ? step.doneColor : step.active ? step.activeColor : '#64748b';
+                                      const shadow = isCurrent ? step.activeShadow : 'none';
 
-                              {/* Stufe 3: Meister-Feuer */}
-                              {(() => {
-                                const isCurrentTier = isTier3Unlocked;
-                                return (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px', 
-                                    background: isCurrentTier ? '#ffffff' : '#f8fafc', 
-                                    padding: '8px 12px', 
-                                    borderRadius: '14px', 
-                                    border: isCurrentTier ? '1.5px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(0,0,0,0.04)', 
-                                    boxShadow: isCurrentTier ? '0 3px 12px rgba(239, 68, 68, 0.18)' : 'none', 
-                                    zIndex: 2, 
-                                    opacity: isTier3Unlocked ? 1 : 0.7,
-                                    transition: 'all 0.25s ease'
-                                  }}>
-                                    <div style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
-                                      borderRadius: '50%', 
-                                      background: isTier3Unlocked ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : '#e2e8f0', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      flexShrink: 0, 
-                                      boxShadow: isTier3Unlocked ? '0 2px 6px rgba(239, 68, 68, 0.25)' : 'none'
-                                    }}>
-                                      <Crown size={15} color={isTier3Unlocked ? '#dc2626' : '#94a3b8'} fill={isTier3Unlocked ? '#ef4444' : 'none'} />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Stufe 3: Meister-Feuer
-                                        </span>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 900, color: isTier3Unlocked ? '#b91c1c' : '#64748b', flexShrink: 0 }}>
-                                          9+ Tage • {heldenMins} Min. täglich
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isTier3Unlocked ? '#dc2626' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
-                                        {isTier3Unlocked ? '👑 Meister-Level aktiv!' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Level`}
-                                      </div>
-                                    </div>
+                                      return (
+                                        <div 
+                                          key={idx}
+                                          onClick={() => setShowRulesModal(true)}
+                                          role="button"
+                                          tabIndex={0}
+                                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowRulesModal(true); }}
+                                          style={{
+                                            flex: 1,
+                                            padding: '8px 4px',
+                                            borderRadius: '10px',
+                                            background: bg,
+                                            border: border,
+                                            boxShadow: shadow,
+                                            textAlign: 'center',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          title={`${step.name} (${step.label}) – Klicke für Details`}
+                                        >
+                                          <div style={{ fontSize: '0.64rem', fontWeight: 900, color: textColor, textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                            {step.done ? <span>✓ {step.name}</span> : <span>{step.name}</span>}
+                                          </div>
+                                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: textColor, opacity: step.active ? 1 : 0.75, marginTop: '1px' }}>
+                                            {step.label}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })()}
-                            </div>
+
+                                  {/* Gamification-Sog Countdown (Pure White Background, No Gray Box, Monochrome Icon) */}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '6px 0 0 0',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    color: streak >= 9 ? '#dc2626' : streak >= 4 ? '#ea580c' : streak >= 1 ? '#b45309' : '#64748b',
+                                    textAlign: 'center'
+                                  }}>
+                                    <Flame size={14} color="currentColor" />
+                                    {streak >= 9 ? (
+                                      <span>Meister-Stufe aktiv (9+ T)! Maximaler Streak.</span>
+                                    ) : streak >= 4 ? (
+                                      <span>Noch {9 - streak} {9 - streak === 1 ? 'Tag' : 'Tage'} bis zur Meister-Stufe (9+ T)</span>
+                                    ) : streak >= 1 ? (
+                                      <span>Noch {4 - streak} {4 - streak === 1 ? 'Tag' : 'Tage'} bis zur Power-Stufe (4–8 T)</span>
+                                    ) : (
+                                      <span>Erste Session starten für den ersten Funken (1–3 T)</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -6495,7 +6691,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           letterSpacing: '-0.02em',
                           color: 'white'
                         }}>
-                          {songStats.masteredCount}/{songStats.assignedCount}
+                          {songStats.assignedCount ? `${songStats.masteredCount}/${songStats.assignedCount}` : `${songStats.masteredCount || 0}`}
                         </span>
                         <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
                           Songs
@@ -6681,14 +6877,19 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       }} />
                       <img 
                         src={resolveCampusStudentAvatar({ ...studentUser, instrument: studentInstrumentName || studentUser?.instrument })} 
-                        alt="" 
+                        alt={studentUser?.first_name ? `${studentUser.first_name} Avatar` : "Musiker Instrument"} 
+                        width={190}
+                        height={160}
+                        loading="eager"
+                        decoding="async"
                         style={{ 
                           width: '100%', 
                           height: '100%', 
                           objectFit: 'cover',
                           zIndex: 2,
                           transform: 'scale(1.05)',
-                          transition: 'transform 0.5s ease'
+                          transition: 'transform 0.5s ease',
+                          aspectRatio: isMobile ? '16/9' : '190/160'
                         }} 
                         className="hover-zoom"
                       />
@@ -6699,69 +6900,86 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '6px',
-                          background: '#ffffff',
-                          border: '1px solid rgba(0, 0, 0, 0.05)',
+                          gap: '8px',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #e2e8f0',
                           borderRadius: '100px',
-                          padding: '4px 12px',
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                          padding: '3px 12px 3px 6px',
+                          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.03)'
                         }}>
-                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
-                          <span style={{ 
-                            fontSize: '0.65rem', 
-                            fontWeight: 800, 
-                            color: '#475569', 
-                            letterSpacing: '0.05em', 
-                            textTransform: 'uppercase', 
-                            fontFamily: 'monospace' 
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#f1f5f9',
+                            padding: '3px 8px',
+                            borderRadius: '100px'
                           }}>
-                            {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
+                            <span style={{ 
+                              fontSize: '0.66rem', 
+                              fontWeight: 800, 
+                              color: '#334155', 
+                              letterSpacing: '0.04em'
+                            }}>
+                              {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                            color: '#4f46e5',
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase'
+                          }}>
+                            STUDIO MODE • PRO
                           </span>
                         </div>
 
                         {/* Offline- & Keller-Bereit Status Badge */}
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: carrierGhostingDetected
-                            ? '#fef3c7'
-                            : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
-                              ? '#fef9c3' 
-                              : 'rgba(52, 168, 83, 0.08)'),
-                          border: carrierGhostingDetected
-                            ? '1px solid #fde68a'
-                            : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
-                              ? '1px solid #fef08a' 
-                              : '1px solid rgba(52, 168, 83, 0.2)'),
-                          borderRadius: '100px',
-                          padding: '4px 12px',
-                          color: carrierGhostingDetected
-                            ? '#92400e'
-                            : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
-                              ? '#854d0e' 
-                              : '#15803d'),
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
-                        }}>
+                        {/* 1% Goldstandard Offline-Pill: Nur anzeigen wenn TATSÄCHLICH offline oder Signalstau */}
+                        {(((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive || carrierGhostingDetected)) && (
                           <div style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            background: carrierGhostingDetected ? '#f59e0b' : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) ? '#eab308' : '#34a853')
-                          }} />
-                          <span style={{
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            letterSpacing: '0.04em',
-                            textTransform: 'uppercase'
-                          }}>
-                            {carrierGhostingDetected 
-                              ? '📶 5G-Signalstau • Offline-Plan' 
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: carrierGhostingDetected
+                              ? '#fef3c7'
                               : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
-                                ? '☁️ Offline-Modus' 
-                                : '● Offline-bereit')}
-                          </span>
-                        </div>
+                                ? '#fef9c3' 
+                                : 'rgba(52, 168, 83, 0.08)'),
+                            border: carrierGhostingDetected
+                              ? '1px solid #fde68a'
+                              : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
+                                ? '1px solid #fef08a' 
+                                : '1px solid rgba(52, 168, 83, 0.2)'),
+                            borderRadius: '100px',
+                            padding: '4px 12px',
+                            color: carrierGhostingDetected
+                              ? '#92400e'
+                              : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
+                                ? '#854d0e' 
+                                : '#15803d'),
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                          }}>
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: carrierGhostingDetected ? '#f59e0b' : '#eab308'
+                            }} />
+                            <span style={{
+                              fontSize: '0.65rem',
+                              fontWeight: 900,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase'
+                            }}>
+                              {carrierGhostingDetected 
+                                ? '📶 5G-Signalstau • Offline-Plan' 
+                                : '☁️ Offline-Modus'}
+                            </span>
+                          </div>
+                        )}
 
                         {onRefreshConnection && (carrierGhostingDetected || isOfflineScheduleActive) && (
                           <button
@@ -6789,18 +7007,49 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           </button>
                         )}
 
-                        <div style={{
-                          background: 'rgba(99, 102, 241, 0.08)',
-                          color: '#4f46e5',
-                          fontSize: isMusicStandMode ? '0.80rem' : '0.72rem',
-                          fontWeight: 900,
-                          borderRadius: '100px',
-                          padding: '5px 14px',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.06em'
-                        }}>
-                          STUDIO MODE • PRO
-                        </div>
+
+
+                        {/* TOGGLE RIGHT SIDEBAR (Termine & News) */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRightSidebar(!isRightSidebarCollapsed)}
+                          style={{
+                            marginLeft: 'auto',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            padding: '7px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.84rem',
+                            fontWeight: 850,
+                            border: '1.5px solid #e2e8f0',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                          className="hover-scale"
+                          title={isRightSidebarCollapsed ? "Termine, Neuigkeiten & Mitteilungen einblenden" : "Seitenleiste ausblenden"}
+                          aria-label={isRightSidebarCollapsed ? "Termine und Neuigkeiten einblenden" : "Seitenleiste ausblenden"}
+                        >
+                          <Calendar size={15} color="currentColor" />
+                          <span>Termine & News</span>
+                          {sidebarTotalAlertsCount > 0 && (
+                            <span style={{
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                              color: '#ffffff',
+                              fontSize: '0.68rem',
+                              fontWeight: 950,
+                              padding: '2px 7px',
+                              borderRadius: '100px',
+                              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
+                              letterSpacing: '-0.01em'
+                            }}>
+                              {sidebarTotalAlertsCount}
+                            </span>
+                          )}
+                        </button>
                       </div>
 
                       <h3 style={{ 
@@ -6813,7 +7062,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         letterSpacing: '-0.02em',
                         wordBreak: 'break-word'
                       }}>
-                        Willkommen zurück{studentUser?.first_name ? `, ${studentUser.first_name}` : ''}! 👋
+                        Willkommen zurück{studentUser?.first_name ? `, ${studentUser.first_name}` : ''}!
                       </h3>
                       
                       <p style={{ 
@@ -6824,7 +7073,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         lineHeight: 1.45, 
                         maxWidth: '95%' 
                       }}>
-                        Zeit für dein Repertoire und deinen musikalischen Fokus. 🎯
+                        Zeit für dein Repertoire und deinen musikalischen Fokus.
                       </p>
 
                       {(() => {
@@ -6851,24 +7100,72 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                         return (
                           <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            {/* 1. Next Lesson Status Badge */}
-                            <div style={{ 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '8px', 
-                              background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-                              color: isCanceled ? '#dc2626' : '#34a853', 
-                              padding: '8px 16px', 
-                              minHeight: '38px',
-                              boxSizing: 'border-box',
-                              borderRadius: '12px', 
-                              fontSize: '0.78rem', 
-                              fontWeight: 800, 
-                              border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1px solid rgba(52, 168, 83, 0.18)'
-                            }}>
-                              <Calendar size={14} color={isCanceled ? '#dc2626' : '#34a853'} />
-                              <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächster Unterricht: ${lessonText}`}</span>
-                            </div>
+                            {/* 1. Next Lesson Status & Action Button */}
+                            {nextOcc ? (
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAppointmentForDetail(nextOcc);
+                                  setShowCancelConfirmStep(false);
+                                }}
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '8px', 
+                                  background: isCanceled ? '#fee2e2' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
+                                  color: isCanceled ? '#dc2626' : '#2e7d32', 
+                                  padding: '8px 16px', 
+                                  minHeight: '38px', 
+                                  boxSizing: 'border-box', 
+                                  borderRadius: '12px', 
+                                  fontSize: '0.78rem', 
+                                  fontWeight: 800, 
+                                  border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1px solid rgba(52, 168, 83, 0.2)',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }}
+                                className="hover-scale"
+                                title="Nächster Unterricht – Klicke für Details & Aktionen"
+                              >
+                                {(() => {
+                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
+                                  if (isCanceled) {
+                                    return (
+                                      <>
+                                        {!isUnlocked ? <Lock size={14} color="currentColor" /> : <CalendarX size={14} color="currentColor" />}
+                                        <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
+                                      </>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      <Calendar size={14} color="currentColor" />
+                                      <span>Nächster Unterricht: {lessonText}</span>
+                                    </>
+                                  );
+                                })()}
+                              </button>
+                            ) : (
+                              <div style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
+                                color: '#34a853', 
+                                padding: '8px 16px', 
+                                minHeight: '38px', 
+                                boxSizing: 'border-box', 
+                                borderRadius: '12px', 
+                                fontSize: '0.78rem', 
+                                fontWeight: 800, 
+                                border: '1px solid rgba(52, 168, 83, 0.18)'
+                              }}>
+                                <Calendar size={14} color="currentColor" />
+                                <span>Nächster Unterricht: Demnächst</span>
+                              </div>
+                            )}
 
                             {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
                             {teacherId && (
@@ -6894,8 +7191,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   background: hasMessage ? '#fefce8' : '#ffffff', 
                                   color: hasMessage ? '#ca8a04' : '#475569', 
                                   padding: '8px 16px', 
-                                  minHeight: '38px',
-                                  boxSizing: 'border-box',
+                                  minHeight: '38px', 
+                                  boxSizing: 'border-box', 
                                   borderRadius: '14px', 
                                   fontSize: '0.80rem', 
                                   fontWeight: 900, 
@@ -6918,8 +7215,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               >
                                 <MessageSquare 
                                   size={15} 
-                                  color={hasMessage ? '#ca8a04' : '#64748b'} 
-                                  fill={hasMessage ? '#eab308' : 'none'} 
+                                  color="currentColor" 
+                                  fill="none" 
                                 />
                                 <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
                                 {unreadMsgCount > 0 && (
@@ -6953,14 +7250,14 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 background: '#ffffff', 
                                 color: '#0f172a', 
                                 padding: '8px 16px', 
-                                minHeight: '38px',
-                                boxSizing: 'border-box',
+                                minHeight: '38px', 
+                                boxSizing: 'border-box', 
                                 borderRadius: '14px', 
                                 fontSize: '0.80rem', 
                                 fontWeight: 900, 
                                 border: '1px solid #cbd5e1', 
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                cursor: 'pointer', 
+                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)', 
                                 transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                               }}
                               onMouseEnter={(e) => {
@@ -6973,63 +7270,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)';
                                 e.currentTarget.style.borderColor = '#cbd5e1';
                               }}
-                              title="Praxis-Toolbox (Metronom, Rhythmus-Trainer & Stimmgerät) öffnen"
+                              title="Praxis-Toolbox: Metronom & Stimmgerät öffnen"
                             >
-                              <Sliders size={15} color="#34a853" />
+                              <Sliders size={14} color="currentColor" />
                               <span>Praxis-Toolbox</span>
                             </button>
-
-                            {/* 4. Absage / Reaktivieren Button */}
-                            {nextOcc && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isCanceled) {
-                                    handleTriggerUndoCancelOccurrence(nextOcc);
-                                  } else {
-                                    handleTriggerCancelOccurrence(nextOcc);
-                                  }
-                                }}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  background: isCanceled ? '#fee2e2' : '#ffffff',
-                                  color: isCanceled ? '#dc2626' : '#475569',
-                                  padding: '8px 16px',
-                                  minHeight: '38px',
-                                  boxSizing: 'border-box',
-                                  borderRadius: '12px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
-                                  transition: 'all 0.2s'
-                                }}
-                                className="hover-scale"
-                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen"}
-                              >
-                                {(() => {
-                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
-                                  if (isCanceled) {
-                                    return (
-                                      <>
-                                        {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
-                                        <span>{!isUnlocked ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen'}</span>
-                                      </>
-                                    );
-                                  }
-                                  return (
-                                    <>
-                                      {!isUnlocked ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
-                                      <span>{!isUnlocked ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
-                                    </>
-                                  );
-                                })()}
-                              </button>
-                            )}
 
                             {/* 4. Wochenfokus / Kompetenz-Radar Badge */}
                             {weeklyFocusMeta && (
@@ -7416,289 +7661,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         return `S. ${ranges.join(', ')}`;
                       };
 
-                      // 1. Gather all active homework books & pages directly from localProgress (assigned Lehrwerke)
-                      const activeLehrwerkeMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
-
-                      (Array.isArray(localProgress) ? localProgress : []).forEach((assignment: any) => {
-                        const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
-                        if (!isStudentMatch || !assignment.pageStates) return;
-                        const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                        const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
-                        if (!bookTitle) return;
-
-                        Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                          if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                            const pageNum = parseInt(pNumStr, 10);
-                            if (!isNaN(pageNum)) {
-                              if (!activeLehrwerkeMap[bookTitle]) {
-                                activeLehrwerkeMap[bookTitle] = { pages: [] };
-                              }
-                              if (!activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
-                                let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
-                                if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
-                                  try {
-                                    const parsed = JSON.parse(cleanNote);
-                                    if (Array.isArray(parsed)) {
-                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                    }
-                                  } catch {}
-                                }
-                                cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                activeLehrwerkeMap[bookTitle].pages.push({
-                                  num: pageNum,
-                                  notes: cleanNote,
-                                  status: pState.status || 'homework'
-                                });
-                              }
-                            }
-                          }
-                        });
-                      });
-
-                      // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
-                      const otherActiveHWItems: any[] = [];
-                      (progressItems || []).forEach(item => {
-                        if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
-                        if (item.topic_name.includes(' - Seite ')) {
-                          const parts = item.topic_name.split(' - Seite ');
-                          const rawBookTitle = cleanTitle(parts[0].trim());
-                          const pageNum = parseInt(parts[1], 10);
-                          const book = lehrwerke.find(g => cleanTitle(g.title).toLowerCase() === rawBookTitle.toLowerCase());
-                          const resolvedTitle = book?.title || rawBookTitle;
-                          if (resolvedTitle) {
-                            if (!activeLehrwerkeMap[resolvedTitle]) {
-                              activeLehrwerkeMap[resolvedTitle] = { pages: [] };
-                            }
-                            if (!isNaN(pageNum) && !activeLehrwerkeMap[resolvedTitle].pages.some(p => p.num === pageNum)) {
-                              let cleanNote = item.homework_notes || '';
-                              if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
-                                try {
-                                  const parsed = JSON.parse(cleanNote);
-                                  if (Array.isArray(parsed)) {
-                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                  }
-                                } catch {}
-                              }
-                              cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                              activeLehrwerkeMap[resolvedTitle].pages.push({
-                                num: pageNum,
-                                notes: cleanNote,
-                                status: item.status || 'homework'
-                              });
-                            }
-                          }
-                        } else {
-                          const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${item.id}`) ?? (item.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${item.song_id}`) : null)) : null;
-                          if (localHw !== 'false') {
-                            const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
-                            if (isSongHw) {
-                              const cleanT = cleanTitle((item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, ''));
-                              if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${item.id}`) || localStorage.getItem(`song_note_${effectiveId}_${item.song_id}`)) : '') ||
-                                                 item.homework_notes || '';
-                                if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                                  try {
-                                    const parsed = JSON.parse(cachedNote);
-                                    if (Array.isArray(parsed)) {
-                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                    }
-                                  } catch {}
-                                }
-                                cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                                otherActiveHWItems.push({
-                                  ...item,
-                                  homework_notes: cachedNote
-                                });
-                              }
-                            }
-                          }
-                        }
-                      });
-
-                      // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
-                      (activeSongSkills || []).forEach((skill: any) => {
-                        const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${skill.id}`) ??
-                                        (skill.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.song_id}`) : null) ??
-                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.songs.id}`) : null)) : null;
-
-                        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
-
-                        if (isHw) {
-                          const songArtist = skill.songs?.artist || skill.artist || '';
-                          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                          if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-                          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                          const cleanT = cleanTitle(fullTitle);
-
-                          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${skill.id}`) ||
-                                             (skill.song_id ? localStorage.getItem(`song_note_${effectiveId}_${skill.song_id}`) : '') ||
-                                             (skill.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${skill.songs.id}`) : '')) : '') ||
-                                             skill.homework_notes || '';
-                            if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                              try {
-                                const parsed = JSON.parse(cachedNote);
-                                if (Array.isArray(parsed)) {
-                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                }
-                              } catch {}
-                            }
-                            cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                            otherActiveHWItems.push({
-                              id: skill.id,
-                              song_id: skill.song_id || skill.songs?.id,
-                              topic_name: fullTitle,
-                              title: fullTitle,
-                              is_current_homework: true,
-                              status: 'IN_PROGRESS',
-                              homework_notes: cachedNote
-                            });
-                          }
-                        }
-                      });
-
-                      // Also incorporate student's assignedCampusSongs
-                      (assignedCampusSongs || []).forEach((cSong: any) => {
-                        const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${cSong.id}`) ??
-                                        (cSong.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.song_id}`) : null) ??
-                                        (cSong.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.songs.id}`) : null)) : null;
-
-                        const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
-
-                        if (isHw) {
-                          const songArtist = cSong.songs?.artist || cSong.artist || '';
-                          const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
-                          if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-                          const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
-                          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                          const cleanT = cleanTitle(fullTitle);
-
-                          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${cSong.id}`) ||
-                                             (cSong.song_id ? localStorage.getItem(`song_note_${effectiveId}_${cSong.song_id}`) : '') ||
-                                             (cSong.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${cSong.songs.id}`) : '')) : '') ||
-                                             cSong.homework_notes || cSong.teacher_notes || '';
-                            if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                              try {
-                                const parsed = JSON.parse(cachedNote);
-                                if (Array.isArray(parsed)) {
-                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                }
-                              } catch {}
-                            }
-                            cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                            otherActiveHWItems.push({
-                              id: cSong.id,
-                              song_id: cSong.song_id || cSong.songs?.id,
-                              topic_name: fullTitle,
-                              title: fullTitle,
-                              is_current_homework: true,
-                              status: 'IN_PROGRESS',
-                              homework_notes: cachedNote
-                            });
-                          }
-                        }
-                      });
-
-                      // 🔄 Snapshot Hydration for Pro Mode
-                      if (Object.keys(activeLehrwerkeMap).length === 0 || otherActiveHWItems.length === 0) {
-                        const allSnapshotCandidates = (progressItems || []).filter((item: any) => {
-                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
-                          const itWeekIso = getItemWeek(item);
-                          return itWeekIso && itWeekIso <= currentWeekStr;
-                        });
-                        allSnapshotCandidates.sort((a: any, b: any) => {
-                          const wA = getItemWeek(a);
-                          const wB = getItemWeek(b);
-                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
-                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
-                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
-                          return tB - tA;
-                        });
-
-                        for (const snapItem of allSnapshotCandidates) {
-                          const rawNotes = snapItem.homework_notes || snapItem.teacher_notes;
-                          if (!rawNotes) continue;
-                          let parsedSnapNotes: any = null;
-                          try {
-                            parsedSnapNotes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
-                          } catch {}
-                          if (!Array.isArray(parsedSnapNotes)) {
-                            if (typeof rawNotes === 'string' && rawNotes.includes('SNAPSHOT_')) {
-                              parsedSnapNotes = [rawNotes];
-                            } else {
-                              continue;
-                            }
-                          }
-
-                          if (Object.keys(activeLehrwerkeMap).length === 0) {
-                            const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
-                            if (snapLwEntry) {
-                              try {
-                                const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
-                                const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
-                                const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
-                                const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
-                                const parsedLw = JSON.parse(jsonStr);
-                                if (Array.isArray(parsedLw) && parsedLw.length > 0) {
-                                  parsedLw.forEach((lw: any) => {
-                                    const title = cleanTitle(lw.title || '');
-                                    const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
-                                    if (title && pages.length > 0 && !activeLehrwerkeMap[title]) {
-                                      activeLehrwerkeMap[title] = {
-                                        pages: pages.map((pNum: number) => ({
-                                          num: pNum,
-                                          notes: '',
-                                          status: 'homework'
-                                        }))
-                                      };
-                                      isBooksCarriedOver = true;
-                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
-                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
-                                    }
-                                  });
-                                }
-                              } catch (e) {
-                                console.warn('Error hydrating SNAPSHOT_LEHRWERKE in Pro:', e);
-                              }
-                            }
-                          }
-
-                          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
-                          if (snapSongEntry) {
-                            try {
-                              const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
-                              const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
-                              const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
-                              const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
-                              const parsedSongs = JSON.parse(jsonStr);
-                              if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
-                                parsedSongs.forEach((song: any) => {
-                                  const tName = cleanTitle(song.topic_name || song.title || '');
-                                  if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
-                                    otherActiveHWItems.push({
-                                      ...song,
-                                      topic_name: tName,
-                                      title: tName
-                                    });
-                                    isSongsCarriedOver = true;
-                                    const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
-                                    if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
-                                  }
-                                });
-                              }
-                            } catch (e) {
-                              console.warn('Error hydrating SNAPSHOT_SONGS in Pro:', e);
-                            }
-                          }
-
-                          if (Object.keys(activeLehrwerkeMap).length > 0 && otherActiveHWItems.length > 0) break;
-                        }
-                      }
+                      // 1. Memoized Active Homework & Books Collation (0.1% Goldstandard)
+                      const {
+                        activeLehrwerkeMap,
+                        otherActiveHWItems,
+                        isBooksCarriedOver: memoBooksCarriedOver,
+                        isSongsCarriedOver: memoSongsCarriedOver,
+                        carriedOverWeekLabel: memoCarriedOverWeekLabel
+                      } = memoizedHomeworkSummary;
+                      if (memoBooksCarriedOver) isBooksCarriedOver = true;
+                      if (memoSongsCarriedOver) isSongsCarriedOver = true;
+                      if (memoCarriedOverWeekLabel && !carriedOverWeekLabel) carriedOverWeekLabel = memoCarriedOverWeekLabel;
 
                       isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver || isBooksCarriedOver || isSongsCarriedOver;
 
@@ -7740,17 +7713,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                 <div style={{ 
-                                  background: '#f1f5f9', 
-                                  color: '#475569', 
-                                  width: '32px', 
-                                  height: '32px', 
-                                  borderRadius: '9px', 
+                                  background: 'rgba(22, 163, 74, 0.12)', 
+                                  color: '#16a34a', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '11px', 
                                   display: 'flex', 
                                   alignItems: 'center', 
                                   justifyContent: 'center',
                                   flexShrink: 0
                                 }}>
-                                  <BookOpen size={16} strokeWidth={2.2} />
+                                  <BookOpen size={17} strokeWidth={2.2} />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                                   <h4 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
@@ -7759,24 +7732,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
-                                    fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
-                                    fontWeight: 750,
-                                    color: '#64748b',
+                                    gap: '5px',
+                                    fontSize: isMusicStandMode ? '0.78rem' : '0.74rem',
+                                    fontWeight: 800,
+                                    color: '#16a34a',
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis'
                                   }}>
-                                    <span>Diese Woche</span>
-                                    {isCarriedOverPlan && (
-                                      <>
-                                        <span style={{ opacity: 0.4 }}>•</span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
-                                          <RotateCcw size={10} color="#64748b" strokeWidth={2.5} />
-                                          <span>Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
-                                        </span>
-                                      </>
-                                    )}
+                                    <Music size={12} color="#16a34a" strokeWidth={2.4} />
+                                    <span>Dein Wochen-Fahrplan</span>
                                   </div>
                                 </div>
                               </div>
@@ -7887,64 +7852,100 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     );
                                   })}
 
-                                  {otherActiveHWItems.map((item, idx) => (
-                                    <div key={`pro-song-${idx}`} style={{
-                                      background: '#ffffff',
-                                      border: '1px solid #f1f5f9',
-                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                      padding: '10px 14px',
-                                      borderRadius: '14px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}>
-                                      <div style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '8px',
-                                        background: '#ede9fe',
+                                  {otherActiveHWItems.map((item, idx) => {
+                                    const songTitle = cleanTitle(item.title || item.topic_name);
+                                    const songColor = getSongColor(songTitle);
+                                    return (
+                                      <div key={`pro-song-${idx}`} style={{
+                                        background: '#ffffff',
+                                        border: '1px solid #f1f5f9',
+                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+                                        padding: '10px 14px',
+                                        borderRadius: '14px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#7c3aed',
-                                        flexShrink: 0
+                                        gap: '10px'
                                       }}>
-                                        <Music size={14} strokeWidth={2.4} />
-                                      </div>
-                                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {cleanTitle(item.title || item.topic_name)}
-                                      </span>
-                                    </div>
-                                  ))}
-
-                                  {/* Zusätzliche Bemerkung / Notizen */}
-                                  {generalNotesList && generalNotesList.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: '#15803d', fontWeight: 850 }}>
-                                        <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                        <span>
-                                          {isPastNoteCarriedOver ? `Hinweise aus Vorwoche (${carriedOverWeekLabel || 'KW'}):` : 'Hinweise deiner Lehrkraft:'}
+                                        <div style={{
+                                          width: '28px',
+                                          height: '28px',
+                                          borderRadius: '8px',
+                                          background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: songColor.text || '#0f172a',
+                                          boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
+                                          flexShrink: 0
+                                        }}>
+                                          <Music size={14} strokeWidth={2.4} />
+                                        </div>
+                                        <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {songTitle}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
-                                        {generalNotesList.map((noteItem: string, nIdx: number) => (
-                                          <div key={`pro-gn-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.86rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
-                                            {generalNotesList.length > 1 && <span style={{ color: '#16a34a', fontWeight: 800 }}>•</span>}
-                                            <span>{noteItem}</span>
+                                    );
+                                  })}
+
+                                  {/* Zusätzliche Bemerkung / Notizen (Aufbau wie Wochen-Fahrplan im Aufgaben Board) */}
+                                  {generalNotesList && generalNotesList.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {generalNotesList.map((noteItem: string, nIdx: number) => (
+                                        <div key={`pro-gn-${nIdx}`} style={{
+                                          background: '#ffffff',
+                                          border: '1px solid #f1f5f9',
+                                          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+                                          padding: '10px 14px',
+                                          borderRadius: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px'
+                                        }}>
+                                          <div style={{
+                                            width: '28px',
+                                            height: '28px',
+                                            borderRadius: '8px',
+                                            background: '#dcfce7',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#15803d',
+                                            flexShrink: 0
+                                          }}>
+                                            <FileText size={14} strokeWidth={2.4} />
                                           </div>
-                                        ))}
-                                      </div>
+                                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {noteItem}
+                                          </span>
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
 
-                                  {/* Frage des Schülers für die Stunde */}
-                                  {studentQuestionText && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#1e40af', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
-                                      <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
-                                    </div>
-                                  )}
+                                  {/* Frage des Schülers für die Stunde (Gelber Text & Gelbe Kennzeichnung) */}
+                                  {(() => {
+                                    const displayedProQuestion = activeStudentQuestion || studentQuestionText;
+                                    if (!displayedProQuestion) return null;
+                                    return (
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '0.88rem',
+                                        padding: '8px 12px',
+                                        borderRadius: '12px',
+                                        background: '#fffdf0',
+                                        border: '1px solid #fde047',
+                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
+                                      }}>
+                                        <HelpCircle size={14} style={{ color: '#ca8a04', flexShrink: 0 }} strokeWidth={2.5} />
+                                        <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#713f12', fontWeight: 700 }}>
+                                          „{displayedProQuestion}“
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </>
                               ) : (
                                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -7952,31 +7953,120 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </div>
                               )}
                             </div>
+                            {/* Ausgelagertes Aufnahmen-Pill-Button */}
+                            {audioTracks && audioTracks.length > 0 && (
+                              <div style={{ marginTop: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveRecordingTrack(audioTracks[0]);
+                                    setRecordingsModalTracks(audioTracks);
+                                    setShowRecordingsModal(true);
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '5px 12px',
+                                    borderRadius: '100px',
+                                    background: '#f0fdf4',
+                                    border: '1.5px solid #bbf7d0',
+                                    color: '#15803d',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 850,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title="Aufnahmen deiner Lehrkraft öffnen"
+                                >
+                                  <Headphones size={13} color="currentColor" />
+                                  <span>{audioTracks.length === 1 ? '1 Aufnahme anhören' : `${audioTracks.length} Aufnahmen anhören`}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
 
-                          <button
-                            onClick={() => handleTabChangeLocal('homework_book')}
-                            style={{
-                              width: '100%',
-                              padding: '10px 14px',
-                              borderRadius: '14px',
-                              border: '1.5px solid #e2e8f0',
-                              background: '#f8fafc',
-                              color: '#0f172a',
-                              fontSize: '0.88rem',
-                              fontWeight: 900,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
-                              transition: 'all 0.2s'
-                            }}
-                            className="hover-scale"
-                          >
-                            <BookOpen size={14} color="#34a853" />
-                            <span>Hausaufgabenheft öffnen →</span>
-                          </button>
+                          {/* 2-Button Action Footer */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleTabChangeLocal('homework_book')}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '14px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                color: '#ffffff',
+                                fontSize: '0.86rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s',
+                                minHeight: '44px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.28)'
+                              }}
+                              className="hover-scale"
+                              title="Alle Hausaufgaben ansehen"
+                            >
+                              <BookOpen size={15} color="currentColor" style={{ flexShrink: 0 }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Aufgaben ansehen →</span>
+                            </button>
+
+                            {(() => {
+                              const displayedProQuestion = activeStudentQuestion || studentQuestionText;
+                              return (
+                                <button
+                                  type="button"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openQuestionModal();
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openQuestionModal();
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '10px 14px',
+                                    borderRadius: '14px',
+                                    border: displayedProQuestion ? 'none' : '1.5px solid #e2e8f0',
+                                    background: displayedProQuestion ? '#facc15' : '#f8fafc',
+                                    color: displayedProQuestion ? '#0f172a' : '#475569',
+                                    fontSize: '0.86rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s',
+                                    minHeight: '44px',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: displayedProQuestion ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none'
+                                  }}
+                                  className="hover-scale"
+                                  title={displayedProQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
+                                  aria-label={displayedProQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
+                                >
+                                  <HelpCircle size={15} color="currentColor" style={{ flexShrink: 0 }} />
+                                  <span>{displayedProQuestion ? 'Frage aktiv' : 'Frage?'}</span>
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </div>
                       );
                     })()}
@@ -8024,8 +8114,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ 
-                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(251, 188, 5, 0.14)', 
-                                  color: isGoalAchieved ? '#16a34a' : '#d97706', 
+                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(124, 58, 237, 0.12)', 
+                                  color: isGoalAchieved ? '#16a34a' : '#7c3aed', 
                                   width: '34px', 
                                   height: '34px', 
                                   borderRadius: '11px', 
@@ -8059,50 +8149,26 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             </div>
 
-                            {/* Smart-Gauge: Kompakter horizontaler Fortschrittsbalken */}
+                            {/* 1% Apple-Fitness-Style Radial Wow-Gauge (126px) - Zentriert, ohne grauen Kasten */}
                             <div style={{
-                              background: '#f8fafc',
-                              border: '1px solid #f1f5f9',
-                              borderRadius: '14px',
-                              padding: '10px 14px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '6px'
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '12px',
+                              padding: '12px 0 6px 0',
+                              width: '100%'
                             }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', fontWeight: 750 }}>
-                                <span style={{ color: '#475569' }}>
-                                  Heute: <strong style={{ color: isGoalAchieved ? '#15803d' : '#0f172a' }}>{todayMins} von {requiredMins} Min.</strong>
-                                </span>
-                                <span style={{ color: isGoalAchieved ? '#15803d' : '#4f46e5', fontWeight: 900 }}>
-                                  {progressPercent}%
-                                </span>
-                              </div>
-                              <div style={{
-                                width: '100%',
-                                height: '7px',
-                                background: '#e2e8f0',
-                                borderRadius: '100px',
-                                overflow: 'hidden',
-                                position: 'relative'
-                              }}>
-                                <div style={{
-                                  width: `${progressPercent}%`,
-                                  height: '100%',
-                                  background: isGoalAchieved 
-                                    ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' 
-                                    : 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
-                                  borderRadius: '100px',
-                                  transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-                                }} />
+                              {renderCircularGauge(progressPercent, isGoalAchieved, 126, 12, todayMins, requiredMins)}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textAlign: 'center', width: '100%' }}>
+                                <div style={{ fontSize: '1.10rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  {isGoalAchieved ? 'Tagesziel erreicht' : 'Tagesfokus'}
+                                </div>
+                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: isGoalAchieved ? '#15803d' : '#64748b', lineHeight: 1.35 }}>
+                                  {isGoalAchieved ? 'Serie für heute gesichert' : `${Math.max(1, requiredMins - todayMins)} Min. bis zum Streak-Schutz`}
+                                </div>
                               </div>
                             </div>
-
-                            {/* Motivations-Text */}
-                            <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.84rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
-                              {isGoalAchieved 
-                                ? `Exzellent! Dein heutiges Übeziel von ${requiredMins} Minuten ist abgeschlossen. 🎯`
-                                : `Gezielte Übeeinheit: Schon ${requiredMins} Minuten ${instPrep} halten deinen Fortschritt im Fluss. 🎯`}
-                            </p>
                           </div>
 
                           {/* CTA Button */}
@@ -8113,7 +8179,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               background: isGoalAchieved 
                                 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                                 : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
-                              color: 'white', 
+                              color: '#ffffff', 
                               border: 'none', 
                               borderRadius: '14px', 
                               padding: '14px 20px', 
@@ -8134,7 +8200,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }}
                             className="hover-scale"
                           >
-                            {isGoalAchieved ? <Check size={16} /> : <Play size={16} fill="white" />}
+                            {isGoalAchieved ? <Check size={16} /> : <Play size={15} fill="currentColor" color="currentColor" />}
                             <span>{isGoalAchieved ? 'Tagesziel erreicht • Session starten' : `${requiredMins} Min. Übe-Timer starten`}</span>
                           </button>
                         </div>
@@ -8174,20 +8240,35 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             {/* Header: Title + Rules + Minimalist Badge */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: isMusicStandMode ? '0.96rem' : '0.84rem', fontWeight: 950, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  ÜBE-KONTINUITÄT
-                                </span>
-                                <button 
-                                  onClick={() => setShowRulesModal(true)}
-                                  style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.15s' }}
-                                  onMouseOver={e => e.currentTarget.style.color = '#64748b'}
-                                  onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
-                                  title="Regeln & Meilensteine anzeigen"
-                                  aria-label="Regeln & Meilensteine anzeigen"
-                                >
-                                  <HelpCircle size={15} />
-                                </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ 
+                                  background: isTier3Unlocked ? 'rgba(239, 68, 68, 0.12)' : 'rgba(249, 115, 22, 0.12)', 
+                                  color: isTier3Unlocked ? '#dc2626' : '#ea580c', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '11px', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Flame size={17} strokeWidth={2.2} fill={streak > 0 ? "currentColor" : "none"} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    Übe-Kontinuität
+                                  </h4>
+                                  <button 
+                                    onClick={() => setShowRulesModal(true)}
+                                    style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.15s' }}
+                                    onMouseOver={e => e.currentTarget.style.color = '#64748b'}
+                                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                                    title="Regeln & Meilensteine anzeigen"
+                                    aria-label="Regeln & Meilensteine anzeigen"
+                                  >
+                                    <HelpCircle size={15} />
+                                  </button>
+                                </div>
                               </div>
                               <span style={{ 
                                 background: streak === 0 ? '#f1f5f9' : '#ecfdf5', 
@@ -8240,10 +8321,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             ) : (
                               <div style={{
-                                background: '#f8fafc',
-                                borderRadius: '16px',
-                                padding: '12px 14px',
-                                border: '1px solid #e2e8f0',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8px'
@@ -8299,155 +8376,201 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             )}
 
-                            {/* MEILENSTEINE: 3 PLATEAUS */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
-                              <div style={{ position: 'absolute', left: '19px', top: '24px', bottom: '24px', width: '2px', background: '#e2e8f0', zIndex: 1 }} />
-                              <div style={{ 
-                                position: 'absolute', 
-                                left: '19px', 
-                                top: '24px', 
-                                height: streak >= 9 ? '100%' : streak >= 4 ? '58%' : streak >= 1 ? '16%' : '0%', 
-                                width: '2px', 
-                                background: 'linear-gradient(to bottom, #10b981 0%, #059669 100%)', 
-                                zIndex: 1, 
-                                transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)' 
-                              }} />
+                            {/* CONDENSED ACTIVE TIER CARD & MILESTONE STEPPER */}
+                            {(() => {
+                              const isMeister = isTier3Unlocked;
+                              const isFlow = !isMeister && isTier2Unlocked;
+                              const isBasis = !isMeister && !isFlow;
 
-                              {/* Tier 1 */}
-                              {(() => {
-                                const isCurrent = isTier1Unlocked && !isTier2Unlocked;
-                                return (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px', 
-                                    background: isCurrent ? '#ffffff' : '#f8fafc', 
-                                    padding: '10px 14px', 
-                                    borderRadius: '16px', 
-                                    border: isCurrent ? '1.5px solid #10b981' : '1px solid rgba(0,0,0,0.04)', 
-                                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.10)' : 'none',
-                                    zIndex: 2, 
-                                    opacity: isTier1Unlocked ? 1 : 0.65 
-                                  }}>
-                                    <div style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
-                                      borderRadius: '50%', 
-                                      background: isTier1Unlocked ? '#ecfdf5' : '#e2e8f0', 
+                              const tierTitle = isMeister ? 'Stufe 3: Meister-Fokus' : isFlow ? 'Stufe 2: Flow-Fokus' : 'Stufe 1: Basis-Fokus';
+                              const tierIcon = isMeister 
+                                ? <Crown size={16} color="#dc2626" fill="#ef4444" /> 
+                                : isFlow 
+                                ? <Zap size={16} color="#ea580c" fill="#f97316" /> 
+                                : <Flame size={16} color={isTier1Unlocked ? '#d97706' : '#94a3b8'} fill={isTier1Unlocked ? '#facc15' : 'none'} />;
+                              const tierIconBg = isMeister ? '#fee2e2' : isFlow ? '#ffedd5' : isTier1Unlocked ? '#fef9c3' : '#f1f5f9';
+                              const tierBorder = isMeister ? '1.5px solid #ef4444' : isFlow ? '1.5px solid #f97316' : isTier1Unlocked ? '1.5px solid #facc15' : '1px solid #e2e8f0';
+                              const tierShadow = isMeister 
+                                ? '0 4px 14px rgba(239, 68, 68, 0.16)' 
+                                : isFlow 
+                                ? '0 4px 14px rgba(249, 115, 22, 0.16)' 
+                                : isTier1Unlocked 
+                                ? '0 4px 14px rgba(250, 204, 21, 0.16)' 
+                                : 'none';
+                              const tierRequirement = isMeister ? `9+ Tage • ${heldenMins} Min. täglich` : isFlow ? `4–8 Tage • ${mittlereMins} Min. täglich` : `1–3 Tage • ${kleineMins} Min. täglich`;
+                              const tierStatus = isMeister 
+                                ? '★ Meister-Fokus aktiv • Volle Flamme' 
+                                : isFlow 
+                                ? `● Flow-Phase aktiv • Noch ${Math.max(1, 9 - streak)} ${Math.max(1, 9 - streak) === 1 ? 'Tag' : 'Tage'} bis Meister` 
+                                : (isTier1Unlocked 
+                                  ? `● Basis-Fokus aktiv • Noch ${Math.max(1, 4 - streak)} ${Math.max(1, 4 - streak) === 1 ? 'Tag' : 'Tage'} bis Flow` 
+                                  : 'Bereit zum Start');
+                              const tierTitleColor = isMeister ? '#991b1b' : isFlow ? '#9a3412' : isTier1Unlocked ? '#713f12' : '#0f172a';
+
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div 
+                                    onClick={() => setShowRulesModal(true)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowRulesModal(true); }}
+                                    style={{ 
                                       display: 'flex', 
                                       alignItems: 'center', 
-                                      justifyContent: 'center',
+                                      gap: '12px', 
+                                      background: '#ffffff', 
+                                      padding: '10px 14px', 
+                                      borderRadius: '16px', 
+                                      border: tierBorder, 
+                                      boxShadow: tierShadow, 
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title="Klicke hier, um alle Meilensteine und Regeln einzusehen"
+                                  >
+                                    <div style={{ 
+                                      width: '32px', 
+                                      height: '32px', 
+                                      borderRadius: '50%', 
+                                      background: tierIconBg, 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
                                       flexShrink: 0 
                                     }}>
-                                      <Flame size={16} color={isTier1Unlocked ? '#059669' : '#94a3b8'} fill={isTier1Unlocked ? '#10b981' : 'none'} />
+                                      {tierIcon}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: isTier1Unlocked ? '#065f46' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Stufe 1: Basis-Fokus
+                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: tierTitleColor }}>
+                                          {tierTitle}
                                         </span>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: isTier1Unlocked ? '#047857' : '#64748b', flexShrink: 0 }}>
-                                          1–3 Tage • {kleineMins} Min. täglich
+                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: '#64748b', flexShrink: 0 }}>
+                                          {tierRequirement}
                                         </span>
                                       </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isTier2Unlocked ? '#64748b' : isTier1Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
-                                        {isTier2Unlocked ? '✓ Erreicht' : isTier1Unlocked ? '● Aktiv: Kontinuität gesichert' : 'Bereit zum Start'}
+                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isMeister ? '#dc2626' : isFlow ? '#ea580c' : isTier1Unlocked ? '#d97706' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {tierStatus}
                                       </div>
                                     </div>
                                   </div>
-                                );
-                              })()}
 
-                              {/* Tier 2 */}
-                              {(() => {
-                                const isCurrent = isTier2Unlocked && !isTier3Unlocked;
-                                return (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px', 
-                                    background: isCurrent ? '#ffffff' : '#f8fafc', 
-                                    padding: '10px 14px', 
-                                    borderRadius: '16px', 
-                                    border: isCurrent ? '1.5px solid #10b981' : '1px solid rgba(0,0,0,0.04)', 
-                                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.10)' : 'none',
-                                    zIndex: 2, 
-                                    opacity: isTier2Unlocked ? 1 : 0.65 
+                                  {/* 3-Step Milestone Stepper as unified Segment Track */}
+                                  <div style={{
+                                    display: 'flex',
+                                    gap: '4px',
+                                    background: '#f1f5f9',
+                                    padding: '4px',
+                                    borderRadius: '14px',
+                                    border: '1px solid #e2e8f0'
                                   }}>
-                                    <div style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
-                                      borderRadius: '50%', 
-                                      background: isTier2Unlocked ? '#ecfdf5' : '#e2e8f0', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center',
-                                      flexShrink: 0 
-                                    }}>
-                                      <Zap size={16} color={isTier2Unlocked ? '#059669' : '#94a3b8'} fill={isTier2Unlocked ? '#10b981' : 'none'} />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: isTier2Unlocked ? '#065f46' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Stufe 2: Flow-Fokus
-                                        </span>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: isTier2Unlocked ? '#047857' : '#64748b', flexShrink: 0 }}>
-                                          4–8 Tage • {mittlereMins} Min. täglich
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isTier3Unlocked ? '#64748b' : isTier2Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
-                                        {isTier3Unlocked ? '✓ Erreicht' : isTier2Unlocked ? '● Aktiv: Flow-Phase' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
+                                    {[
+                                      { 
+                                        label: '1–3 T', 
+                                        name: 'Basis', 
+                                        active: streak >= 1, 
+                                        done: streak >= 4,
+                                        activeBg: '#facc15',
+                                        activeBorder: '#eab308',
+                                        activeColor: '#0f172a',
+                                        activeShadow: '0 2px 8px rgba(250, 204, 21, 0.35)',
+                                        doneBg: '#fef08a',
+                                        doneBorder: '#facc15',
+                                        doneColor: '#713f12'
+                                      },
+                                      { 
+                                        label: '4–8 T', 
+                                        name: 'Flow', 
+                                        active: streak >= 4, 
+                                        done: streak >= 9,
+                                        activeBg: '#f97316',
+                                        activeBorder: '#ea580c',
+                                        activeColor: '#ffffff',
+                                        activeShadow: '0 2px 8px rgba(249, 115, 22, 0.35)',
+                                        doneBg: '#ffedd5',
+                                        doneBorder: '#f97316',
+                                        doneColor: '#9a3412'
+                                      },
+                                      { 
+                                        label: '9+ T', 
+                                        name: 'Meister', 
+                                        active: streak >= 9, 
+                                        done: streak >= 9,
+                                        activeBg: '#ef4444',
+                                        activeBorder: '#dc2626',
+                                        activeColor: '#ffffff',
+                                        activeShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                                        doneBg: '#fee2e2',
+                                        doneBorder: '#ef4444',
+                                        doneColor: '#991b1b'
+                                      }
+                                    ].map((step, idx) => {
+                                      const isCurrent = step.active && !step.done;
+                                      const bg = step.done ? step.doneBg : step.active ? step.activeBg : 'transparent';
+                                      const border = step.done ? `1px solid ${step.doneBorder}` : step.active ? `1px solid ${step.activeBorder}` : '1px solid transparent';
+                                      const textColor = step.done ? step.doneColor : step.active ? step.activeColor : '#64748b';
+                                      const shadow = isCurrent ? step.activeShadow : 'none';
 
-                              {/* Tier 3 */}
-                              {(() => {
-                                const isCurrent = isTier3Unlocked;
-                                return (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px', 
-                                    background: isCurrent ? '#ffffff' : '#f8fafc', 
-                                    padding: '10px 14px', 
-                                    borderRadius: '16px', 
-                                    border: isCurrent ? '1.5px solid #10b981' : '1px solid rgba(0,0,0,0.04)', 
-                                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.10)' : 'none',
-                                    zIndex: 2, 
-                                    opacity: isTier3Unlocked ? 1 : 0.65 
-                                  }}>
-                                    <div style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
-                                      borderRadius: '50%', 
-                                      background: isTier3Unlocked ? '#ecfdf5' : '#e2e8f0', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center',
-                                      flexShrink: 0 
-                                    }}>
-                                      <Crown size={16} color={isTier3Unlocked ? '#059669' : '#94a3b8'} fill={isTier3Unlocked ? '#10b981' : 'none'} />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: isTier3Unlocked ? '#065f46' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Stufe 3: Meister-Fokus
-                                        </span>
-                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: isTier3Unlocked ? '#047857' : '#64748b', flexShrink: 0 }}>
-                                          9+ Tage • {heldenMins} Min. täglich
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isTier3Unlocked ? '#059669' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
-                                        {isTier3Unlocked ? '★ Meister-Fokus aktiv' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Fokus`}
-                                      </div>
-                                    </div>
+                                      return (
+                                        <div 
+                                          key={idx}
+                                          onClick={() => setShowRulesModal(true)}
+                                          role="button"
+                                          tabIndex={0}
+                                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowRulesModal(true); }}
+                                          style={{
+                                            flex: 1,
+                                            padding: '8px 4px',
+                                            borderRadius: '10px',
+                                            background: bg,
+                                            border: border,
+                                            boxShadow: shadow,
+                                            textAlign: 'center',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          title={`${step.name} (${step.label}) – Klicke für Details`}
+                                        >
+                                          <div style={{ fontSize: '0.64rem', fontWeight: 900, color: textColor, textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                            {step.done ? <span>✓ {step.name}</span> : <span>{step.name}</span>}
+                                          </div>
+                                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: textColor, opacity: step.active ? 1 : 0.75, marginTop: '1px' }}>
+                                            {step.label}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })()}
-                            </div>
+
+                                  {/* Gamification-Sog Countdown (Pure White Background, No Gray Box, Monochrome Icon) */}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '6px 0 0 0',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    color: streak >= 9 ? '#dc2626' : streak >= 4 ? '#ea580c' : streak >= 1 ? '#b45309' : '#64748b',
+                                    textAlign: 'center'
+                                  }}>
+                                    <Flame size={14} color="currentColor" />
+                                    {streak >= 9 ? (
+                                      <span>Meister-Stufe erreicht (9+ T) • Maximale Routine gesichert.</span>
+                                    ) : streak >= 4 ? (
+                                      <span>Noch {9 - streak} {9 - streak === 1 ? 'Tag' : 'Tage'} bis Meister (9+ T)</span>
+                                    ) : streak >= 1 ? (
+                                      <span>Noch {4 - streak} {4 - streak === 1 ? 'Tag' : 'Tage'} bis Flow (4–8 T)</span>
+                                    ) : (
+                                      <span>Erste Session starten für Basis (1–3 T)</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -8461,1258 +8584,90 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
             {/* RIGHT COLUMN (Only for Teen Level 2 and Pro Level 3 - Junior Level 1 gets full width) */}
             {studentUiLevel !== 'junior' && (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '24px',
-              width: isRightSidebarCollapsed ? '0px' : '340px',
-              minWidth: isRightSidebarCollapsed ? '0px' : '340px',
-              maxWidth: isRightSidebarCollapsed ? '0px' : '340px',
-              opacity: isRightSidebarCollapsed ? 0 : 1,
-              transform: isRightSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
-              pointerEvents: isRightSidebarCollapsed ? 'none' : 'auto',
-              overflowY: isRightSidebarCollapsed ? 'hidden' : 'visible',
-              overflowX: 'hidden',
-              boxSizing: 'border-box',
-              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}>
-              {/* Sidebar Header with Collapse Button */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 2px 4px 2px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    background: '#e6f4ea',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Calendar size={15} color="#34a853" />
-                  </div>
-                  <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                    Termine &amp; Mitteilungen
-                  </span>
-                  {sidebarTotalAlertsCount > 0 && (
-                    <span style={{
-                      background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
-                      color: '#ffffff',
-                      fontSize: '0.65rem',
-                      fontWeight: 900,
-                      padding: '2px 7px',
-                      borderRadius: '100px'
-                    }}>
-                      {sidebarTotalAlertsCount}
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => handleToggleRightSidebar(true)}
-                  style={{
-                    background: '#f8fafc',
-                    border: '1.5px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '6px 10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                  title="Sidebar einklappen"
-                >
-                  <span>Einklappen</span>
-                  <ChevronRight size={14} color="#64748b" />
-                </button>
-              </div>
-
-              {/* Nächste Termine */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={18} color="#34a853" />
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Nächste Termine</h3>
-                  </div>
-                  <button onClick={() => handleTabChangeLocal('events')} style={{ background: 'transparent', border: 'none', color: '#34a853', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>Alle anzeigen</button>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {(() => {
-                    const todayStr = new Date().toLocaleDateString('sv-SE');
-                    const combinedList = [...(scheduleOccurrences || []), ...(schoolYearOccurrences || [])];
-                    const seenKeys = new Set<string>();
-                    const upcomingConfirmed = combinedList.filter(occ => {
-                      if (!occ || !occ.date) return false;
-                      if (occ.date < todayStr) return false;
-                      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student') return false;
-                      const key = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
-                      if (seenKeys.has(key)) return false;
-                      seenKeys.add(key);
-                      return true;
-                    });
-                    if (upcomingConfirmed.length > 0) {
-                      return upcomingConfirmed.slice(0, 4).map(occ => {
-                        const d = new Date(occ.date);
-                        const isCancelled = occ.status === 'cancelled';
-                        
-                        if (isCancelled) {
-                          return (
-                            <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                              <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                                 <div style={{ background: '#ef4444', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                                 <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
-                              </div>
-                              
-                              <div style={{ 
-                                flex: 1, 
-                                background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                                boxShadow: '0 4px 10px rgba(239, 68, 68, 0.1)',
-                                borderRadius: '14px',
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px'
-                              }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: '#000000', color: '#ffffff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
-                                  </div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: 'rgba(255, 255, 255, 0.95)', fontWeight: 650, marginTop: '3px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>{getOccRoomName(occ)}</span>
-                                  </div>
-                                </div>
-
-                                <button
-                                  onClick={() => {
-                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                    const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                    const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
-                                    setAppointmentChatData({
-                                      teacherId: occ.teacher_id,
-                                      date: occ.date,
-                                      start_time: occ.start_time?.substring(0, 5),
-                                      label,
-                                      occurrenceId: occ.id,
-                                      status: 'cancelled',
-                                      isCancelled: true
-                                    });
-                                    setShowAppointmentChat(true);
-                                  }}
-                                  title="Shoutbox zum Ausfall-Termin öffnen"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'),
-                                    color: (getOccurrenceUnreadCount(occ) > 0 || checkOccurrenceHasMessages(occ)) ? '#d97706' : '#ffffff',
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    flexShrink: 0
-                                  }}
-                                  onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
-                                >
-                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
-                                    {getOccurrenceUnreadCount(occ) > 0 && (
-                                      <span style={{
-                                        position: 'absolute',
-                                        top: '-4px',
-                                        right: '-4px',
-                                        width: '7px',
-                                        height: '7px',
-                                        borderRadius: '50%',
-                                        background: '#ea4335',
-                                        border: '1.5px solid #ffffff',
-                                        boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
-                                      }} />
-                                    )}
-                                  </div>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        const isRescheduled = occ.status === 'rescheduled_confirmed';
-                        if (isRescheduled) {
-                          return (
-                            <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                              <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                                 <div style={{ background: '#eab308', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                                 <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
-                              </div>
-                              
-                              <div style={{ 
-                                flex: 1, 
-                                background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
-                                boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
-                                borderRadius: '14px',
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px'
-                              }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: '#000000', color: '#ffffff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
-                                  </div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 650, marginTop: '3px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>{getOccRoomName(occ)}</span>
-                                  </div>
-                                </div>
-
-                                <button
-                                  onClick={() => {
-                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                    const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                    const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Verschoben)`;
-                                    setAppointmentChatData({
-                                      teacherId: occ.teacher_id,
-                                      date: occ.date,
-                                      start_time: occ.start_time?.substring(0, 5),
-                                      label,
-                                      occurrenceId: occ.id,
-                                      status: 'rescheduled_confirmed',
-                                      isCancelled: false
-                                    });
-                                    setShowAppointmentChat(true);
-                                  }}
-                                  title="Shoutbox zum verschobenen Termin öffnen"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'),
-                                    color: checkOccurrenceHasMessages(occ) ? '#ffffff' : '#78350f',
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    flexShrink: 0
-                                  }}
-                                  onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
-                                >
-                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
-                                    {getOccurrenceUnreadCount(occ) > 0 && (
-                                      <span style={{
-                                        position: 'absolute',
-                                        top: '-4px',
-                                        right: '-4px',
-                                        width: '7px',
-                                        height: '7px',
-                                        borderRadius: '50%',
-                                        background: '#ea4335',
-                                        border: '1.5px solid #ffffff',
-                                        boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
-                                      }} />
-                                    )}
-                                  </div>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                            <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
-                              <div style={{ background: '#34a853', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                              <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                              </div>
-                              <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#475569', fontWeight: 650 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#15803d', fontWeight: 800 }}>{getOccRoomName(occ)}</span></div>
-                            </div>
-                            <button
-                              onClick={() => {
-                                const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr`;
-                                setAppointmentChatData({
-                                  teacherId: occ.teacher_id,
-                                  date: occ.date,
-                                  start_time: occ.start_time?.substring(0, 5),
-                                  label,
-                                  occurrenceId: occ.id,
-                                  status: occ.status || 'scheduled',
-                                  isCancelled: false
-                                });
-                                setShowAppointmentChat(true);
-                              }}
-                              title="Shoutbox öffnen"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#f8fafc'),
-                                color: (getOccurrenceUnreadCount(occ) > 0 || checkOccurrenceHasMessages(occ)) ? '#d97706' : '#475569',
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                marginLeft: 'auto',
-                                flexShrink: 0
-                              }}
-                              onMouseOver={e => {
-                                e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : '#f1f5f9';
-                                e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#1e293b';
-                              }}
-                              onMouseOut={e => {
-                                e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#ffffff';
-                                e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#475569';
-                              }}
-                            >
-                              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
-                                {getOccurrenceUnreadCount(occ) > 0 && (
-                                  <span style={{
-                                    position: 'absolute',
-                                    top: '-4px',
-                                    right: '-4px',
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    background: '#ea4335',
-                                    border: '1.5px solid #ffffff',
-                                    boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
-                                  }} />
-                                )}
-                              </div>
-                            </button>
-                          </div>
-                        );
-                      });
-                    } else {
-                      const simNow = typeof getSimulatedNow === 'function' ? getSimulatedNow() : new Date();
-                      const dayOfWeek = simNow.getDay();
-                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-                      if (isWeekend) {
-                        if (effectiveLevel === 'junior') {
-                          return (
-                            <div style={{
-                              background: 'linear-gradient(135deg, #fffbeb 0%, #f0fdf4 50%, #eff6ff 100%)',
-                              border: '1.5px solid #bbf7d0',
-                              borderRadius: '20px',
-                              padding: '20px 16px',
-                              textAlign: 'center',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '10px',
-                              boxShadow: '0 4px 16px rgba(34, 197, 94, 0.06)',
-                              margin: '6px 0'
-                            }}>
-                              <div style={{
-                                width: '46px',
-                                height: '46px',
-                                borderRadius: '16px',
-                                background: 'linear-gradient(135deg, #facc15 0%, #eab308 50%, #ca8a04 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)',
-                                fontSize: '1.3rem'
-                              }}>
-                                🎶
-                              </div>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  Wochenend-Pause!
-                                </h4>
-                                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-                                  Heute ist kein Unterricht. Zeit für deine Lieblings-Songs &amp; neue Grooves!
-                                </p>
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '4px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleTabChangeLocal && handleTabChangeLocal('practice_board')}
-                                  style={{
-                                    background: '#16a34a',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '10px',
-                                    padding: '6px 14px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
-                                  }}
-                                >
-                                  <span>🎧</span>
-                                  <span>Übe-Studio</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleTabChangeLocal && handleTabChangeLocal('homework_book')}
-                                  style={{
-                                    background: '#ffffff',
-                                    color: '#334155',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '10px',
-                                    padding: '6px 12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 750,
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px'
-                                  }}
-                                >
-                                  <span>📖</span>
-                                  <span>Hausaufgaben</span>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // Teen & Pro Level: Clean, high-end, calm
-                        return (
-                          <div style={{
-                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '18px',
-                            padding: '18px 16px',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                            margin: '6px 0'
-                          }}>
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              background: '#ede9fe',
-                              color: '#6d28d9',
-                              padding: '3px 10px',
-                              borderRadius: '100px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              letterSpacing: '0.04em',
-                              textTransform: 'uppercase'
-                            }}>
-                              <Sparkles size={11} color="#6d28d9" />
-                              <span>Unterrichtsfreies Wochenende</span>
-                            </div>
-                            <div style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 650, marginTop: '2px' }}>
-                              Deine nächsten Stunden starten ab Montag.
-                            </div>
-                            <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                              Nutze das freie Wochenende für deine Songs, Improvisation und Jam-Sessions.
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleTabChangeLocal && handleTabChangeLocal('practice_board')}
-                                style={{
-                                  background: '#ffffff',
-                                  color: '#0f172a',
-                                  border: '1px solid #cbd5e1',
-                                  borderRadius: '10px',
-                                  padding: '5px 12px',
-                                  fontSize: '0.76rem',
-                                  fontWeight: 750,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                                }}
-                              >
-                                <Music size={13} color="#6d28d9" />
-                                <span>Zum Übe-Studio</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '20px 0' }}>
-                          Heute keine Termine im Stundenplan.
-                        </div>
-                      );
-                    }
-                  })()}
-                </div>
-              </div>
-
-              {/* Terminänderungen */}
-              {(() => {
-                const appointmentChanges = (scheduleOccurrences || []).filter(occ => 
-                  !occ.student_acknowledged && (
-                    occ.status === 'pending_reschedule' || 
-                    occ.status === 'cancelled' || 
-                    (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date)
-                  )
-                );
-                if (appointmentChanges.length === 0) return null;
-                return (
-                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: appointmentChanges.length > 0 ? '1.5px dashed #f59e0b' : '1px solid #e2e8f0', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                      <Calendar size={16} color={appointmentChanges.length > 0 ? '#f59e0b' : '#475569'} />
-                      <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Terminänderungen</h3>
-                    </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {appointmentChanges.map(occ => {
-                        const d = new Date(occ.date);
-                        const isReschedule = occ.status === 'pending_reschedule';
-                        const isCancelled = occ.status === 'cancelled';
-                        const isRegularReset = occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date;
-                        
-                        let cardBg = '#fef2f2';
-                        let cardBorder = '#fecaca';
-                        let badgeNode: React.ReactNode = (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <CalendarX size={12} color="#991b1b" /> Termin abgesagt
-                          </span>
-                        );
-                        let badgeColor = '#991b1b';
-                        
-                        if (isReschedule) {
-                          cardBg = '#fffbeb';
-                          cardBorder = '#fef08a';
-                          badgeNode = (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <RotateCcw size={12} color="#854d0e" /> Verschiebung vorgeschlagen
-                            </span>
-                          );
-                          badgeColor = '#854d0e';
-                        } else if (isRegularReset) {
-                          cardBg = '#e6f4ea';
-                          cardBorder = '#e6f4ea';
-                          badgeNode = (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <Check size={12} color="#34a853" /> Findet wieder regulär statt
-                            </span>
-                          );
-                          badgeColor = '#34a853';
-                        }
-                        
-                        return (
-                          <div key={occ.id} style={{ 
-                            padding: '12px', 
-                            borderRadius: '12px', 
-                            background: cardBg, 
-                            border: `1px solid ${cardBorder}`, 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            gap: '8px',
-                            position: 'relative',
-                            zIndex: 5
-                          }}>
-                            <div>
-                              <div style={{ fontSize: '9px', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
-                                {badgeNode}
-                              </div>
-                              <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e293b' }}>
-                                {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', gap: '8px' }}>
-                                <div style={{ fontSize: '0.80rem', color: '#475569', fontWeight: 700 }}>
-                                  {occ.start_time?.substring(0,5)} Uhr
-                                </div>
-                                {!isReschedule && (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleAcknowledgeCancellation(occ.id);
-                                    }}
-                                    style={{ 
-                                      background: (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? '#34a853' : '#ef4444', 
-                                      color: 'white', 
-                                      border: 'none', 
-                                      minHeight: '40px',
-                                      padding: '8px 14px', 
-                                      borderRadius: '12px', 
-                                      fontSize: '0.82rem', 
-                                      fontWeight: 800, 
-                                      cursor: 'pointer',
-                                      boxShadow: `0 2px 6px ${(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? 'rgba(52, 168, 83, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-                                      transition: 'all 0.2s',
-                                      flexShrink: 0,
-                                      position: 'relative',
-                                      zIndex: 10,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
-                                    }}
-                                  >
-                                    <Check size={13} strokeWidth={2.5} />
-                                    <span>Gelesen abhaken</span>
-                                  </button>
-                                )}
-                              </div>
-                              {(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) && (
-                                <div style={{ fontSize: '0.74rem', color: '#34a853', fontWeight: 600, marginTop: '4px', lineHeight: '1.3' }}>
-                                  Findet wieder regulär statt.
-                                </div>
-                              )}
-                            </div>
-                            
-                            {isReschedule && (
-                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px', flexWrap: 'wrap' }}>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                  {onOpenRescheduleBottomSheet && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        onOpenRescheduleBottomSheet(occ);
-                                      }}
-                                      style={{
-                                        background: '#fef3c7',
-                                        color: '#b45309',
-                                        border: '1px solid #fde68a',
-                                        minHeight: '40px',
-                                        padding: '8px 14px',
-                                        borderRadius: '12px',
-                                        fontSize: '0.82rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        boxShadow: '0 2px 6px rgba(217, 119, 6, 0.15)',
-                                        transition: 'all 0.2s',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                      }}
-                                    >
-                                      <Calendar size={14} strokeWidth={2.4} />
-                                      <span>Termin prüfen</span>
-                                    </button>
-                                  )}
-                                  <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleRejectReschedule(occ);
-                                    }}
-                                    style={{ 
-                                      background: '#ef4444', 
-                                      color: 'white', 
-                                      border: 'none', 
-                                      minHeight: '40px',
-                                      padding: '8px 14px', 
-                                      borderRadius: '12px', 
-                                      fontSize: '0.82rem', 
-                                      fontWeight: 800, 
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
-                                      transition: 'all 0.2s',
-                                      position: 'relative',
-                                      zIndex: 10,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
-                                    }}
-                                  >
-                                    <X size={14} strokeWidth={2.5} />
-                                    <span>Ablehnen</span>
-                                  </button>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleTriggerConfirmReschedule(occ.id);
-                                    }}
-                                    style={{ 
-                                      background: '#34a853', 
-                                      color: 'white', 
-                                      border: 'none', 
-                                      minHeight: '40px',
-                                      padding: '8px 14px', 
-                                      borderRadius: '12px', 
-                                      fontSize: '0.82rem', 
-                                      fontWeight: 800, 
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
-                                      transition: 'all 0.2s',
-                                      position: 'relative',
-                                      zIndex: 10,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
-                                    }}
-                                  >
-                                    {!isStudentRescheduleAllowed ? <Lock size={14} strokeWidth={2.5} /> : <Check size={14} strokeWidth={2.5} />}
-                                    <span>{!isStudentRescheduleAllowed ? 'Bestätigen (Eltern-PIN)' : 'Bestätigen'}</span>
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* ÜBE-ZIEL WIDGET (Crowdfunding-Stil) */}
-              {classGoals.length > 0 && (
-                <div style={{
-                  background: '#ffffff',
-                  borderRadius: '24px',
-                  padding: '18px 20px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif"
-                }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '10px',
-                      background: '#e6f4ea',
-                      border: '1px solid #e6f4ea',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <Target size={18} color="#34a853" />
-                    </div>
-                    <h3 style={{
-                      fontSize: '0.92rem',
-                      fontWeight: 750,
-                      color: '#1c1c1e',
-                      margin: 0,
-                      letterSpacing: '-0.02em',
-                      lineHeight: '1.2'
-                    }}>
-                      Klassen-Übe-Ziel
-                    </h3>
-                  </div>
-
-                  {/* Goals */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {classGoals.map((goal: any) => {
-                      const pct = goal.minutes > 0 ? Math.round((classWeeklyMins / goal.minutes) * 100) : 0;
-                      const isDeadlinePassed = goal.deadline ? new Date(goal.deadline) < new Date() : false;
-                      const maxPercentOnBar = 133;
-                      const visualWidth = Math.min(100, (pct / maxPercentOnBar) * 100);
-                      const isAchieved = pct >= 100;
-
-                      return (
-                        <div 
-                          key={goal.id} 
-                          onClick={() => handleOpenContributions(goal.title || 'Klassen-Übe-Ziel', goal.minutes)}
-                          onMouseOver={e => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(52, 168, 83, 0.22)';
-                          }}
-                          onMouseOut={e => {
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(52, 168, 83, 0.12)';
-                          }}
-                          style={{
-                            position: 'relative',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            background: '#34a853',
-                            boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
-                            borderRadius: '16px',
-                            padding: '12px 14px',
-                            gap: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                        >
-                          {/* Row 1: Title, Deadline on left & Percentage on right */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                              <span style={{
-                                fontSize: '0.8rem',
-                                fontWeight: 700,
-                                color: '#ffffff',
-                                letterSpacing: '-0.01em',
-                                lineHeight: '1.25',
-                                whiteSpace: 'normal',
-                                wordBreak: 'break-word'
-                              }}>
-                                {goal.title || 'Challenge'}
-                              </span>
-                              {goal.deadline && (
-                                <span style={{
-                                  fontSize: '0.62rem',
-                                  fontWeight: 500,
-                                  color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)',
-                                  lineHeight: '1.2',
-                                  whiteSpace: 'normal'
-                                }}>
-                                  bis {new Date(goal.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                  {isDeadlinePassed && ' (abgelaufen)'}
-                                </span>
-                              )}
-                            </div>
-                            <span style={{
-                              fontSize: '1.1rem',
-                              fontWeight: 800,
-                              color: '#ffffff',
-                              letterSpacing: '-0.02em',
-                              fontFeatureSettings: '"tnum"',
-                              flexShrink: 0,
-                              alignSelf: 'flex-start'
-                            }}>
-                              {pct}%
-                            </span>
-                          </div>
-
-                          {/* Progress bar container */}
-                          <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
-                            {/* Target marker (100% line) at 75% width */}
-                            <div style={{
-                              position: 'absolute',
-                              left: '75%',
-                              top: '-2px',
-                              height: '10px',
-                              width: '2px',
-                              background: '#ffffff',
-                              zIndex: 3,
-                              borderRadius: '99px'
-                            }} />
-
-                            {/* Bar fill */}
-                            <div style={{
-                              width: `${visualWidth}%`,
-                              height: '100%',
-                              background: '#ffffff',
-                              borderRadius: '99px',
-                              transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
-                            }} />
-                          </div>
-
-                          {/* Row 3: Current / Target & Status label */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
-                              <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyMins}</span> / {goal.minutes} Min.
-                            </span>
-                            <span style={{
-                              fontWeight: 700,
-                              color: isAchieved ? '#e6f4ea' : 'rgba(255, 255, 255, 0.8)',
-                              whiteSpace: 'normal',
-                              textAlign: 'right'
-                            }}>
-                              {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, goal.minutes - classWeeklyMins)} Min.`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* LIVE CAMPUS FEED (DESKTOP) */}
-              <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '24px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <Sparkles size={18} color="#34a853" />
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilungen</h3>
-                </div>
-
-                {/* Tab switcher */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
-                  <button
-                    onClick={() => setStudentFeedTab('campus')}
-                    style={{
-                      flex: 1,
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: studentFeedTab === 'campus' ? '#ffffff' : 'transparent',
-                      color: studentFeedTab === 'campus' ? '#34a853' : '#64748b',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: studentFeedTab === 'campus' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <School size={16} />
-                      <span>Campus</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setStudentFeedTab('class')}
-                    style={{
-                      flex: 1,
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: studentFeedTab === 'class' ? '#ffffff' : 'transparent',
-                      color: studentFeedTab === 'class' ? '#34a853' : '#64748b',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: studentFeedTab === 'class' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', position: 'relative' }}>
-                      <Users size={16} />
-                      <span>Klassen-Feed</span>
-                      {unreadClassFeedCount > 0 && (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: '#ea4335',
-                          color: '#ffffff',
-                          fontSize: '9px',
-                          fontWeight: 'bold',
-                          borderRadius: '10px',
-                          minWidth: '15px',
-                          height: '15px',
-                          padding: '0 3px',
-                          marginLeft: '4px'
-                        }}>
-                          {unreadClassFeedCount}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {studentFeedTab === 'class' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {classFeedPosts.length === 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                          <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                            Keine Beiträge in deinem Klassen-Feed.
-                          </span>
-                        </div>
-                      ) : (
-                        classFeedPosts.map((post) => {
-                          const myInteraction = classFeedInteractions.find(i => i.post_id === post.id && i.user_id === studentId);
-                          const isAnswered = !!myInteraction;
-
-                          let typeLabel = 'Mitteilung';
-                          let typeBg = '#e6f4ea';
-                          let typeColor = '#34a853';
-                          if (post.post_type === 'homework') {
-                            typeLabel = 'Hausaufgabe';
-                            typeBg = '#fef3c7';
-                            typeColor = '#b45309';
-                          } else if (post.post_type === 'poll') {
-                            typeLabel = 'Umfrage';
-                            typeBg = '#e0f2fe';
-                            typeColor = '#0369a1';
-                          } else if (post.post_type === 'quiz') {
-                            typeLabel = 'Quiz';
-                            typeBg = '#f3e8ff';
-                            typeColor = '#6b21a8';
-                          }
-
-                          return (
-                            <div key={post.id} style={{
-                              paddingBottom: '16px',
-                              borderBottom: '1px solid #f1f5f9',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '9px', fontWeight: 800, color: typeColor, background: typeBg, padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>
-                                  {typeLabel}
-                                </span>
-                                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                                  {new Date(post.created_at).toLocaleDateString('de-DE')}
-                                </span>
-                              </div>
-
-                              <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                                {post.title}
-                              </h5>
-                              <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                                {post.content}
-                              </p>
-
-                              {post.attachment_url && (
-                                <div style={{ marginTop: '4px' }}>
-                                  {post.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                    <a href={post.attachment_url} target="_blank" rel="noopener noreferrer">
-                                      <img src={post.attachment_url} alt="Anhang" style={{ maxWidth: '100%', maxHeight: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
-                                    </a>
-                                  ) : (
-                                    <a href={post.attachment_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}>
-                                      📄 Dokument öffnen
-                                    </a>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Interactive Poll / Quiz options */}
-                              {(post.post_type === 'quiz' || post.post_type === 'poll') && post.quiz_data && (
-                                <div style={{ marginTop: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
-                                    {post.quiz_data.question}
-                                  </span>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {Array.isArray(post.quiz_data.options) && post.quiz_data.options.map((opt: string, oIdx: number) => {
-                                      const isSelectedByMe = myInteraction?.selected_option === oIdx;
-                                      const isCorrectOption = post.post_type === 'quiz' && post.quiz_data.correctAnswer === oIdx;
-
-                                      let btnBg = 'white';
-                                      let btnBorder = '#cbd5e1';
-                                      let btnColor = '#1e293b';
-
-                                      if (isAnswered) {
-                                        if (post.post_type === 'quiz') {
-                                          if (isCorrectOption) {
-                                            btnBg = '#e6f4ea';
-                                            btnBorder = '#34a853';
-                                            btnColor = '#34a853';
-                                          } else if (isSelectedByMe) {
-                                            btnBg = '#fce8e6';
-                                            btnBorder = '#ea4335';
-                                            btnColor = '#ea4335';
-                                          }
-                                        } else {
-                                          if (isSelectedByMe) {
-                                            btnBg = '#e0f2fe';
-                                            btnBorder = '#0369a1';
-                                            btnColor = '#0369a1';
-                                          }
-                                        }
-                                      }
-
-                                      return (
-                                        <button
-                                          key={oIdx}
-                                          disabled={isAnswered}
-                                          onClick={() => {
-                                            if (post.post_type === 'quiz') {
-                                              handleSubmitClassFeedInteraction(post.id, 'quiz_answer', oIdx, oIdx === post.quiz_data.correctAnswer);
-                                            } else {
-                                              handleSubmitClassFeedInteraction(post.id, 'poll_vote', oIdx);
-                                            }
-                                          }}
-                                          style={{
-                                            width: '100%',
-                                            padding: '8px 12px',
-                                            borderRadius: '8px',
-                                            background: btnBg,
-                                            border: `1.5px solid ${btnBorder}`,
-                                            color: btnColor,
-                                            fontSize: '0.78rem',
-                                            fontWeight: isSelectedByMe || isCorrectOption ? 700 : 500,
-                                            textAlign: 'left',
-                                            cursor: isAnswered ? 'default' : 'pointer',
-                                            transition: 'all 0.2s',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center'
-                                          }}
-                                        >
-                                          <span>{opt}</span>
-                                          {isAnswered && (
-                                            <span>
-                                              {post.post_type === 'quiz' ? (
-                                                isCorrectOption ? '✓ Richtig' : (isSelectedByMe ? '✗ Falsch' : '')
-                                              ) : (
-                                                isSelectedByMe ? '✓ Gewählt' : ''
-                                              )}
-                                            </span>
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  ) : (
-                    campusFeedAnnouncements.length === 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                        <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                          Keine aktuellen Campus-Mitteilungen vorhanden.
-                        </span>
-                      </div>
-                    ) : (
-                      campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
-                        const postReactions = feedInteractions.filter(i => i.post_id === item.id);
-                        const thumbsUpCount = postReactions.filter(i => i.emoji_unicode === '👍').length;
-                        const heartCount = postReactions.filter(i => i.emoji_unicode === '❤️').length;
-                        const userHasThumbsUp = postReactions.some(i => i.emoji_unicode === '👍' && i.user_id === studentId);
-                        const userHasHeart = postReactions.some(i => i.emoji_unicode === '❤️' && i.user_id === studentId);
-
-                        let categoryLabel = 'Info';
-                        let categoryBg = '#f1f5f9';
-                        let categoryColor = '#475569';
-                        if (item.category === 'announcement') {
-                          categoryLabel = 'Ankündigung';
-                        } else if (item.category === 'event') {
-                          categoryLabel = 'Event';
-                        } else if (item.category === 'holidays') {
-                          categoryLabel = 'Ferien';
-                        }
-
-                        if (item.is_emergency) {
-                          categoryColor = '#b91c1c';
-                          categoryBg = '#fce8e6';
-                        }
-
-                        return (
-                          <div key={item.id} style={{
-                            paddingBottom: idx === arr.length - 1 ? '0' : '16px',
-                            borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span style={{
-                                  fontSize: '9px',
-                                  fontWeight: 800,
-                                  color: '#475569',
-                                  background: '#f1f5f9',
-                                  padding: '2px 8px',
-                                  borderRadius: '100px',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.04em'
-                                }}>
-                                  {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
-                                </span>
-                                <span style={{
-                                  fontSize: '9px',
-                                  fontWeight: 800,
-                                  color: categoryColor,
-                                  background: categoryBg,
-                                  padding: '2px 8px',
-                                  borderRadius: '100px',
-                                  textTransform: 'uppercase',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '2px'
-                                }}>
-                                  {item.is_emergency && <AlertTriangle size={9} color="#b91c1c" />}
-                                  {categoryLabel}
-                                </span>
-                              </div>
-                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                                {new Date(item.created_at).toLocaleDateString('de-DE')}
-                              </span>
-                            </div>
-                            
-                            <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                              {item.title}
-                            </h5>
-                            
-                            <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                              {item.content}
-                            </p>
-
-                            {item.attachment_url && (
-                              <div style={{ marginTop: '4px' }}>
-                                {item.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                  <a href={item.attachment_url} target="_blank" rel="noopener noreferrer">
-                                    <img 
-                                      src={item.attachment_url} 
-                                      alt="Anhang" 
-                                      style={{ maxWidth: '100%', maxHeight: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                                    />
-                                  </a>
-                                ) : (
-                                  <a 
-                                    href={item.attachment_url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}
-                                  >
-                                    📄 Dokument öffnen
-                                  </a>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Monochrome Emoji Reactions */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                              <button 
-                                onClick={() => handleReactToPost(item.id, '👍')}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
-                                  border: '1px solid',
-                                  borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
-                                  color: userHasThumbsUp ? '#34a853' : '#64748b',
-                                  padding: '3px 8px',
-                                  borderRadius: '9999px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
-                                <span>{thumbsUpCount}</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )
-                  )}
-                </div>
-              </div>
-            </div>
+              <StudentBriefingRightSidebar
+                isRightSidebarCollapsed={isRightSidebarCollapsed}
+                handleToggleRightSidebar={handleToggleRightSidebar}
+                sidebarTotalAlertsCount={sidebarTotalAlertsCount}
+                hasSidebarAppointmentAlerts={hasSidebarAppointmentAlerts}
+                handleTabChangeLocal={handleTabChangeLocal}
+                scheduleOccurrences={scheduleOccurrences}
+                schoolYearOccurrences={schoolYearOccurrences}
+                isMusicStandMode={isMusicStandMode}
+                getOccRoomName={getOccRoomName}
+                checkOccurrenceHasMessages={checkOccurrenceHasMessages}
+                getOccurrenceUnreadCount={getOccurrenceUnreadCount}
+                setAppointmentChatData={setAppointmentChatData}
+                setShowAppointmentChat={setShowAppointmentChat}
+                handleTriggerConfirmReschedule={handleTriggerConfirmReschedule}
+                handleRejectReschedule={handleRejectReschedule}
+                handleAcknowledgeCancellation={handleAcknowledgeCancellation}
+                onOpenRescheduleBottomSheet={onOpenRescheduleBottomSheet}
+                studentFeedTab={studentFeedTab}
+                setStudentFeedTab={setStudentFeedTab}
+                campusFeedAnnouncements={campusFeedAnnouncements}
+                classFeedPosts={classFeedPosts}
+                classFeedInteractions={classFeedInteractions}
+                unreadClassFeedCount={unreadClassFeedCount}
+                studentId={studentId}
+                handleReactToPost={handleReactToPost}
+                handleSubmitClassFeedInteraction={handleSubmitClassFeedInteraction}
+                handleOpenContributions={handleOpenContributions}
+                isStudentRescheduleAllowed={isStudentRescheduleAllowed}
+                classGoals={classGoals}
+                classWeeklyMins={classWeeklyMins}
+                feedInteractions={feedInteractions}
+                effectiveLevel={effectiveLevel}
+              />
             )}
 
           </div>
         </div>
         );
       })()}
+
+      {/* 🎧 Hidden Quickie Audio Element */}
+      <audio
+        ref={quickieAudioRef}
+        onTimeUpdate={(e) => setQuickieCurrentTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setQuickieDuration(e.currentTarget.duration)}
+        onEnded={() => setQuickiePlaying(false)}
+        style={{ display: 'none' }}
+      />
+
+      {/* 🚀 0.1% GOLDSTANDARD: MODALS HUB (Leaf Extraction) */}
+      <StudentBriefingModalsHub
+        showQuestionModal={showQuestionModal}
+        setShowQuestionModal={setShowQuestionModal}
+        questionInput={questionInput}
+        setQuestionInput={setQuestionInput}
+        handleQuestionInputChange={handleQuestionInputChange}
+        isSavingQuestion={isSavingQuestion}
+        handleSaveQuestion={handleSaveQuestion}
+        questionToast={questionToast}
+        isListeningSpeech={isListeningSpeech}
+        toggleSpeechRecognition={toggleSpeechRecognition}
+
+        selectedAppointmentForDetail={selectedAppointmentForDetail}
+        setSelectedAppointmentForDetail={setSelectedAppointmentForDetail}
+        showCancelConfirmStep={showCancelConfirmStep}
+        setShowCancelConfirmStep={setShowCancelConfirmStep}
+        handleTriggerCancelOccurrence={handleTriggerCancelOccurrence}
+        handleTriggerUndoCancelOccurrence={handleTriggerUndoCancelOccurrence}
+        studentUser={studentUser}
+        briefingData={briefingData}
+        studentInstrumentName={studentInstrumentName}
+        setAppointmentChatData={setAppointmentChatData}
+        setShowAppointmentChat={setShowAppointmentChat}
+
+        showRecordingsModal={showRecordingsModal}
+        setShowRecordingsModal={setShowRecordingsModal}
+        recordingsModalTracks={recordingsModalTracks}
+        activeRecordingTrack={activeRecordingTrack}
+        setActiveRecordingTrack={setActiveRecordingTrack}
+        getJuniorWeeklyHomeworkSummary={getJuniorWeeklyHomeworkSummary}
+        handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
+        handleTabChangeLocal={handleTabChangeLocal}
+      />
       </div>
   );
 }

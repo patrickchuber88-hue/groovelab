@@ -16,15 +16,17 @@ echo "==========================================================================
 
 # 1. Prune unused Docker images, builder cache, and networks (NEVER touch volumes)
 if command -v docker >/dev/null 2>&1; then
-  echo "📦 1. Bereinige ungenutzte Docker-Layer und Build-Cache (Volumes geschützt)..."
+  echo "📦 1. Bereinige ungenutzte Docker-Layer, alte Images und Build-Cache (Volumes geschützt)..."
   docker system prune -f --volumes=false || true
+  docker image prune -a --filter "until=168h" -f 2>/dev/null || true
   docker builder prune -f --keep-storage 1GB || true
   echo "  ✓ Docker-Bereinigung abgeschlossen."
 fi
 
-# 2. Clean temporary files in /tmp older than 7 days
-echo "🗑️  2. Bereinige temporäre Systemdateien (> 7 Tage)..."
-find /tmp -type f -atime +7 -delete 2>/dev/null || true
+# 2. Clean temporary files in /tmp (mtime-basiert gegen ENOSPC)
+echo "🗑️  2. Bereinige temporäre Systemdateien und alte Dumps in /tmp..."
+find /tmp -type f \( -name "*.sql.gz" -o -name "*.tmp" -o -name "dump_*" \) -mtime +2 -delete 2>/dev/null || true
+find /tmp -type f -mtime +7 -delete 2>/dev/null || true
 echo "  ✓ Temp-Bereinigung abgeschlossen."
 
 # 3. Force logrotate execution

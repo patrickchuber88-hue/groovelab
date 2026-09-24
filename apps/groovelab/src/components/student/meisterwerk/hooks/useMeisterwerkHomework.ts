@@ -12,7 +12,7 @@ import {
 import {
   extractSongArtistAndTitle,
   areSongsIdentical
-} from '../MeisterwerkDocumentTab';
+} from '../utils/meisterwerkSongHelpers';
 
 export const isSongMatch = (a: any, b: any) => areSongsIdentical(a, b);
 export const getCanonicalSongKey = (s: any) => extractSongArtistAndTitle(s).canonical;

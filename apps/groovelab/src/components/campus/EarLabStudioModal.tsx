@@ -796,12 +796,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 width: isNotebook ? '46px' : '42px',
                 height: isNotebook ? '46px' : '42px',
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.28)',
+                boxShadow: '0 4px 14px rgba(139, 92, 246, 0.28)',
                 flexShrink: 0
               }}
             >
@@ -821,15 +821,15 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                     lineHeight: 1.2
                   }}
                 >
-                  {uiLevel === 'junior' ? 'Klang-Detektiv 🎧' : 'EarLab & Harmony'}
+                  {uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining'}
                 </h2>
                 <span
                   style={{
                     fontSize: '0.70rem',
                     fontWeight: 900,
-                    background: '#dcfce7',
-                    color: '#15803d',
-                    border: '1px solid #bbf7d0',
+                    background: '#f3e8ff',
+                    color: '#6d28d9',
+                    border: '1px solid #e9d5ff',
                     padding: '2px 8px',
                     borderRadius: '100px',
                     letterSpacing: '0.02em'
@@ -2094,7 +2094,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="EarLab & Harmony-Studio"
+      aria-label="Gehörtraining-Studio"
       style={{
         position: 'fixed',
         inset: 0,

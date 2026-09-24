@@ -40,8 +40,8 @@ export const MASTER_CURRENCY_RATES: Record<CurrencyCode, CurrencyPricingRates> =
   },
 };
 
-import { formatCurrency } from '../utils/formatters';
-export { formatCurrency };
+import { formatCurrency, roundToFiveRappen } from '../utils/formatters';
+export { formatCurrency, roundToFiveRappen };
 
 export interface StorageTier {
   gb: number;

@@ -1449,20 +1449,26 @@ export function AdminDeviceSetupView({
                       onClick={async () => {
                         if (window.confirm("Möchtest du die Übe-Statistik (eingeloggte Minuten) wirklich für alle Schüler zurücksetzen?")) {
                           setIsSaving(true);
-                          const updatedHours = {
-                            ...hours,
-                            [activePlatform === 'campus' ? 'campus_stats_reset_at' : 'groovelab_stats_reset_at']: new Date().toISOString()
-                          };
-                          const { error } = await supabase
-                            .from('schools')
-                            .update({ opening_hours: updatedHours })
-                            .eq('id', school.id);
-                          setIsSaving(false);
-                          if (error) alert("Fehler: " + error.message);
-                          else {
-                            setHours(updatedHours);
-                            alert("Statistiken erfolgreich zurückgesetzt!");
-                            onUpdate();
+                          try {
+                            const updatedHours = {
+                              ...hours,
+                              [activePlatform === 'campus' ? 'campus_stats_reset_at' : 'groovelab_stats_reset_at']: new Date().toISOString()
+                            };
+                            const { error } = await supabase
+                              .from('schools')
+                              .update({ opening_hours: updatedHours })
+                              .eq('id', school.id);
+                            if (error) alert("Fehler: " + error.message);
+                            else {
+                              setHours(updatedHours);
+                              alert("Statistiken erfolgreich zurückgesetzt!");
+                              onUpdate();
+                            }
+                          } catch (err: any) {
+                            console.error("Fehler beim Zurücksetzen der Statistiken:", err);
+                            alert("Fehler beim Zurücksetzen der Statistiken: " + (err.message || String(err)));
+                          } finally {
+                            setIsSaving(false);
                           }
                         }
                       }}

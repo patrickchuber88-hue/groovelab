@@ -101,11 +101,25 @@ export function useStudentSchedule({
       setBriefingData({ todayLesson });
 
       if (!occError && occData && occData.length > 0) {
-        setScheduleOccurrences(occData);
-        setSchoolYearOccurrences(occData);
+        // Monolith Goldstandard: Enrich occurrences with master schedule room & instrument metadata
+        const enrichedOccData = occData.map((occ: any) => {
+          const matchingMaster = (masterSchedules || []).find((s: any) => s.id === occ.schedule_id || s.teacher_id === occ.teacher_id);
+          const resolvedRoom = occ.room_name || occ.room || (matchingMaster?.rooms as any)?.name || 'Lieber Raum';
+          const resolvedInst = occ.instrument || matchingMaster?.instrument || studentUser?.instrument || 'Gitarre';
+          return {
+            ...occ,
+            room: resolvedRoom,
+            room_name: resolvedRoom,
+            instrument: resolvedInst,
+            subject: occ.subject || resolvedInst,
+            teacher: occ.teacher || matchingMaster?.teacher || null
+          };
+        });
+        setScheduleOccurrences(enrichedOccData);
+        setSchoolYearOccurrences(enrichedOccData);
         setIsOfflineScheduleActive(false);
         try {
-          localStorage.setItem(`campus_schedule_cache_${studentId}`, JSON.stringify(occData));
+          localStorage.setItem(`campus_schedule_cache_${studentId}`, JSON.stringify(enrichedOccData));
         } catch (e) {}
       } else if (masterSchedules && masterSchedules.length > 0) {
         // Monolith Goldstandard SSOT Fallback: Project recurring slots from master schedules
@@ -187,13 +201,13 @@ export function useStudentSchedule({
       await supabase
         .from('schedule_occurrences')
         .update({
-          status: 'rescheduled',
+          status: 'rescheduled_confirmed',
           student_acknowledged: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', occId);
 
-      setScheduleOccurrences(prev => prev.map(o => o.id === occId ? { ...o, status: 'rescheduled', student_acknowledged: true } : o));
+      setScheduleOccurrences(prev => prev.map(o => o.id === occId ? { ...o, status: 'rescheduled_confirmed', student_acknowledged: true } : o));
     } catch (e) {
       console.error('Error confirming reschedule:', e);
     }

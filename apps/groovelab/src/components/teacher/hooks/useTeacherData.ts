@@ -11,7 +11,9 @@ import {
   fetchUnreadShouts,
   getCachedRoomsSync,
   getCachedStationsSync,
-  getCachedActiveSessionsSync
+  getCachedActiveSessionsSync,
+  invalidateActiveSessionsCache,
+  optimisticallyInjectActiveSession
 } from '../../../repositories';
 import {
   CANONICAL_GROOVELAB_STUDIO_ROOM,
@@ -139,12 +141,38 @@ export function useTeacherData({
   const [allBands, setAllBands] = useState<any[]>([]);
   const [openProposals, setOpenProposals] = useState<any[]>([]);
   const [activeSessions, setActiveSessions] = useState<any[]>(() => {
+    let initialList: any[] = [];
     if (initialSchoolId) {
       const cached = getCachedActiveSessionsSync(initialSchoolId);
-      if (cached && cached.length > 0) return cached;
+      if (cached && cached.length > 0) initialList = [...cached];
     }
-    return [];
+    // ⚡ 0ms Instant Hydration: Inject session prop immediately if provided
+    if (session && session.user_id) {
+      const exists = initialList.some(s => s && (s.id === session.id || (s.station_id && s.station_id === session.station_id)));
+      if (!exists) {
+        initialList = [session, ...initialList];
+      }
+    }
+    return initialList;
   });
+
+  // Synchronize when session prop changes (e.g. fresh student check-in)
+  useEffect(() => {
+    if (session && session.user_id) {
+      setActiveSessions(prev => {
+        const idx = prev.findIndex(s => s && (s.id === session.id || (s.station_id && s.station_id === session.station_id)));
+        if (idx !== -1) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...session };
+          return next;
+        }
+        return [session, ...prev];
+      });
+      if (initialSchoolId) {
+        optimisticallyInjectActiveSession(session, initialSchoolId);
+      }
+    }
+  }, [session, initialSchoolId]);
   const [isSyncing, setIsSyncing] = useState<boolean>(true);
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [unreadShouts, setUnreadShouts] = useState<any[]>([]);
@@ -308,7 +336,7 @@ export function useTeacherData({
             helpRes
           ] = await Promise.all([
             fetchRoomsBySchool(tData.school_id, false, activePlatform).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            fetchActiveSessions(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+            fetchActiveSessions(tData.school_id, true).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
             fetchSchoolStaff(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
             fetchStationsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
             supabase
@@ -320,15 +348,17 @@ export function useTeacherData({
               .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e }))
           ]);
 
-          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Non-blocking)
+          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Non-blocking, skipped for students)
           Promise.all([
-            supabase
-              .from('bands')
-              .select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
-              .eq('school_id', tData.school_id)
-              .neq('name', '__SYSTEM_ANNOUNCEMENTS__')
-              .order('name')
-              .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e })),
+            !isStudent
+              ? supabase
+                  .from('bands')
+                  .select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
+                  .eq('school_id', tData.school_id)
+                  .neq('name', '__SYSTEM_ANNOUNCEMENTS__')
+                  .order('name')
+                  .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e }))
+              : Promise.resolve({ data: [], error: null }),
             !isStudent
               ? fetchCrisisNotifications(tData.is_ghost_mode ? tData.school_id : userId, tData.is_ghost_mode).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
               : Promise.resolve({ data: [], error: null })
@@ -447,6 +477,37 @@ export function useTeacherData({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 📡 Supabase Realtime Sessions Listener: Synchronize all room check-ins & check-outs live (< 50ms)
+  useEffect(() => {
+    const effectiveSchoolId = schoolData?.id || teacher?.school_id || initialSchoolId;
+    if (!effectiveSchoolId) return;
+
+    const channelName = `realtime_sessions_school_${effectiveSchoolId}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sessions' },
+        async () => {
+          // Immediately invalidate the SWR cache so stale data is never served
+          invalidateActiveSessionsCache(effectiveSchoolId);
+          try {
+            const freshSessions = await fetchActiveSessions(effectiveSchoolId, true);
+            if (Array.isArray(freshSessions)) {
+              setActiveSessions(prev => areArraysEqualFast(prev, freshSessions) ? prev : freshSessions);
+            }
+          } catch (err) {
+            console.warn('[TeacherData] Realtime active sessions sync notice:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [schoolData?.id, teacher?.school_id, initialSchoolId]);
 
   return {
     teacher,

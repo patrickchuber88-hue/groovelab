@@ -15,6 +15,7 @@ import {
 } from '../../config/feedbackConfig';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
 import { requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
+import { useDictationInput } from '../../hooks/useVoiceToText';
 
 const renderCategoryIcon = (iconName: string, size = 14, color = 'currentColor') => {
   switch (iconName) {
@@ -73,11 +74,18 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
   const [heroOptIn, setHeroOptIn] = useState<HeroOptInType>('school_only');
   const [showLegalDetails, setShowLegalDetails] = useState<boolean>(false);
   
-  // Voice dictation states
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [speechSupported, setSpeechSupported] = useState<boolean>(true);
+  // Canonical Voice dictation engine
   const [speechError, setSpeechError] = useState<string | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const {
+    isListening: isRecording,
+    isSupported: speechSupported,
+    toggleListening: toggleDictation,
+    stopListening: stopDictation,
+    error: dictationError,
+  } = useDictationInput({
+    value: content,
+    onChange: setContent
+  });
 
   // Student pseudonymization helper (GDPR Article 8 compliant)
   const studentPseudonym = React.useMemo(() => {
@@ -118,55 +126,6 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       ? '#ea4335'
       : '#34a853';
 
-  // Initialize Speech Recognition
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'de-DE';
-
-        recognition.onresult = (event: any) => {
-          let currentTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              const text = event.results[i][0].transcript;
-              setContent(prev => (prev ? `${prev.trim()} ${text.trim()}` : text.trim()));
-            }
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error:', event.error);
-          setIsRecording(false);
-          if (event.error === 'not-allowed') {
-            localStorage.removeItem('campus_microphone_permission_granted');
-            setSpeechError('Mikrofon-Zugriff verweigert. Bitte erlaube den Mikrofon-Zugriff in den Browser-Einstellungen.');
-          }
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognitionRef.current = recognition;
-      } else {
-        setSpeechSupported(false);
-      }
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {
-          // ignore
-        }
-      }
-    };
-  }, []);
 
   const fetchMyFeedback = async () => {
     if (!userId) return;
@@ -269,10 +228,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       }
     } else {
       // Stop speech dictation if modal is closed
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
-      setIsRecording(false);
+      stopDictation();
     }
   }, [isOpen, userId, activePlatform]);
 
@@ -286,37 +242,6 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     );
   };
 
-  const toggleDictation = async () => {
-    if (!speechSupported) {
-      alert('Sprachdiktat wird von diesem Browser leider nicht unterstützt. Bitte nutze die Tastatureingabe.');
-      return;
-    }
-
-    setSpeechError(null);
-    if (isRecording) {
-      try {
-        recognitionRef.current?.stop();
-      } catch (e) {
-        console.error(e);
-      }
-      setIsRecording(false);
-    } else {
-      // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
-      const hasPermission = await requestMicrophonePermissionOnce();
-      if (!hasPermission) {
-        setSpeechError('Mikrofon-Freigabe nicht erteilt.');
-        return;
-      }
-      try {
-        recognitionRef.current?.start();
-        setIsRecording(true);
-      } catch (e) {
-        console.error('Error starting speech recognition:', e);
-        setIsRecording(false);
-      }
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) {
@@ -328,9 +253,8 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     setErrorMessage(null);
 
     // Stop recording if active
-    if (isRecording && recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-      setIsRecording(false);
+    if (isRecording) {
+      stopDictation();
     }
 
     // Telemetry metadata snapshot
@@ -1340,9 +1264,9 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     </button>
                   </div>
                 </div>
-                {speechError && (
+                {(speechError || dictationError) && (
                   <p style={{ margin: '4px 0 0', fontSize: '0.74rem', color: '#ef4444', fontWeight: 600 }}>
-                    {speechError}
+                    {speechError || dictationError}
                   </p>
                 )}
               </div>

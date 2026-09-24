@@ -1681,6 +1681,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             <div
               ref={templatesPopoverRef}
               role="dialog"
+              aria-modal="true"
               aria-label="Smarte Notiz-Funktionen und Vorlagen"
               style={{
                 position: 'fixed',

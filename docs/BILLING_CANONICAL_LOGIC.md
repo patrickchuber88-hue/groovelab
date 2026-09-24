@@ -14,16 +14,16 @@
 
 ---
 
-## 2. Modul-Grundpreise & Kombi-Vorteil Bundle
+## 2. Modul-Grundpreise & Kombi-Vorteil Bundle (Fairer B2B-Standard)
 
-Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musikschule/Mandant):
+Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musikschule/Mandant, inklusive 10 GB Audio-Tresor Hard Cap):
 
-| Tarif / Komponente | Monatspreis (Netto) | Leistungsumfang & Bounded Context |
-|---|---|---|
-| **Campus Modul** | **14,90 € / Mo.** | Didaktik, Messenger, Hausaufgaben, Schwarzes Brett, Stundenplan & Raumverwaltung |
-| **GrooveLab Modul** | **9,90 € / Mo.** | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine |
-| **Kombi-Vorteil Bundle** | **19,90 € / Mo.** | Beide Module vollständig gebucht (**4,90 € / Mo. Ersparnis** gegenüber 24,80 € Einzelsumme) |
-| **Service Fee (Team)** | **0,49 € / Mo.** | Pro aktivem Administrator-, Schulleiter- oder Lehrer-Profil |
+| Tarif / Komponente | Monatspreis Netto (EUR) | Monatspreis Netto (CHF) | Leistungsumfang & Bounded Context |
+|---|---|---|---|
+| **Campus Modul** | **19,90 € / Mo.** | **CHF 25.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Schwarzes Brett, Stundenplan & Raumverwaltung (inkl. 10 GB Audio-Tresor) |
+| **GrooveLab Modul** | **12,90 € / Mo.** | **CHF 16.80 / Mo.** | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine (inkl. 10 GB Audio-Tresor) |
+| **Kombi-Vorteil Bundle** | **24,90 € / Mo.** | **CHF 32.50 / Mo.** | Beide Module vollständig gebucht (**7,90 € bzw. CHF 10.20 / Mo. Ersparnis** gegenüber Einzelsumme) |
+| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 0.65 / Mo.** | Pro aktivem Administrator-, Schulleiter- oder Lehrer-Profil |
 
 ---
 
@@ -119,13 +119,36 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
 
 ---
 
-## 6. Währungs- & Ländermatrix
+## 6. Währungs- & Ländermatrix (1% Goldstandard - Fairer B2B-Standard)
 
-| Land / Region | Währung | Schülerbeitrag monatlich | Max. Jahresbeitrag Direktabrechnung |
+| Tarif / Komponente | 🇪🇺 Deutschland & Österreich (EUR) | 🇨🇭 Schweiz (CHF) (+30%, auf 5/0 aufgerundet) | Bounded Context & Governance |
 |---|---|---|---|
-| **Deutschland (DE)** | **EUR (€)** | 0,49 € / Mo. | **5,39 € / Schuljahr** (11 × 0,49 €) |
-| **Österreich (AT)** | **EUR (€)** | 0,49 € / Mo. | **5,39 € / Schuljahr** (11 × 0,49 €) |
-| **Schweiz (CH)** | **CHF** | CHF 1.00 / Mo. | **CHF 11.00 / Schuljahr** (11 × CHF 1.00) |
+| **Campus Modul** | **19,90 € / Mo.** | **CHF 25.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Raum- & Stundenplan (inkl. 10 GB Audio-Tresor) |
+| **GrooveLab Modul** | **12,90 € / Mo.** | **CHF 16.80 / Mo.** | WebAudio Synth, Loopstation, Practice Companion & DAW (inkl. 10 GB Audio-Tresor) |
+| **Kombi-Vorteil Bundle** | **24,90 € / Mo.** | **CHF 32.50 / Mo.** | Volles Paket (**7,90 € bzw. CHF 10.20** monatliche Ersparnis) |
+| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 0.65 / Mo.** | Je aktives Pädagogen-Profil (Admin & Sekretariat 0,00 € / CHF 0.00) |
+| **Schülerbeitrag monatlich** | **0,49 € / Mo.** | **CHF 0.65 / Mo.** | Bereitstellung je aktiver Schüler im Monat |
+| **Max. Jahresbeitrag Direkt** | **5,39 € / Schuljahr** | **CHF 7.00 / Schuljahr** | 1 Probemonat gratis + bis zu 11 Monate berechnet |
+| **Passiv-Schüler Hosting** | **0,09 € / Mo.** | **CHF 0.15 / Mo.** | DSGVO/nDSG Datensatz-Hosting & Notenarchiv |
+| **Inklusiv-Speicher (Hard Cap)**| **10 GB** (0,00 €) | **10 GB** (CHF 0.00) | Zentraler Audio- & Noten-Tresor dauerhaft inklusive |
+| **Storage-Addon (+10 GB)** | **2,90 € / Mo.** | **CHF 3.80 / Mo.** | **Der Verdoppler:** Schneller Einstieg auf 20 GB Gesamtkapazität |
+| **Storage-Addon (+25 GB)** | **4,90 € / Mo.** | **CHF 6.40 / Mo.** | Zusatz-Speicher für Ensembles & Klassen (bis 250 Schüler, 35 GB ges.) |
+| **Storage-Addon (+50 GB)** | **8,90 € / Mo.** | **CHF 11.60 / Mo.** | Beliebteste Stufe für mittelgroße Schulen (bis 500 Schüler, 60 GB ges.) |
+| **Storage-Addon (+100 GB)** | **14,90 € / Mo.** | **CHF 19.40 / Mo.** | Großschulen (500 – 1.000 Schüler, 110 GB ges.) |
+| **Storage-Addon (+250 GB)** | **19,90 € / Mo.** | **CHF 25.90 / Mo.** | Konservatorien & Landesmusikschulen (bis 2.500+ Schüler, 260 GB ges.) |
+
+---
+
+## 10. 100% Lifetime-Bestandskunden Preisversprechen & Treuetarif-Governance
+
+1. **Modell A: Musikschule als Sammelzahler (B2B)**
+   - **Unantastbare Lifetime-Garantie:** Der bei Vertragsabschluss vereinbarte Grundtarif (Server-Hosting-Flatrate) sowie bestehende aktive Team- und Schülerprofile sind dauerhaft und unbegrenzt vor Preiserhöhungen geschützt.
+   - Master-Tarifänderungen auf dem Leitstand gelten ausnahmslos als Katalogpreise für zukünftige Neuregistrierungen. Der Sockelpreis bestehender Mandanten steigt um keinen Cent.
+
+2. **Modell B: Eltern-Direktabrechnung (B2C)**
+   - **Treuetarif für fortgeführte Schülerprofile:** Schüler, die bereits im Vorjahr ein aktives Profil führten und dieses unterbrechungsfrei weiterführen, behalten ihren bisherigen Jahressatz (z. B. 5,39 € / CHF 11.00).
+   - **Neuanmeldungen:** Neu an der Musikschule angemeldete Schüler im neuen Schuljahr zahlen den jeweils aktuell gültigen Katalogtarif.
+   - **Herbst-Schonfenster (bis 31. Oktober):** Um Familien und Sekretariate zu entlasten, wird das Treuepreis-Zeitfenster über den Gratismonat September hinaus bis zum 31. Oktober offen gehalten. Erst bei Nichtzahlung nach dem 31.10. fällt das Profil in den Basistarif und verliert bei späterer Reaktivierung den Treuetarif.
 
 ---
 

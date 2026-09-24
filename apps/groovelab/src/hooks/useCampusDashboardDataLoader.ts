@@ -222,6 +222,9 @@ export function useCampusDashboardDataLoader({
             schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
           };
         } else if (userId === '15102f5e-c504-4c33-93ab-436285197c8c' || userId === '44444444-4444-4444-4444-444444444444' || (sessionStorage.getItem('groovelab_active_workspace') === 'student' && (!userId || userId.startsWith('15102f5e') || userId.startsWith('4444')))) {
+          const storedLevel = typeof window !== 'undefined'
+            ? (localStorage.getItem(`campus_student_ui_level_${userId || '15102f5e-c504-4c33-93ab-436285197c8c'}`) || localStorage.getItem('campus_student_ui_level') || 'junior')
+            : 'junior';
           userData = {
             id: userId || '15102f5e-c504-4c33-93ab-436285197c8c',
             first_name: 'Linus',
@@ -231,6 +234,7 @@ export function useCampusDashboardDataLoader({
             school_id: targetSchoolId,
             is_campus_active: true,
             is_groovelab_active: true,
+            campus_ui_level: storedLevel,
             photo_url: '/campus_login_hero.png',
             avatar_url: '/campus_login_hero.png',
             instrument: 'Gitarre',

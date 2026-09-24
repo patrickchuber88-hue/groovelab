@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw, Share2, Printer, Copy, RefreshCw } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, ChevronRight, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw, Share2, Printer, Copy, RefreshCw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
@@ -530,6 +530,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
   const [unreadMessageOccurrences, setUnreadMessageOccurrences] = useState<string[]>([]);
   const [pastSectionExpanded, setPastSectionExpanded] = useState(false);
+  const [expandedHistoryWeek, setExpandedHistoryWeek] = useState<string | null>(null);
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   
@@ -5699,24 +5700,294 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     const hasAnyHWItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || filteredTextNotes.length > 0;
 
-    if (!hasAnyHWItems) {
+    const renderCompactArchiveSection = () => {
+      const allPastWeeksSet = new Set<string>();
+      (progressItems || []).forEach(item => {
+        const itemWk = getItemWeek(item);
+        if (itemWk && itemWk < currentWeek) {
+          allPastWeeksSet.add(itemWk);
+        }
+      });
+
+      const getPrevWeekIso = (weekIso: string): string => {
+        try {
+          const parts = weekIso.split('-W');
+          let y = parseInt(parts[0], 10);
+          let w = parseInt(parts[1], 10) - 1;
+          if (w < 1) {
+            y -= 1;
+            w = 52;
+          }
+          return `${y}-W${String(w).padStart(2, '0')}`;
+        } catch {
+          return '';
+        }
+      };
+
+      const previousWeekIso = getPrevWeekIso(currentWeek);
+      if (previousWeekIso) {
+        allPastWeeksSet.add(previousWeekIso);
+      }
+
+      const sortedPastWeeks = Array.from(allPastWeeksSet).sort().reverse().slice(0, 8);
+
+      if (sortedPastWeeks.length === 0) return null;
+
       return (
         <div style={{
-          padding: '16px 12px',
+          borderRadius: '20px',
           background: '#ffffff',
-          borderRadius: '14px',
-          border: '1.5px dashed #cbd5e1',
+          border: '1px solid rgba(0, 0, 0, 0.06)',
+          padding: '16px 18px',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          textAlign: 'center',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+          width: '100%',
           boxSizing: 'border-box'
         }}>
-          <span style={{ fontSize: '1.1rem' }}>📖</span>
-          <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 650 }}>
-            Noch keine Aufgaben für KW {currentKw} erfasst.
-          </span>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '7px',
+                background: '#64748b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(100, 116, 139, 0.25)'
+              }}>
+                <BookOpen size={13} color="#ffffff" strokeWidth={2.5} />
+              </div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Verlauf &amp; Archiv
+              </span>
+            </div>
+            <span style={{
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              color: '#64748b',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              padding: '2px 8px',
+              borderRadius: '100px'
+            }}>
+              Schuljahr
+            </span>
+          </div>
+
+          {/* List of Weeks */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {sortedPastWeeks.map(pw => {
+              const pwNum = pw.split('-W')[1] || '';
+              const isDirectPrevWeek = pw === previousWeekIso;
+              const isExpanded = expandedHistoryWeek === pw;
+
+              if (isDirectPrevWeek) {
+                const prevItems = (progressItems || []).filter(item => getItemWeek(item) === pw && item.is_current_homework && !item.topic_name?.startsWith('Hausaufgabe KW '));
+                const prevNotes = getHomeworkNotes(pw).filter(n => !n.startsWith('AUDIO:') && !n.startsWith('SNAPSHOT_') && !n.includes('STICKER:'));
+
+                return (
+                  <div
+                    key={pw}
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setExpandedHistoryWeek(isExpanded ? null : pw)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setExpandedHistoryWeek(isExpanded ? null : pw);
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                          KW {pwNum} (Letzte Woche)
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 750,
+                          color: '#15803d',
+                          background: '#dcfce7',
+                          padding: '1px 7px',
+                          borderRadius: '6px'
+                        }}>
+                          {prevItems.length > 0 ? `${prevItems.length} Aufgaben` : 'Dokumentiert'}
+                        </span>
+                      </div>
+                      <ChevronDown
+                        size={15}
+                        color="#64748b"
+                        style={{
+                          transform: isExpanded ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.2s ease'
+                        }}
+                      />
+                    </div>
+
+                    {isExpanded && (
+                      <div style={{
+                        borderTop: '1px solid #e2e8f0',
+                        paddingTop: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        {prevItems.length > 0 ? (
+                          prevItems.map((item, pIdx) => (
+                            <div key={pIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.80rem', color: '#334155', fontWeight: 650 }}>
+                              <Check size={13} color="#16a34a" style={{ flexShrink: 0 }} />
+                              <span>{item.topic_name || item.title || 'Übeaufgabe'}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                            Keine gesonderten Einträge aus der Vorwoche archiviert.
+                          </div>
+                        )}
+                        {prevNotes.length > 0 && (
+                          <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {prevNotes.slice(0, 3).map((note, nIdx) => (
+                              <div key={nIdx} style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <FileText size={11} color="#16a34a" style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{note}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={pw}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setShowGiroCodeModal(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setShowGiroCodeModal(true);
+                    }
+                  }}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    touchAction: 'manipulation',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                  title="Schuljahres-Archiv im Campus-Vollzugang öffnen"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Lock size={12} color="#64748b" />
+                    <span style={{ fontSize: '0.80rem', fontWeight: 750, color: '#64748b' }}>
+                      KW {pwNum} · Archiviert
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '0.70rem',
+                    fontWeight: 800,
+                    color: '#34a853',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>Freischalten</span>
+                    <ChevronRight size={12} color="#34a853" />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Teaser Button für Eltern */}
+          <button
+            type="button"
+            onClick={() => setShowGiroCodeModal(true)}
+            style={{
+              marginTop: '4px',
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: '1px solid #bbf7d0',
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              color: '#166534',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+              minHeight: '44px',
+              boxShadow: '0 2px 6px rgba(22, 101, 52, 0.08)'
+            }}
+            className="hover-scale-mini"
+          >
+            <Sparkles size={14} color="#16a34a" />
+            <span>Schuljahres-Archiv &amp; Audio-Biografie freischalten</span>
+          </button>
+        </div>
+      );
+    };
+
+    if (!hasAnyHWItems) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+          <div style={{
+            padding: '16px 12px',
+            background: '#ffffff',
+            borderRadius: '14px',
+            border: '1.5px dashed #cbd5e1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            textAlign: 'center',
+            boxSizing: 'border-box'
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>📖</span>
+            <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 650 }}>
+              Noch keine Aufgaben für KW {currentKw} erfasst.
+            </span>
+          </div>
+          {!compressed && renderCompactArchiveSection()}
         </div>
       );
     }
@@ -5827,7 +6098,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       window.print();
     };
 
-    return (
+    const currentWeekCard = (
       <div style={{
         borderRadius: '20px',
         background: '#ffffff',
@@ -6251,6 +6522,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           )}
         </div>
+      </div>
+    );
+
+    if (compressed) {
+      return currentWeekCard;
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+        {currentWeekCard}
+        {renderCompactArchiveSection()}
       </div>
     );
   };

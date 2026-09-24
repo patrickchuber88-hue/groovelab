@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Shield } from 'lucide-react';
 import { formatTeacherFullName } from '../utils/nameHelper';
 import { CampusUiLevel } from './campus/CampusLevelSwitcher';
-import { StudentBriefingTab } from './student/tabs/StudentBriefingTab';
 import { StudentHeroTab } from './student/tabs/StudentHeroTab';
 import { StudentModalsHub } from './student/modals/StudentModalsHub';
 import { useStudentProfile } from './student/hooks/useStudentProfile';
@@ -26,6 +25,7 @@ import {
 } from './student/meisterwerk/HomeworkBookErrorBoundary';
 
 // 🚀 High-Performance Lazy Loaded Tabs
+const StudentBriefingTab = lazy(() => import('./student/tabs/StudentBriefingTab').then(m => ({ default: m.StudentBriefingTab })));
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
 const StudentSongsTab = lazy(() => import('./student/tabs/StudentSongsTab').then(m => ({ default: m.StudentSongsTab })));
 const StudentProfileTab = lazy(() => import('./student/tabs/StudentProfileTab').then(m => ({ default: m.StudentProfileTab })));
@@ -500,7 +500,14 @@ export function StudentAvatarDashboard({
       </div>
 
       {/* 6. Briefing Tab */}
-      <StudentBriefingTab {...briefingTabProps} />
+      <Suspense fallback={
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+          <div style={{ height: '80px', borderRadius: '24px', background: 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)', backgroundSize: '200% 100%', opacity: 0.7 }} />
+          <div style={{ height: '140px', borderRadius: '24px', background: 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)', backgroundSize: '200% 100%', opacity: 0.7 }} />
+        </div>
+      }>
+        <StudentBriefingTab {...briefingTabProps} />
+      </Suspense>
 
       
       {/* 7. Hero Tab */}

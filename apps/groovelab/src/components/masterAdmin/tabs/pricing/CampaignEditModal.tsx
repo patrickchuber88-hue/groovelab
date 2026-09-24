@@ -96,6 +96,21 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                Währung
+              </label>
+              <select
+                value={editingOffer.currency || 'ALL'}
+                onChange={(e) => onChange({ ...editingOffer, currency: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
+              >
+                <option value="ALL">🌐 Alle Währungen</option>
+                <option value="EUR">🇪🇺 Nur Euro (EUR)</option>
+                <option value="CHF">🇨🇭 Nur Franken (CHF)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                 Laufzeit (Monate)
               </label>
               <select
@@ -109,7 +124,9 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
                 <option value={0}>Dauerhaft (Permanent)</option>
               </select>
             </div>
+          </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                 Max. Einlösungen
@@ -122,20 +139,20 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
               />
             </div>
-          </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-              Geltungsbereich
-            </label>
-            <select
-              value={editingOffer.discount_scope || 'hosting_only'}
-              onChange={(e) => onChange({ ...editingOffer, discount_scope: e.target.value })}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
-            >
-              <option value="hosting_only">🏢 Nur Server-Hosting Flatrates</option>
-              <option value="total_invoice">🌐 Gesamtrechnung (inkl. Schüler/Lehrer)</option>
-            </select>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                Geltungsbereich
+              </label>
+              <select
+                value={editingOffer.discount_scope || 'hosting_only'}
+                onChange={(e) => onChange({ ...editingOffer, discount_scope: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
+              >
+                <option value="hosting_only">🏢 Nur Server-Hosting</option>
+                <option value="total_invoice">🌐 Gesamtrechnung</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #86efac', fontSize: '0.76rem', color: '#166534', lineHeight: 1.35 }}>

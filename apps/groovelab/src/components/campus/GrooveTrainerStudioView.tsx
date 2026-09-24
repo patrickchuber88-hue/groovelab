@@ -50,6 +50,7 @@ import { getOptimalDeviceLatency, detectDeviceLatencyInfo } from '../../utils/de
 import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
 import { AcousticOnsetEngine } from '../../services/audio/AcousticOnsetEngine';
 import { WebMidiEngine } from '../../services/audio/WebMidiEngine';
+import { AudioSettingsSheet } from '../student/meisterwerk/AudioSettingsSheet';
 
 export interface GrooveTrainerProps {
   student?: any;
@@ -535,6 +536,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   useEffect(() => {
     return UniversalLatencyEngine.subscribe((newMs) => {
       setLatencyOffsetMs(newMs);
+      // Synchronize acoustic onset offset proportionally with calibrated hardware latency
+      setAcousticLatencyOffsetMs(Math.max(10, Math.min(60, Math.round(newMs * 0.4))));
     });
   }, []);
 
@@ -552,14 +555,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   });
 
   const [isBluetoothDetected, setIsBluetoothDetected] = useState<boolean>(false);
-  const [showCalibrationModal, setShowCalibrationModal] = useState<boolean>(false);
+  const [showAudioSettingsSheet, setShowAudioSettingsSheet] = useState<boolean>(false);
   const [showCelebrationModal, setShowCelebrationModal] = useState<boolean>(false);
-
-  // 4-Tap Quick Calibration Wizard State
-  const [is4TapWizardActive, setIs4TapWizardActive] = useState<boolean>(false);
-  const [wizardTapCount, setWizardTapCount] = useState<number>(0);
-  const [wizardMeasuredOffsets, setWizardMeasuredOffsets] = useState<number[]>([]);
-  const [wizardSuccessMessage, setWizardSuccessMessage] = useState<string | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const isRunningRef = useRef<boolean>(false);
@@ -1892,7 +1889,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   // Spacebar Keyboard Listener (mit Isolation für Texteingaben wie z.B. Nickname-Modal)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && !showCalibrationModal) {
+      if (e.code === 'Space' && !e.repeat && !showAudioSettingsSheet) {
         // 🛡️ Guard 1: Wenn der Benutzer in einem Eingabefeld (z.B. Nickname-Modal, Suche, Notizen) tippt,
         // darf die Leertaste NIEMALS den Groove-Trainer auslösen oder das Tippen blockieren!
         const activeEl = document.activeElement;
@@ -1915,62 +1912,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUserTap, sessionCompleted, showCalibrationModal]);
-
-  // 4-Tap Wizard Runner with Real Mathematical Time Difference Measurement
-  const wizardClicksRef = useRef<number[]>([]);
-  const start4TapWizard = useCallback(() => {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    setIs4TapWizardActive(true);
-    setWizardTapCount(0);
-    setWizardMeasuredOffsets([]);
-    setWizardSuccessMessage(null);
-    wizardClicksRef.current = [];
-
-    const wizardBpm = 60;
-    const intervalSec = 60 / wizardBpm;
-    const startTime = ctx.currentTime + 0.12;
-
-    for (let i = 0; i < 4; i++) {
-      const clickTime = startTime + (i * intervalSec);
-      wizardClicksRef.current.push(clickTime);
-      playDrumSound('click', clickTime, i === 0);
-    }
-  }, [getAudioContext, playDrumSound]);
-
-  const handleWizardTap = useCallback(() => {
-    const ctx = getAudioContext();
-    if (!ctx || !is4TapWizardActive) return;
-
-    const now = ctx.currentTime;
-    playDrumSound('snare', now, true);
-
-    const currentTapIndex = wizardTapCount;
-    const targetClickTime = wizardClicksRef.current[currentTapIndex] || now;
-    const measuredRawDeltaMs = Math.round((now - targetClickTime) * 1000);
-
-    const nextOffsets = [...wizardMeasuredOffsets, measuredRawDeltaMs];
-    setWizardMeasuredOffsets(nextOffsets);
-
-    const nextCount = currentTapIndex + 1;
-    setWizardTapCount(nextCount);
-
-    if (nextCount >= 4) {
-      setIs4TapWizardActive(false);
-      // Echter Median-Filter über die 4 Messungen:
-      const sorted = [...nextOffsets].sort((a, b) => a - b);
-      const medianOffset = Math.round((sorted[1] + sorted[2]) / 2);
-      // Sicherheits-Clamp für Web-Audio (0ms bis 220ms)
-      const finalOffset = Math.max(0, Math.min(220, medianOffset));
-      
-      setLatencyOffsetMs(finalOffset);
-      UniversalLatencyEngine.saveLatencyMs(finalOffset, student?.id);
-      setCalibrationSource('trainer');
-      setWizardSuccessMessage(`Perfekt eingemessen! Dein realer Hardware-Offset beträgt ${finalOffset}ms.`);
-    }
-  }, [getAudioContext, is4TapWizardActive, playDrumSound, wizardMeasuredOffsets, wizardTapCount]);
+  }, [handleUserTap, sessionCompleted, showAudioSettingsSheet]);
 
   const accuracyPercent = totalHits > 0 ? Math.round(scoreSum / totalHits) : 0;
   const starsEarned = accuracyPercent >= 90 ? 3 : (accuracyPercent >= 75 ? 2 : (accuracyPercent >= 50 ? 1 : 0));
@@ -2408,7 +2350,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
               <button
                 type="button"
-                onClick={() => setShowCalibrationModal(true)}
+                onClick={() => setShowAudioSettingsSheet(true)}
                 style={{
                   background: isBluetoothDetected ? '#eff6ff' : '#ffffff',
                   border: isBluetoothDetected ? '1.5px solid #93c5fd' : '1px solid #cbd5e1',
@@ -3342,252 +3284,11 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         </div>
       )}
 
-      {/* 6. Hardware Latency Calibration Modal with 4-Tap Wizard */}
-      {showCalibrationModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            maxWidth: '460px',
-            width: '100%',
-            padding: '26px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <SlidersHorizontal size={20} color="#15803d" />
-                <h4 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900, color: '#0f172a' }}>
-                  Hardware-Latenz Kalibrierung
-                </h4>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCalibrationModal(false);
-                  setIs4TapWizardActive(false);
-                }}
-                style={{ background: 'transparent', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
-              Jedes Gerät (AirPods, Lautsprecher, Mac-Klinke) hat messbare Audio-Verzögerungen.
-              {isBluetoothDetected && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', color: '#2563eb', fontWeight: 700 }}>
-                  <Bluetooth size={13} color="#2563eb" />
-                  <span>Bluetooth-Verbindung erkannt: Latenzausgleich aktiv.</span>
-                </span>
-              )}
-            </p>
-
-            {/* Loopstation Sync Notification */}
-            {calibrationSource === 'loopstation' && (
-              <div style={{
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.76rem',
-                color: '#166534',
-                fontWeight: 700
-              }}>
-                <CheckCircle2 size={16} color="#166534" />
-                <span>Automatisch mit deiner GrooveLoopstation synchronisiert!</span>
-              </div>
-            )}
-
-            {/* Current Offset Display */}
-            <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '16px',
-              padding: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  Aktueller Offset
-                </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 950, color: '#15803d' }}>
-                  {inputMode === 'acoustic' ? `${acousticLatencyOffsetMs} ms (Mikrofon)` : `${latencyOffsetMs} ms (Touch/Taste)`}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (inputMode === 'acoustic') {
-                      const next = Math.max(0, acousticLatencyOffsetMs - 5);
-                      setAcousticLatencyOffsetMs(next);
-                      try { localStorage.setItem('campus_acoustic_latency_offset', String(next)); } catch (_) {}
-                    } else {
-                      const next = Math.max(-50, latencyOffsetMs - 5);
-                      setLatencyOffsetMs(next);
-                      UniversalLatencyEngine.saveLatencyMs(next, student?.id);
-                      setCalibrationSource('trainer');
-                    }
-                  }}
-                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
-                >
-                  - 5ms
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (inputMode === 'acoustic') {
-                      const next = Math.min(80, acousticLatencyOffsetMs + 5);
-                      setAcousticLatencyOffsetMs(next);
-                      try { localStorage.setItem('campus_acoustic_latency_offset', String(next)); } catch (_) {}
-                    } else {
-                      const next = Math.min(220, latencyOffsetMs + 5);
-                      setLatencyOffsetMs(next);
-                      UniversalLatencyEngine.saveLatencyMs(next, student?.id);
-                      setCalibrationSource('trainer');
-                    }
-                  }}
-                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
-                >
-                  + 5ms
-                </button>
-              </div>
-            </div>
-
-            {/* 4-Tap Quick Calibration Wizard Button */}
-            <div style={{
-              background: '#ffffff',
-              border: '1.5px dashed #cbd5e1',
-              borderRadius: '16px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              alignItems: 'center',
-              textAlign: 'center'
-            }}>
-              {!is4TapWizardActive ? (
-                <>
-                  <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Target size={14} color="#0f172a" />
-                    <span>4-Tap Schnell-Einmessung</span>
-                  </span>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                    Spielt 4 Klicks ab – tippe 4x im Takt mit, um dein Gerät auf 0ms zu eichen.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={start4TapWizard}
-                    style={{
-                      background: '#15803d',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '8px 16px',
-                      fontSize: '0.80rem',
-                      fontWeight: 900,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Einmessung starten
-                  </button>
-                </>
-              ) : (
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d' }}>
-                    Höre die Klicks &amp; tippe 4x: ({wizardTapCount} von 4)
-                  </span>
-                  <button
-                    type="button"
-                    onPointerDown={handleWizardTap}
-                    style={{
-                      width: '100%',
-                      height: '60px',
-                      borderRadius: '12px',
-                      background: '#e6f4ea',
-                      border: '2px solid #34a853',
-                      color: '#15803d',
-                      fontSize: '0.94rem',
-                      fontWeight: 950,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    JETZT TIPPEN ({wizardTapCount + 1}. Schlag)
-                  </button>
-                </div>
-              )}
-
-              {wizardSuccessMessage && (
-                <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 800 }}>
-                  {wizardSuccessMessage}
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setLatencyOffsetMs(25);
-                  UniversalLatencyEngine.saveLatencyMs(25, student?.id);
-                  setCalibrationSource('trainer');
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  color: '#334155',
-                  cursor: 'pointer'
-                }}
-              >
-                Standard zurücksetzen (25 ms)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCalibrationModal(false);
-                  setIs4TapWizardActive(false);
-                }}
-                style={{
-                  background: '#15803d',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px',
-                  fontSize: '0.82rem',
-                  fontWeight: 900,
-                  cursor: 'pointer'
-                }}
-              >
-                Speichern &amp; Schließen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 🎧 2027er Universal Audio- & Hardware-Latenz Sheet */}
+      <AudioSettingsSheet
+        isOpen={showAudioSettingsSheet}
+        onClose={() => setShowAudioSettingsSheet(false)}
+      />
 
     </div>
   );

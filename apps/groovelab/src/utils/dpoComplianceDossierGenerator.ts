@@ -227,13 +227,13 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
       ['Bezeichnung der Tätigkeit:', 'Digitale Musikschulverwaltung, Raumplanung & didaktische Übebegleitung (Campus-Groovelab)'],
       ['Verantwortlicher Träger:', `${cleanSchoolName} (vertreten durch Schulleitung / Schulverwaltung)`],
       ['Auftragsverarbeiter (Art. 28):', 'Campus-Groovelab (Einzelunternehmen Patrick Huber, 79618 Rheinfelden, Deutschland)'],
-      ['Zweckbestimmung der Verarbeitung:', 'Didaktisches Convenience- & Beschleunigungswerkzeug („Fast-Track“) zur Raum- & Terminabstimmung, Bereitstellung digitaler Hausaufgabennotizen & didaktische Audio-Übebegleitung ohne Werbefunktionen. Subsidiaritäts-Doktrin: Primäre Schulverwaltung (ERP) und Dienstwege verbleiben beim Träger. Gehostete Schüleraufnahmen (Cover) dienen rein didaktischem Feedback und dem privaten Familienkreis (§ 53 Abs. 1, § 60a UrhG).'],
+      ['Zweckbestimmung der Verarbeitung:', 'Didaktisches Convenience- & Beschleunigungswerkzeug („Fast-Track“) zur Raum- & Terminabstimmung, Bereitstellung digitaler Hausaufgabennotizen & didaktische Audio-Übebegleitung ohne Werbefunktionen. Subsidiaritäts- & Herrenberg-Doktrin: Primäre Schulverwaltung (ERP), Honorarabrechnungen und städtische Dienstwege verbleiben beim Träger. Gehostete Schüleraufnahmen (Cover) dienen rein didaktischem Feedback und dem privaten Familienkreis (§ 53 Abs. 1, § 60a UrhG).'],
       ['Rechtsgrundlagen (DSGVO):', 'Art. 6 Abs. 1 lit. b DSGVO (Unterrichtsvertrag der Erziehungsberechtigten)\nArt. 6 Abs. 1 lit. e DSGVO i.V.m. Landes-SchulG (Kommunale Bildungsaufgabe)\nArt. 6 Abs. 1 lit. a / Art. 8 DSGVO (Einwilligung für optionale Audioaufnahmen)'],
-      ['Kategorien betroffener Personen:', 'Musikschüler/innen (Minderjährige), Erziehungsberechtigte, Lehrkräfte, Sekretariats- & Schulleitungspersonal'],
-      ['Verarbeitete Datenkategorien:', 'Vorname, Nachname (im Lehrerbereich pseudonymisiert auf Anfangsbuchstabe "Max M."), Instrument, Raum- und Zeitdisposition, didaktische Übenotizen, freiwillige Audioaufnahmen.\nExplizit KEINE Speicherung von: Schüler-E-Mails, Passwörtern oder Bankverbindungen.'],
-      ['Empfänger / Sub-Auftragsverarbeiter:', '1. Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland – ISO 27001 zertifiziert)\n2. 100% Self-Hosted Open-Source Technologie-Stack (PostgreSQL, Supabase Auth/Storage Engine auf dediziertem Hetzner Bare-Metal VPS, kein Drittanbieter-Cloudtransfer)'],
-      ['Drittlandübermittlung (Art. 44 ff.):', '0,00 % (NEIN) – Die Datenverarbeitung erfolgt ausnahmslos in Rechenzentren innerhalb der Bundesrepublik Deutschland.'],
-      ['Regellöschfristen (DIN 66398):', 'Unterrichtsdaten: Dauer des Ausbildungsverhältnisses (Löschung 30 Tage nach Abmeldung)\nInaktive Profile: Automatische Inaktivierung nach 60 Tagen (Fair-Play Kostenschutz)\nSession-Logs: Unmittelbare Löschung nach Sitzungsende']
+      ['Kategorien betroffener Personen:', 'Musikschüler/innen (Minderjährige), Erziehungsberechtigte, Lehrkräfte (Herrenberg-geschützt), Sekretariats- & Schulleitungspersonal'],
+      ['Verarbeitete Datenkategorien:', 'Vorname, Nachname (im Lehrerbereich pseudonymisiert auf Anfangsbuchstabe "Max M."), Instrument, Raum- und Zeitdisposition, didaktische Übenotizen, freiwillige Audioaufnahmen.\nExplizit KEINE Speicherung von: Schüler-E-Mails, Passwörtern, Bankverbindungen oder Lehrer-Arbeitszeiten.'],
+      ['Empfänger / Sub-Auftragsverarbeiter:', '1. Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland – ISO 27001 zertifiziert)\n2. Hetzner DNS / Rechenzentrumsnetzwerk (Deutschland)\n3. 100% Self-Hosted Open-Source Technologie-Stack (PostgreSQL RLS, Supabase Auth/Storage Engine auf dediziertem Hetzner Bare-Metal VPS, 0,00% US-Cloudtransfer)'],
+      ['Drittlandübermittlung (Art. 44 ff.):', '0,00 % (NEIN) – Die Datenverarbeitung erfolgt ausnahmslos in Rechenzentren innerhalb der Bundesrepublik Deutschland. Volle Immunität gegen US CLOUD Act und FISA 702 (Schrems II konform).'],
+      ['Regellöschfristen (DIN 66398):', 'Unterrichtsdaten: Dauer des Ausbildungsverhältnisses (Löschung 30 Tage nach Abmeldung)\nInaktive Profile: Automatische Inaktivierung nach 60 Tagen (Fair-Play Kostenschutz)\nAudio-Micro-TTL: TTL <= 1800s für Medienstream / temporäre Session-Caches']
     ];
 
     vvtRows.forEach(([key, val]) => {
@@ -380,24 +380,24 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     curY += 6;
     const toms = [
       {
-        t: '1. Vertraulichkeit (Art. 32 Abs. 1 lit. b)',
-        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen zur logischen Mandantentrennung. Trennung aller Credentials in separatem private_auth Datenbankschema. Keine Plaintext-Passwörter oder PINs. Schülernamen-Pseudonymisierung (Max M.).'
+        t: '1. Vertraulichkeit & Mandanten-Airgap (Art. 32 Abs. 1 lit. b)',
+        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs.'
       },
       {
         t: '2. Integrität & Datenhygiene (Art. 32 Abs. 1 lit. b)',
-        d: 'TLS 1.3 End-to-End Transportverschlüsselung mit striktem HSTS. Datei-Uploads mit SHA-256 Integritätsprüfung. Intrusion Detection durch Canary-Honeypots und automatische Alarmierung bei unbefugten Zugriffen.'
+        d: 'TLS 1.3 End-to-End Transportverschlüsselung mit HSTS Preload (max-age=63072000). Datei-Uploads mit Magic-Byte-Prüfung, Stripping von EXIF/GPS-Metadaten und SHA-256 Integritätssiegel. Micro-TTL (<= 1800s) für Audio-Streams.'
       },
       {
-        t: '3. Verfügbarkeit & Belastbarkeit (Art. 32 Abs. 1 lit. b)',
-        d: 'Täglich automatisierte Cloud-Backups mit Point-in-Time-Recovery (PITR). Georedundante Speicherung. Fail-Closed Doktrin bei Ausfall von Sicherheits-RPCs.'
+        t: '3. Verfügbarkeit & 3-2-1 Backup (Art. 32 Abs. 1 lit. b)',
+        d: '3-2-1 Backup-Strategie: Tägliche AES-256 verschlüsselte Dumps via rsync/SSH auf geographisch getrennte Hetzner Storage Boxen. Automatisierte DR-Reconciliation und Tombstone-Scrubbing nach Notfall-Wiederherstellungen.'
       },
       {
-        t: '4. Verfahren zur regelmäßigen Überprüfung (Art. 32 Abs. 1 lit. d)',
-        d: 'Automatisierte CI/CD Security Drift Guards (npm run security:check), Pre-Commit Secret-Scanner und WORM-Audit-Logging (Write Once Read Many) für alle administrativen Aktionen.'
+        t: '4. WORM-Manipulationsschutz & Auditing (Art. 32 Abs. 1 lit. d)',
+        d: 'Revisionssicheres WORM-Logging (Write-Once-Read-Many) mit PostgreSQL-Triggern gegen UPDATE/DELETE auf audit_logs. Kontinuierliche Security-Drift-Guards in der CI/CD-Pipeline (Zero-Sampling-Axiom).'
       },
       {
         t: '5. WebAuthn / Passkeys (Keine Biometrie gem. Art. 9 DSGVO)',
-        d: 'Optionale Passkey-Authentifizierung (FIDO2/WebAuthn) nutzt FaceID/TouchID ausschließlich lokal in der isolierten Hardware-Enclave (Secure Enclave/TPM) des Endgeräts. Biometrische Rohdaten verlassen niemals das Gerät; der Server empfängt und verifiziert lediglich eine Public-Key-Signatur (Zero Art. 9 Leakage).'
+        d: 'Optionale Passkey-Authentifizierung (FIDO2/WebAuthn) nutzt biometrische Sensorik ausschließlich lokal in der Hardware-Enclave (TPM/Secure Enclave) des Endgeräts. Biometrische Rohdaten verlassen niemals das Gerät (Zero Art. 9 Leakage).'
       }
     ];
 
@@ -483,23 +483,23 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     const mbItems = [
       {
         t: 'Keine Verhaltens- und Leistungskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / § 75 BPersVG)',
-        d: 'Es findet keine Auswertung, Messung oder Aggregation von Klickzahlen, Online-Zeiten, Reaktionsgeschwindigkeiten im Chat oder Erledigungsfristen für Lehrkräfte statt. Die Software erzeugt keine Verhaltensprofile.'
+        d: 'Es findet keine Auswertung, Messung oder Aggregation von Klickzahlen, Online-Zeiten, Reaktionsgeschwindigkeiten im Chat oder Erledigungsfristen für Lehrkräfte statt. Die Software erzeugt keine Mitarbeiter-Verhaltensprofile oder Überwachungs-Dashboards.'
       },
       {
-        t: 'Subsidiaritäts-Doktrin & Fast-Track Convenience',
-        d: 'Campus-Groovelab ist ein freiwilliges, unterstützendes Beschleunigungswerkzeug. Dienstliche Weisungen und Arbeitsverträge verbleiben auf den städtischen Primärkanälen (E-Mail, MS Teams, Post). Keine Weisungsbefugnis über die App.'
+        t: 'Subsidiaritäts-Doktrin & Fast-Track Convenience (Reines Add-On)',
+        d: 'Campus-Groovelab ist ein freiwilliges, didaktisches Add-On. Es ist kein ERP-System. Dienstliche Weisungen und Arbeitsverträge verbleiben auf den städtischen Primärkanälen. Keine Weisungsbefugnis über die App.'
       },
       {
-        t: 'Herrenberg-Autonomie & Übermittlungsfreiheit (BSG B 12 R 3/20 R Konformität)',
-        d: 'Raum- und Terminzuweisungen im Stundenplan-Designer stellen unverbindliche didaktische Abstimmungsvorschläge dar. Volle Übermittlungsfreiheit für Lehrkräfte (per App oder herkömmlich per E-Mail/Telefon); keine arbeitgeberseitige Direktion.'
+        t: 'Herrenberg-Immunität (§ 7 SGB IV / BSG B 12 R 3/20 R Konformität)',
+        d: 'Raum- und Terminabstimmungen sind unverbindliche didaktische Dispositionen („Kreidetafel-Doktrin“). Keine Erfassung von employment_type, keine Stundensätze, keine Honorarabrechnungen im Add-On (Obliegenheit des kommunalen Schul-ERPs). Freie Honorarkräfte und Festangestellte bleiben frei von Weisungsdruck.'
       },
       {
-        t: 'Keine Arbeitszeiterfassung (ArbZG-Abgrenzung)',
-        d: 'Die Plattform fungiert als reines didaktisches Dispositionsmittel ("Kreidetafel-Doktrin"). Sie enthält keine Stempeluhr und erfasst keine Arbeitszeiten oder Pausenzeiten der Lehrkräfte.'
+        t: 'Keine Arbeitszeiterfassung & Stempeluhr (ArbZG-Abgrenzung)',
+        d: 'Die Plattform fungiert als didaktisches Dispositionsmittel. Sie enthält bewusst keine Stempeluhr und erfasst keine Arbeitszeiten, Pausenzeiten oder Deputate der Lehrkräfte.'
       },
       {
         t: 'Recht auf Nichterreichbarkeit (§ 5 ArbSchG / Fürsorgepflicht)',
-        d: 'Mitteilungen und Aufgabenübermittlungen sind asynchron. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihres Fachunterrichts Nachrichten abzurufen oder zu beantworten.'
+        d: 'Mitteilungen und didaktischer Austausch sind rein asynchron. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihres Fachunterrichts Nachrichten abzurufen oder zu beantworten.'
       }
     ];
 

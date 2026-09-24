@@ -52,13 +52,23 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
   const fetchAdminUser = useCallback(async () => {
     try {
       // 🛡️ OWASP ASVS Level 3: Strict explicit column whitelist (Zero Secret Leakage)
-      let query = supabase.from('users').select('id, school_id, first_name, last_name, role, master_admin_username, username, is_master_admin, is_2fa_enabled, email');
+      const columns = 'id, school_id, first_name, last_name, role, master_admin_username, username, is_master_admin, is_2fa_enabled, email';
+      let data: any = null;
+
       if (currentUser?.id && currentUser.id !== 'master_admin') {
-        query = query.eq('id', currentUser.id);
-      } else {
-        query = query.or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%').limit(1);
+        const res = await supabase.from('users').select(columns).eq('id', currentUser.id).maybeSingle();
+        data = res.data;
       }
-      let { data } = await query.maybeSingle();
+
+      // 🛡️ Robust fallback: If querying by currentUser.id found no match or currentUser is 'master_admin',
+      // locate authoritative Master Admin record in users_raw
+      if (!data) {
+        const res = await supabase.from('users').select(columns)
+          .or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%')
+          .limit(1)
+          .maybeSingle();
+        data = res.data;
+      }
 
       if (data) {
         setAdminUser(data);
@@ -80,9 +90,8 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
     if (!adminUsername.trim()) return;
     try {
       setUpdatingAdmin(true);
-      const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
-        ? currentUser.id 
-        : adminUser?.id;
+      const targetUserId = adminUser?.id 
+        || (currentUser?.id && currentUser.id !== 'master_admin' ? currentUser.id : null);
 
       const { error: rpcErr } = await supabase.rpc('update_master_admin_credentials', {
         p_username: adminUsername.trim(),
@@ -239,9 +248,10 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
 
   const handleRegisterPasskey = useCallback(async () => {
     try {
-      const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
-        ? currentUser.id 
-        : adminUser?.id || '88888888-8888-8888-8888-888888888888';
+      // 🛡️ OWASP ASVS L3: Prioritize authoritative database-verified user ID over client fallbacks
+      const targetUserId = adminUser?.id 
+        || (currentUser?.id && currentUser.id !== 'master_admin' ? currentUser.id : null)
+        || '88888888-8888-8888-8888-888888888888';
 
       const res = await registerMasterPasskeyAuthoritative(supabase, targetUserId, 'Master Touch ID / YubiKey');
       if (res.success) {

@@ -348,6 +348,27 @@ if command -v docker &>/dev/null; then
 fi
 
 # ------------------------------------------------------------------------------
+# 9. NVMe Swapfile Anti-OOM Airbag (4 GB, vm.swappiness = 10)
+# ------------------------------------------------------------------------------
+log_step "9. NVMe Swapfile Anti-OOM Airbag (4 GB)"
+
+if [ ! -f /swapfile ]; then
+    log_info "Erstelle 4 GB Swapfile auf NVMe zur Verhinderung von Kernel-OOM-Kills..."
+    fallocate -l 4G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=none
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+    swapon /swapfile
+    if ! grep -q '/swapfile' /etc/fstab; then
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+    sysctl vm.swappiness=10 >/dev/null
+    echo 'vm.swappiness=10' > /etc/sysctl.d/99-swap.conf
+    log_info "4 GB NVMe-Swapfile erfolgreich angelegt und aktiviert (swappiness=10)."
+else
+    log_info "Swapfile /swapfile existiert bereits."
+fi
+
+# ------------------------------------------------------------------------------
 # Zusammenfassung & Verifikation
 # ------------------------------------------------------------------------------
 log_step "Zusammenfassung & Status der Sicherheits-Härtung"
@@ -359,5 +380,6 @@ echo -e "🚨 Fail2Ban:         ${GREEN}Aktiv (sshd-Jail aktiv)${NC}"
 echo -e "🔄 Security-Updates: ${GREEN}Aktiv (unattended-upgrades 03:30 Uhr)${NC}"
 echo -e "⚙️  Kernel-Sysctl:    ${GREEN}SYN-Cookies & Spoofing-Schutz aktiv${NC}"
 echo -e "🐳 Docker Daemon:    ${GREEN}No-New-Privileges & Log-Rotation aktiv${NC}"
+echo -e "💾 Swap-Airbag:      ${GREEN}Aktiv (4 GB NVMe, swappiness=10)${NC}"
 echo ""
 log_info "Die Host-Härtung für Campus-Groovelab wurde erfolgreich abgeschlossen!"

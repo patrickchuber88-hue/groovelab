@@ -53,36 +53,36 @@ const dispatchSecurityAlert = async (type: string, req: express.Request, details
   }
 };
 
-// --- TIER-1 SECURITY: IP Rate Limiting ---
+// --- TIER-1 SECURITY: IP Rate Limiting (Calibrated for School-WLAN / NAT-Gateways) ---
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // Limit each IP to 30 login attempts per 15 minutes
+  max: 150, // 150 login attempts per 15 minutes per IP (supports entire classroom on shared NAT IP)
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    dispatchSecurityAlert('AUTH_RATE_LIMIT_EXCEEDED', req, { threshold: 30, window: '15m' });
+    dispatchSecurityAlert('AUTH_RATE_LIMIT_EXCEEDED', req, { threshold: 150, window: '15m' });
     res.status(429).json({ error: 'Too many authentication attempts. Security cooldown active.' });
   }
 });
 
 const apiRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 300, // 300 requests per minute per IP for regular DB traffic
+  max: 1200, // 1,200 requests per minute per IP (prevents throttling during multi-user classroom sessions)
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    dispatchSecurityAlert('API_RATE_LIMIT_EXCEEDED', req, { threshold: 300, window: '1m' });
+    dispatchSecurityAlert('API_RATE_LIMIT_EXCEEDED', req, { threshold: 1200, window: '1m' });
     res.status(429).json({ error: 'Too many API requests. Rate limit exceeded.' });
   }
 });
 
 const storageRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // 60 presigned upload tickets per minute per IP
+  max: 120, // 120 presigned upload tickets per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    dispatchSecurityAlert('STORAGE_RATE_LIMIT_EXCEEDED', req, { threshold: 60, window: '1m' });
+    dispatchSecurityAlert('STORAGE_RATE_LIMIT_EXCEEDED', req, { threshold: 120, window: '1m' });
     res.status(429).json({ error: 'Too many storage requests. Rate limit active.' });
   }
 });

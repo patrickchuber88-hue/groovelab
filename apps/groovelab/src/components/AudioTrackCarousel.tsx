@@ -6,6 +6,7 @@ import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNot
 import { getSecureAudioUrl, resolvePlayableAudioSource } from '../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { getLoopLocator, saveLoopLocator, toggleLoopLocator, removeLoopLocator, AudioLoopLocator } from '../utils/audioLoopLocatorStorage';
+import { safeDecodeAudioData } from '../utils/audioMasteringEngine';
 
 const isPlayableUrl = (u?: string): boolean => {
   if (!u) return false;
@@ -46,7 +47,7 @@ interface AudioTrackCarouselProps {
 }
 
 // Precision WebAudio beep scheduler for 4-beat count-in
-export const scheduleCountInBeep = (ctx: AudioContext, time: number, isAccent: boolean) => {
+const scheduleCountInBeep = (ctx: AudioContext, time: number, isAccent: boolean) => {
   try {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -434,7 +435,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   }, [initialDuration]);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState<boolean>(false);
+  const [countInSoundActive, setCountInSoundActive] = useState<boolean>(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -475,8 +476,169 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     };
   }, [url, resolvedUrl]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const loopSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const isWebAudioPlayingRef = useRef<boolean>(false);
+  const loopStartTimestampRef = useRef<number>(0);
+  const loopOffsetSecRef = useRef<number>(0);
   const countInTimerRef = useRef<any>(null);
   const playerIdRef = useRef<string>(`carousel_strip_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+  const lastPlayheadUpdateRef = useRef<number>(0);
+
+  const stopWebAudio = (resetTime = false) => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.onended = null;
+        loopSourceRef.current.stop();
+        loopSourceRef.current.disconnect();
+      } catch {}
+      loopSourceRef.current = null;
+    }
+    isWebAudioPlayingRef.current = false;
+    if (resetTime) {
+      setCurrentTime(0);
+    }
+  };
+
+  const loadAudioBuffer = async (): Promise<AudioBuffer | null> => {
+    if (audioBufferRef.current) return audioBufferRef.current;
+    const ctx = SharedAudioEngine.getContext();
+    if (!ctx) return null;
+    try {
+      let targetUrl = resolvedUrl || url;
+      if (!targetUrl) return null;
+      let arrayBuffer: ArrayBuffer | null = null;
+      if (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) {
+        const resp = await fetch(targetUrl);
+        arrayBuffer = await resp.arrayBuffer();
+      } else {
+        const resp = await fetch(targetUrl, { mode: 'cors' });
+        arrayBuffer = await resp.arrayBuffer();
+      }
+      if (arrayBuffer) {
+        const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
+        audioBufferRef.current = decoded;
+        if (decoded.duration && isFinite(decoded.duration)) {
+          setDuration(Math.round(decoded.duration));
+        }
+        return decoded;
+      }
+    } catch (err) {
+      console.warn('[CompactAudioStrip] Buffer load error:', err);
+    }
+    return null;
+  };
+
+  const startWebAudioPlayback = async (options: { loop: boolean; offsetSec?: number }) => {
+    try {
+      const ctx = SharedAudioEngine.getContext();
+      let buffer = audioBufferRef.current;
+      if (!buffer) {
+        buffer = await loadAudioBuffer();
+      }
+      if (!ctx || !buffer) {
+        // Fallback: HTML5
+        if (audioRef.current) {
+          audioRef.current.currentTime = options.offsetSec || 0;
+          audioRef.current.loop = options.loop;
+          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
+        return;
+      }
+
+      stopWebAudio();
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = playbackRate || 1;
+
+      const hasLocatorLoop = Boolean(options.loop && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec);
+      const loopStartBound = hasLocatorLoop ? loopLocator!.startSec : 0;
+      const loopEndBound = hasLocatorLoop ? Math.min(buffer.duration, loopLocator!.endSec) : buffer.duration;
+
+      source.loop = options.loop;
+      if (options.loop) {
+        source.loopStart = loopStartBound;
+        source.loopEnd = loopEndBound;
+      }
+      source.connect(ctx.destination);
+
+      const bufDur = buffer.duration;
+      let playStart = options.offsetSec !== undefined ? options.offsetSec : currentTime;
+      if (hasLocatorLoop) {
+        if (playStart < loopStartBound || playStart >= loopEndBound - 0.05) {
+          playStart = loopStartBound;
+        }
+      } else {
+        if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
+      }
+
+      source.start(0, playStart);
+      loopSourceRef.current = source;
+      isWebAudioPlayingRef.current = true;
+      loopStartTimestampRef.current = ctx.currentTime;
+      loopOffsetSecRef.current = playStart;
+      setIsPlaying(true);
+      setCurrentTime(playStart);
+
+      source.onended = () => {
+        if (!options.loop && isWebAudioPlayingRef.current && loopSourceRef.current === source) {
+          stopWebAudio();
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }
+      };
+
+      const updatePlayhead = () => {
+        if (!isWebAudioPlayingRef.current || !loopSourceRef.current || !ctx || !audioBufferRef.current) return;
+        const curBufDur = audioBufferRef.current.duration;
+        if (curBufDur > 0) {
+          const elapsed = (ctx.currentTime - loopStartTimestampRef.current) * (playbackRate || 1);
+          const current = (loopOffsetSecRef.current + elapsed);
+          const now = performance.now();
+          if (options.loop) {
+            if (hasLocatorLoop) {
+              const loopSpan = Math.max(0.05, loopEndBound - loopStartBound);
+              const offsetInLoop = (current - loopStartBound) % loopSpan;
+              if (now - lastPlayheadUpdateRef.current >= 40) {
+                lastPlayheadUpdateRef.current = now;
+                setCurrentTime(loopStartBound + (offsetInLoop < 0 ? offsetInLoop + loopSpan : offsetInLoop));
+              }
+            } else {
+              if (now - lastPlayheadUpdateRef.current >= 40) {
+                lastPlayheadUpdateRef.current = now;
+                setCurrentTime(current % curBufDur);
+              }
+            }
+          } else {
+            if (current >= curBufDur) {
+              stopWebAudio();
+              setIsPlaying(false);
+              setCurrentTime(0);
+              return;
+            }
+            if (now - lastPlayheadUpdateRef.current >= 40) {
+              lastPlayheadUpdateRef.current = now;
+              setCurrentTime(Math.min(curBufDur, current));
+            }
+          }
+        }
+        animFrameRef.current = requestAnimationFrame(updatePlayhead);
+      };
+      animFrameRef.current = requestAnimationFrame(updatePlayhead);
+    } catch (err) {
+      console.warn('[CompactAudioStrip] Web Audio playback error:', err);
+      setIsPlaying(false);
+    }
+  };
 
   const notifyGlobalPlay = () => {
     window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
@@ -486,10 +648,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     const handleOtherPlay = (e: any) => {
       if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
         if (countInTimerRef.current) {
-          clearTimeout(countInTimerRef.current);
+          if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+            countInTimerRef.current.clear();
+          } else {
+            clearTimeout(countInTimerRef.current);
+          }
           countInTimerRef.current = null;
           setCountInStep(null);
         }
+        stopWebAudio();
         if (audioRef.current && !audioRef.current.paused) {
           audioRef.current.pause();
         }
@@ -520,26 +687,49 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     return () => {
       active = false;
       if (cleanupFn) cleanupFn();
+      stopWebAudio();
       if (countInTimerRef.current) {
         if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
           countInTimerRef.current.clear();
         } else {
           clearTimeout(countInTimerRef.current);
         }
+        countInTimerRef.current = null;
       }
     };
   }, [url]);
 
+  // Preload audio buffer whenever resolvedUrl is ready
+  useEffect(() => {
+    audioBufferRef.current = null;
+    if (resolvedUrl) {
+      loadAudioBuffer().catch(() => {});
+    }
+  }, [resolvedUrl]);
+
   // 🔁 Seamless Native Gapless Loop
   useEffect(() => {
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.loop = isLooping;
+      } catch {}
+    }
     if (audioRef.current) {
       audioRef.current.loop = isLooping;
     }
   }, [isLooping]);
 
+  useEffect(() => {
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.playbackRate.value = playbackRate;
+      } catch {}
+    }
+  }, [playbackRate]);
+
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
+    // 🔓 Safari AudioContext Unlock on user gesture
     const ctx = SharedAudioEngine.getContext();
     if (ctx && ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
@@ -553,113 +743,73 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
       countInTimerRef.current = null;
       setCountInStep(null);
+      stopWebAudio();
       if (audioRef.current) {
         try {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
-          audioRef.current.muted = false;
-          audioRef.current.volume = 1;
         } catch {}
       }
       setIsPlaying(false);
       return;
     }
-    if (!audioRef.current) return;
+
     if (isPlaying) {
-      audioRef.current.pause();
+      stopWebAudio();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setIsPlaying(false);
-    } else {
-      notifyGlobalPlay();
+      return;
+    }
 
-      const playNative = () => {
-        if (!audioRef.current) return;
-        if (isLooping && loopLocator && loopLocator.enabled) {
-          if (audioRef.current.currentTime < loopLocator.startSec || audioRef.current.currentTime >= loopLocator.endSec) {
-            audioRef.current.currentTime = loopLocator.startSec;
-          }
-        } else if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-          audioRef.current.currentTime = 0;
-        }
-        if (audioRef.current.readyState === 0) {
-          audioRef.current.load();
-        }
-        audioRef.current.loop = isLooping && (!loopLocator || !loopLocator.enabled);
-        audioRef.current.muted = false;
-        audioRef.current.volume = 1;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
-          console.warn('[CompactAudioStrip] Play error:', err);
-          setIsPlaying(false);
-        });
-      };
+    notifyGlobalPlay();
 
-      if (countInActive) {
-        // 🔓 Safari WebKit Autoplay Priming:
-        // Keep the audio element playing silently throughout count-in so WebKit permits unmuting on beat 4!
-        try {
-          audioRef.current.muted = true;
-          audioRef.current.volume = 0;
-          if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-            audioRef.current.currentTime = 0;
-          }
-          if (audioRef.current.readyState === 0) {
-            audioRef.current.load();
-          }
-          const primePromise = audioRef.current.play();
-          if (primePromise !== undefined) {
-            primePromise.catch(() => {});
-          }
-        } catch {}
+    const hasLocatorLoop = Boolean(isLooping && loopLocator && loopLocator.enabled);
+    let startOffset = currentTime;
+    if (hasLocatorLoop) {
+      if (startOffset < loopLocator!.startSec || startOffset >= loopLocator!.endSec - 0.05) {
+        startOffset = loopLocator!.startSec;
+      }
+    } else if (duration > 0 && startOffset >= duration - 0.05) {
+      startOffset = 0;
+    }
 
-        const bpmMatch = label ? label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
-        const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
-        const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
-        const beatDurationMs = beatDurationSec * 1000;
+    // ⏱️ Standardmäßig 4 Taktschläge einzählen (Visuell immer 1-2-3-4; Metronom-Audio nur wenn countInSoundActive)
+    const bpmMatch = label ? label.match(/(?:BPM\s*:\s*|BPM\s+)(\d{2,3})|(\d{2,3})\s*BPM/i) : null;
+    const parsedBpm = bpmMatch ? parseInt(bpmMatch[1] || bpmMatch[2], 10) : null;
+    const effectiveBpm = (parsedBpm && parsedBpm >= 40 && parsedBpm <= 260) ? parsedBpm : 90; // 🎯 Standard 90 BPM (667ms pro Viertelnote)
+    const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
+    const beatDurationMs = beatDurationSec * 1000;
 
-        const now = ctx ? ctx.currentTime : 0;
-        const leadTime = 0.05; // 50ms scheduling headroom
-        const scheduleStart = now + leadTime;
+    // Ensure buffer is ready for Beat 1
+    loadAudioBuffer().catch(() => {});
 
-        if (ctx) {
-          for (let i = 0; i < 4; i++) {
-            scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
-          }
-        }
+    const now = ctx ? ctx.currentTime : 0;
+    const leadTime = 0.05; // 50ms scheduling headroom
+    const scheduleStart = now + leadTime;
 
-        setCountInStep(1);
-        const timers: any[] = [];
-        const clearTimers = () => timers.forEach(t => clearTimeout(t));
-        countInTimerRef.current = { clear: clearTimers };
-
-        const leadTimeMs = Math.round(leadTime * 1000);
-        timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
-        timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
-        timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
-        timers.push(setTimeout(() => {
-          setCountInStep(null);
-          countInTimerRef.current = null;
-          if (audioRef.current) {
-            let startPos = 0;
-            if (isLooping && loopLocator && loopLocator.enabled) {
-              startPos = loopLocator.startSec;
-            }
-            try {
-              audioRef.current.currentTime = startPos;
-              audioRef.current.muted = false;
-              audioRef.current.volume = 1;
-              if (audioRef.current.paused) {
-                audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-              } else {
-                setIsPlaying(true);
-              }
-            } catch {
-              playNative();
-            }
-          }
-        }, leadTimeMs + 4 * beatDurationMs));
-      } else {
-        playNative();
+    // Metronom-Klicks nur abspielen wenn der Vorzähler-Sound-Button manuell aktiviert wurde
+    if (countInSoundActive && ctx) {
+      for (let i = 0; i < 4; i++) {
+        scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
       }
     }
+
+    setCountInStep(1);
+    const timers: any[] = [];
+    const clearTimers = () => timers.forEach(t => clearTimeout(t));
+    countInTimerRef.current = { clear: clearTimers };
+
+    const leadTimeMs = Math.round(leadTime * 1000);
+    timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
+    timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
+    timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
+    timers.push(setTimeout(() => {
+      setCountInStep(null);
+      countInTimerRef.current = null;
+      startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+    }, leadTimeMs + 4 * beatDurationMs));
   };
 
   useEffect(() => {
@@ -671,6 +821,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
     };
     const handleTimeUpdate = () => {
+      if (isWebAudioPlayingRef.current || countInTimerRef.current) return; // 🛡️ Freeze time update while WebAudio or count-in is active
       const cur = audio.currentTime;
       setCurrentTime(cur);
       if (cur > duration) {
@@ -795,18 +946,18 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         )}
       </button>
 
-      {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
+      {/* ⏱️ Vorzähler-Metronom Sound Button (Standardmäßig deaktiviert, optional mit Metronom-Klick) */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setCountInActive(!countInActive);
+          setCountInSoundActive(!countInSoundActive);
         }}
-        aria-label={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren'}
+        aria-label={countInSoundActive ? 'Einzähler-Metronom aktiv' : 'Einzähler-Metronom aktivieren'}
         style={{
-          border: countInActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-          background: countInActive ? '#dcfce7' : '#ffffff',
-          color: countInActive ? '#15803d' : '#64748b',
+          border: countInSoundActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+          background: countInSoundActive ? '#dcfce7' : '#ffffff',
+          color: countInSoundActive ? '#15803d' : '#64748b',
           fontSize: '0.80rem',
           fontWeight: 850,
           height: isMobile ? '44px' : '36px',
@@ -817,14 +968,14 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '3px',
-          boxShadow: countInActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          boxShadow: countInSoundActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
+        title={countInSoundActive ? 'Einzähler-Metronom aktiv (Ton an)' : 'Einzähler-Metronom stumm (Klicken für Metronom-Ton)'}
       >
-        <Timer size={15} strokeWidth={countInActive ? 2.5 : 2.2} />
+        <Timer size={15} strokeWidth={countInSoundActive ? 2.5 : 2.2} />
         <span>4</span>
       </button>
 
@@ -1008,7 +1159,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       <audio
         ref={audioRef}
         src={resolvedUrl || undefined}
-        preload="metadata"
+        preload="auto"
         playsInline
         onLoadedMetadata={(e) => {
           const a = e.currentTarget;
@@ -1396,7 +1547,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState<boolean>(false);
+  const [countInSoundActive, setCountInSoundActive] = useState<boolean>(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -1438,8 +1589,169 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   }, [url, resolvedUrl]);
   const [isHovered, setIsHovered] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const loopSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const isWebAudioPlayingRef = useRef<boolean>(false);
+  const loopStartTimestampRef = useRef<number>(0);
+  const loopOffsetSecRef = useRef<number>(0);
   const countInTimerRef = useRef<any>(null);
   const playerIdRef = useRef<string>(`carousel_capsule_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+  const lastPlayheadUpdateRef = useRef<number>(0);
+
+  const stopWebAudio = (resetTime = false) => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.onended = null;
+        loopSourceRef.current.stop();
+        loopSourceRef.current.disconnect();
+      } catch {}
+      loopSourceRef.current = null;
+    }
+    isWebAudioPlayingRef.current = false;
+    if (resetTime) {
+      setCurrentTime(0);
+    }
+  };
+
+  const loadAudioBuffer = async (): Promise<AudioBuffer | null> => {
+    if (audioBufferRef.current) return audioBufferRef.current;
+    const ctx = SharedAudioEngine.getContext();
+    if (!ctx) return null;
+    try {
+      let targetUrl = resolvedUrl || url;
+      if (!targetUrl) return null;
+      let arrayBuffer: ArrayBuffer | null = null;
+      if (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) {
+        const resp = await fetch(targetUrl);
+        arrayBuffer = await resp.arrayBuffer();
+      } else {
+        const resp = await fetch(targetUrl, { mode: 'cors' });
+        arrayBuffer = await resp.arrayBuffer();
+      }
+      if (arrayBuffer) {
+        const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
+        audioBufferRef.current = decoded;
+        if (decoded.duration && isFinite(decoded.duration)) {
+          setDuration(Math.round(decoded.duration));
+        }
+        return decoded;
+      }
+    } catch (err) {
+      console.warn('[AppleSplitCapsulePlayer] Buffer load error:', err);
+    }
+    return null;
+  };
+
+  const startWebAudioPlayback = async (options: { loop: boolean; offsetSec?: number }) => {
+    try {
+      const ctx = SharedAudioEngine.getContext();
+      let buffer = audioBufferRef.current;
+      if (!buffer) {
+        buffer = await loadAudioBuffer();
+      }
+      if (!ctx || !buffer) {
+        // Fallback: HTML5
+        if (audioRef.current) {
+          audioRef.current.currentTime = options.offsetSec || 0;
+          audioRef.current.loop = options.loop;
+          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
+        return;
+      }
+
+      stopWebAudio();
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = playbackRate || 1;
+
+      const hasLocatorLoop = Boolean(options.loop && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec);
+      const loopStartBound = hasLocatorLoop ? loopLocator!.startSec : 0;
+      const loopEndBound = hasLocatorLoop ? Math.min(buffer.duration, loopLocator!.endSec) : buffer.duration;
+
+      source.loop = options.loop;
+      if (options.loop) {
+        source.loopStart = loopStartBound;
+        source.loopEnd = loopEndBound;
+      }
+      source.connect(ctx.destination);
+
+      const bufDur = buffer.duration;
+      let playStart = options.offsetSec !== undefined ? options.offsetSec : currentTime;
+      if (hasLocatorLoop) {
+        if (playStart < loopStartBound || playStart >= loopEndBound - 0.05) {
+          playStart = loopStartBound;
+        }
+      } else {
+        if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
+      }
+
+      source.start(0, playStart);
+      loopSourceRef.current = source;
+      isWebAudioPlayingRef.current = true;
+      loopStartTimestampRef.current = ctx.currentTime;
+      loopOffsetSecRef.current = playStart;
+      setIsPlaying(true);
+      setCurrentTime(playStart);
+
+      source.onended = () => {
+        if (!options.loop && isWebAudioPlayingRef.current && loopSourceRef.current === source) {
+          stopWebAudio();
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }
+      };
+
+      const updatePlayhead = () => {
+        if (!isWebAudioPlayingRef.current || !loopSourceRef.current || !ctx || !audioBufferRef.current) return;
+        const curBufDur = audioBufferRef.current.duration;
+        if (curBufDur > 0) {
+          const elapsed = (ctx.currentTime - loopStartTimestampRef.current) * (playbackRate || 1);
+          const current = (loopOffsetSecRef.current + elapsed);
+          const now = performance.now();
+          if (options.loop) {
+            if (hasLocatorLoop) {
+              const loopSpan = Math.max(0.05, loopEndBound - loopStartBound);
+              const offsetInLoop = (current - loopStartBound) % loopSpan;
+              if (now - lastPlayheadUpdateRef.current >= 40) {
+                lastPlayheadUpdateRef.current = now;
+                setCurrentTime(loopStartBound + (offsetInLoop < 0 ? offsetInLoop + loopSpan : offsetInLoop));
+              }
+            } else {
+              if (now - lastPlayheadUpdateRef.current >= 40) {
+                lastPlayheadUpdateRef.current = now;
+                setCurrentTime(current % curBufDur);
+              }
+            }
+          } else {
+            if (current >= curBufDur) {
+              stopWebAudio();
+              setIsPlaying(false);
+              setCurrentTime(0);
+              return;
+            }
+            if (now - lastPlayheadUpdateRef.current >= 40) {
+              lastPlayheadUpdateRef.current = now;
+              setCurrentTime(Math.min(curBufDur, current));
+            }
+          }
+        }
+        animFrameRef.current = requestAnimationFrame(updatePlayhead);
+      };
+      animFrameRef.current = requestAnimationFrame(updatePlayhead);
+    } catch (err) {
+      console.warn('[AppleSplitCapsulePlayer] Web Audio playback error:', err);
+      setIsPlaying(false);
+    }
+  };
 
   const notifyGlobalPlay = () => {
     window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
@@ -1449,10 +1761,15 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     const handleOtherPlay = (e: any) => {
       if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
         if (countInTimerRef.current) {
-          clearTimeout(countInTimerRef.current);
+          if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+            countInTimerRef.current.clear();
+          } else {
+            clearTimeout(countInTimerRef.current);
+          }
           countInTimerRef.current = null;
           setCountInStep(null);
         }
+        stopWebAudio();
         if (audioRef.current && !audioRef.current.paused) {
           audioRef.current.pause();
         }
@@ -1483,26 +1800,49 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     return () => {
       active = false;
       if (cleanupFn) cleanupFn();
+      stopWebAudio();
       if (countInTimerRef.current) {
         if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
           countInTimerRef.current.clear();
         } else {
           clearTimeout(countInTimerRef.current);
         }
+        countInTimerRef.current = null;
       }
     };
   }, [url]);
 
+  // Preload audio buffer whenever resolvedUrl is ready
+  useEffect(() => {
+    audioBufferRef.current = null;
+    if (resolvedUrl) {
+      loadAudioBuffer().catch(() => {});
+    }
+  }, [resolvedUrl]);
+
   // 🔁 Seamless Native Gapless Loop
   useEffect(() => {
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.loop = isLooping;
+      } catch {}
+    }
     if (audioRef.current) {
       audioRef.current.loop = isLooping;
     }
   }, [isLooping]);
 
+  useEffect(() => {
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.playbackRate.value = playbackRate;
+      } catch {}
+    }
+  }, [playbackRate]);
+
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
+    // 🔓 Safari AudioContext Unlock on user gesture
     const ctx = SharedAudioEngine.getContext();
     if (ctx && ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
@@ -1516,113 +1856,73 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
       countInTimerRef.current = null;
       setCountInStep(null);
+      stopWebAudio();
       if (audioRef.current) {
         try {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
-          audioRef.current.muted = false;
-          audioRef.current.volume = 1;
         } catch {}
       }
       setIsPlaying(false);
       return;
     }
-    if (!audioRef.current) return;
+
     if (isPlaying) {
-      audioRef.current.pause();
+      stopWebAudio();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setIsPlaying(false);
-    } else {
-      notifyGlobalPlay();
+      return;
+    }
 
-      const playNative = () => {
-        if (!audioRef.current) return;
-        if (isLooping && loopLocator && loopLocator.enabled) {
-          if (audioRef.current.currentTime < loopLocator.startSec || audioRef.current.currentTime >= loopLocator.endSec) {
-            audioRef.current.currentTime = loopLocator.startSec;
-          }
-        } else if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-          audioRef.current.currentTime = 0;
-        }
-        if (audioRef.current.readyState === 0) {
-          audioRef.current.load();
-        }
-        audioRef.current.loop = isLooping && (!loopLocator || !loopLocator.enabled);
-        audioRef.current.muted = false;
-        audioRef.current.volume = 1;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
-          console.warn('[Audio] Play error:', err);
-          setIsPlaying(false);
-        });
-      };
+    notifyGlobalPlay();
 
-      if (countInActive) {
-        // 🔓 Safari WebKit Autoplay Priming:
-        // Keep the audio element playing silently throughout count-in so WebKit permits unmuting on beat 4!
-        try {
-          audioRef.current.muted = true;
-          audioRef.current.volume = 0;
-          if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-            audioRef.current.currentTime = 0;
-          }
-          if (audioRef.current.readyState === 0) {
-            audioRef.current.load();
-          }
-          const primePromise = audioRef.current.play();
-          if (primePromise !== undefined) {
-            primePromise.catch(() => {});
-          }
-        } catch {}
+    const hasLocatorLoop = Boolean(isLooping && loopLocator && loopLocator.enabled);
+    let startOffset = currentTime;
+    if (hasLocatorLoop) {
+      if (startOffset < loopLocator!.startSec || startOffset >= loopLocator!.endSec - 0.05) {
+        startOffset = loopLocator!.startSec;
+      }
+    } else if (duration > 0 && startOffset >= duration - 0.05) {
+      startOffset = 0;
+    }
 
-        const bpmMatch = label ? label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
-        const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
-        const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
-        const beatDurationMs = beatDurationSec * 1000;
+    // ⏱️ Standardmäßig 4 Taktschläge einzählen (Visuell immer 1-2-3-4; Metronom-Audio nur wenn countInSoundActive)
+    const bpmMatch = label ? label.match(/(?:BPM\s*:\s*|BPM\s+)(\d{2,3})|(\d{2,3})\s*BPM/i) : null;
+    const parsedBpm = bpmMatch ? parseInt(bpmMatch[1] || bpmMatch[2], 10) : null;
+    const effectiveBpm = (parsedBpm && parsedBpm >= 40 && parsedBpm <= 260) ? parsedBpm : 90; // 🎯 Standard 90 BPM (667ms pro Viertelnote)
+    const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
+    const beatDurationMs = beatDurationSec * 1000;
 
-        const now = ctx ? ctx.currentTime : 0;
-        const leadTime = 0.05; // 50ms scheduling headroom
-        const scheduleStart = now + leadTime;
+    // Ensure buffer is ready for Beat 1
+    loadAudioBuffer().catch(() => {});
 
-        if (ctx) {
-          for (let i = 0; i < 4; i++) {
-            scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
-          }
-        }
+    const now = ctx ? ctx.currentTime : 0;
+    const leadTime = 0.05; // 50ms scheduling headroom
+    const scheduleStart = now + leadTime;
 
-        setCountInStep(1);
-        const timers: any[] = [];
-        const clearTimers = () => timers.forEach(t => clearTimeout(t));
-        countInTimerRef.current = { clear: clearTimers };
-
-        const leadTimeMs = Math.round(leadTime * 1000);
-        timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
-        timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
-        timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
-        timers.push(setTimeout(() => {
-          setCountInStep(null);
-          countInTimerRef.current = null;
-          if (audioRef.current) {
-            let startPos = 0;
-            if (isLooping && loopLocator && loopLocator.enabled) {
-              startPos = loopLocator.startSec;
-            }
-            try {
-              audioRef.current.currentTime = startPos;
-              audioRef.current.muted = false;
-              audioRef.current.volume = 1;
-              if (audioRef.current.paused) {
-                audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-              } else {
-                setIsPlaying(true);
-              }
-            } catch {
-              playNative();
-            }
-          }
-        }, leadTimeMs + 4 * beatDurationMs));
-      } else {
-        playNative();
+    // Metronom-Klicks nur abspielen wenn der Vorzähler-Sound-Button manuell aktiviert wurde
+    if (countInSoundActive && ctx) {
+      for (let i = 0; i < 4; i++) {
+        scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
       }
     }
+
+    setCountInStep(1);
+    const timers: any[] = [];
+    const clearTimers = () => timers.forEach(t => clearTimeout(t));
+    countInTimerRef.current = { clear: clearTimers };
+
+    const leadTimeMs = Math.round(leadTime * 1000);
+    timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
+    timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
+    timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
+    timers.push(setTimeout(() => {
+      setCountInStep(null);
+      countInTimerRef.current = null;
+      startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+    }, leadTimeMs + 4 * beatDurationMs));
   };
 
   useEffect(() => {
@@ -1634,6 +1934,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     };
     const handleTimeUpdate = () => {
+      if (isWebAudioPlayingRef.current || countInTimerRef.current) return; // 🛡️ Freeze time update while WebAudio or count-in is active
       const cur = audio.currentTime;
       setCurrentTime(cur);
       if (cur > duration) {
@@ -1648,7 +1949,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     };
     const handleEnded = () => {
-      if (!isLooping) {
+      if (!isLooping && !isWebAudioPlayingRef.current) {
         setIsPlaying(false);
         setCurrentTime(0);
       }
@@ -1758,18 +2059,18 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         )}
       </button>
 
-      {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
+      {/* ⏱️ Vorzähler-Metronom Sound Button (Standardmäßig deaktiviert, optional mit Metronom-Klick) */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setCountInActive(!countInActive);
+          setCountInSoundActive(!countInSoundActive);
         }}
-        aria-label={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren'}
+        aria-label={countInSoundActive ? 'Einzähler-Metronom aktiv' : 'Einzähler-Metronom aktivieren'}
         style={{
-          border: countInActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-          background: countInActive ? '#dcfce7' : '#ffffff',
-          color: countInActive ? '#15803d' : '#64748b',
+          border: countInSoundActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+          background: countInSoundActive ? '#dcfce7' : '#ffffff',
+          color: countInSoundActive ? '#15803d' : '#64748b',
           fontSize: '0.80rem',
           fontWeight: 850,
           height: isMobile ? '44px' : '34px',
@@ -1780,14 +2081,14 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '3px',
-          boxShadow: countInActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          boxShadow: countInSoundActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
+        title={countInSoundActive ? 'Einzähler-Metronom aktiv (Ton an)' : 'Einzähler-Metronom stumm (Klicken für Metronom-Ton)'}
       >
-        <Timer size={15} strokeWidth={countInActive ? 2.5 : 2.2} />
+        <Timer size={15} strokeWidth={countInSoundActive ? 2.5 : 2.2} />
         <span>4</span>
       </button>
 
@@ -1971,7 +2272,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       <audio
         ref={audioRef}
         src={resolvedUrl || undefined}
-        preload="metadata"
+        preload="auto"
         playsInline
         onLoadedMetadata={(e) => {
           const a = e.currentTarget;
@@ -2318,7 +2619,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           <AudioEditorModal
             isOpen={isEditorOpen}
             onClose={() => setIsEditorOpen(false)}
-            audioUrl={resolvedUrl}
+            audioUrl={resolvedUrl || url}
             initialLabel={label || 'Aufnahme'}
             initialDuration={duration}
             initialLocator={loopLocator}

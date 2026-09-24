@@ -86,6 +86,28 @@ export async function fetchCrisisNotifications(targetId: string, isSchoolLevel =
 const inMemoryActiveSessions = new Map<string, { timestamp: number; data: any[] }>();
 const SESSIONS_CACHE_TTL_MS = 15 * 1000; // 15 seconds SWR TTL
 
+/**
+ * Invalidates the in-memory active sessions cache for a school (or globally).
+ */
+export function invalidateActiveSessionsCache(schoolId?: string): void {
+  if (schoolId) {
+    inMemoryActiveSessions.delete(schoolId);
+  } else {
+    inMemoryActiveSessions.clear();
+  }
+}
+
+/**
+ * Optimistically injects or updates an active session in the cache for 0ms hydration.
+ */
+export function optimisticallyInjectActiveSession(session: any, schoolId: string): void {
+  if (!schoolId || !session) return;
+  const current = inMemoryActiveSessions.get(schoolId)?.data || [];
+  const filtered = current.filter(s => s && s.id !== session.id && s.station_id !== session.station_id);
+  const updated = [session, ...filtered];
+  inMemoryActiveSessions.set(schoolId, { timestamp: Date.now(), data: updated });
+}
+
 export async function fetchActiveSessions(schoolId: string, force = false): Promise<any[]> {
   if (!schoolId) return [];
 
@@ -102,7 +124,7 @@ export async function fetchActiveSessions(schoolId: string, force = false): Prom
         .from('sessions')
         .select(`
           id, user_id, station_id, check_in_time, check_out_time,
-          users!inner(id, first_name, last_name, instrument, photo_url, role, school_id),
+          users!inner(id, first_name, last_name, instrument, photo_url, avatar_url, role, school_id),
           stations(id, name, color, instrument, pos_x, pos_y, room_id)
         `)
         .is('check_out_time', null)

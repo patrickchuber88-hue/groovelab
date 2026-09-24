@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { invalidateActiveSessionsCache } from '../../../repositories/scheduleRepository';
 
 export interface UseTeacherLiveLabProps {
   userId: string;
@@ -186,6 +187,7 @@ export function useTeacherLiveLab({
       if (onSessionChange) onSessionChange(sessData);
       if (onLocationModeChange) onLocationModeChange('lab');
 
+      invalidateActiveSessionsCache(teacher?.school_id);
       await fetchData();
       setShowKioskView(false);
       setCheckingInStatus('idle');
@@ -194,7 +196,7 @@ export function useTeacherLiveLab({
       alert('Fehler beim Einchecken: ' + (err?.message || String(err)));
       setCheckingInStatus('error');
     }
-  }, [userId, isTeacher, onSessionChange, onLocationModeChange, fetchData]);
+  }, [userId, isTeacher, teacher?.school_id, onSessionChange, onLocationModeChange, fetchData]);
 
   const handleTeacherSelfCheckout = useCallback(async () => {
     if (!window.confirm('Vom Lehrer iPad abmelden?')) return;
@@ -209,12 +211,13 @@ export function useTeacherLiveLab({
       if (onSessionChange) onSessionChange(null);
       if (onLocationModeChange) onLocationModeChange('home');
       sessionStorage.setItem('groovelab_location_mode', 'home');
+      invalidateActiveSessionsCache(teacher?.school_id);
       await fetchData();
     } catch (err) {
       console.error('Failed to self checkout:', err);
       alert('Fehler beim Abmelden.');
     }
-  }, [userId, onSessionChange, onLocationModeChange, setActiveSessions, setCoaches, fetchData]);
+  }, [userId, teacher?.school_id, onSessionChange, onLocationModeChange, setActiveSessions, setCoaches, fetchData]);
 
   const handleTeacherCheckout = useCallback(async (coach: any) => {
     if (!coach) return;
@@ -223,12 +226,13 @@ export function useTeacherLiveLab({
     try {
       const now = new Date().toISOString();
       await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', coach.id).is('check_out_time', null);
+      invalidateActiveSessionsCache(teacher?.school_id);
       await fetchData();
     } catch (err) {
       console.error('Failed to checkout coach:', err);
       alert('Fehler beim Abmelden des Coaches.');
     }
-  }, [fetchData]);
+  }, [fetchData, teacher?.school_id]);
 
   const handleLogoutStudent = useCallback(async (sessionId: string) => {
     if (!window.confirm('Ausloggen?')) return;
@@ -238,12 +242,13 @@ export function useTeacherLiveLab({
         alert('Fehler beim Ausloggen: ' + error.message);
         return;
       }
+      invalidateActiveSessionsCache(teacher?.school_id);
       await fetchData();
     } catch (err: any) {
       console.error('Failed to logout student:', err);
       alert('Fehler beim Ausloggen: ' + (err?.message || 'Unbekannter Fehler'));
     }
-  }, [fetchData]);
+  }, [fetchData, teacher?.school_id]);
 
   const handleResolveHelp = useCallback(async (requestId: string) => {
     try {

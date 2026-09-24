@@ -300,8 +300,23 @@ export function StudentBandMatchingSuite({
 
                                     const isGuestSearch = !!form.originBand;
                                     const isProposal = form.status === 'proposal';
-                                    const mySkill = userSongs.find(us => us.song_id === song.song_id && (us.difficulty_level || 'original') === song.level);
-                                    const canJoin = mySkill && !isMySlot && !form.memberMap[mySkill.instrument] && !form.isComplete;
+                                    const mySkill = userSongs.find(us => {
+                                      if (us.song_id !== song.song_id) return false;
+                                      const usLevel = (us.difficulty_level || 'original').toLowerCase();
+                                      const normUs = (usLevel === 'original' || usLevel === 'pro') ? 'pro' : 'starter';
+                                      const songLvl = (song.level || 'pro').toLowerCase();
+                                      const normSong = (songLvl === 'original' || songLvl === 'pro') ? 'pro' : 'starter';
+                                      return normUs === normSong;
+                                    });
+                                    const normMyInst = mySkill ? normalizeInstrument(mySkill.instrument) : '';
+                                    const reqInstCount = mySkill ? (
+                                      Object.entries(song.instrumentation || {}).find(([k]) => normalizeInstrument(k) === normMyInst)?.[1] || 0
+                                    ) : 0;
+                                    const filledInstCount = mySkill ? (
+                                      (form.members || []).filter((m: any) => normalizeInstrument(m.instrument) === normMyInst).length
+                                    ) : 0;
+                                    const hasOpenSlotForMyInst = (reqInstCount as number) > filledInstCount;
+                                    const canJoin = mySkill && !isMySlot && hasOpenSlotForMyInst && !form.isComplete;
 
                                     return (
                                       <div key={form.id} style={{ 
@@ -337,28 +352,32 @@ export function StudentBandMatchingSuite({
                                           {canJoin && (
                                             <button 
                                               onClick={async () => {
-                                                if (form.originBand) {
-                                                  const choice = window.confirm(`BAND-PROJEKT: ${form.originBand.name}\n\nOption A (OK): Als GASTMUSIKER beitreten (Du unterstützt diese Band).\n\nOption B (Abbrechen): NEUE BAND gründen (Du startest ein eigenes Projekt für diesen Song).`);
-                                                  if (choice) {
-                                                    const { error } = await supabase.from('band_song_slots').insert({
-                                                      band_song_id: form.bandSongId,
-                                                      user_id: user.id,
-                                                      instrument: mySkill.instrument,
-                                                      status: 'joined'
-                                                    });
-                                                    if (error) alert('Fehler beim Beitreten: ' + error.message);
-                                                    else {
-                                                      alert(`Du bist nun Gastmusiker für "${form.originBand.name}"!`);
+                                                try {
+                                                  if (form.originBand) {
+                                                    const choice = window.confirm(`BAND-PROJEKT: ${form.originBand.name}\n\nOption A (OK): Als GASTMUSIKER beitreten (Du unterstützt diese Band).\n\nOption B (Abbrechen): NEUE BAND gründen (Du startest ein eigenes Projekt für diesen Song).`);
+                                                    if (choice) {
+                                                      const { error } = await supabase.from('band_song_slots').insert({
+                                                        band_song_id: form.bandSongId,
+                                                        user_id: user.id,
+                                                        instrument: mySkill.instrument,
+                                                        status: 'joined'
+                                                      });
+                                                      if (error) alert('Fehler beim Beitreten: ' + error.message);
+                                                      else {
+                                                        alert(`Du bist nun Gastmusiker für "${form.originBand.name}"!`);
+                                                        onRefreshDashboard(user.id);
+                                                      }
+                                                    } else {
+                                                      const newFormId = crypto.randomUUID();
+                                                      await supabase.from('user_song_skills').update({ formation_group: newFormId }).eq('id', mySkill.id);
                                                       onRefreshDashboard(user.id);
                                                     }
                                                   } else {
-                                                    const newFormId = crypto.randomUUID();
-                                                    await supabase.from('user_song_skills').update({ formation_group: newFormId }).eq('id', mySkill.id);
+                                                    await supabase.from('user_song_skills').update({ formation_group: form.id }).eq('id', mySkill.id);
                                                     onRefreshDashboard(user.id);
                                                   }
-                                                } else {
-                                                  await supabase.from('user_song_skills').update({ formation_group: form.id }).eq('id', mySkill.id);
-                                                  onRefreshDashboard(user.id);
+                                                } catch (err: any) {
+                                                  console.error('[StudentBandMatchingSuite] Fehler beim Slot-Update:', err);
                                                 }
                                               }}
                                               style={{ background: form.originBand ? '#8b5cf6' : '#eab308', color: form.originBand ? 'white' : '#1e293b', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', minHeight: '44px', touchAction: 'manipulation' }}
@@ -523,11 +542,15 @@ export function StudentBandMatchingSuite({
                             {!(song?.formations || []).some((f: any) => (f?.members || []).some((m: any) => m?.user_id === user?.id)) && (
                               <button 
                                 onClick={async () => {
-                                  const mySkill = userSongs.find(us => us.song_id === song.song_id);
-                                  if (mySkill) {
-                                    const newId = `form_${Math.random().toString(36).substr(2, 9)}`;
-                                    await supabase.from('user_song_skills').update({ formation_group: newId }).eq('id', mySkill.id);
-                                    onRefreshDashboard(user.id);
+                                  try {
+                                    const mySkill = userSongs.find(us => us.song_id === song.song_id);
+                                    if (mySkill) {
+                                      const newId = `form_${Math.random().toString(36).substr(2, 9)}`;
+                                      await supabase.from('user_song_skills').update({ formation_group: newId }).eq('id', mySkill.id);
+                                      onRefreshDashboard(user.id);
+                                    }
+                                  } catch (err: any) {
+                                    console.error('[StudentBandMatchingSuite] Fehler beim Starten einer Formation:', err);
                                   }
                                 }}
                                 style={{ padding: '16px', background: 'white', border: '2px dashed #cbd5e1', borderRadius: '24px', color: '#64748b', fontWeight: 800, cursor: 'pointer', width: '100%', marginTop: '20px', minHeight: '44px', touchAction: 'manipulation' }}

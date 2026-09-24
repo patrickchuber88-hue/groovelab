@@ -124,15 +124,15 @@ export type StudioModuleKey = 'practice' | 'recordings' | 'groovetrainer' | 'tun
 
 export const ALL_STUDIO_MODULE_KEYS: StudioModuleKey[] = [
   'practice',
+  'protocol',
   'recordings',
   'groovetrainer',
   'tuner',
-  'loopstation',
   'earlab',
+  'loopstation',
   'skillradar',
-  'protocol',
-  'archive',
-  'worldtour'
+  'worldtour',
+  'archive'
 ];
 
 export function isStudioModuleActive(

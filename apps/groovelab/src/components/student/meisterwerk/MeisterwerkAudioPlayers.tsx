@@ -1149,21 +1149,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
       const beatDurationMs = beatDurationSec * 1000;
 
-      // 🚀 Preload buffer in background
+      // 🚀 Preload buffer in background during count-in so WebAudio is ready on Beat 1
       loadAudioBuffer().catch(() => {});
 
-      // 🔓 Safari WebKit Autoplay Priming:
-      // Start audio playing silently during user gesture so unmuting on beat 4 is guaranteed
-      if (audio && isPlayable) {
+      // Keep HTML5 audio paused at startOffset during count-in (DO NOT play silently in background!)
+      if (audio && audio.readyState > 0) {
         try {
-          audio.muted = true;
-          audio.volume = 0;
-          if (audio.readyState > 0) audio.currentTime = startOffset;
-          audio.playbackRate = playbackRate || 1;
-          const primePromise = audio.play();
-          if (primePromise !== undefined) {
-            primePromise.catch(() => {});
-          }
+          audio.pause();
+          audio.currentTime = startOffset;
         } catch {}
       }
 
@@ -1194,34 +1187,48 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       // 🚀 Launch Track Playback and Waveform Visualization EXACTLY on Beat 1 of Bar 2!
       // (Exakt nach Ablauf aller 4 Viertelnoten des Einzähl-Taktes)
       const songStartDelayMs = Math.max(0, leadTimeMs + 4 * beatDurationMs);
-      timers.push(setTimeout(() => {
+      timers.push(setTimeout(async () => {
         setCountInStep(null);
         countInTimerRef.current = null;
 
+        // 1. Primär: Web Audio API Playback (100% Autoplay-immun da Context bei Klick entsperrt wurde)
+        if (audioBufferRef.current) {
+          startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+          return;
+        }
+
+        // 2. Fallback: Versuche Puffer asynchron fertig zu laden
+        try {
+          const buf = await loadAudioBuffer();
+          if (buf) {
+            startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+            return;
+          }
+        } catch {}
+
+        // 3. Fallback: Sauberes HTML5-Audio Playback direkt ab startOffset
         if (audio && isPlayable) {
           try {
-            try { audio.currentTime = startOffset; } catch {}
+            audio.currentTime = startOffset;
             audio.loop = Boolean(isLooping);
             audio.playbackRate = playbackRate || 1;
             audio.muted = false;
             audio.volume = 1;
-            if (audio.paused) {
-              const playPromise = audio.play();
-              if (playPromise !== undefined) {
-                playPromise.then(() => setIsPlaying(true)).catch(() => {
-                  startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
-                });
-              } else {
-                setIsPlaying(true);
-              }
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+              playPromise.then(() => setIsPlaying(true)).catch((err) => {
+                console.warn('[InlineAudioPlayer] HTML5 count-in play error, retrying WebAudio:', err);
+                startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+              });
             } else {
               setIsPlaying(true);
             }
-          } catch {
-            startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+          } catch (err) {
+            console.warn('[InlineAudioPlayer] HTML5 play exception, falling back to WebAudio:', err);
+            startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
           }
         } else {
-          startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+          startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
         }
       }, songStartDelayMs));
 

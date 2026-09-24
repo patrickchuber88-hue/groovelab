@@ -37,6 +37,7 @@
 
 import * as lamejs from '@breezystack/lamejs';
 import { reportAudioError } from '../lib/errorTelemetry';
+import { SharedAudioEngine } from './sharedAudioEngine';
 
 // 🌟 CENTRAL PLATFORM-WIDE LOUDNESS & PEAK STANDARDS
 export const TARGET_STUDIO_LUFS = -14.0;
@@ -1538,18 +1539,11 @@ export async function processPureRawBlob(
   finalLufs: number;
 }> {
   const arrayBuffer = await inputBlob.arrayBuffer();
-  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  let decodedBuffer: AudioBuffer;
-  try {
-    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
-    if (options?.latencyCompensationSec && options.latencyCompensationSec > 0) {
-      decodedBuffer = alignAudioBufferToGrid(decodedBuffer, options.latencyCompensationSec, tempCtx);
-    }
-  } finally {
-    try {
-      tempCtx.close();
-    } catch (e) {}
+  const audioCtx = SharedAudioEngine.getContext();
+  const rawDecoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+  let decodedBuffer: AudioBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawDecoded);
+  if (options?.latencyCompensationSec && options.latencyCompensationSec > 0) {
+    decodedBuffer = alignAudioBufferToGrid(decodedBuffer, options.latencyCompensationSec, audioCtx);
   }
 
   const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
@@ -1938,16 +1932,9 @@ export async function processStudioMastering(
     ? (maybeOptions || DEFAULT_ACOUSTIC_MASTERING_OPTIONS)
     : (durationSecOrOptions || DEFAULT_ACOUSTIC_MASTERING_OPTIONS);
   const arrayBuffer = await audioBlobOrFile.arrayBuffer();
-  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  let decodedBuffer: AudioBuffer;
-  try {
-    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
-  } finally {
-    try {
-      tempCtx.close();
-    } catch (e) {}
-  }
+  const audioCtx = SharedAudioEngine.getContext();
+  const rawDecoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+  const decodedBuffer: AudioBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawDecoded);
 
   // 🌟 BASELINE CALIBRATION: Apply Stage 0 Pure RAW baseline before applying mastering plugins
   processPureRawAudioBuffer(decodedBuffer, {
@@ -1984,68 +1971,62 @@ export async function processDualMastering(
   };
 
   const arrayBuffer = await audioInput.arrayBuffer();
-  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  try {
-    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-    const decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
-    const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
+  const audioCtx = SharedAudioEngine.getContext();
+  const rawDecoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+  const decodedBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawDecoded);
+  const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
 
-    // 1. Generate Pure RAW Buffer (Calibrated to TARGET_PURE_RAW_LUFS = -14.5 LUFS)
-    const rawBuffer = tempCtx.createBuffer(2, decodedBuffer.length, decodedBuffer.sampleRate);
-    rawBuffer.getChannelData(0).set(decodedBuffer.getChannelData(0));
-    rawBuffer.getChannelData(1).set(decodedBuffer.getChannelData(1));
-    processPureRawAudioBuffer(rawBuffer, {
-      targetLufs: TARGET_PURE_RAW_LUFS,
-      targetPeakDb: TARGET_PEAK_DBTP
-    });
+  // 1. Generate Pure RAW Buffer (Calibrated to TARGET_PURE_RAW_LUFS = -14.5 LUFS)
+  const rawBuffer = audioCtx.createBuffer(2, decodedBuffer.length, decodedBuffer.sampleRate);
+  rawBuffer.getChannelData(0).set(decodedBuffer.getChannelData(0));
+  rawBuffer.getChannelData(1).set(decodedBuffer.getChannelData(1));
+  processPureRawAudioBuffer(rawBuffer, {
+    targetLufs: TARGET_PURE_RAW_LUFS,
+    targetPeakDb: TARGET_PEAK_DBTP
+  });
 
-    const rawWavBlob = audioBufferToWavBlob(rawBuffer, {
-      title: 'Campus-Groovelab Pure RAW Audio',
-      artist: 'Campus-Groovelab'
-    });
-    const rawNormalizedUrl = URL.createObjectURL(rawWavBlob);
+  const rawWavBlob = audioBufferToWavBlob(rawBuffer, {
+    title: 'Campus-Groovelab Pure RAW Audio',
+    artist: 'Campus-Groovelab'
+  });
+  const rawNormalizedUrl = URL.createObjectURL(rawWavBlob);
 
-    const rawStreamingRes = audioBufferToStreamingBlob(rawBuffer, {
-      title: 'Campus-Groovelab Pure RAW Audio',
-      artist: 'Campus-Groovelab',
-      bitrateKbps: 256
-    });
-    const rawStreamingUrl = URL.createObjectURL(rawStreamingRes.blob);
+  const rawStreamingRes = audioBufferToStreamingBlob(rawBuffer, {
+    title: 'Campus-Groovelab Pure RAW Audio',
+    artist: 'Campus-Groovelab',
+    bitrateKbps: 256
+  });
+  const rawStreamingUrl = URL.createObjectURL(rawStreamingRes.blob);
 
-    // 2. Generate Studio Master (DIRECTLY from Pure RAW Buffer, calibrated to TARGET_STUDIO_LUFS = -14.0 LUFS)
-    const masterRes = await processStudioMasteringAudioBuffer(rawBuffer, {
-      ...mergedOptions,
-      targetLufs: TARGET_STUDIO_LUFS,
-      targetPeakDb: TARGET_PEAK_DBTP
-    });
+  // 2. Generate Studio Master (DIRECTLY from Pure RAW Buffer, calibrated to TARGET_STUDIO_LUFS = -14.0 LUFS)
+  const masterRes = await processStudioMasteringAudioBuffer(rawBuffer, {
+    ...mergedOptions,
+    targetLufs: TARGET_STUDIO_LUFS,
+    targetPeakDb: TARGET_PEAK_DBTP
+  });
 
-    return {
-      masteredBlob: masterRes.masteredBlob,
-      masteredUrl: masterRes.masteredUrl,
-      masteredStreamingBlob: masterRes.masteredStreamingBlob,
-      masteredStreamingUrl: masterRes.masteredStreamingUrl,
-      rawNormalizedBlob: rawWavBlob,
-      rawNormalizedUrl,
-      rawStreamingBlob: rawStreamingRes.blob,
-      rawStreamingUrl,
-      originalLufs,
-      finalLufs: masterRes.finalLufs,
-      detectedF0MinHz: masterRes.detectedF0MinHz,
-      adaptiveHpfFreqHz: masterRes.adaptiveHpfFreqHz,
-      crestFactorDb: masterRes.crestFactorDb,
-      transientSofteningApplied: masterRes.transientSofteningApplied,
-      durationSec: masterRes.durationSec,
-      // Backwards-compatible aliases
-      rawUrl: rawNormalizedUrl,
-      rawBlob: rawWavBlob,
-      masterBlob: masterRes.masteredBlob,
-      duration: masterRes.durationSec
-    };
-  } finally {
-    try {
-      tempCtx.close();
-    } catch (e) {}
-  }
+  return {
+    masteredBlob: masterRes.masteredBlob,
+    masteredUrl: masterRes.masteredUrl,
+    masteredStreamingBlob: masterRes.masteredStreamingBlob,
+    masteredStreamingUrl: masterRes.masteredStreamingUrl,
+    rawNormalizedBlob: rawWavBlob,
+    rawNormalizedUrl,
+    rawStreamingBlob: rawStreamingRes.blob,
+    rawStreamingUrl,
+    originalLufs,
+    finalLufs: masterRes.finalLufs,
+    detectedF0MinHz: masterRes.detectedF0MinHz,
+    adaptiveHpfFreqHz: masterRes.adaptiveHpfFreqHz,
+    crestFactorDb: masterRes.crestFactorDb,
+    transientSofteningApplied: masterRes.transientSofteningApplied,
+    durationSec: masterRes.durationSec,
+    // Backwards-compatible aliases
+    rawUrl: rawNormalizedUrl,
+    rawBlob: rawWavBlob,
+    masterBlob: masterRes.masteredBlob,
+    duration: masterRes.durationSec
+  };
 }
 
 // ==============================================================================
@@ -2250,53 +2231,47 @@ export async function sliceAudioBlobForPreview(
   sliceDurationSec = 20
 ): Promise<Blob> {
   const arrayBuffer = await audioBlobOrFile.arrayBuffer();
-  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const audioCtx = SharedAudioEngine.getContext();
   
-  try {
-    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-    const totalDuration = rawDecoded.duration;
-    
-    if (totalDuration <= sliceDurationSec) {
-      return audioBlobOrFile instanceof Blob ? audioBlobOrFile : new Blob([audioBlobOrFile], { type: 'audio/wav' });
-    }
+  const rawDecoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+  const totalDuration = rawDecoded.duration;
+  
+  if (totalDuration <= sliceDurationSec) {
+    return audioBlobOrFile instanceof Blob ? audioBlobOrFile : new Blob([audioBlobOrFile], { type: 'audio/wav' });
+  }
 
-    // 🏛️ Goldstandard: Vorschau startet ab Sekunde 0.00 (ab der ersten gespielten Note)
-    const startSec = 0;
-    const sampleRate = rawDecoded.sampleRate;
-    const startSample = 0;
-    const lengthSamples = Math.min(rawDecoded.length, Math.floor(sliceDurationSec * sampleRate));
+  // 🏛️ Goldstandard: Vorschau startet ab Sekunde 0.00 (ab der ersten gespielten Note)
+  const startSec = 0;
+  const sampleRate = rawDecoded.sampleRate;
+  const startSample = 0;
+  const lengthSamples = Math.min(rawDecoded.length, Math.floor(sliceDurationSec * sampleRate));
 
-    const numChannels = rawDecoded.numberOfChannels;
-    const slicedBuffer = tempCtx.createBuffer(numChannels, lengthSamples, sampleRate);
+  const numChannels = rawDecoded.numberOfChannels;
+  const slicedBuffer = audioCtx.createBuffer(numChannels, lengthSamples, sampleRate);
 
+  for (let ch = 0; ch < numChannels; ch++) {
+    const srcData = rawDecoded.getChannelData(ch);
+    const dstData = slicedBuffer.getChannelData(ch);
+    dstData.set(srcData.subarray(startSample, startSample + lengthSamples));
+  }
+
+  if (lengthSamples > sampleRate * 0.1) {
+    const fadeSamples = Math.min(Math.floor(sampleRate * 0.01), Math.floor(lengthSamples * 0.05));
     for (let ch = 0; ch < numChannels; ch++) {
-      const srcData = rawDecoded.getChannelData(ch);
       const dstData = slicedBuffer.getChannelData(ch);
-      dstData.set(srcData.subarray(startSample, startSample + lengthSamples));
-    }
-
-    if (lengthSamples > sampleRate * 0.1) {
-      const fadeSamples = Math.min(Math.floor(sampleRate * 0.01), Math.floor(lengthSamples * 0.05));
-      for (let ch = 0; ch < numChannels; ch++) {
-        const dstData = slicedBuffer.getChannelData(ch);
-        for (let i = 0; i < fadeSamples; i++) {
-          const factor = Math.sin((i / fadeSamples) * (Math.PI / 2));
-          dstData[i] *= factor;
-          dstData[lengthSamples - 1 - i] *= factor;
-        }
+      for (let i = 0; i < fadeSamples; i++) {
+        const factor = Math.sin((i / fadeSamples) * (Math.PI / 2));
+        dstData[i] *= factor;
+        dstData[lengthSamples - 1 - i] *= factor;
       }
     }
-
-    const wavBlob = audioBufferToWavBlob(slicedBuffer, {
-      title: 'Campus-Groovelab Preview Slice',
-      artist: 'Campus-Groovelab Studio'
-    });
-    return wavBlob;
-  } finally {
-    try {
-      tempCtx.close();
-    } catch (e) {}
   }
+
+  const wavBlob = audioBufferToWavBlob(slicedBuffer, {
+    title: 'Campus-Groovelab Preview Slice',
+    artist: 'Campus-Groovelab Studio'
+  });
+  return wavBlob;
 }
 
 /**
@@ -2316,18 +2291,12 @@ export async function ensureWavBlob(
 
   try {
     const arrayBuffer = await blob.arrayBuffer();
-    const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    try {
-      const decoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-      return audioBufferToWavBlob(decoded, {
-        title: metadata?.title || 'Campus-Groovelab Audio',
-        artist: metadata?.artist || 'Campus-Groovelab'
-      });
-    } finally {
-      try {
-        tempCtx.close();
-      } catch (e) {}
-    }
+    const audioCtx = SharedAudioEngine.getContext();
+    const decoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+    return audioBufferToWavBlob(decoded, {
+      title: metadata?.title || 'Campus-Groovelab Audio',
+      artist: metadata?.artist || 'Campus-Groovelab'
+    });
   } catch (err) {
     console.warn('[ensureWavBlob] Transcode fallback note:', err);
     return blob instanceof Blob ? blob : new Blob([blob], { type: 'audio/wav' });

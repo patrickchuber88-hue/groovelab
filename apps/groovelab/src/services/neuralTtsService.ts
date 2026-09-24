@@ -521,26 +521,32 @@ export function cleanTextForTts(text: string): string {
  */
 export function buildContinuousHomeworkNarrative(options: {
   teacherName?: string;
+  studentFirstName?: string;
   instrument?: string;
-  books?: { title: string; formattedPages?: string; pageNums?: number[]; notes?: string[] }[];
-  songs?: { title: string; note?: string }[];
+  books?: { title: string; formattedPages?: string; pageNums?: number[]; pages?: number[]; notes?: string[] | string }[];
+  songs?: { title: string; artist?: string; note?: string; notes?: string }[];
   audioCount?: number;
+  audioRecordings?: Array<{ label?: string; title?: string; duration?: string }>;
   generalNotes?: string;
+  studentQuestion?: string;
 }): string {
   const parts: string[] = [];
 
   const booksList = options.books || [];
   const songsList = options.songs || [];
+  const audioList = options.audioRecordings || [];
   const hasBooks = booksList.length > 0;
   const hasSongs = songsList.length > 0;
-  const hasAudio = Boolean(options.audioCount && options.audioCount > 0);
+  const hasAudio = audioList.length > 0 || Boolean(options.audioCount && options.audioCount > 0);
   const hasGeneralNotes = Boolean(options.generalNotes && options.generalNotes.trim().length > 0);
+  const hasStudentQuestion = Boolean(options.studentQuestion && options.studentQuestion.trim().length > 0);
 
   const totalTasks = booksList.length + songsList.length;
 
   // 1. Leerzustand (Ferien / Keine Aufgaben)
-  if (totalTasks === 0 && !hasAudio && !hasGeneralNotes) {
-    return cleanTextForTts('Hallo! Für diese Woche sind noch keine Aufgaben eingetragen. Viel Freude beim Üben!');
+  if (totalTasks === 0 && !hasAudio && !hasGeneralNotes && !hasStudentQuestion) {
+    const greeting = options.studentFirstName ? `Hallo ${options.studentFirstName}!` : 'Hallo!';
+    return cleanTextForTts(`${greeting} Für diese Woche sind noch keine Aufgaben eingetragen. Viel Freude beim Üben!`);
   }
 
   // 2. Pädagogischer Einstieg & Begrüßung (Senior Pädagoge)
@@ -551,12 +557,16 @@ export function buildContinuousHomeworkNarrative(options: {
     teacherIntro = ` von deiner Lehrkraft ${rawTeacher}`;
   }
 
+  const salutation = options.studentFirstName && options.studentFirstName.toLowerCase() !== 'schüler'
+    ? `Hallo ${options.studentFirstName}!`
+    : 'Hallo!';
+
   if (totalTasks > 1) {
-    parts.push(`Hallo! Hier sind deine Aufgaben für diese Woche${teacherIntro}.`);
+    parts.push(`${salutation} Hier sind deine Aufgaben für diese Woche${teacherIntro}.`);
   } else if (totalTasks === 1) {
-    parts.push(`Hallo! Hier ist deine Hausaufgabe für diese Woche${teacherIntro}.`);
+    parts.push(`${salutation} Hier ist deine Hausaufgabe für diese Woche${teacherIntro}.`);
   } else {
-    parts.push(`Hallo! Hier sind deine musikalischen Hinweise für diese Woche${teacherIntro}.`);
+    parts.push(`${salutation} Hier sind deine musikalischen Hinweise für diese Woche${teacherIntro}.`);
   }
 
   // 3. Didaktische Satzverbinder für natürlichen, kindgerechten Redefluss (Legato Flow)
@@ -576,8 +586,22 @@ export function buildContinuousHomeworkNarrative(options: {
   // 4. Lehrwerke / Buch-Aufgaben (Eigenständige Aufgabenkategorie)
   if (hasBooks) {
     booksList.forEach((b) => {
-      const bookTitle = formatBookTitleForSpeech(b.title);
-      const pagePhrase = formatPageNumbersGerman(b.pageNums, b.formattedPages);
+      // 🛡️ 1% Goldstandard: Fallback zwischen pageNums, pages und formattedPages
+      const rawPages = (b.pageNums && b.pageNums.length > 0) ? b.pageNums : b.pages;
+      let rawFormatted = b.formattedPages;
+
+      // Falls die Seitenzahlen im Buchtitel stehen (z. B. "Modern Drumming (S. 14, 15)")
+      let cleanTitle = b.title || '';
+      if (!rawPages && !rawFormatted) {
+        const pagesInTitleMatch = cleanTitle.match(/\(S\.\s*([^)]+)\)/i);
+        if (pagesInTitleMatch) {
+          rawFormatted = pagesInTitleMatch[1];
+        }
+      }
+      cleanTitle = cleanTitle.replace(/\s*\(S\.\s*[^)]+\)$/i, '').trim();
+
+      const bookTitle = formatBookTitleForSpeech(cleanTitle);
+      const pagePhrase = formatPageNumbersGerman(rawPages, rawFormatted);
       const connector = getTaskConnector(currentIndex, totalTasks);
 
       let bookSentence = '';
@@ -595,10 +619,15 @@ export function buildContinuousHomeworkNarrative(options: {
         }
       }
 
-      // Hinweise zu den Seiten des Lehrwerks
-      const rawNotes = b.notes 
-        ? b.notes.filter(n => n && !n.startsWith('AUDIO:')).map(n => cleanTeacherNoteForSpeech(n)).filter(Boolean)
-        : [];
+      // Hinweise & konkrete Aufgaben zu den Seiten des Lehrwerks
+      const notesArr = Array.isArray(b.notes)
+        ? b.notes
+        : (typeof b.notes === 'string' ? b.notes.split(';').map(n => n.trim()) : []);
+
+      const rawNotes = notesArr
+        .filter(n => n && !n.startsWith('AUDIO:'))
+        .map(n => cleanTeacherNoteForSpeech(n))
+        .filter(Boolean);
 
       if (rawNotes.length > 0) {
         const formattedNotes = rawNotes.map(n => {
@@ -607,7 +636,7 @@ export function buildContinuousHomeworkNarrative(options: {
           }
           return n;
         }).join(', ');
-        
+
         bookSentence += ` Achte dabei besonders auf folgenden Hinweis: ${formattedNotes}.`;
       }
 
@@ -619,8 +648,13 @@ export function buildContinuousHomeworkNarrative(options: {
   // 5. Songs & Repertoire (Eigenständige Aufgabenkategorie)
   if (hasSongs) {
     songsList.forEach((s) => {
-      const songInfo = formatSongTitleForSpeech(s.title);
-      const cleanSongNote = s.note ? cleanTeacherNoteForSpeech(s.note) : '';
+      let fullTitle = s.title || '';
+      if (s.artist && !fullTitle.toLowerCase().includes(s.artist.toLowerCase())) {
+        fullTitle = `${fullTitle} von ${s.artist}`;
+      }
+      const songInfo = formatSongTitleForSpeech(fullTitle);
+      const rawNote = s.note || s.notes || '';
+      const cleanSongNote = rawNote ? cleanTeacherNoteForSpeech(rawNote) : '';
       const connector = getTaskConnector(currentIndex, totalTasks);
 
       let songSentence = '';
@@ -643,20 +677,50 @@ export function buildContinuousHomeworkNarrative(options: {
     });
   }
 
-  // 6. Unterrichtsaufnahmen (Sichtbare Anzahl)
-  if (hasAudio) {
-    if (options.audioCount === 1) {
-      parts.push('Dazu gibt es eine Aufnahme aus dem Unterricht zum Mitspielen.');
+  // 6. Unterrichtsaufnahmen (0.1% Goldstandard: Natürliche Grammatik, kein "Aufnahme Aufnahme", kompakt & motivierend)
+  if (audioList.length > 0) {
+    const labels = audioList.map(a => (a.label || a.title || '').trim()).filter(Boolean);
+    if (labels.length === 1) {
+      const raw = labels[0];
+      const isGenericAufnahme = /^aufnahme\b/i.test(raw);
+      if (isGenericAufnahme) {
+        const cleanLabel = raw.replace(/^aufnahme\s*#?\s*/i, 'Aufnahme ');
+        parts.push(`Zum Mitspielen gibt es ${cleanLabel}.`);
+      } else {
+        parts.push(`Zum Mitspielen gibt es die Aufnahme ${raw}.`);
+      }
+    } else if (labels.length === 2) {
+      const num0 = /^aufnahme\s*#?\s*(\d+)/i.exec(labels[0]);
+      const num1 = /^aufnahme\s*#?\s*(\d+)/i.exec(labels[1]);
+      if (num0 && num1) {
+        parts.push(`Zum Mitspielen gibt es die Aufnahmen ${num0[1]} und ${num1[1]}.`);
+      } else {
+        const clean0 = labels[0].replace(/^aufnahme\s*#?\s*/i, '');
+        const clean1 = labels[1].replace(/^aufnahme\s*#?\s*/i, '');
+        parts.push(`Zum Mitspielen gibt es die Aufnahmen ${clean0} und ${clean1}.`);
+      }
+    } else if (labels.length > 2) {
+      parts.push(`Zum Mitspielen gibt es ${labels.length} Aufnahmen aus dem Unterricht.`);
     } else {
-      parts.push(`Dazu gibt es ${options.audioCount} Aufnahmen aus dem Unterricht zum Mitspielen.`);
+      parts.push('Zum Mitspielen gibt es eine Aufnahme aus dem Unterricht.');
+    }
+  } else if (hasAudio) {
+    if (options.audioCount === 1) {
+      parts.push('Zum Mitspielen gibt es eine Aufnahme aus dem Unterricht.');
+    } else {
+      parts.push(`Zum Mitspielen gibt es ${options.audioCount} Aufnahmen aus dem Unterricht.`);
     }
   }
 
   // 7. Zusätzliche Hinweise der Lehrkraft
   if (hasGeneralNotes && options.generalNotes) {
     const cleanGen = cleanTeacherNoteForSpeech(options.generalNotes.trim());
-    parts.push(`Ein wichtiger Hinweis von deiner Lehrkraft: ${cleanGen}.`);
+    if (cleanGen && !cleanGen.startsWith('[AUDIO:') && !cleanGen.startsWith('AUDIO:')) {
+      parts.push(`Ein wichtiger Hinweis von deiner Lehrkraft: ${cleanGen}.`);
+    }
   }
+
+  // 7b. Schülerfrage: Wird im Vorlese-Stream bewusst NICHT vorgelesen (Rückkanal Schüler -> Lehrkraft, bleibt im E-Mail- & Druck-Dossier)
 
   // 8. Ermutigender Abschluss (Senior Pädagoge)
   parts.push('Viel Freude beim Üben!');

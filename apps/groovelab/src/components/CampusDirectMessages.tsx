@@ -4983,8 +4983,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     <button
                       type="button"
                       onClick={async () => {
-                        await sendDirectQuickMessage('Gesehen & notiert');
-                        await handleAcknowledgeAndMarkAsRead(selectedRecipient);
+                        try {
+                          await sendDirectQuickMessage('Gesehen & notiert');
+                          await handleAcknowledgeAndMarkAsRead(selectedRecipient);
+                        } catch (err) {
+                          console.error('Fehler beim Senden der Schnellnachricht:', err);
+                        }
                       }}
                       style={{
                         padding: '6px 14px',
@@ -5083,12 +5087,16 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           key={`chip-${idx}`}
                           type="button"
                           onClick={async () => {
-                            if (chip.label.includes('Gesehen')) {
-                              await sendDirectQuickMessage(chip.text);
-                              await handleAcknowledgeAndMarkAsRead(selectedRecipient);
-                              setTypedMessage('');
-                            } else {
-                              setTypedMessage(chip.text);
+                            try {
+                              if (chip.label.includes('Gesehen')) {
+                                await sendDirectQuickMessage(chip.text);
+                                await handleAcknowledgeAndMarkAsRead(selectedRecipient);
+                                setTypedMessage('');
+                              } else {
+                                setTypedMessage(chip.text);
+                              }
+                            } catch (err) {
+                              console.error('Fehler bei Quick-Chip Aktion:', err);
                             }
                           }}
                           style={{

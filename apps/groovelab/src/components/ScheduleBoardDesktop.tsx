@@ -2998,12 +2998,77 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         console.warn('[ScheduleBoard] users view persistence note:', viewErr);
       }
 
+      // 3. Live Synchronisation for Approved Schedules (Closed-Loop Lifecycle):
+      // When modifying an approved schedule, sync changes revisionssicher, update room bookings, and notify students
+      if (scheduleStatus === 'approved') {
+        try {
+          const cleanTeacherId = selectedTeacherId ? selectedTeacherId.replace(/^teacher-/i, '') : '';
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+
+          for (const b of boardsToSave) {
+            const cleanRoomId = isUUID(b.roomId) ? b.roomId : null;
+            const dayName = DAYS_OF_WEEK.find(d => d.value === b.dayOfWeek)?.name || 'Unterrichtstag';
+
+            for (const s of b.students) {
+              if (s.isBreak || !s.assignedTime) continue;
+              const studentIds = (s.isGroup && s.groupStudents) ? s.groupStudents.map((gs: any) => gs.id) : [s.id];
+
+              for (const stId of studentIds) {
+                if (!isUUID(stId)) continue;
+
+                // 1. Update / Upsert schedules table
+                await supabase.from('schedules').upsert({
+                  school_id: effectiveSchoolId,
+                  teacher_id: cleanTeacherId,
+                  student_id: stId,
+                  day_of_week: b.dayOfWeek,
+                  time_slot: s.assignedTime,
+                  room_id: cleanRoomId,
+                  duration: s.duration || 30,
+                  status: 'approved'
+                }, { onConflict: 'school_id,teacher_id,student_id' });
+
+                // 2. Update future occurrences for this student with this teacher via authoritative reschedule RPC
+                const { data: upcomingOccs } = await supabase
+                  .from('schedule_occurrences')
+                  .select('id, date, start_time')
+                  .eq('student_id', stId)
+                  .eq('teacher_id', cleanTeacherId)
+                  .gte('date', todayStr)
+                  .order('date', { ascending: true })
+                  .limit(1);
+
+                if (upcomingOccs && upcomingOccs.length > 0) {
+                  const occ = upcomingOccs[0];
+                  await supabase.rpc('reschedule_lesson_authoritative', {
+                    p_occurrence_id: occ.id,
+                    p_student_id: stId,
+                    p_teacher_id: cleanTeacherId,
+                    p_date: occ.date,
+                    p_start_time: s.assignedTime.length === 5 ? `${s.assignedTime}:00` : s.assignedTime,
+                    p_original_date: occ.date,
+                    p_original_start_time: occ.start_time,
+                    p_duration: s.duration || 30,
+                    p_template_room_id: cleanRoomId,
+                    p_notes: `Termin auf Stundenplan-Board verschoben auf ${dayName} ${s.assignedTime} Uhr`
+                  });
+                }
+              }
+            }
+          }
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        } catch (liveSyncErr) {
+          console.warn('[ScheduleBoardDesktop] Approved live schedule sync note:', liveSyncErr);
+        }
+      }
+
       // HERMETIC SANDBOX INVARIANT:
       // An unsubmitted draft (e.g. Entwurf 4) must NEVER mutate `schedules` or `schedule_occurrences`!
       // Production database tables remain 100% untouched until formal secretariat approval.
 
       if (showToastNotification) {
-        setToast({ message: 'Entwurf erfolgreich gesichert!', type: 'success' });
+        setToast({ message: scheduleStatus === 'approved' ? 'Änderung revisionssicher live synchronisiert!' : 'Entwurf erfolgreich gesichert!', type: 'success' });
       }
     } catch (err) {
       console.error('Error auto-saving schedule draft:', err);
@@ -5374,7 +5439,158 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
       }
 
-      // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
+      // 🛡️ 1. Automatic Room Bookings Synchronization (Enterprise Closed-Loop Lifecycle)
+      try {
+        const bookingsToInsert: any[] = [];
+        const processedBookingKeys = new Set<string>();
+
+        // Purge existing upcoming bookings for this teacher to prevent ghost collisions
+        await supabase
+          .from('room_bookings')
+          .delete()
+          .eq('school_id', schoolId)
+          .eq('booked_by', cleanTeacherId)
+          .gte('date', todayStr);
+
+        validBoards.forEach(b => {
+          const cleanRoomId = isUUID(b.roomId) ? b.roomId : null;
+          if (!cleanRoomId) return;
+
+          b.students.forEach(s => {
+            if (s.isBreak || !s.assignedTime) return;
+            const [sh, sm] = parseTime(s.assignedTime);
+            const startMins = sh * 60 + sm;
+            const duration = s.duration || 30;
+            const endMins = startMins + duration;
+            const eh = Math.floor(endMins / 60);
+            const em = endMins % 60;
+            const startTimeStr = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}:00`;
+            const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+
+            const current = new Date(today);
+            current.setHours(0, 0, 0, 0);
+            const currentDay = current.getDay() || 7;
+            const diff = b.dayOfWeek - currentDay;
+            const targetDate = new Date(current);
+            targetDate.setDate(current.getDate() + diff);
+            const todayMidnight = new Date(today);
+            todayMidnight.setHours(0, 0, 0, 0);
+            if (targetDate < todayMidnight) {
+              targetDate.setDate(targetDate.getDate() + 7);
+            }
+
+            // Generate bookings for the next 8 weeks
+            const bookingHorizon = new Date(today.getTime() + 8 * 7 * 24 * 60 * 60 * 1000);
+            while (targetDate <= bookingHorizon) {
+              const ty = targetDate.getFullYear();
+              const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+              const td = String(targetDate.getDate()).padStart(2, '0');
+              const dateStr = `${ty}-${tm}-${td}`;
+              const key = `${cleanRoomId}_${dateStr}_${startTimeStr}`;
+
+              if (!processedBookingKeys.has(key)) {
+                processedBookingKeys.add(key);
+                const sName = s.isGroup && s.groupStudents ? `Gruppe (${s.groupStudents.length} Schüler)` : `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Schüler';
+                bookingsToInsert.push({
+                  school_id: schoolId,
+                  room_id: cleanRoomId,
+                  booked_by: cleanTeacherId,
+                  date: dateStr,
+                  start_time: startTimeStr,
+                  end_time: endTimeStr,
+                  title: `Unterricht: ${sName}`,
+                  status: 'approved',
+                  is_confirmed: true
+                });
+              }
+              targetDate.setDate(targetDate.getDate() + 7);
+            }
+          });
+        });
+
+        if (bookingsToInsert.length > 0) {
+          const bookingChunkSize = 250;
+          for (let i = 0; i < bookingsToInsert.length; i += bookingChunkSize) {
+            const bChunk = bookingsToInsert.slice(i, i + bookingChunkSize);
+            await supabase.from('room_bookings').insert(bChunk);
+          }
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        }
+      } catch (roomErr) {
+        console.warn('[ScheduleBoardDesktop] Room bookings synchronization note:', roomErr);
+      }
+
+      // 🛡️ 2. Student & Parent Notification Pipeline (Enterprise Closed-Loop Lifecycle)
+      try {
+        const studentNotificationPromises: any[] = [];
+        const notifiedStudentIds = new Set<string>();
+
+        validBoards.forEach(b => {
+          const dayName = DAYS_OF_WEEK.find(d => d.value === b.dayOfWeek)?.name || 'Unterrichtstag';
+          const roomObj = rooms.find(r => r.id === b.roomId);
+          const roomName = roomObj ? roomObj.name : 'Musikschule';
+
+          b.students.forEach(s => {
+            if (s.isBreak || !s.assignedTime) return;
+            const studentsToNotify = (s.isGroup && s.groupStudents && s.groupStudents.length > 0)
+              ? s.groupStudents
+              : [s];
+
+            studentsToNotify.forEach((st: any) => {
+              const cleanStudentId = isUUID(st.id) ? st.id : null;
+              if (!cleanStudentId || notifiedStudentIds.has(cleanStudentId)) return;
+              notifiedStudentIds.add(cleanStudentId);
+
+              const timeLabel = s.assignedTime ? s.assignedTime.substring(0, 5) : '';
+              const firstName = (st.first_name || 'Schüler').trim();
+              const notifMsg = `Hallo ${firstName}, dein neuer Unterrichtstermin ist bestätigt: Jeden ${dayName} um ${timeLabel} Uhr bei ${teacherName} in ${roomName}.`;
+
+              // Direct message
+              studentNotificationPromises.push(
+                supabase.from('campus_direct_messages').insert({
+                  school_id: schoolId,
+                  sender_id: cleanTeacherId,
+                  recipient_id: cleanStudentId,
+                  content: notifMsg,
+                  is_system: true,
+                  message_type: 'schedule_approved',
+                  is_read: false
+                })
+              );
+
+              // In-app notification (Glocke)
+              studentNotificationPromises.push(
+                supabase.from('notifications').insert({
+                  user_id: cleanStudentId,
+                  title: '✅ Neuer Unterrichtstermin',
+                  message: notifMsg,
+                  metadata: { type: 'schedule_approved', day_of_week: b.dayOfWeek, time_slot: timeLabel }
+                })
+              );
+
+              // Push notification trigger
+              studentNotificationPromises.push(
+                supabase.functions.invoke('send-push', {
+                  body: {
+                    userId: cleanStudentId,
+                    title: '✅ Neuer Unterrichtstermin',
+                    body: notifMsg,
+                    url: '/'
+                  }
+                }).catch(() => {})
+              );
+            });
+          });
+        });
+
+        if (studentNotificationPromises.length > 0) {
+          await Promise.allSettled(studentNotificationPromises);
+        }
+      } catch (notifErr) {
+        console.warn('[ScheduleBoardDesktop] Student notification pipeline note:', notifErr);
+      }
+
+      // 🛡️ 3. Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
       try {
         await logApplicationAudit({
           schoolId: schoolId || null,
@@ -5393,7 +5609,6 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       } catch (auditErr) {
         console.warn('[ScheduleBoardDesktop] Audit logging notice:', auditErr);
       }
-
 
       setScheduleStatus('approved');
       setToast({ message: `Stundenplan für ${teacherName} erfolgreich genehmigt & live geschaltet!`, type: 'success' });

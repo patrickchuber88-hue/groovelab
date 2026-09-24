@@ -192,6 +192,9 @@ export interface PricingAuditLog {
   changed_by: string;
   old_rates: any;
   new_rates: any;
+  currency?: 'EUR' | 'CHF' | 'ALL';
+  scope?: string;
+  reason?: string;
   created_at: string;
 }
 
@@ -201,6 +204,16 @@ export interface SpecialOffer {
   discount_percent: number;
   code: string;
   is_active: boolean;
+  currency?: 'EUR' | 'CHF' | 'ALL';
+  discount_scope?: 'hosting_only' | 'total_invoice';
+  offer_type?: 'promocode' | 'founder' | 'annual' | 'free_quota';
+  duration_months?: number;
+  max_redemptions?: number;
+  redeemed_school_ids?: string[];
+  expires_at?: string | null;
+  is_archived?: boolean;
+  archived_at?: string | null;
+  created_at?: string;
 }
 
 export function getSubdomainOrigin(schoolName: string): string {

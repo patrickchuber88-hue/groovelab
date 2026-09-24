@@ -9,6 +9,7 @@ interface PricingLegalNoticeModalProps {
   priceTeacher: number;
   priceStudent: number;
   priceEffectiveDate: string;
+  currency?: 'EUR' | 'CHF';
 }
 
 export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = ({
@@ -20,23 +21,29 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
   priceTeacher,
   priceStudent,
   priceEffectiveDate,
+  currency = 'EUR'
 }) => {
   if (!isOpen) return null;
 
-  const effectiveDateFormatted = new Date(priceEffectiveDate || Date.now()).toLocaleDateString('de-DE');
+  const isChf = currency === 'CHF';
+  const sym = isChf ? 'CHF' : '€';
+  const fmt = (n: number | string) => isChf ? `CHF ${Number(n).toFixed(2)}` : `${Number(n).toFixed(2).replace('.', ',')} €`;
+
+  const effectiveDateFormatted = new Date(priceEffectiveDate || Date.now() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE');
 
   const handleCopyNotice = () => {
     navigator.clipboard.writeText(
-      `Betreff: Informationen zu den Abonnementkonditionen von Campus-Groovelab ab ${effectiveDateFormatted}\n\n` +
-      `Sehr geehrte Damen und Herren der Schulleitung,\n` +
-      `wir danken Ihnen herzlich für das Vertrauen in Campus-Groovelab. Um den stetig wachsenden Anforderungen an IT-Sicherheit, Rechenzentrumsinfrastruktur in Deutschland sowie der kontinuierlichen Weiterentwicklung unserer Software gerecht zu werden, passen wir die Tarife zum ${effectiveDateFormatted} an.\n\n` +
-      `Campus-Modul: ${Number(priceCampus).toFixed(2)} € / Mo.\n` +
-      `GrooveLab-Modul: ${Number(priceGroovelab).toFixed(2)} € / Mo.\n` +
-      `Kombi-Vorteil Bundle: ${Number(priceKombi).toFixed(2)} € / Mo.\n` +
-      `Lehrer- & Verwaltungsprofil: ${Number(priceTeacher).toFixed(2)} € / Mo.\n` +
-      `Schüleraktivierung: ${Number(priceStudent).toFixed(2)} € / Mo.\n\n` +
-      `Gesetzliche Belehrung zum Sonderkündigungsrecht:\n` +
-      `Sie haben das Recht, dieser Vertragsanpassung innerhalb von vier (4) Wochen ab Zugang dieser Mitteilung in Textform zu widersprechen. Im Falle eines Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens kostenfrei außerordentlich zu kündigen.`
+      `Betreff: Wichtige Information zu den Abonnementkonditionen von Campus-Groovelab ab ${effectiveDateFormatted}\n\n` +
+      `Sehr geehrte Damen und Herren der Schulleitung und Geschäftsführung,\n\n` +
+      `wir danken Ihnen herzlich für die partnerschaftliche Zusammenarbeit mit Campus-Groovelab. Um den kontinuierlich steigenden Anforderungen an IT-Sicherheit (OWASP ASVS Level 3), modernste Rechenzentrumsinfrastruktur in Europa sowie der didaktischen Weiterentwicklung unserer Software gerecht zu werden, passen wir die Tarife zum Schuljahresbeginn am ${effectiveDateFormatted} an.\n\n` +
+      `Ihre neuen Modultarife im Überblick:\n` +
+      `- Campus-Modul: ${fmt(priceCampus)} / Mo.\n` +
+      `- GrooveLab-Modul: ${fmt(priceGroovelab)} / Mo.\n` +
+      `- Kombi-Vorteil Bundle: ${fmt(priceKombi)} / Mo.\n` +
+      `- Pädagogen- & Verwaltungslizenz: ${fmt(priceTeacher)} / Mo.\n` +
+      `- Schüleraktivierung: ${fmt(priceStudent)} / Mo.\n\n` +
+      `Gesetzliche Belehrung zum Sonderkündigungsrecht (AGB Ziffer 4 & BGB 315):\n` +
+      `Gemäß unserer vertraglichen Preisanpassungsklausel kündigen wir diese Änderung mit einer Frist von mindestens zwei (2) Monaten in Textform an. Sie haben das Recht, dieser Vertragsanpassung vor dem Wirksamkeitszeitpunkt in Textform zu widersprechen. Im Falle eines form- und fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens (${effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen.`
     );
     alert('Rechtssicherer Mitteilungstext erfolgreich in die Zwischenablage kopiert!');
   };
@@ -89,7 +96,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
               gap: '8px',
             }}
           >
-            📄 Rechtssichere Mitteilungsvorlage (B2B SaaS / BGB)
+            📄 Rechtssichere Mitteilungsvorlage (B2B SaaS / AGB Ziffer 4)
           </h3>
           <button
             onClick={onClose}
@@ -120,6 +127,19 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
             border: '1px solid #e2e8f0',
           }}
         >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{
+              background: isChf ? '#fee2e2' : '#dbeafe',
+              color: isChf ? '#991b1b' : '#1e40af',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              fontWeight: 800,
+              fontSize: '0.72rem'
+            }}>
+              {isChf ? '🇨🇭 Währung: Schweizer Franken (CHF)' : '🇪🇺 Währung: Euro (EUR)'}
+            </span>
+          </div>
+
           <p style={{ margin: '0 0 12px 0', fontWeight: 700, color: '#0f172a' }}>
             Betreff: Informationen zu den Abonnementkonditionen von Campus-Groovelab ab {effectiveDateFormatted}
           </p>
@@ -127,7 +147,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
             Sehr geehrte Damen und Herren der Schulleitung und Geschäftsführung,
           </p>
           <p style={{ margin: '0 0 12px 0' }}>
-            wir danken Ihnen herzlich für das Vertrauen in <strong>Campus-Groovelab</strong>. Um den stetig wachsenden Anforderungen an IT-Sicherheit, Rechenzentrumsinfrastruktur in Deutschland sowie der kontinuierlichen Weiterentwicklung unserer Software gerecht zu werden, passen wir die Tarife zum <strong>{effectiveDateFormatted}</strong> an.
+            wir danken Ihnen herzlich für die partnerschaftliche Zusammenarbeit mit <strong>Campus-Groovelab</strong>. Um den kontinuierlich steigenden Anforderungen an IT-Sicherheit, Serverinfrastruktur in Europa sowie der didaktischen Weiterentwicklung unserer Software gerecht zu werden, passen wir die Tarife zum Schuljahresbeginn am <strong>{effectiveDateFormatted}</strong> an.
           </p>
 
           <div
@@ -143,19 +163,19 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
               Ihre angepassten Modultarife im Überblick:
             </div>
             <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.78rem' }}>
-              <li>Campus-Modul: {Number(priceCampus).toFixed(2)} € / Mo.</li>
-              <li>GrooveLab-Modul: {Number(priceGroovelab).toFixed(2)} € / Mo.</li>
-              <li>Kombi-Vorteil Bundle: {Number(priceKombi).toFixed(2)} € / Mo.</li>
-              <li>Lehrer- & Verwaltungsprofil: {Number(priceTeacher).toFixed(2)} € / Mo.</li>
-              <li>Schüleraktivierung: {Number(priceStudent).toFixed(2)} € / Mo.</li>
+              <li>Campus-Modul: {fmt(priceCampus)} / Mo.</li>
+              <li>GrooveLab-Modul: {fmt(priceGroovelab)} / Mo.</li>
+              <li>Kombi-Vorteil Bundle: {fmt(priceKombi)} / Mo.</li>
+              <li>Pädagogen- & Verwaltungslizenz: {fmt(priceTeacher)} / Mo.</li>
+              <li>Schüleraktivierung: {fmt(priceStudent)} / Mo.</li>
             </ul>
           </div>
 
           <p style={{ margin: '0 0 12px 0', fontWeight: 700, color: '#0f172a' }}>
-            ⚖️ Gesetzliche Belehrung zum Sonderkündigungsrecht:
+            ⚖️ Gesetzliche Belehrung zum Sonderkündigungsrecht (AGB Ziffer 4):
           </p>
           <p style={{ margin: '0 0 12px 0', fontSize: '0.80rem', color: '#334155' }}>
-            Sie haben das Recht, dieser Vertragsanpassung innerhalb von vier (4) Wochen ab Zugang dieser Mitteilung in Textform zu widersprechen. Im Falle eines form- und fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens ({effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen. Wenn Sie nicht widersprechen, gilt die Vertragsanpassung als von Ihnen genehmigt.
+            Gemäß unserer AGB kündigen wir diese Preisanpassung mit einer Frist von mindestens zwei (2) Monaten vor dem neuen Schuljahr in Textform an. Sie haben das Recht, dieser Vertragsanpassung vor dem Stichtag in Textform zu widersprechen. Im Falle eines fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag ({effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen.
           </p>
         </div>
 

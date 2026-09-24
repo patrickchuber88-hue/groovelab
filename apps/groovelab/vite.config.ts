@@ -84,6 +84,10 @@ export default defineConfig({
             dep.includes('vendor-qr') ||
             dep.includes('StudentAvatarDashboard') ||
             dep.includes('student-') ||
+            dep.includes('campus-app-modals') ||
+            dep.includes('student-groovelab-tabs') ||
+            dep.includes('campus-profile-views') ||
+            dep.includes('campus-messages-suite') ||
             dep.includes('Startseite2') ||
             dep.includes('Startseite');
           return !isHeavyChunk;
@@ -209,11 +213,26 @@ export default defineConfig({
           if (id.includes('MeisterwerkStickerAlbumTab') || id.includes('MeisterwerkSkillRadarTab') || id.includes('MeisterwerkAudioPlayers')) {
             return 'meisterwerk-subviews';
           }
+          if (id.includes('MeisterwerkDocumentTab')) {
+            return 'meisterwerk-document-tab';
+          }
           if (id.includes('MeisterwerkDocumentationModal')) {
             return 'meisterwerk-suite';
           }
           if (id.includes('GrooveLoopstation')) {
             return 'audio-loopstation';
+          }
+          if (id.includes('CampusAppModalsHub') || id.includes('components/modals/')) {
+            return 'campus-app-modals-hub';
+          }
+          if (id.includes('StudentPracticeRepertoireTabs') || id.includes('StudentBandMatchingSuite') || id.includes('StudentLibraryTab') || id.includes('StudentTeamTab')) {
+            return 'student-groovelab-tabs';
+          }
+          if (id.includes('CampusStaffProfileView') || id.includes('GrooveLabProfileView')) {
+            return 'campus-profile-views';
+          }
+          if (id.includes('MessagesTabContainer') || id.includes('components/messages/')) {
+            return 'campus-messages-suite';
           }
         }
       }

@@ -11,8 +11,9 @@ import { LegalConsentGate } from './components/LegalConsentGate';
 import { SecurityHoneyTrap } from './components/ui/SecurityHoneyTrap';
 import { CampusSystemBannersOverlay } from './components/layout/CampusSystemBannersOverlay';
 import { CampusAppLayout } from './components/layout/CampusAppLayout';
-import { CampusAppModalsHub } from './components/layout/CampusAppModalsHub';
 import { useCampusAppOrchestrator } from './hooks/useCampusAppOrchestrator';
+
+const CampusAppModalsHub = lazy(() => import('./components/layout/CampusAppModalsHub').then(m => ({ default: m.CampusAppModalsHub })));
 
 import './App.css';
 

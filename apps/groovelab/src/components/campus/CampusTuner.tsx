@@ -240,6 +240,49 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     setCentsDeviation(0);
   }, []);
 
+  // Saiten-Erfolgs-Tracker (1% Goldstandard)
+  const [tunedStrings, setTunedStrings] = useState<Record<number, boolean>>({});
+
+  // 🔔 1% Goldstandard: Kristallklarer zweistufiger Sinus-Chime (880Hz -> 1760Hz) bei erfolgreichem Stimmen
+  const playLockInChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = audioContextRef.current || new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+
+      // Note 1: A5 (880Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      gain1.gain.setValueAtTime(0.001, now);
+      gain1.gain.linearRampToValueAtTime(0.18, now + 0.03);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.32);
+
+      // Note 2: A6 (1760Hz)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1760, now + 0.1);
+      gain2.gain.setValueAtTime(0.001, now + 0.1);
+      gain2.gain.linearRampToValueAtTime(0.22, now + 0.14);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.55);
+    } catch (err) {
+      console.warn('CampusTuner chime playback failed:', err);
+    }
+  }, []);
+
   // Update Loop für Audio-Analyse
   const updatePitch = useCallback(() => {
     if (!analyserRef.current || !audioContextRef.current) return;
@@ -262,7 +305,23 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       setCentsDeviation(Math.max(-50, Math.min(50, cents)));
 
       if (Math.abs(cents) <= 3) {
-        setInTuneConfidence(prev => Math.min(prev + 1, 10));
+        setInTuneConfidence(prev => {
+          const next = Math.min(prev + 1, 10);
+          // Bei stabiler Intonation (>= 5 Frames) Saite einrasten lassen
+          if (next >= 5 && selectedPreset.strings.length > 0) {
+            const bestStringIdx = selectedPreset.strings.findIndex(
+              s => s.name === noteName && Math.abs(s.octave - octave) <= 1
+            );
+            if (bestStringIdx !== -1) {
+              setTunedStrings(tPrev => {
+                if (tPrev[bestStringIdx]) return tPrev;
+                playLockInChime();
+                return { ...tPrev, [bestStringIdx]: true };
+              });
+            }
+          }
+          return next;
+        });
       } else {
         setInTuneConfidence(0);
       }
@@ -281,7 +340,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     }
 
     animationFrameRef.current = requestAnimationFrame(updatePitch);
-  }, [a4Reference, selectedPreset.strings]);
+  }, [a4Reference, selectedPreset.strings, playLockInChime]);
 
   // Start Microphone
   const startListening = async () => {
@@ -740,78 +799,140 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           </div>
         </div>
 
-        {/* Saiten-Auswahl / Target Pegs mit Ton-Vorhören */}
+        {/* Saiten-Auswahl / Target Pegs mit Ton-Vorhören & Lock-in Status */}
         {selectedPreset.strings.length > 0 && (
           <div style={{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '10px',
-            justifyContent: 'center',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            width: '100%',
             marginTop: '8px'
           }}>
-            {selectedPreset.strings.map((str, idx) => {
-              const isSelected = selectedStringIndex === idx;
-              const isPegPlaying = playingToneFreq === str.freq;
-              return (
+            {/* Status-Leiste gestimmte Saiten */}
+            {Object.keys(tunedStrings).length > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                maxWidth: '460px',
+                padding: '4px 10px',
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '12px'
+              }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#047857', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Check size={13} strokeWidth={3} color="#059669" />
+                  <span>{Object.keys(tunedStrings).length} von {selectedPreset.strings.length} Saiten gestimmt</span>
+                </span>
                 <button
-                  key={idx}
                   type="button"
-                  onClick={() => {
-                    setSelectedStringIndex(idx);
-                    playTone(str.freq);
-                  }}
+                  onClick={() => setTunedStrings({})}
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '66px',
-                    padding: '10px 14px',
-                    borderRadius: '16px',
-                    border: isPegPlaying
-                      ? '2px solid #16a34a'
-                      : isSelected
-                      ? '2px solid #22c55e'
-                      : '1.5px solid #e2e8f0',
-                    background: isPegPlaying
-                      ? '#dcfce7'
-                      : isSelected
-                      ? '#f0fdf4'
-                      : '#f8fafc',
-                    color: isPegPlaying || isSelected ? '#15803d' : '#334155',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    color: '#475569',
+                    fontSize: '0.70rem',
+                    fontWeight: 800,
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    boxShadow: isPegPlaying
-                      ? '0 6px 18px rgba(34, 197, 94, 0.28)'
-                      : isSelected
-                      ? '0 4px 12px rgba(34, 197, 94, 0.15)'
-                      : 'none',
-                    position: 'relative'
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"
-                  title={`${str.name}${str.octave} (${str.freq} Hz) Vorhören / Referenzton`}
+                  title="Alle gestimmten Saiten zurücksetzen"
                 >
-                  <span style={{ fontSize: '0.96rem', fontWeight: 950, letterSpacing: '-0.02em' }}>
-                    {str.name}{str.octave}
-                  </span>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b' }}>
-                    {str.label || `${str.freq} Hz`}
-                  </span>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px',
-                    marginTop: '4px',
-                    fontSize: '0.64rem',
-                    fontWeight: 800,
-                    color: isPegPlaying ? '#16a34a' : '#94a3b8'
-                  }}>
-                    {isPegPlaying ? <Volume2 size={12} color="#16a34a" /> : <Volume2 size={11} color="#94a3b8" />}
-                    <span>{isPegPlaying ? 'Stop' : 'Ton'}</span>
-                  </div>
+                  <RotateCcw size={11} />
+                  <span>Neu stimmen</span>
                 </button>
-              );
-            })}
+              </div>
+            )}
+
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '10px',
+              justifyContent: 'center'
+            }}>
+              {selectedPreset.strings.map((str, idx) => {
+                const isSelected = selectedStringIndex === idx;
+                const isPegPlaying = playingToneFreq === str.freq;
+                const isTuned = !!tunedStrings[idx];
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStringIndex(idx);
+                      playTone(str.freq);
+                    }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '66px',
+                      padding: '10px 14px',
+                      borderRadius: '16px',
+                      border: isTuned
+                        ? '2px solid #10b981'
+                        : isPegPlaying
+                        ? '2px solid #16a34a'
+                        : isSelected
+                        ? '2px solid #22c55e'
+                        : '1.5px solid #e2e8f0',
+                      background: isTuned
+                        ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+                        : isPegPlaying
+                        ? '#dcfce7'
+                        : isSelected
+                        ? '#f0fdf4'
+                        : '#f8fafc',
+                      color: isTuned ? '#065f46' : (isPegPlaying || isSelected ? '#15803d' : '#334155'),
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: isTuned
+                        ? '0 4px 14px rgba(16, 185, 129, 0.28)'
+                        : isPegPlaying
+                        ? '0 6px 18px rgba(34, 197, 94, 0.28)'
+                        : isSelected
+                        ? '0 4px 12px rgba(34, 197, 94, 0.15)'
+                        : 'none',
+                      position: 'relative'
+                    }}
+                    className="hover-scale"
+                    title={`${str.name}${str.octave} (${str.freq} Hz) ${isTuned ? '✓ Bereits perfekt gestimmt' : 'Vorhören / Referenzton'}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '0.96rem', fontWeight: 950, letterSpacing: '-0.02em' }}>
+                        {str.name}{str.octave}
+                      </span>
+                      {isTuned && <Check size={12} strokeWidth={3.5} color="#059669" />}
+                    </div>
+                    <span style={{ fontSize: '0.66rem', fontWeight: 700, color: isTuned ? '#047857' : '#64748b' }}>
+                      {str.label || `${str.freq} Hz`}
+                    </span>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      marginTop: '4px',
+                      fontSize: '0.64rem',
+                      fontWeight: 800,
+                      color: isTuned ? '#059669' : (isPegPlaying ? '#16a34a' : '#94a3b8')
+                    }}>
+                      {isPegPlaying ? <Volume2 size={12} color="#16a34a" /> : <Volume2 size={11} color={isTuned ? '#059669' : '#94a3b8'} />}
+                      <span>{isPegPlaying ? 'Stop' : isTuned ? 'Gestimmt' : 'Ton'}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

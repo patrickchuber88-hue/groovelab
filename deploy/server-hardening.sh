@@ -54,6 +54,13 @@ net.ipv4.conf.default.send_redirects = 0
 # Broadcast ICMP Echo Requests (Smurf Attacks) ignorieren
 net.ipv4.icmp_echo_ignore_broadcasts = 1
 
+# Memory-Dump & Process Snooping Shield (Data-in-Use RAM Protection)
+# Verhindert Core-Dumps privilegierter Prozesse und PTRACE-Speicherauslesen (Yama LSM)
+fs.suid_dumpable = 0
+kernel.yama.ptrace_scope = 2
+kernel.kptr_restrict = 2
+kernel.dmesg_restrict = 1
+
 # Maximale Dateideskriptoren & Socket-Limits für High-Performance
 fs.file-max = 2097152
 EOF

@@ -882,7 +882,11 @@ export function CampusSetupScreen({
                       </div>
                       <button 
                         onClick={async () => {
-                          await generateDSBCompliancePDF(schoolName || 'Meine Musikschule');
+                          try {
+                            await generateDSBCompliancePDF(schoolName || 'Meine Musikschule');
+                          } catch (err) {
+                            console.error('Fehler beim Erzeugen des DSB-Dossiers:', err);
+                          }
                         }}
                         style={{ 
                           padding: '10px 18px',
@@ -929,7 +933,7 @@ export function CampusSetupScreen({
                         style={{ 
                           padding: '8px 16px',
                           background: '#eab308',
-                          color: '#ffffff',
+                          color: '#0f172a',
                           border: 'none',
                           borderRadius: '8px',
                           fontSize: '0.78rem',
@@ -1582,8 +1586,12 @@ export function CampusSetupScreen({
               {activeCampusSettingsModal !== 'pin_login' && (
                 <button
                   onClick={async () => {
-                    await handleSave();
-                    setActiveCampusSettingsModal(null);
+                    try {
+                      await handleSave();
+                      setActiveCampusSettingsModal(null);
+                    } catch (err) {
+                      console.error('Fehler beim Speichern der Einstellungen:', err);
+                    }
                   }}
                   disabled={!isSettingsDirty || isSaving}
                   style={{

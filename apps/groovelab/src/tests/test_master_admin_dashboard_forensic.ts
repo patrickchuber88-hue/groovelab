@@ -430,6 +430,43 @@ function testZeroMasterAdminPasswordInvariant() {
 }
 
 // ------------------------------------------------------------------------------
+// SUITE 10: MULTI-SCHOOL INGESTION & ZERO DROPPED TENANTS
+// ------------------------------------------------------------------------------
+function testMultiSchoolIngestionIntegrity() {
+  console.log('\n--- SUITE 10: MULTI-SCHOOL INGESTION & ZERO DROPPED TENANTS ---');
+
+  const schoolsHookPath = path.resolve(__dirname, '../components/masterAdmin/hooks/useMasterAdminSchools.ts');
+  const content = fs.readFileSync(schoolsHookPath, 'utf-8');
+
+  // Check 1: Zero arbitrary name drop filters
+  const hasArbitraryDrop = /!name\.includes\(['"]groove academy['"]\)/i.test(content);
+  assert(
+    !hasArbitraryDrop,
+    'Zero Dropped Tenants',
+    'useMasterAdminSchools has zero arbitrary client-side school drop filters (e.g. groove academy)',
+    'Found arbitrary client-side drop filter in useMasterAdminSchools'
+  );
+
+  // Check 2: Authoritative Union Map logic exists
+  const hasUnionMap = content.includes('get_master_schools_overview') && content.includes('schoolMap');
+  assert(
+    hasUnionMap,
+    'Multi-Source School Union',
+    'useMasterAdminSchools unifies table and authoritative RPC get_master_schools_overview via Union Map',
+    'Missing Union Map unification in useMasterAdminSchools'
+  );
+
+  // Check 3: Missing table records from RPC are injected directly
+  const hasDirectRpcInjection = content.includes('rpc.school_id') && content.includes('schoolMap.set(rpc.school_id');
+  assert(
+    hasDirectRpcInjection,
+    'RLS-Bypass School Injection',
+    'Schools returned by RPC but omitted by PostgREST table RLS are directly injected into schoolMap',
+    'Missing direct RPC school injection in useMasterAdminSchools'
+  );
+}
+
+// ------------------------------------------------------------------------------
 // EXECUTION & SUMMARY
 // ------------------------------------------------------------------------------
 async function runAll() {
@@ -442,6 +479,7 @@ async function runAll() {
   testCoordinatorShellLoc();
   testHighSecurityHardenings();
   testZeroMasterAdminPasswordInvariant();
+  testMultiSchoolIngestionIntegrity();
 
   console.log('\n================================================================');
   console.log('AUDIT SUMMARY');

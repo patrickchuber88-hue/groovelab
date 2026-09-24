@@ -1374,27 +1374,28 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
                 {/* Gamified KPI Cards row (Desktop 1:1 Server Parity) */}
                 {(!isTeacherCurrentlyAbsent || bypassAbsenceView) && (
-                  <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                  <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
 
                     {/* Card 1: Heutige Schüler */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
                       background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                      padding: '16px', boxSizing: 'border-box',
+                      borderRadius: '22px', 
+                      boxShadow: '0 12px 28px -6px rgba(79, 70, 229, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
+                      padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: '1px solid rgba(255, 255, 255, 0.18)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)', padding: '6px', borderRadius: '10px' }}>
                           <Users size={14} color="white" />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>UE</span>
+                        <span style={{ fontSize: '1.75rem', fontWeight: 950, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, opacity: 0.9 }}>UE</span>
                         {totalActiveStudentsToday > activeLessonsCount && (
                           <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px' }}>
                             ({totalActiveStudentsToday} Schüler)
@@ -1406,23 +1407,24 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     {/* Card 2: Ø Übe-Zeit */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                      padding: '16px', boxSizing: 'border-box',
+                      background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)', color: 'white',
+                      borderRadius: '22px', 
+                      boxShadow: '0 12px 28px -6px rgba(22, 163, 74, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
+                      padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: '1px solid rgba(255, 255, 255, 0.18)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Zeit</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Zeit</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)', padding: '6px', borderRadius: '10px' }}>
                           <Timer size={14} color="white" />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgPracticeTime.value}</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>{avgPracticeTime.unit}</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.75, marginLeft: '2px' }}>/ Woche</span>
+                        <span style={{ fontSize: '1.75rem', fontWeight: 950, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgPracticeTime.value}</span>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, opacity: 0.9 }}>{avgPracticeTime.unit}</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.8, marginLeft: '2px' }}>/ Woche</span>
                       </div>
                     </div>
 
@@ -1430,11 +1432,12 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     <div style={{
                       position: 'relative', overflow: 'hidden',
                       background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                      padding: '16px', boxSizing: 'border-box',
+                      borderRadius: '22px', 
+                      boxShadow: '0 12px 28px -6px rgba(234, 179, 8, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
+                      padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                      border: '1px solid rgba(255, 255, 255, 0.25)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
@@ -1443,7 +1446,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>{workloadHoursStr}</span>
+                        <span style={{ fontSize: '1.75rem', fontWeight: 950, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>{workloadHoursStr}</span>
                       </div>
                     </div>
 
@@ -1451,21 +1454,22 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     <div style={{
                       position: 'relative', overflow: 'hidden',
                       background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                      padding: '16px', boxSizing: 'border-box',
+                      borderRadius: '22px', 
+                      boxShadow: '0 12px 28px -6px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
+                      padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: '1px solid rgba(255, 255, 255, 0.18)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)', padding: '6px', borderRadius: '10px' }}>
                           <AlertCircle size={14} color="white" />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Heute</span>
+                        <span style={{ fontSize: '1.75rem', fontWeight: 950, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, opacity: 0.9 }}>Heute</span>
                       </div>
                     </div>
                   </div>
@@ -1488,22 +1492,22 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                       boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                       transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                       width: '100%',
-                      minHeight: '200px',
+                      minHeight: '170px',
                       flex: '0 1 auto',
                       boxSizing: 'border-box',
                       overflow: 'hidden'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                         <div style={{
-                          width: '190px',
-                          height: '100%',
+                          width: '135px',
+                          height: '135px',
+                          margin: '14px 0 14px 14px',
+                          borderRadius: '18px',
                           flexShrink: 0,
                           position: 'relative',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
                           overflow: 'hidden',
-                          borderRight: '1px solid rgba(0, 0, 0, 0.05)'
+                          boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                          border: '1px solid rgba(0, 0, 0, 0.06)'
                         }} className="hover-scale hero-avatar-container">
                           <img 
                             src={resolvedAvatarSrc} 
@@ -1512,7 +1516,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                             onError={() => setAvatarLoadError(true)}
                           />
                         </div>
-                        <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1 }}>
+                        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1 }}>
                           <div style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -1531,7 +1535,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                             </span>
                           </div>
 
-                          <h3 style={{ margin: 0, fontSize: '28px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
+                          <h3 style={{ margin: 0, fontSize: '26px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
                             {isWeekend ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
                             <span style={{ color: '#2563eb', fontWeight: 900, letterSpacing: '-0.01em', display: 'inline' }}>
                               {resolvedTeacherFullName}
@@ -1540,7 +1544,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.35, maxWidth: '420px' }}>
                             {isWeekend
                               ? 'Keine Termine heute – Zeit zum Durchatmen und Erholen.'
-                              : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei! Genieße deinen freien Tag.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
+                              : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute unterrichtsfrei • Alle Systeme synchronisiert.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
                             }
                           </p>
                         </div>

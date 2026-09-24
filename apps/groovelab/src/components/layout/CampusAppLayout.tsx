@@ -266,6 +266,7 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         user={user}
         school={school}
         activePlatform={activePlatform}
+        setActivePlatform={setActivePlatform}
         activeStudentTab={activeStudentTab}
         setActiveStudentTab={setActiveStudentTab}
         activeWorkspace={activeWorkspace}
@@ -335,33 +336,35 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
           Zum Hauptinhalt springen
         </a>
 
-        <CampusDesktopHeader
-          user={user}
-          school={school}
-          activePlatform={activePlatform}
-          setActivePlatform={setActivePlatform}
-          activeStudentTab={activeStudentTab}
-          setActiveStudentTab={setActiveStudentTab}
-          windowWidth={windowWidth}
-          locationMode={locationMode}
-          setLocationMode={setLocationMode}
-          isKioskMode={isKioskMode}
-          isCampusUnlocked={isCampusUnlocked}
-          setShowCampusPinPrompt={setShowCampusPinPrompt}
-          showEnsemblesFeature={showEnsemblesFeature}
-          setShowMobileInfo={setShowMobileInfo}
-          isOfflineMode={isOfflineMode}
-          trialDaysLeft={trialDaysLeft}
-          setShowTrialInfoModal={setShowTrialInfoModal}
-          teachers={teachers}
-          session={session}
-          activeStudentsCount={activeStudentsCount}
-          showDateSimulation={showDateSimulation}
-          simulatedDate={simulatedDate}
-          setSimulatedDate={setSimulatedDate}
-          handleSwitchActiveRole={handleSwitchActiveRole}
-          handleLogout={handleLogout}
-        />
+        {user?.role?.toLowerCase() !== 'student' && (
+          <CampusDesktopHeader
+            user={user}
+            school={school}
+            activePlatform={activePlatform}
+            setActivePlatform={setActivePlatform}
+            activeStudentTab={activeStudentTab}
+            setActiveStudentTab={setActiveStudentTab}
+            windowWidth={windowWidth}
+            locationMode={locationMode}
+            setLocationMode={setLocationMode}
+            isKioskMode={isKioskMode}
+            isCampusUnlocked={isCampusUnlocked}
+            setShowCampusPinPrompt={setShowCampusPinPrompt}
+            showEnsemblesFeature={showEnsemblesFeature}
+            setShowMobileInfo={setShowMobileInfo}
+            isOfflineMode={isOfflineMode}
+            trialDaysLeft={trialDaysLeft}
+            setShowTrialInfoModal={setShowTrialInfoModal}
+            teachers={teachers}
+            session={session}
+            activeStudentsCount={activeStudentsCount}
+            showDateSimulation={showDateSimulation}
+            simulatedDate={simulatedDate}
+            setSimulatedDate={setSimulatedDate}
+            handleSwitchActiveRole={handleSwitchActiveRole}
+            handleLogout={handleLogout}
+          />
+        )}
 
         <CampusMainContentRouter
           windowWidth={windowWidth}

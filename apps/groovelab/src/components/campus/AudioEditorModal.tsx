@@ -152,13 +152,21 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         if (activeUrl.startsWith('data:') || activeUrl.startsWith('blob:')) {
           const resp = await fetch(activeUrl);
           arrayBuffer = await resp.arrayBuffer();
+        } else if (activeUrl.startsWith('http://') || activeUrl.startsWith('https://')) {
+          try {
+            const resp = await fetch(activeUrl, { mode: 'cors' });
+            if (resp.ok) {
+              arrayBuffer = await resp.arrayBuffer();
+            }
+          } catch {}
+          if (!arrayBuffer && activeUrl.includes('/storage/v1/object/')) {
+            const signedUrl = await getSecureAudioUrl(activeUrl, 'campus-assets', 1800);
+            const resp = await fetch(signedUrl, { mode: 'cors' });
+            if (resp.ok) arrayBuffer = await resp.arrayBuffer();
+          }
         } else if (activeUrl.startsWith('schools/') || activeUrl.includes('/storage/v1/object/')) {
           const signedUrl = await getSecureAudioUrl(activeUrl, 'campus-assets', 1800);
           const resp = await fetch(signedUrl, { mode: 'cors' });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          arrayBuffer = await resp.arrayBuffer();
-        } else if (activeUrl.startsWith('http://') || activeUrl.startsWith('https://')) {
-          const resp = await fetch(activeUrl, { mode: 'cors' });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           arrayBuffer = await resp.arrayBuffer();
         } else {
@@ -602,13 +610,13 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
       <div style={{
         background: '#ffffff',
         borderRadius: '26px',
-        maxWidth: '480px',
+        maxWidth: '440px',
         width: '100%',
         boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25)',
         display: 'flex',
         flexDirection: 'column',
         gap: '14px',
-        padding: '22px',
+        padding: '20px',
         boxSizing: 'border-box',
         animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         border: '1px solid #e2e8f0'
@@ -637,7 +645,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
             <div>
               <h3 id="audio-editor-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {editorMode === 'locator' 
-                  ? (uiLevel === 'junior' ? '🔁 Übe-Schleife einstellen' : '🎛️ A/B Loop-Studio')
+                  ? (uiLevel === 'junior' ? 'Übe-Schleife einstellen' : 'A/B Loop-Studio')
                   : 'Aufnahme kürzen'}
               </h3>
               {editorMode === 'locator' && (
@@ -671,68 +679,70 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           </button>
         </div>
 
-        {/* 🏷️ Title Field: Subtle, Clean */}
-        <div style={{ position: 'relative', width: '100%' }}>
-          <div style={{
-            position: 'absolute',
-            left: '12px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            display: 'flex',
-            alignItems: 'center',
-            color: '#16a34a',
-            pointerEvents: 'none'
-          }}>
-            <Music2 size={16} />
-          </div>
-          <input
-            type="text"
-            value={editLabel}
-            onChange={(e) => setEditLabel(e.target.value)}
-            placeholder="Titel der Aufnahme..."
-            style={{
-              width: '100%',
-              fontSize: '0.86rem',
-              fontWeight: 750,
-              padding: '9px 36px 9px 38px',
-              borderRadius: '12px',
-              border: '1.5px solid #e2e8f0',
-              background: '#f8fafc',
-              color: '#0f172a',
-              outline: 'none',
-              boxSizing: 'border-box',
-              transition: 'all 0.15s ease'
-            }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#ffffff'; }}
-            onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
-          />
-          {editLabel && (
-            <button
-              type="button"
-              onClick={() => setEditLabel('')}
+        {/* 🏷️ Title Field: Nur im Schnitt-/Crop-Modus (im Übe-Schleifen-Modus ausgeblendet) */}
+        {editorMode !== 'locator' && (
+          <div style={{ position: 'relative', width: '100%' }}>
+            <div style={{
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              color: '#16a34a',
+              pointerEvents: 'none'
+            }}>
+              <Music2 size={16} />
+            </div>
+            <input
+              type="text"
+              value={editLabel}
+              onChange={(e) => setEditLabel(e.target.value)}
+              placeholder="Titel der Aufnahme..."
               style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: '#e2e8f0',
-                border: 'none',
-                borderRadius: '50%',
-                width: '20px',
-                height: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748b',
-                padding: 0
+                width: '100%',
+                fontSize: '0.86rem',
+                fontWeight: 750,
+                padding: '9px 36px 9px 38px',
+                borderRadius: '12px',
+                border: '1.5px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#0f172a',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'all 0.15s ease'
               }}
-              title="Titel leeren"
-            >
-              <X size={12} strokeWidth={2.5} />
-            </button>
-          )}
-        </div>
+              onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#ffffff'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+            />
+            {editLabel && (
+              <button
+                type="button"
+                onClick={() => setEditLabel('')}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#e2e8f0',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: 0
+                }}
+                title="Titel leeren"
+              >
+                <X size={12} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 🎛️ Waveform & Trimmer Stage */}
         <div style={{
@@ -746,52 +756,61 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           boxSizing: 'border-box'
         }}>
           
-          {/* Header Badges: Grün für Start, Weiß für Dauer, Rot für Ende */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{
-              background: '#dcfce7',
-              border: '1px solid #86efac',
-              color: '#15803d',
-              padding: '4px 10px',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              fontWeight: 850,
+          {/* 🎛️ 2027 Studio HUD: Schlank, integriert, elegant */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '5px 12px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+          }}>
+            {/* A Point */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                background: '#16a34a',
+                color: '#ffffff',
+                borderRadius: '5px',
+                padding: '1px 5px',
+                fontSize: '0.66rem',
+                fontWeight: 900,
+                letterSpacing: '0.02em'
+              }}>A</span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{formatTime(startTime)}</span>
+            </div>
+            
+            {/* Center Duration Badge */}
+            <div style={{
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              color: '#475569',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              padding: '2px 8px',
+              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px'
             }}>
-              <span>Start: {formatTime(startTime)}</span>
-            </span>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{
-                color: '#334155',
-                fontWeight: 850,
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-              }}>
-                Dauer: {formatTime(Math.max(0, endTime - startTime))}
-              </span>
+              <Repeat size={12} strokeWidth={2.4} color="#16a34a" />
+              <span>{formatTime(Math.max(0, endTime - startTime))}</span>
             </div>
 
-            <span style={{
-              background: '#fee2e2',
-              border: '1px solid #fca5a5',
-              color: '#b91c1c',
-              padding: '4px 10px',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              fontWeight: 850,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <span>Ende: {formatTime(endTime)}</span>
-            </span>
+            {/* B Point */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{formatTime(endTime)}</span>
+              <span style={{
+                background: '#0f172a',
+                color: '#ffffff',
+                borderRadius: '5px',
+                padding: '1px 5px',
+                fontSize: '0.66rem',
+                fontWeight: 900,
+                letterSpacing: '0.02em'
+              }}>B</span>
+            </div>
           </div>
 
           {/* Waveform Stage with tactile iOS-style drag handles */}
@@ -1043,8 +1062,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       transition: 'transform 0.1s ease',
                       transform: activeDraggingHandle === 'start' ? 'scale(1.15)' : 'scale(1)'
                     }}>
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>A</span>
                     </div>
 
                     {/* ⚡ 1px feine vertikale Schnittlinie für absoluten genauen Schnitt */}
@@ -1066,17 +1084,15 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '2px',
                       flexShrink: 0,
                       transition: 'transform 0.1s ease',
                       transform: activeDraggingHandle === 'start' ? 'scale(1.15)' : 'scale(1)'
                     }}>
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>A</span>
                     </div>
                   </div>
 
-                  {/* 5. 🔴 Ende-Griff (Rot) mit 1px feiner vertikaler Schnittlinie */}
+                  {/* 5. 🎛️ Ende-Griff (B) mit 1px feiner vertikaler Schnittlinie */}
                   <div
                     onPointerDown={(e) => handlePointerDownHandle(e, 'end')}
                     onMouseEnter={() => setIsHoveringHandle('end')}
@@ -1123,26 +1139,24 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       width: '22px',
                       height: '18px',
                       borderRadius: '6px',
-                      background: '#ef4444',
+                      background: '#0f172a',
                       border: '2px solid #ffffff',
-                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
+                      boxShadow: '0 2px 6px rgba(15, 23, 42, 0.45)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '2px',
                       flexShrink: 0,
                       transition: 'transform 0.1s ease',
                       transform: activeDraggingHandle === 'end' ? 'scale(1.15)' : 'scale(1)'
                     }}>
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>B</span>
                     </div>
 
                     {/* ⚡ 1px feine vertikale Schnittlinie für absoluten genauen Schnitt */}
                     <div style={{
                       width: '1px',
                       flex: 1,
-                      background: '#ef4444',
+                      background: '#0f172a',
                       opacity: 0.95
                     }} />
 
@@ -1151,19 +1165,17 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       width: '22px',
                       height: '18px',
                       borderRadius: '6px',
-                      background: '#ef4444',
+                      background: '#0f172a',
                       border: '2px solid #ffffff',
-                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
+                      boxShadow: '0 2px 6px rgba(15, 23, 42, 0.45)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '2px',
                       flexShrink: 0,
                       transition: 'transform 0.1s ease',
                       transform: activeDraggingHandle === 'end' ? 'scale(1.15)' : 'scale(1)'
                     }}>
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
-                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>B</span>
                     </div>
                   </div>
                 </>
@@ -1275,100 +1287,107 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           </div>
         </div>
 
-        {/* 🎧 Playback Button: Spielt automatisch immer im Loop ab */}
-        <button
-          type="button"
-          onClick={togglePlay}
-          style={{
-            width: '100%',
-            background: isPlaying ? '#0f172a' : '#f1f5f9',
-            color: isPlaying ? '#ffffff' : '#0f172a',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 18px',
-            fontSize: '0.88rem',
-            fontWeight: 850,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            transition: 'all 0.15s ease'
-          }}
-          className="hover-scale"
-        >
-          {isPlaying ? (
-            <>
-              <Square size={15} fill="currentColor" />
-              <span>Stopp</span>
-            </>
-          ) : (
-            <>
-              <Repeat size={15} strokeWidth={2.6} style={{ color: '#16a34a' }} />
-              <Play size={15} fill="currentColor" style={{ marginLeft: '-2px' }} />
-              <span>Bereich loopen ({formatTime(Math.max(0, endTime - startTime))})</span>
-            </>
-          )}
-        </button>
-
-        {/* 💾 Fertig Speichern Button: Locator Mode (Non-Destructive) vs. Classic Crop */}
+        {/* 💾 Aktions-Leiste: Kompakt & Schlicht im Locator-Modus vs. Klassischer Schnitt-Modus */}
         {editorMode === 'locator' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-            <button
-              type="button"
-              onClick={() => {
-                stopPlayback();
-                const savedLocator = saveLoopLocator(
-                  activeUrl || audioUrl,
-                  { startSec: startTime, endSec: endTime, enabled: true },
-                  {
-                    schoolId,
-                    userId,
-                    recordingId,
-                    recordingTitle: editLabel || initialLabel,
-                    totalDuration: duration
-                  }
-                );
-                if (onSave) {
-                  onSave({
-                    url: activeUrl || audioUrl,
-                    duration: duration,
-                    label: editLabel,
-                    mode: 'overwrite',
-                    is_edited: false,
-                    cut_start_time: startTime,
-                    cut_end_time: endTime,
-                    loop_locator: savedLocator
-                  });
-                }
-                onClose();
-              }}
-              style={{
-                width: '100%',
-                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                border: 'none',
-                borderRadius: '16px',
-                padding: '14px 20px',
-                fontSize: '0.94rem',
-                fontWeight: 900,
-                color: '#ffffff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
-                transition: 'all 0.15s ease',
-                minHeight: '48px',
-                touchAction: 'manipulation'
-              }}
-              className="hover-scale"
-            >
-              <Check size={18} strokeWidth={2.8} />
-              <span>Als Übe-Schleife aktivieren (A ⇄ B)</span>
-            </button>
+            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              {/* Hörprobe Button */}
+              <button
+                type="button"
+                onClick={togglePlay}
+                style={{
+                  flex: '0 0 auto',
+                  minWidth: '125px',
+                  background: isPlaying ? '#0f172a' : '#ffffff',
+                  color: isPlaying ? '#ffffff' : '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '14px',
+                  padding: '11px 14px',
+                  fontSize: '0.84rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                  transition: 'all 0.15s ease',
+                  minHeight: '44px',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale-mini"
+                title="Ausgewählten Abschnitt vorhören"
+              >
+                {isPlaying ? (
+                  <>
+                    <Square size={14} fill="currentColor" />
+                    <span>Stopp</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} fill="#16a34a" color="#16a34a" />
+                    <span>Anhören</span>
+                  </>
+                )}
+              </button>
 
+              {/* Master Save Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  stopPlayback();
+                  const savedLocator = saveLoopLocator(
+                    activeUrl || audioUrl,
+                    { startSec: startTime, endSec: endTime, enabled: true },
+                    {
+                      schoolId,
+                      userId,
+                      recordingId,
+                      recordingTitle: editLabel || initialLabel,
+                      totalDuration: duration
+                    }
+                  );
+                  if (onSave) {
+                    onSave({
+                      url: activeUrl || audioUrl,
+                      duration: duration,
+                      label: editLabel,
+                      mode: 'overwrite',
+                      is_edited: false,
+                      cut_start_time: startTime,
+                      cut_end_time: endTime,
+                      loop_locator: savedLocator
+                    });
+                  }
+                  onClose();
+                }}
+                style={{
+                  flex: 1,
+                  background: '#16a34a',
+                  border: 'none',
+                  borderRadius: '14px',
+                  padding: '11px 16px',
+                  fontSize: '0.88rem',
+                  fontWeight: 900,
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.28)',
+                  transition: 'all 0.15s ease',
+                  minHeight: '44px',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale-mini"
+              >
+                <Check size={16} strokeWidth={2.8} />
+                <span>Schleife aktivieren</span>
+              </button>
+            </div>
+
+            {/* Schleife aufheben Link (nur falls bereits ein Loop aktiv war) */}
             {existingLocator && (
               <button
                 type="button"
@@ -1396,33 +1415,66 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                   onClose();
                 }}
                 style={{
-                  width: '100%',
-                  background: '#f8fafc',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '14px',
-                  padding: '11px 16px',
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '4px 8px',
+                  fontSize: '0.74rem',
+                  fontWeight: 750,
                   color: '#64748b',
                   cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease',
-                  minHeight: '44px',
-                  touchAction: 'manipulation'
+                  gap: '4px',
+                  transition: 'color 0.15s ease'
                 }}
                 className="hover-scale-mini"
               >
-                <X size={15} strokeWidth={2.4} />
-                <span>Schleife aufheben (Ganzes Stück abspielen)</span>
+                <X size={12} strokeWidth={2.4} />
+                <span>Schleife löschen (ganzes Stück abspielen)</span>
               </button>
             )}
           </div>
         ) : (
-          <button
-            type="button"
+          <>
+            {/* 🎧 Playback Button im Crop-Modus */}
+            <button
+              type="button"
+              onClick={togglePlay}
+              style={{
+                width: '100%',
+                background: isPlaying ? '#0f172a' : '#f1f5f9',
+                color: isPlaying ? '#ffffff' : '#0f172a',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '11px 16px',
+                fontSize: '0.86rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              {isPlaying ? (
+                <>
+                  <Square size={14} fill="currentColor" />
+                  <span>Stopp</span>
+                </>
+              ) : (
+                <>
+                  <Repeat size={14} strokeWidth={2.6} style={{ color: '#16a34a' }} />
+                  <Play size={14} fill="currentColor" style={{ marginLeft: '-2px' }} />
+                  <span>Bereich vorhören ({formatTime(Math.max(0, endTime - startTime))})</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
             disabled={isSaving}
             onClick={() => handleExportSave('overwrite')}
             style={{
@@ -1447,7 +1499,8 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
             <Check size={18} strokeWidth={2.8} />
             <span>{isSaving ? 'Wird gespeichert...' : 'Fertig (Zuschnitt speichern)'}</span>
           </button>
-        )}
+        </>
+      )}
 
         {/* ↩️ Dezent unten: Zurück zum Original */}
         {isDifferentFromMaster && (

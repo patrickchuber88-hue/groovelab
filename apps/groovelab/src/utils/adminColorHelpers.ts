@@ -68,14 +68,8 @@ export const getAlphabeticalUniColor = (name: string) => {
   };
 };
 
+import { getSongColor as getCanonicalSongColor } from '../components/student/studentDateUtils';
+
 export const getSongColor = (title: string) => {
-  const trimmed = (title || '').trim();
-  const hue = getAlphabeticalHue(trimmed);
-  return {
-    from: `hsl(${hue}, 85%, 92%)`,
-    to: `hsl(${hue}, 80%, 82%)`,
-    text: `hsl(${hue}, 90%, 25%)`,
-    shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-    shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-  };
+  return getCanonicalSongColor(title);
 };

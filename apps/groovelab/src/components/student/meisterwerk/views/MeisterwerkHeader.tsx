@@ -91,16 +91,18 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
       <div
         style={{
           padding: isMobileOrSim
-            ? 'max(10px, env(safe-area-inset-top, 10px)) max(12px, env(safe-area-inset-right, 12px)) 6px max(12px, env(safe-area-inset-left, 12px))'
-            : 'max(16px, env(safe-area-inset-top, 16px)) max(20px, env(safe-area-inset-right, 20px)) 16px max(20px, env(safe-area-inset-left, 20px))',
-          background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
+            ? 'max(8px, env(safe-area-inset-top, 8px)) 14px 8px 14px'
+            : 'max(11px, env(safe-area-inset-top, 11px)) 22px 11px 22px',
+          minHeight: isMobileOrSim ? '48px' : '54px',
+          background: 'linear-gradient(135deg, #2e8b57 0%, #4338ca 100%)',
           backdropFilter: 'none',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.18)',
           borderRadius: '0',
           display: 'flex',
           flexDirection: 'column',
+          justifyContent: 'center',
           zIndex: 50,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)'
         }}
         className="modal-header-container"
       >
@@ -118,20 +120,20 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
         >
           {/* Left: Avatar + Student Info */}
           <div
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}
             className="header-left-info"
           >
             <div
               onClick={() => onProfileClick && onProfileClick(student)}
               title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
               style={{
-                width: isMobileOrSim ? '30px' : '38px',
-                height: isMobileOrSim ? '30px' : '38px',
-                borderRadius: '10px',
+                width: isMobileOrSim ? '32px' : '38px',
+                height: isMobileOrSim ? '32px' : '38px',
+                borderRadius: '11px',
                 overflow: 'hidden',
                 flexShrink: 0,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                border: '1.5px solid rgba(255, 213, 79, 0.2)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                border: '1.5px solid rgba(250, 204, 21, 0.65)',
                 cursor: onProfileClick ? 'pointer' : 'default',
                 transition: 'opacity 0.2s'
               }}
@@ -151,15 +153,15 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                 alt=""
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h2
                   onClick={() => onProfileClick && onProfileClick(student)}
                   title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
                   style={{
                     margin: 0,
-                    fontSize: '1rem',
-                    fontWeight: 700,
+                    fontSize: isMobileOrSim ? '1.02rem' : '1.15rem',
+                    fontWeight: 850,
                     color: '#ffffff',
                     letterSpacing: '-0.02em',
                     lineHeight: 1.2,
@@ -199,7 +201,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                         justifyContent: 'center',
                         cursor: 'pointer',
                         padding: 0,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
                         transition: 'all 0.2s ease',
                         flexShrink: 0
                       }}
@@ -215,25 +217,17 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
-                        background:
-                          uiLevel === 'junior'
-                            ? 'rgba(254, 240, 138, 0.22)'
-                            : uiLevel === 'teen'
-                            ? 'rgba(199, 210, 254, 0.22)'
-                            : 'rgba(233, 213, 255, 0.22)',
-                        border:
-                          uiLevel === 'junior'
-                            ? '1px solid rgba(253, 224, 71, 0.55)'
-                            : uiLevel === 'teen'
-                            ? '1px solid rgba(165, 180, 252, 0.55)'
-                            : '1px solid rgba(216, 180, 254, 0.55)',
+                        background: 'rgba(255, 255, 255, 0.18)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.32)',
                         borderRadius: '100px',
                         padding: '2px 8px',
                         color: '#ffffff',
                         fontSize: '0.70rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                         transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                         flexShrink: 0
                       }}
@@ -254,8 +248,8 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      border: '1px solid rgba(255, 255, 255, 0.35)',
+                      background: 'rgba(255, 255, 255, 0.18)',
+                      border: '1px solid rgba(255, 255, 255, 0.32)',
                       borderRadius: '100px',
                       padding: '2px 8px',
                       color: '#ffffff',
@@ -273,7 +267,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   style={{
                     fontSize: '0.68rem',
                     fontWeight: 650,
-                    color: 'rgba(255, 255, 255, 0.75)',
+                    color: 'rgba(255, 255, 255, 0.85)',
                     lineHeight: 1,
                     marginTop: '2px'
                   }}
@@ -310,9 +304,9 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   setHubTab('modules');
                 }}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.16)',
-                  backdropFilter: 'blur(24px)',
-                  WebkitBackdropFilter: 'blur(24px)',
+                  background: 'rgba(255, 255, 255, 0.18)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
                   border: '1px solid rgba(255, 255, 255, 0.32)',
                   color: '#ffffff',
                   padding: '7px 18px',
@@ -323,7 +317,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '7px',
-                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.35)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                   letterSpacing: '-0.01em',
                   userSelect: 'none'
@@ -442,7 +436,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   setHubTab('modules');
                 }}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.22)',
+                  background: 'rgba(255, 255, 255, 0.20)',
                   border: '1px solid rgba(255, 255, 255, 0.35)',
                   borderRadius: '100px',
                   minHeight: '34px',
@@ -463,7 +457,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                 aria-label="Zurück zum Aufgabenheft"
                 title="Zurück zum Aufgabenheft"
               >
-                <ArrowLeft size={14} strokeWidth={2.6} />
+                <ArrowLeft size={14} color="#ffffff" strokeWidth={2.6} />
                 <span>Zurück</span>
               </button>
             )}

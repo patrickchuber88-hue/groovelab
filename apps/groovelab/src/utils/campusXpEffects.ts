@@ -7,16 +7,16 @@
  * - Keyframes & CSS styles for the golden deposit pulse & floating XP badge
  */
 
+import { SharedAudioEngine } from './sharedAudioEngine';
+
 /**
  * Plays a shimmering, harmonic C-Major arpeggio chime to celebrate XP deposits
  */
 export const playTriumphantXpChime = (): void => {
   try {
     if (typeof window === 'undefined') return;
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const ctx = new AudioContextClass();
+    const ctx = SharedAudioEngine.getContext();
+    if (!ctx) return;
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }

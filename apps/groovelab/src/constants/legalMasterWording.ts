@@ -126,5 +126,14 @@ export const LEGAL_MASTER_WORDING = {
     fairPlayInactivityRule: 'Bei mehr als 60 Tagen ohne Login wird das Profil fair-play-konform auf Basis-Bereitstellung (0,09 €) umgestellt (automatischer Kostenschutz für Musikschulen).',
     educationalPortfolioRule: 'Didaktische Bildungsbiografie & Meisterwerk-Dokumentation (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO) bleiben über Schuljahre hinweg (mehrjährig) kumulativ erhalten. Physische Datenlöschung erfolgt erst 30 Tage nach formeller Exmatrikulation.',
     audioSchoolYearRetention: 'Didaktische Audio-Aufnahmen (Hausaufgaben, Übe-Studio & Loopstation) dienen der Dokumentation des individuellen Lernfortschritts über das Ausbildungsjahr (pädagogisches Jahres-Portfolio). Sie verbleiben bis zum Ende des jeweiligen Schuljahres (30. September inklusive Karenzzeit) im geschützten deutschen Cloud-Speicher. Eltern und Lehrkräfte besitzen jederzeitige 1-Klick-Selbstlöschautonomie.'
+  },
+
+  // 7. Schweizer Musikschul-Compliance (revDSG, MWSTG Art. 21, VMS-Richtlinien & CHF 0.05 Rappenrundung)
+  swissMusicSchoolCompliance: {
+    title: 'Schweizer Rechts- & Musikschul-Compliance (revDSG, MWSTG & VMS)',
+    revDsgCompliance: 'Vollständige Konformität mit dem Schweizer Datenschutzgesetz (revDSG vom 1. September 2023): Datenübermittlung in die EU (Deutschland) gestützt auf den Angemessenheitsbeschluss des Bundesrats gemäss Art. 16 Abs. 1 revDSG. Schutz von besonders schützenswerten Personendaten (Art. 5 lit. c revDSG) durch strikte Neutralität bei Absenzen und Verzicht auf medizinische Diagnosen. Umfassendes Auskunfts- und Herausgaberecht gemäss Art. 25 und Art. 28 revDSG.',
+    mwstgArt21EducationExemption: 'Mehrwertsteuerbefreiung für Bildungsleistungen gemäss Art. 21 Abs. 2 Ziff. 11 MWSTG: Unterrichts- und Ausbildungsleistungen von Musikschulen sowie damit eng verbundene didaktische Zusatzleistungen sind von der Mehrwertsteuer ausgenommen. Rechnungsstellung für Schweizer Musikschulen erfolgt in Schweizer Franken (CHF) ohne Mehrwertsteuerausweis unter Ausweisung der Bildungsbefreiung bzw. UID/MWST-Nummer.',
+    rappenrundungRule: 'Kaufmännische Rappenrundung auf 5 Rappen (CHF 0.05) gemäss Art. 30 MWSTV: Endbeträge in Schweizer Franken werden deterministisch auf die nächsten CHF 0.05 gerundet (Math.round(amount * 20) / 20). Rechnungen und Zahlungspläne für Schweizer Mandanten weisen ausschliesslich Beträge mit 0.05-Teilbarkeit aus.',
+    vmsGuidelinesAndZgb28: 'Verband Musikschulen Schweiz (VMS) & Persönlichkeitsschutz (Art. 28 ZGB): Semesterweise Laufzeitharmonisierung, Wahrung des Kindeswohls und der Persönlichkeitsrechte Minderjähriger durch Avatar-First-Doktrin ohne Fotoveröffentlichung.'
   }
 } as const;

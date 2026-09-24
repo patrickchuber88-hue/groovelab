@@ -1920,11 +1920,15 @@ export function SecretaryRoomsView({
                                       aria-label={`Campus-Modul für Raum ${room.name} ${room.is_campus_active !== false ? 'deaktivieren' : 'aktivieren'}`}
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        const newVal = room.is_campus_active === false ? true : false;
-                                        const { error } = await supabase.from('rooms').update({ is_campus_active: newVal }).eq('id', room.id);
-                                        if (error) alert(error.message);
-                                        else {
-                                          setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_campus_active: newVal } : r));
+                                        try {
+                                          const newVal = room.is_campus_active === false ? true : false;
+                                          const { error } = await supabase.from('rooms').update({ is_campus_active: newVal }).eq('id', room.id);
+                                          if (error) alert(error.message);
+                                          else {
+                                            setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_campus_active: newVal } : r));
+                                          }
+                                        } catch (err: any) {
+                                          console.error("Fehler beim Umschalten des Campus-Status:", err);
                                         }
                                       }}
                                       style={{
@@ -1949,11 +1953,15 @@ export function SecretaryRoomsView({
                                       aria-label={`GrooveLab-Modul für Raum ${room.name} ${room.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        const newVal = !room.is_groovelab_active;
-                                        const { error } = await supabase.from('rooms').update({ is_groovelab_active: newVal }).eq('id', room.id);
-                                        if (error) alert(error.message);
-                                        else {
-                                          setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_groovelab_active: newVal } : r));
+                                        try {
+                                          const newVal = !room.is_groovelab_active;
+                                          const { error } = await supabase.from('rooms').update({ is_groovelab_active: newVal }).eq('id', room.id);
+                                          if (error) alert(error.message);
+                                          else {
+                                            setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_groovelab_active: newVal } : r));
+                                          }
+                                        } catch (err: any) {
+                                          console.error("Fehler beim Umschalten des GrooveLab-Status:", err);
                                         }
                                       }}
                                       style={{

@@ -1,6 +1,7 @@
-import { Router, Request, Response } from 'express';
+import express, { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { decryptSession } from '../lib/session/crypto';
+import { validateMagicBytes, scrubMediaMetadata } from '../lib/mediaValidator';
 
 const router = Router();
 
@@ -219,6 +220,100 @@ router.post('/presign-upload', async (req: Request, res: Response) => {
       error: 'INTERNAL_SERVER_ERROR',
       message: 'Unerwarteter Fehler bei der Signierung des Datei-Uploads.'
     });
+  }
+});
+
+/**
+ * POST /api/storage/verify-upload-buffer
+ * 
+ * Inspects uploaded file buffer for genuine magic bytes and scrubs identifiable metadata (EXIF/ID3/GPS).
+ */
+router.post('/verify-upload-buffer', express.raw({ type: '*/*', limit: '25mb' }), (req: Request, res: Response) => {
+  const buffer = req.body as Buffer;
+  if (!buffer || buffer.length === 0) {
+    return res.status(400).json({ error: 'EMPTY_FILE', message: 'Keine Dateidaten empfangen.' });
+  }
+
+  const validation = validateMagicBytes(buffer);
+  if (!validation.isValid) {
+    return res.status(415).json({
+      error: 'INVALID_MAGIC_BYTES',
+      message: 'Echte Magic-Byte-Prüfung fehlgeschlagen: Die Datei entspricht nicht dem autorisierten Binärformat.',
+      details: validation.error
+    });
+  }
+
+  const { scrubbedItemsCount } = scrubMediaMetadata(buffer);
+
+  return res.status(200).json({
+    success: true,
+    detectedFormat: validation.detectedFormat,
+    mimeType: validation.mimeType,
+    metadataScrubbed: scrubbedItemsCount > 0,
+    scrubbedItemsCount
+  });
+});
+
+/**
+ * GET /api/storage/stream/:bucket/*
+ * 
+ * Streams protected private audio media with HTTP 206 Partial Content (Range Support)
+ * for seamless scrubbing/buffering in iOS Safari WebAudio.
+ */
+router.get('/stream/:bucket/*', async (req: Request, res: Response) => {
+  try {
+    const bucket = req.params.bucket;
+    const filePath = req.params[0];
+
+    if (!ALLOWED_BUCKETS.has(bucket) || !filePath) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Zugriff auf diesen Speicherpfad verweigert.' });
+    }
+
+    // Ephemeral download client
+    const storageClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+    const { data: signedData, error: signError } = await storageClient.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 1800); // 30 minutes TTL for playback (UrhG § 73)
+
+    if (signError || !signedData?.signedUrl) {
+      return res.status(404).json({ error: 'FILE_NOT_FOUND', message: 'Audiodatei nicht gefunden oder Signierung fehlgeschlagen.' });
+    }
+
+    // Forward range requests to upstream storage to ensure iOS Safari WebAudio compatibility
+    const rangeHeader = req.headers.range;
+    const fetchHeaders: Record<string, string> = {};
+    if (rangeHeader) {
+      fetchHeaders['Range'] = rangeHeader;
+    }
+
+    const upstreamRes = await fetch(signedData.signedUrl, { headers: fetchHeaders });
+
+    res.status(upstreamRes.status);
+    upstreamRes.headers.forEach((value, key) => {
+      // Forward relevant audio streaming headers
+      if (['content-range', 'content-length', 'content-type', 'accept-ranges'].includes(key.toLowerCase())) {
+        res.setHeader(key, value);
+      }
+    });
+
+    if (upstreamRes.body) {
+      const reader = upstreamRes.body.getReader();
+      const pump = async () => {
+        const { done, value } = await reader.read();
+        if (done) {
+          res.end();
+          return;
+        }
+        res.write(Buffer.from(value));
+        await pump();
+      };
+      await pump();
+    } else {
+      res.end();
+    }
+  } catch (err: any) {
+    console.error('[BFF Storage Stream] Error streaming media:', err);
+    return res.status(500).json({ error: 'STREAMING_ERROR', message: 'Fehler beim Medienstreaming.' });
   }
 });
 

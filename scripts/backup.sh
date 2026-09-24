@@ -102,9 +102,9 @@ fi
 TARGET_HOURLY_DUMP="${HOURLY_DIR}/cg_db_${TIMESTAMP}.sql.gz.age"
 TEMP_DUMP="${TARGET_HOURLY_DUMP}.tmp"
 
-# Atomare Pipeline: pg_dump -> gzip-9 -> age (X25519) -> .tmp Datei
+# Atomare Pipeline: pg_dump -> gzip-1 -> age (X25519) -> .tmp Datei (gzip-1 schützt vor 100% CPU-Spikes)
 docker exec "${CONTAINER_NAME}" pg_dump -U "${DB_USER}" --clean --if-exists --no-owner "${DB_NAME}" \
-    | gzip -9 \
+    | gzip -1 \
     | age -r "${AGE_RECIPIENT}" > "${TEMP_DUMP}"
 
 # Validierung: Mindestgröße prüfen (> 10 KB)

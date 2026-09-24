@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Tag, Percent, Plus, Copy, Check, Trash2, Edit2, RotateCcw, 
-  ArrowRight, ShieldCheck, Building2, Rocket, Calendar, GraduationCap, Download, FileText
+  ArrowRight, ShieldCheck, Building2, Rocket, Calendar, GraduationCap, Download, FileText,
+  HardDrive, Users, DollarSign, Sparkles, AlertCircle, Clock
 } from 'lucide-react';
 import { CampaignEditModal } from './pricing/CampaignEditModal';
 import { SchoolRedemptionDetailModal } from './pricing/SchoolRedemptionDetailModal';
@@ -10,6 +11,15 @@ import type { School, SchoolStat, SpecialOffer, PricingAuditLog } from '../Maste
 import type { StorageTier } from '../hooks/useMasterAdminPricing';
 
 interface PricingTabProps {
+  activeCurrency?: 'EUR' | 'CHF';
+  setActiveCurrency?: (curr: 'EUR' | 'CHF') => void;
+  liveKpiStats?: {
+    eurMrr: number;
+    chfMrr: number;
+    totalProtectedSchools: number;
+    totalActiveStudents: number;
+    totalPassiveStudents: number;
+  };
   priceCampus: number | string;
   setPriceCampus: (val: any) => void;
   priceGroovelab: number | string;
@@ -47,6 +57,9 @@ interface PricingTabProps {
 }
 
 export const PricingTab: React.FC<PricingTabProps> = ({
+  activeCurrency = 'EUR',
+  setActiveCurrency,
+  liveKpiStats,
   priceCampus,
   setPriceCampus,
   priceGroovelab,
@@ -82,6 +95,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({
   schools,
   schoolStats
 }) => {
+  const [localCurrency, setLocalCurrency] = useState<'EUR' | 'CHF'>('EUR');
+  const currentCurrency = setActiveCurrency ? activeCurrency : localCurrency;
+  const handleCurrencyChange = (curr: 'EUR' | 'CHF') => {
+    if (setActiveCurrency) setActiveCurrency(curr);
+    else setLocalCurrency(curr);
+  };
+
+  const isChf = currentCurrency === 'CHF';
+  const currencySymbol = isChf ? 'CHF' : '€';
+  const currencyUnit = isChf ? 'CHF/Mo' : '€/Mo';
+
   // Campaign Form State
   const [newOfferName, setNewOfferName] = useState('');
   const [newOfferDiscount, setNewOfferDiscount] = useState<number>(10);
@@ -90,8 +114,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({
   const [newOfferMaxRedemptions, setNewOfferMaxRedemptions] = useState<number | ''>('');
   const [newOfferType, setNewOfferType] = useState<'promocode' | 'founder' | 'annual' | 'free_quota'>('promocode');
   const [newOfferScope, setNewOfferScope] = useState<'hosting_only' | 'total_invoice'>('hosting_only');
-  const [campaignFilter, setCampaignFilter] = useState<'all' | 'active' | 'paused' | 'archived'>('all');
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [newOfferCurrency, setNewOfferCurrency] = useState<'ALL' | 'EUR' | 'CHF'>('ALL');
+  const [campaignFilter, setCampaignFilter] = useState<'all' | 'active' | 'archived'>('all');
 
   // Sub-modal states
   const [editingOffer, setEditingOffer] = useState<any | null>(null);
@@ -106,17 +130,21 @@ export const PricingTab: React.FC<PricingTabProps> = ({
     const affectedList: { name: string; oldCost: number; newCost: number }[] = [];
 
     schools.forEach(school => {
+      const isSchoolChf = school.country === 'CH' || school.currency === 'CHF';
+      // Only count schools matching target currency for simulation delta
+      if ((isChf && !isSchoolChf) || (!isChf && isSchoolChf)) return;
+
       const stats = schoolStats[school.id] || { totalStudents: 0, activeStudents: 0, totalTeachers: 0, totalSongs: 0, hasGroovelab: false, hasCampus: false };
-      const teachers = stats.totalTeachers || 0;
-      const activeStudents = stats.activeStudents || 0;
+      const teachers = stats.totalTeachers || school.teachers_count || 0;
+      const activeStudents = stats.activeStudents || school.active_students_count || 0;
       const passiveStudents = Math.max(0, (stats.totalStudents || 0) - activeStudents);
 
-      const curCampus = school.grandfathered_campus_price ?? (Number(priceCampus) || 14.90);
-      const curGroove = school.grandfathered_groovelab_price ?? (Number(priceGroovelab) || 9.90);
-      const curKombi = school.grandfathered_kombi_price ?? (Number(priceKombi) || 19.90);
-      const curTeacher = school.grandfathered_teacher_price ?? (Number(priceTeacher) || 0.49);
-      const curStudent = school.grandfathered_student_price ?? (Number(priceStudent) || 0.49);
-      const curPassive = 0.09;
+      const curCampus = school.grandfathered_campus_price ?? (Number(priceCampus) || (isChf ? 25.90 : 19.90));
+      const curGroove = school.grandfathered_groovelab_price ?? (Number(priceGroovelab) || (isChf ? 16.80 : 12.90));
+      const curKombi = school.grandfathered_kombi_price ?? (Number(priceKombi) || (isChf ? 32.50 : 24.90));
+      const curTeacher = school.grandfathered_teacher_price ?? (Number(priceTeacher) || (isChf ? 0.65 : 0.49));
+      const curStudent = school.grandfathered_student_price ?? (Number(priceStudent) || (isChf ? 0.65 : 0.49));
+      const curPassive = isChf ? 0.15 : 0.09;
       const curStorage = Number(school.storage_addon_monthly_fee || 0);
 
       let curBase = 0;
@@ -129,12 +157,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       let projCost = curCost;
       if (priceChangeScope === 'all') {
         let projBase = 0;
-        const newCamp = Number(priceCampus) || 14.90;
-        const newGroove = Number(priceGroovelab) || 9.90;
-        const newKombi = Number(priceKombi) || 19.90;
-        const newTeach = Number(priceTeacher) || 0.49;
-        const newStud = Number(priceStudent) || 0.49;
-        const newPass = Number(pricePassiveStudent) || 0.09;
+        const newCamp = Number(priceCampus) || (isChf ? 25.90 : 19.90);
+        const newGroove = Number(priceGroovelab) || (isChf ? 16.80 : 12.90);
+        const newKombi = Number(priceKombi) || (isChf ? 32.50 : 24.90);
+        const newTeach = Number(priceTeacher) || (isChf ? 0.65 : 0.49);
+        const newStud = Number(priceStudent) || (isChf ? 0.65 : 0.49);
+        const newPass = Number(pricePassiveStudent) || (isChf ? 0.15 : 0.09);
 
         if (school.has_campus_subscription && school.has_groovelab_subscription) projBase = newKombi;
         else if (school.has_campus_subscription) projBase = newCamp;
@@ -152,10 +180,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       }
     });
 
-    const delta = Math.round((projectedTotalMrr - currentTotalMrr) * 100) / 100;
+    const delta = priceChangeScope === 'new_only' ? 0 : Math.round((projectedTotalMrr - currentTotalMrr) * 100) / 100;
     setPricingImpactData({
       currentMrr: Math.round(currentTotalMrr * 100) / 100,
-      projectedMrr: Math.round(projectedTotalMrr * 100) / 100,
+      projectedMrr: priceChangeScope === 'new_only' ? Math.round(currentTotalMrr * 100) / 100 : Math.round(projectedTotalMrr * 100) / 100,
       deltaMrr: delta,
       affectedSchoolsCount: priceChangeScope === 'new_only' ? 0 : affectedList.length,
       affectedSchools: affectedList
@@ -176,6 +204,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       storageAddon: Number(priceStorageAddon),
       trialDays: defaultTrialDays,
       scope: priceChangeScope,
+      currency: currentCurrency,
       effectiveDate: priceEffectiveDate,
       reason: priceChangeReason
     });
@@ -191,13 +220,14 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       discount_percent: Number(newOfferDiscount),
       code: newOfferCode.trim().toUpperCase() || `PROMO${newOfferDiscount}`,
       is_active: true,
+      currency: newOfferCurrency,
       duration_months: Number(newOfferDuration) || 0,
       max_redemptions: newOfferMaxRedemptions === '' ? 0 : Number(newOfferMaxRedemptions),
       offer_type: newOfferType,
       discount_scope: newOfferScope,
       redeemed_school_ids: [],
       created_at: new Date().toISOString()
-    } as any;
+    };
 
     const updated = [...specialOffers, newOffer];
     await onSaveCampaigns(updated);
@@ -210,11 +240,6 @@ export const PricingTab: React.FC<PricingTabProps> = ({
 
   const handleToggleOfferActive = async (id: string, current: boolean) => {
     const updated = specialOffers.map(o => o.id === id ? { ...o, is_active: !current } : o);
-    await onSaveCampaigns(updated);
-  };
-
-  const handleArchiveOffer = async (id: string) => {
-    const updated = specialOffers.map(o => o.id === id ? { ...o, is_archived: true, archived_at: new Date().toISOString() } : o);
     await onSaveCampaigns(updated);
   };
 
@@ -249,20 +274,31 @@ export const PricingTab: React.FC<PricingTabProps> = ({
     setSelectedOfferForSchools(updated.find(o => o.id === offerId));
   };
 
+  const handleStorageTierPriceChange = (gb: number, newPrice: number) => {
+    const updated = storageTiersList.map(t => t.gb === gb ? { ...t, price: newPrice } : t);
+    setStorageTiersList(updated);
+  };
+
+  const filteredOffers = specialOffers.filter(o => {
+    if (campaignFilter === 'active') return o.is_active && !o.is_archived;
+    if (campaignFilter === 'archived') return o.is_archived;
+    return !o.is_archived;
+  });
+
   return (
     <div
       role="tabpanel"
       id="master-panel-pricing"
       aria-labelledby="master-tab-pricing"
       tabIndex={0}
-      style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}
       className="animate-fade-in"
     >
-      {/* Header Panel */}
+      {/* Header Panel with Currency Toggle */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         flexWrap: 'wrap',
         gap: '16px',
         borderBottom: '1px solid #e2e8f0',
@@ -271,9 +307,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
             <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
               background: '#f1f5f9',
               border: '1px solid #e2e8f0',
               display: 'flex',
@@ -287,11 +323,72 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </h2>
           </div>
           <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', fontWeight: 500 }}>
-            Standard-Abonnementpreise, BGB-konforme Preisanpassungs-Politik und Sonderaktionen für Musikschulen.
+            Katalogpreise für Neuanmeldungen, BGB- &amp; nDSG-konforme Preispolitik und 100% Lifetime-Bestandsschutz.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {/* Dual Currency Switcher */}
+          <div
+            role="tablist"
+            aria-label="Währungsauswahl"
+            style={{
+              display: 'flex',
+              background: '#f1f5f9',
+              padding: '4px',
+              borderRadius: '14px',
+              border: '1px solid #e2e8f0',
+              gap: '4px'
+            }}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentCurrency === 'EUR'}
+              onClick={() => handleCurrencyChange('EUR')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: currentCurrency === 'EUR' ? '#ffffff' : 'transparent',
+                color: currentCurrency === 'EUR' ? '#0f172a' : '#64748b',
+                fontWeight: currentCurrency === 'EUR' ? 800 : 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: currentCurrency === 'EUR' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>🇪🇺</span> EUR (€)
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentCurrency === 'CHF'}
+              onClick={() => handleCurrencyChange('CHF')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: currentCurrency === 'CHF' ? '#ffffff' : 'transparent',
+                color: currentCurrency === 'CHF' ? '#991b1b' : '#64748b',
+                fontWeight: currentCurrency === 'CHF' ? 800 : 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: currentCurrency === 'CHF' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>🇨🇭</span> CHF (Schweiz)
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onOpenLegalNoticeModal}
@@ -299,7 +396,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '8px 14px',
+              padding: '9px 15px',
               borderRadius: '12px',
               background: '#ffffff',
               border: '1px solid #cbd5e1',
@@ -310,31 +407,174 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
             }}
           >
-            <FileText size={15} color="#475569" /> Klausel-Vorlage Sonderkündigung
+            <FileText size={15} color="#475569" /> Vorlage Sonderkündigung (AGB Ziffer 4)
           </button>
 
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '6px 14px',
+            padding: '7px 14px',
             borderRadius: '100px',
             background: '#f0fdf4',
             border: '1px solid #bbf7d0',
             color: '#15803d',
             fontSize: '0.80rem',
-            fontWeight: 700
+            fontWeight: 800
           }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 8px rgba(22, 163, 74, 0.6)' }} />
-            Master-Pricing Live
+            <ShieldCheck size={14} color="#16a34a" />
+            100% Lifetime-Schutz aktiv
           </div>
         </div>
       </div>
 
-      {/* Top Row Grid: Standardpreise & Audit-Logbuch */}
+      {/* Live Financial Cockpit KPI Strip */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 0.95fr)',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+        gap: '16px'
+      }}>
+        {/* KPI 1: EUR MRR */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#eff6ff',
+            color: '#2563eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 900,
+            fontSize: '1.1rem'
+          }}>
+            €
+          </div>
+          <div>
+            <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Live EUR-MRR (DE/AT)
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+              {(liveKpiStats?.eurMrr || 0).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>/ Mo</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 2: CHF MRR */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#fef2f2',
+            color: '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 900,
+            fontSize: '0.95rem'
+          }}>
+            CHF
+          </div>
+          <div>
+            <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Live CHF-MRR (Schweiz)
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+              CHF {(liveKpiStats?.chfMrr || 0).toFixed(2)} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>/ Mo</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 3: Lifetime Protection Counter */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#f0fdf4',
+            color: '#16a34a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <ShieldCheck size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Lifetime-Bestandsschutz
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+              {liveKpiStats?.totalProtectedSchools ?? schools.length} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Schulen geschützt</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 4: Pupil Base */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#faf5ff',
+            color: '#9333ea',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Users size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Schüler-Bereitstellungen
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+              {liveKpiStats?.totalActiveStudents || 0} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Aktiv • {liveKpiStats?.totalPassiveStudents || 0} Passiv</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Row Grid: Standardpreise Form & Audit-Logbuch */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 0.95fr)',
         gap: '28px',
         alignItems: 'start'
       }}>
@@ -342,17 +582,29 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
-          padding: '32px',
+          padding: '30px',
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.1rem' }}>{isChf ? '🇨🇭' : '🇪🇺'}</span>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, fontFamily: '"Outfit", sans-serif' }}>
+                Katalogpreise für {isChf ? 'Schweizer Franken (CHF)' : 'Euro-Zone (EUR)'}
+              </h3>
+            </div>
+            <span style={{ fontSize: '0.74rem', background: isChf ? '#fee2e2' : '#eff6ff', color: isChf ? '#991b1b' : '#1d4ed8', padding: '4px 10px', borderRadius: '8px', fontWeight: 800 }}>
+              Gilt für Neuanmeldungen
+            </span>
+          </div>
+
           <form onSubmit={handlePreSavePricingCheck} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
             {/* 1. Server Hosting Flatrates */}
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
                 1. Server-Hosting Flatrates (pro Musikschule)
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.15fr', gap: '12px' }}>
                 <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
                   <label style={{ display: 'block', fontSize: '0.70rem', color: '#16a34a', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                     Campus Modul
@@ -366,7 +618,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onChange={(e) => setPriceCampus(e.target.value.replace(',', '.'))}
                       style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '1.1rem', fontWeight: 800, outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>€/Mo</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 700, color: '#64748b' }}>{currencyUnit}</span>
                   </div>
                 </div>
 
@@ -383,14 +635,19 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onChange={(e) => setPriceGroovelab(e.target.value.replace(',', '.'))}
                       style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '1.1rem', fontWeight: 800, outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>€/Mo</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 700, color: '#64748b' }}>{currencyUnit}</span>
                   </div>
                 </div>
 
                 <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '14px', border: '1.5px solid #16a34a' }}>
-                  <label style={{ display: 'block', fontSize: '0.70rem', color: '#15803d', fontWeight: 900, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Kombi-Bundle
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '0.70rem', color: '#15803d', fontWeight: 900, textTransform: 'uppercase' }}>
+                      Kombi-Bundle
+                    </label>
+                    <span style={{ fontSize: '0.62rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                      Vorteil
+                    </span>
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <input
                       type="number"
@@ -400,7 +657,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onChange={(e) => setPriceKombi(e.target.value.replace(',', '.'))}
                       style={{ width: '100%', border: 'none', background: 'transparent', color: '#14532d', fontSize: '1.1rem', fontWeight: 900, outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803d' }}>€/Mo</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#15803d' }}>{currencyUnit}</span>
                   </div>
                 </div>
               </div>
@@ -423,7 +680,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onChange={(e) => setPriceTeacher(e.target.value.replace(',', '.'))}
                       style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{currencySymbol}</span>
                   </div>
                 </div>
 
@@ -438,7 +695,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onChange={(e) => setPriceStudent(e.target.value.replace(',', '.'))}
                       style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{currencySymbol}</span>
                   </div>
                 </div>
 
@@ -453,7 +710,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onChange={(e) => setPricePassiveStudent(e.target.value.replace(',', '.'))}
                       style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{currencySymbol}</span>
                   </div>
                 </div>
 
@@ -462,7 +719,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                   <select
                     value={defaultTrialDays}
                     onChange={(e) => setDefaultTrialDays(Number(e.target.value))}
-                    style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.85rem', fontWeight: 800, outline: 'none' }}
+                    style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.82rem', fontWeight: 800, outline: 'none' }}
                   >
                     <option value={14}>14 Tage</option>
                     <option value={30}>30 Tage (Standard)</option>
@@ -473,11 +730,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               </div>
             </div>
 
-            {/* Scope / Bestandsschutz Selector */}
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>
-                3. Geltungsbereich &amp; Bestandsschutz
-              </label>
+            {/* 3. Scope & Lifetime Protection Guarantee */}
+            <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '16px', border: '1.5px solid #86efac' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <ShieldCheck size={18} color="#16a34a" />
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#14532d', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  3. Geltungsbereich &amp; 100% Lifetime-Bestandsschutz
+                </span>
+              </div>
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.45 }}>
+                <strong>Bestandskunden-Garantie:</strong> Bestehende Sammelzahler-Schulen behalten ihren gebuchten Grundtarif sowie aktive Profile dauerhaft (0,00 {currencySymbol} Mehrkosten). Tarifanpassungen gelten ausschließlich für künftige Neuregistrierungen sowie für Schüler-Neuanmeldungen im neuen Schuljahr. Bei Eltern-Direktabrechnung greift der Treuetarif bei Verlängerung bis 31. Oktober.
+              </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <label style={{
                   display: 'flex',
@@ -488,8 +751,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                   background: priceChangeScope === 'new_only' ? '#ffffff' : 'transparent',
                   border: `1.5px solid ${priceChangeScope === 'new_only' ? '#10b981' : '#cbd5e1'}`,
                   cursor: 'pointer',
-                  fontSize: '0.82rem',
-                  fontWeight: 700
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  color: '#0f172a'
                 }}>
                   <input
                     type="radio"
@@ -497,7 +761,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                     checked={priceChangeScope === 'new_only'}
                     onChange={() => setPriceChangeScope('new_only')}
                   />
-                  <span>🛡️ Nur Neuregistrierungen</span>
+                  <span>🛡️ Nur Neuregistrierungen (Garantie)</span>
                 </label>
 
                 <label style={{
@@ -507,10 +771,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                   padding: '10px 14px',
                   borderRadius: '10px',
                   background: priceChangeScope === 'all' ? '#ffffff' : 'transparent',
-                  border: `1.5px solid ${priceChangeScope === 'all' ? '#10b981' : '#cbd5e1'}`,
+                  border: `1.5px solid ${priceChangeScope === 'all' ? '#d97706' : '#cbd5e1'}`,
                   cursor: 'pointer',
-                  fontSize: '0.82rem',
-                  fontWeight: 700
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  color: '#0f172a'
                 }}>
                   <input
                     type="radio"
@@ -518,8 +783,49 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                     checked={priceChangeScope === 'all'}
                     onChange={() => setPriceChangeScope('all')}
                   />
-                  <span>🌐 Alle Mandanten</span>
+                  <span>⚠️ Alle Mandanten (60-Tage Frist)</span>
                 </label>
+              </div>
+            </div>
+
+            {/* 4. Cloud Storage Tiers (Audio & Media) */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  4. Cloud-Speicher-Hosting (Audio-Playalongs &amp; Noten)
+                </div>
+                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                  Preise in {currencySymbol} / Monat
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                {storageTiersList.map((tier) => (
+                  <div key={tier.gb} style={{ background: '#f8fafc', padding: '10px 8px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a', marginBottom: '2px' }}>
+                      {tier.label}
+                    </div>
+                    <div style={{ fontSize: '0.62rem', color: '#64748b', marginBottom: '6px' }}>
+                      {tier.sublabel || (tier.gb === 0 ? 'Inklusive' : `+${tier.gb} GB`)}
+                    </div>
+                    {tier.gb === 0 ? (
+                      <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#16a34a' }}>
+                        {isChf ? 'CHF 0.00' : '0,00 €'}
+                      </span>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                        <input
+                          type="number"
+                          step={isChf ? "0.05" : "0.10"}
+                          min="0"
+                          value={tier.price}
+                          onChange={(e) => handleStorageTierPriceChange(tier.gb, Number(e.target.value.replace(',', '.')))}
+                          style={{ width: '48px', textAlign: 'center', border: 'none', background: '#ffffff', borderRadius: '6px', padding: '2px 4px', fontSize: '0.82rem', fontWeight: 800, outline: 'none' }}
+                        />
+                        <span style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b' }}>{currencySymbol}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -543,7 +849,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 gap: '8px'
               }}
             >
-              <Check size={18} /> {pricingSaving ? 'Wird gespeichert...' : 'Tarife prüfen & speichern'}
+              <Check size={18} /> {pricingSaving ? 'Wird gespeichert...' : `${currentCurrency}-Tarife prüfen & speichern`}
             </button>
           </form>
         </div>
@@ -552,12 +858,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
-          padding: '32px',
+          padding: '30px',
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, fontFamily: '"Outfit", sans-serif' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, fontFamily: '"Outfit", sans-serif' }}>
               📜 Tarifänderungs-Logbuch
             </h3>
             <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#64748b', padding: '4px 10px', borderRadius: '8px', fontWeight: 800 }}>
@@ -565,23 +871,33 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '520px', overflowY: 'auto' }}>
             {pricingAuditLogs.length === 0 ? (
               <div style={{ padding: '36px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '1px dashed #cbd5e1', borderRadius: '16px' }}>
                 Bisher keine Tarifänderungen protokolliert.
               </div>
             ) : (
-              pricingAuditLogs.map((log: any, idx) => (
-                <div key={log.id || idx} style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: '#0f172a', fontWeight: 800 }}>{log.changed_by_name || log.changed_by || 'Master Admin'}</span>
-                    <span style={{ color: '#64748b' }}>{new Date(log.created_at).toLocaleDateString('de-DE')}</span>
+              pricingAuditLogs.map((log: any, idx) => {
+                const logCurrency = log.currency || (log.new_rates?.currency || 'EUR');
+                const logSym = logCurrency === 'CHF' ? 'CHF' : '€';
+                return (
+                  <div key={log.id || idx} style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{logCurrency === 'CHF' ? '🇨🇭' : '🇪🇺'}</span>
+                        {log.changed_by_name || log.changed_by || 'Master Admin'}
+                      </span>
+                      <span style={{ color: '#64748b' }}>{new Date(log.created_at).toLocaleDateString('de-DE')}</span>
+                    </div>
+                    <div style={{ color: '#475569', margin: '4px 0' }}>
+                      Campus: {Number(log.new_rates?.campus || log.new_price_campus || 0).toFixed(2)} {logSym} • GrooveLab: {Number(log.new_rates?.groovelab || log.new_price_groovelab || 0).toFixed(2)} {logSym} • Kombi: {Number(log.new_rates?.kombi || log.new_price_kombi || 0).toFixed(2)} {logSym}
+                    </div>
+                    <div style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 700 }}>
+                      🛡️ {log.scope || 'new_only (Lifetime-Bestandsschutz)'}
+                    </div>
                   </div>
-                  <div style={{ color: '#475569' }}>
-                    Campus: {Number(log.new_rates?.campus || log.new_price_campus || 0).toFixed(2)} € • GrooveLab: {Number(log.new_rates?.groovelab || log.new_price_groovelab || 0).toFixed(2)} € • Kombi: {Number(log.new_rates?.kombi || log.new_price_kombi || 0).toFixed(2)} €
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -590,7 +906,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       {/* Bottom Row: Rabatt-Kampagnen & Sonderangebote */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1.1fr)',
+        gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1.15fr)',
         gap: '28px',
         alignItems: 'start'
       }}>
@@ -598,11 +914,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
-          padding: '32px',
+          padding: '30px',
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
             🏷️ Kampagne anlegen
           </h3>
 
@@ -612,19 +928,19 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               <input
                 type="text"
                 required
-                placeholder="z. B. Frühbucher 2026"
+                placeholder="z. B. Frühbucher 2026 / Schweiz-Pilot"
                 value={newOfferName}
                 onChange={(e) => setNewOfferName(e.target.value)}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600 }}
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Gutschein-Code</label>
                 <input
                   type="text"
-                  placeholder="z. B. SAVE10"
+                  placeholder="z. B. CHPROMO20"
                   value={newOfferCode}
                   onChange={(e) => setNewOfferCode(e.target.value.toUpperCase())}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800, fontFamily: 'monospace' }}
@@ -645,6 +961,61 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Währung</label>
+                <select
+                  value={newOfferCurrency}
+                  onChange={(e) => setNewOfferCurrency(e.target.value as any)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
+                >
+                  <option value="ALL">🌐 Alle Währungen</option>
+                  <option value="EUR">🇪🇺 Nur Euro (EUR)</option>
+                  <option value="CHF">🇨🇭 Nur Franken (CHF)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Geltungsbereich</label>
+                <select
+                  value={newOfferScope}
+                  onChange={(e) => setNewOfferScope(e.target.value as any)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
+                >
+                  <option value="hosting_only">🏢 Nur Server-Hosting Flatrates</option>
+                  <option value="total_invoice">🌐 Gesamtrechnung (inkl. Schüler)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Kampagnentyp</label>
+                <select
+                  value={newOfferType}
+                  onChange={(e) => setNewOfferType(e.target.value as any)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
+                >
+                  <option value="promocode">Gutschein-Code (Standard)</option>
+                  <option value="founder">Gründer-Aktion (Dauerhaft)</option>
+                  <option value="annual">Jahreszahler-Aktion</option>
+                  <option value="free_quota">Freiplatz-Staffel</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Max. Einlösungen</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="0 = Unbegrenzt"
+                  value={newOfferMaxRedemptions}
+                  onChange={(e) => setNewOfferMaxRedemptions(e.target.value === '' ? '' : Number(e.target.value))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
+                />
+              </div>
+            </div>
+
             <button
               type="submit"
               style={{
@@ -661,7 +1032,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                marginTop: '6px'
+                marginTop: '4px'
               }}
             >
               <Plus size={16} /> Kampagne jetzt aktivieren
@@ -673,21 +1044,44 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
-          padding: '32px',
+          padding: '30px',
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-            Aktive Rabatt-Aktionen ({specialOffers.length})
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+              Aktive Aktionen ({filteredOffers.length})
+            </h3>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {(['all', 'active', 'archived'] as const).map(f => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setCampaignFilter(f)}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: campaignFilter === f ? '#0f172a' : '#f1f5f9',
+                    color: campaignFilter === f ? '#ffffff' : '#64748b',
+                    fontSize: '0.70rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {f === 'all' ? 'Alle' : f === 'active' ? 'Aktiv' : 'Archiv'}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto' }}>
-            {specialOffers.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
+            {filteredOffers.length === 0 ? (
               <div style={{ padding: '36px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '1px dashed #cbd5e1', borderRadius: '16px' }}>
-                Keine Kampagnen aktiv.
+                Keine Kampagnen gefunden.
               </div>
             ) : (
-              specialOffers.map((offer: any) => (
+              filteredOffers.map((offer: any) => (
                 <div
                   key={offer.id}
                   style={{
@@ -701,15 +1095,20 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
-                      {offer.name} <span style={{ color: '#16a34a', marginLeft: '6px' }}>-{offer.discount_percent}%</span>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {offer.name} <span style={{ color: '#16a34a' }}>-{offer.discount_percent}%</span>
+                      {offer.currency && offer.currency !== 'ALL' && (
+                        <span style={{ fontSize: '0.66rem', background: offer.currency === 'CHF' ? '#fee2e2' : '#eff6ff', color: offer.currency === 'CHF' ? '#991b1b' : '#1d4ed8', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                          {offer.currency}
+                        </span>
+                      )}
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace' }}>
-                      Code: {offer.code || 'KEIN CODE'}
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>
+                      Code: <strong>{offer.code || 'KEIN CODE'}</strong> • {offer.discount_scope === 'total_invoice' ? 'Gesamtrechnung' : 'Hosting-Only'}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <button
                       type="button"
                       onClick={() => setEditingOffer(offer)}
@@ -723,7 +1122,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                       onClick={() => setSelectedOfferForSchools(offer)}
                       style={{ padding: '6px 10px', borderRadius: '8px', background: '#e0e7ff', border: 'none', cursor: 'pointer', color: '#4338ca', fontSize: '0.72rem', fontWeight: 800 }}
                     >
-                      Mandanten
+                      Mandanten ({(offer.redeemed_school_ids || []).length})
                     </button>
                     <button
                       type="button"
@@ -762,6 +1161,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         pricingImpactData={pricingImpactData}
         priceChangeScope={priceChangeScope}
         priceEffectiveDate={priceEffectiveDate}
+        currency={currentCurrency}
         onClose={() => setShowPricingImpactModal(false)}
         onConfirm={handleConfirmSavePricing}
       />

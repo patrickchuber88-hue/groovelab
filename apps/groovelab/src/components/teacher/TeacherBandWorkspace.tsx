@@ -332,7 +332,7 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
 
                                     return allRequired.map(({ instrument, part }) => {
                                       const key = `${instrument}_${part}`;
-                                      const member = form.members.find((m: any) => {
+                                      const member = (form.members || []).find((m: any) => {
                                         const mNorm = normalizeInstrument(m.instrument).toLowerCase();
                                         const targetNorm = normalizeInstrument(instrument).toLowerCase();
                                         return mNorm === targetNorm && m.part_number === part;

@@ -20,6 +20,7 @@
  * 9. Contract & Schema Alignment Forensic
  * 10. Smoke & Bootstrapping Health Check Forensic
  * 11. UI Snapshot & Visual Regression Forensic
+ * 12. Audio Count-In & Playback Forensic
  * ==============================================================================
  */
 
@@ -44,13 +45,17 @@ const suites = [
   { name: 'Multi-Tenant RLS Dashboards', file: 'apps/groovelab/src/tests/test_multitenant_rls_all_dashboards_forensic.ts' },
   { name: 'Contract Schema Dashboards', file: 'apps/groovelab/src/tests/test_contract_schema_all_dashboards_forensic.ts' },
   { name: 'Smoke & Bootstrapping Health', file: 'apps/groovelab/src/tests/test_smoke_health_bootstrapping_all_dashboards_forensic.ts' },
-  { name: 'UI Snapshot & Visual Regression', file: 'apps/groovelab/src/tests/test_ui_snapshot_visual_regression_all_dashboards_forensic.ts' }
+  { name: 'UI Snapshot & Visual Regression', file: 'apps/groovelab/src/tests/test_ui_snapshot_visual_regression_all_dashboards_forensic.ts' },
+  { name: 'Audio Count-In Playback Forensic', file: 'apps/groovelab/src/tests/test_audio_countin_playback_forensic.ts' },
+  { name: 'Audio Engine Lifecycle Forensic', file: 'apps/groovelab/src/tests/test_audio_engine_lifecycle_forensic.ts' },
+  { name: 'Interactive 4-Role Journeys Forensic', file: 'apps/groovelab/src/tests/test_interactive_journeys_forensic.ts' },
+  { name: 'Closed-Loop Schedule Lifecycle Forensic', file: 'apps/groovelab/src/tests/test_closed_loop_schedule_lifecycle_forensic.ts' }
 ];
 
 console.log('╔════════════════════════════════════════════════════════════════════╗');
 console.log('║   CAMPUS-GROOVELAB: MASTER-RUNNER 1 — DASHBOARD FORENSICS          ║');
 console.log('║   Standards: DIN EN ISO 9241-110, DIN EN 301 549, ISO 8601        ║');
-console.log('║   11 Specialized Forensic Suites / Tier-1 Enterprise+ Defense     ║');
+console.log('║   15 Specialized Forensic Suites / Tier-1 Enterprise+ Defense     ║');
 console.log('╚════════════════════════════════════════════════════════════════════╝\n');
 
 const results: SuiteResult[] = [];

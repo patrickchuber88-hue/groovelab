@@ -162,7 +162,7 @@ export function useTeacherBookings({
           const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
           const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
 
-          if (db.title && db.title.startsWith('Unterricht: ') && db.date) {
+          if (db.title && db.title.startsWith('Unterricht: ') && !db.title.includes('(Verschoben)') && db.date) {
             const bDate = new Date(db.date + 'T00:00:00');
             const bDayOfWeek = bDate.getDay() || 7;
             const { regularRoomId, regMin, regMax } = getTeacherRegularWindow(bDayOfWeek);
@@ -234,64 +234,8 @@ export function useTeacherBookings({
           )
         `);
 
-      const localOccurs: any[] = [];
-      try {
-        const pendingSaved = typeof window !== 'undefined' ? ((userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
-        if (pendingSaved) {
-          const parsedPending = JSON.parse(pendingSaved);
-          Object.values(parsedPending).forEach((item: any) => {
-            if (item && item.date) {
-              const itemTeacherId = item.teacher_id || item.teacherId;
-              if (itemTeacherId && String(itemTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return;
-              localOccurs.push({
-                ...item,
-                is_rescheduled: true,
-                is_moved: true,
-                status: item.status || 'pending_reschedule'
-              });
-            }
-          });
-        }
-        const latestSaved = typeof window !== 'undefined' ? (userId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + userId) : null) : null;
-        if (latestSaved) {
-          const parsedLatest = JSON.parse(latestSaved);
-          if (Array.isArray(parsedLatest)) {
-            parsedLatest.forEach((item: any) => {
-              if (item && item.date) {
-                const itemTeacherId = item.teacher_id || item.teacherId;
-                if (itemTeacherId && String(itemTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return;
-                const isItemChanged = Boolean(
-                  item.is_rescheduled || item.isRescheduled || item.is_moved || item.isMoved ||
-                  (item.status && item.status !== 'scheduled') ||
-                  (item.original_date && item.original_date !== item.date) ||
-                  (item.original_start_time && item.start_time && item.original_start_time.substring(0, 5) !== item.start_time.substring(0, 5))
-                );
-                if (isItemChanged && !localOccurs.some(lo => String(lo.id) === String(item.id))) {
-                  localOccurs.push({
-                    ...item,
-                    is_rescheduled: true,
-                    is_moved: true
-                  });
-                }
-              }
-            });
-          }
-        }
-      } catch (e) {}
-
+      // 🏛️ SSOT: Nur autoritativ in der Datenbank gespeicherte Termine verarbeiten
       const combinedRawOccurs = [...(occurs || [])];
-      localOccurs.forEach((loc: any) => {
-        if (!loc || !loc.date) return;
-        const locTeacherId = loc.teacher_id || loc.teacherId;
-        if (locTeacherId && String(locTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return;
-
-        const existingIdx = combinedRawOccurs.findIndex(o => String(o.id) === String(loc.id));
-        if (existingIdx >= 0) {
-          combinedRawOccurs[existingIdx] = { ...combinedRawOccurs[existingIdx], ...loc };
-        } else {
-          combinedRawOccurs.push(loc);
-        }
-      });
 
       const mappedOccurs = combinedRawOccurs.map((occ: any) => {
         const startTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';

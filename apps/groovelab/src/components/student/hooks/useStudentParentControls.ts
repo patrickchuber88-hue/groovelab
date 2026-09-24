@@ -277,6 +277,9 @@ export function useStudentParentControls({
         });
         if (!leaseErr && leaseData?.success === true) {
           isOk = true;
+          if (leaseData?.lease_token) {
+            sessionStorage.setItem('gl_parent_session_lease', String(leaseData.lease_token));
+          }
         }
       } catch (e) {}
 
@@ -657,6 +660,8 @@ export function useStudentParentControls({
       }
     }
 
+    const prevUiLevel = studentUser?.campus_ui_level;
+
     try {
       if (targetStudentId) {
         const activeLeaseToken = typeof window !== 'undefined'
@@ -669,15 +674,55 @@ export function useStudentParentControls({
           ...(inMemoryParentPinRef.current ? { parent_pin: inMemoryParentPinRef.current } : {})
         };
 
-        const { error: rpcErr } = await supabase.rpc('save_parent_controls', {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('save_parent_controls', {
           p_student_id: targetStudentId,
           p_settings: settingsPayload
         });
 
         if (rpcErr) {
           console.warn('[Security Fail-Closed] save_parent_controls RPC rejected update:', rpcErr);
+          // 🛡️ Fail-Closed Rollback: Revert optimistic state and local caches
+          if (updates.uiLevel !== undefined && prevUiLevel) {
+            if (studentUser) studentUser.campus_ui_level = prevUiLevel;
+            localStorage.setItem(`campus_student_ui_level_${targetStudentId}`, prevUiLevel);
+            localStorage.setItem('campus_student_ui_level', prevUiLevel);
+            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: targetStudentId, uiLevel: prevUiLevel } }));
+            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: prevUiLevel }));
+            if (onProfileUpdate) {
+              try { onProfileUpdate({ campus_ui_level: prevUiLevel }); } catch (_) {}
+            }
+          }
+          throw new Error(rpcErr.message || 'Speichern der Eltern-Einstellungen fehlgeschlagen.');
         } else {
           extendParentSession();
+
+          // 🛡️ Single Source of Truth Cache Sync
+          try {
+            const cachedUserStr = sessionStorage.getItem('groovelab_cached_user');
+            if (cachedUserStr) {
+              const parsed = JSON.parse(cachedUserStr);
+              if (parsed && (parsed.id === targetStudentId || !parsed.id)) {
+                if (updates.uiLevel !== undefined) parsed.campus_ui_level = updates.uiLevel;
+                if (payload.parent_allow_absences !== undefined) parsed.parent_allow_absences = payload.parent_allow_absences;
+                if (payload.parent_permissions) parsed.parent_permissions = payload.parent_permissions;
+                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(parsed));
+              }
+            }
+            if (updates.uiLevel !== undefined) {
+              const offCacheKey = `groovelab_offline_user_cache_${targetStudentId}`;
+              const offCache = localStorage.getItem(offCacheKey);
+              if (offCache) {
+                const parsedOff = JSON.parse(offCache);
+                if (parsedOff?.data) {
+                  parsedOff.data.campus_ui_level = updates.uiLevel;
+                  localStorage.setItem(offCacheKey, JSON.stringify(parsedOff));
+                }
+              }
+            }
+          } catch (cErr) {
+            console.warn('[ParentControls] Cache sync notice:', cErr);
+          }
+
           if (updates.uiLevel !== undefined) {
             const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };
             console.log(`[ParentControls] Alters-UI erfolgreich auf „${labels[updates.uiLevel] || updates.uiLevel}“ gespeichert 🛡️`);
@@ -709,8 +754,19 @@ export function useStudentParentControls({
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error auto-saving parent controls:', err);
+      if (updates.uiLevel !== undefined && prevUiLevel) {
+        if (studentUser) studentUser.campus_ui_level = prevUiLevel;
+        localStorage.setItem(`campus_student_ui_level_${targetStudentId}`, prevUiLevel);
+        localStorage.setItem('campus_student_ui_level', prevUiLevel);
+        window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: targetStudentId, uiLevel: prevUiLevel } }));
+        window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: prevUiLevel }));
+        if (onProfileUpdate) {
+          try { onProfileUpdate({ campus_ui_level: prevUiLevel }); } catch (_) {}
+        }
+      }
+      throw err;
     }
   }, [studentId, studentUser, bedtimeModeEnabled, bedtimeStart, bedtimeEnd, daytimeLockEnabled, daytimeLockStart, daytimeLockEnd, daytimeLockDays, instantLockUntil, onProfileUpdate, extendParentSession]);
 

@@ -141,7 +141,10 @@ export function useCampusDeviceAndParentControls({
   const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
     if (typeof window === 'undefined') return 'junior';
     try {
-      const activeId = localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id');
+      const activeId = localStorage.getItem('campus_active_student_id') ||
+                       localStorage.getItem('groovelab_current_student_id') ||
+                       localStorage.getItem('groovelab_user_id') ||
+                       sessionStorage.getItem('groovelab_user_id');
       if (activeId) {
         const namespaced = localStorage.getItem(`campus_student_ui_level_${activeId}`);
         if (namespaced === 'junior' || namespaced === 'teen' || namespaced === 'pro') return namespaced as CampusUiLevel;
@@ -167,7 +170,9 @@ export function useCampusDeviceAndParentControls({
       if (levelStr === 'junior' || levelStr === 'teen' || levelStr === 'pro') {
         setCampusStudentUiLevel(levelStr);
         try {
-          const targetId = typeof raw === 'object' && raw?.studentId ? raw.studentId : (localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id'));
+          const targetId = typeof raw === 'object' && raw?.studentId 
+            ? raw.studentId 
+            : (localStorage.getItem('campus_active_student_id') || localStorage.getItem('groovelab_user_id') || sessionStorage.getItem('groovelab_user_id'));
           if (targetId) {
             localStorage.setItem(`campus_student_ui_level_${targetId}`, levelStr);
           }

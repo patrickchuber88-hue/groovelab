@@ -938,7 +938,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
       // B. Rescheduled occurrences moved TO targetDateStr in selectedRoom
       (scheduleOccurrences || []).forEach((occ: any) => {
-        const roomId = occ.schedules?.room_id || occ.room_id;
+        const roomId = occ.room_override_id || occ.template_room_id || occ.schedules?.room_id || occ.room_id;
         if (!isRoomMatch(roomId)) return;
         if (occ.date !== targetDateStr) return;
         if (['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(occ.status)) return;
@@ -1885,11 +1885,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
          const em = totalMin % 60;
          const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
          
-         const roomName = occ.schedules?.rooms?.name || occ.schedules?.room_name || (rooms && rooms.find((r: any) => r.id === occ.schedules?.room_id)?.name) || 'Raum';
+         const effectiveRoomId = occ.room_override_id || occ.template_room_id || occ.schedules?.room_id;
+         const roomName = occ.schedules?.rooms?.name || occ.schedules?.room_name || (rooms && rooms.find((r: any) => r.id === effectiveRoomId)?.name) || 'Raum';
          
          return {
            id: occ.id,
-           roomId: occ.schedules?.room_id,
+           roomId: effectiveRoomId,
            roomName: roomName,
            date: occ.date,
            startTime: startTimeStr,

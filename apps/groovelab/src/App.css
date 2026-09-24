@@ -600,10 +600,10 @@ div:hover > .photo-overlay {
 }
 
 .sidebar-nav {
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
-  flex: 0 0 220px;
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  flex: 0 0 260px;
   background: white;
   border-right: 1px solid #e2e8f0;
   display: flex;

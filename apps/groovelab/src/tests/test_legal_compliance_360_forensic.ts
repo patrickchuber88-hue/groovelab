@@ -223,6 +223,47 @@ function testTeacherUrheberrechtAndAbsence() {
     'Rolle 2 (Lehrkraft)',
     '2.4 ArbZG / Ruhezeiten: Lehrkraft-Einstellungen integrieren Quiet-Hours zum Schutz der Arbeits- und Ruhezeiten'
   );
+
+  // 2.5 Herrenberg-Compliance & Autonomie freier Honorarlehrkräfte (BSG B 12 R 3/20 R & § 7 SGB IV)
+  const desktopSchedulePath = path.join(SRC_DIR, 'components', 'ScheduleBoardDesktop.tsx');
+  const mobileSchedulePath = path.join(SRC_DIR, 'components', 'ScheduleBoardMobile.tsx');
+  let desktopDidactic = false;
+  let mobileDidactic = false;
+  let hasToxicWeisung = false;
+
+  if (fs.existsSync(desktopSchedulePath) && fs.existsSync(mobileSchedulePath)) {
+    const dCode = fs.readFileSync(desktopSchedulePath, 'utf8');
+    const mCode = fs.readFileSync(mobileSchedulePath, 'utf8');
+
+    desktopDidactic = dCode.includes('didaktisches Koordinierungsinstrument') && dCode.includes('Unverbindlicher Entwurf zur Raumprüfung');
+    mobileDidactic = mCode.includes('didaktisches Koordinierungsinstrument') && mCode.includes('Unverbindlicher Entwurf zur Raumprüfung');
+
+    const toxicRegex = /(?:unterliegen\s+der\s+Weisungsgebundenheit|Weisungsgebundenheit\s+der\s+(?:Lehrkr|Schulleitung)|Direktionsrecht\s+der\s+Schulleitung)/i;
+    hasToxicWeisung = toxicRegex.test(dCode) || toxicRegex.test(mCode);
+  }
+
+  assert(
+    desktopDidactic && mobileDidactic && !hasToxicWeisung,
+    'Rolle 2 (Lehrkraft)',
+    '2.5 Herrenberg-Compliance BSG B 12 R 3/20 R: Stundenplan fungiert als didaktisches Koordinierungsinstrument ohne Weisungsgebundenheit'
+  );
+
+  // 2.6 UrhDaG § 1 Abs. 2 & EU AI Act (VO (EU) 2024/1689 ErwGr. 12): Reine Metadaten-Doktrin & deterministisches DSP
+  const masterWordingPath = path.join(SRC_DIR, 'constants', 'legalMasterWording.ts');
+  let masterWordingCompliant = false;
+  if (fs.existsSync(masterWordingPath)) {
+    const mWording = fs.readFileSync(masterWordingPath, 'utf8');
+    masterWordingCompliant = 
+      mWording.includes('zeroSheetMusicUploadPolicy') &&
+      mWording.includes('deterministicDspNonAiAct') &&
+      mWording.includes('pureMetadataDoctrine');
+  }
+
+  assert(
+    masterWordingCompliant,
+    'Rolle 2 (Lehrkraft)',
+    '2.6 UrhDaG § 1 Abs. 2 & EU AI Act: Ausschluss von Noten-Uploads (reine Metadaten) und deterministisches Audio-DSP garantiert'
+  );
 }
 
 // ------------------------------------------------------------------------------

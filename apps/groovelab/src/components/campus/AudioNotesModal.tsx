@@ -1687,7 +1687,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                   </>
                 ) : (
                   <>
-                    <Play size={15} fill="currentColor" />
+                    <Play size={15} fill="#16a34a" color="#16a34a" />
                     <span>Abspielen ({formatTime(currentPlayTime)})</span>
                   </>
                 )}
@@ -2014,39 +2014,20 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
               <div
                 style={{
                   background: '#f8fafc',
-                  border: '1.5px dashed #cbd5e1',
-                  borderRadius: '16px',
-                  padding: '24px 16px',
-                  textAlign: 'center',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '8px'
+                  justifyContent: 'center',
+                  gap: '8px',
+                  color: '#64748b',
+                  fontSize: '0.78rem',
+                  fontWeight: 700
                 }}
               >
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#0f172a',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                    marginBottom: '2px'
-                  }}
-                >
-                  <Bookmark size={18} strokeWidth={2.4} />
-                </div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 850, color: '#0f172a' }}>
-                  Noch keine Marker auf dieser Aufnahme
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', maxWidth: '380px', lineHeight: 1.45 }}>
-                  Setze über den Button <strong>+ Marker</strong> oder die Taste <strong>M</strong> spezielle Takt-Marker, Übe-Ziele oder Feedback direkt an der gewünschten Stelle.
-                </div>
+                <Bookmark size={14} strokeWidth={2.2} color="#94a3b8" />
+                <span>Tippe auf die Wellenform oder nutze <strong style={{ color: '#0f172a' }}>+ Marker</strong>, um Übe-Marker zu setzen.</span>
               </div>
             ) : (
               notes.map((n, idx) => {
@@ -2588,10 +2569,14 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                 <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>M</kbd> Marker
               </span>
-              <span style={{ color: '#cbd5e1' }}>•</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>D</kbd> Diktat
-              </span>
+              {!isStudent && (
+                <>
+                  <span style={{ color: '#cbd5e1' }}>•</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>D</kbd> Diktat
+                  </span>
+                </>
+              )}
               <span style={{ color: '#cbd5e1' }}>•</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                 <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>← / →</kbd> 1,5s Scrub

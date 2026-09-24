@@ -271,17 +271,40 @@ export function useMeisterwerkTts() {
   };
 
   const buildCompleteWeeklyHomeworkSpeechPhrases = (
-    weekNumOrTeacher?: any,
+    weekNumOrTeacherOrOptions?: any,
     booksOrNotes?: any,
     songsList?: any,
     audioNotes?: any,
-    generalNotes?: any
+    generalNotes?: any,
+    studentQuestion?: any
   ): string[] => {
+    // 🛡️ 1% Goldstandard: Wenn ein strukturiertes Options-Objekt übergeben wird
+    if (weekNumOrTeacherOrOptions && typeof weekNumOrTeacherOrOptions === 'object' && !Array.isArray(weekNumOrTeacherOrOptions) && ('books' in weekNumOrTeacherOrOptions || 'songs' in weekNumOrTeacherOrOptions || 'studentFirstName' in weekNumOrTeacherOrOptions)) {
+      const narrative = buildContinuousHomeworkNarrative(weekNumOrTeacherOrOptions);
+      return [narrative];
+    }
+
+    // 🛡️ Rückwärtskompatibler Fallback für positionale Argumente
+    const books = Array.isArray(booksOrNotes) ? booksOrNotes : [];
+    const songs = Array.isArray(songsList) ? songsList : [];
+    const audioArr = Array.isArray(audioNotes) ? audioNotes : [];
+    const audioCount = audioArr.length > 0 ? audioArr.length : (typeof audioNotes === 'number' ? audioNotes : 0);
+    const audioRecordings = audioArr.map((a: any) => ({
+      label: a.label || a.title || 'Aufnahme'
+    }));
+
+    const teacherName = typeof weekNumOrTeacherOrOptions === 'string' && isNaN(Number(weekNumOrTeacherOrOptions))
+      ? weekNumOrTeacherOrOptions
+      : undefined;
+
     const narrative = buildContinuousHomeworkNarrative({
-      books: Array.isArray(booksOrNotes) ? booksOrNotes : [],
-      songs: Array.isArray(songsList) ? songsList : [],
-      audioCount: Array.isArray(audioNotes) ? audioNotes.length : (typeof audioNotes === 'number' ? audioNotes : 0),
-      generalNotes: typeof generalNotes === 'string' ? generalNotes : (typeof booksOrNotes === 'string' ? booksOrNotes : '')
+      teacherName,
+      books,
+      songs,
+      audioCount,
+      audioRecordings: audioRecordings.length > 0 ? audioRecordings : undefined,
+      generalNotes: typeof generalNotes === 'string' ? generalNotes : (typeof booksOrNotes === 'string' ? booksOrNotes : ''),
+      studentQuestion: typeof studentQuestion === 'string' ? studentQuestion : undefined
     });
     return [narrative];
   };

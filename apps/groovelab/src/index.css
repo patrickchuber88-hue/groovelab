@@ -767,26 +767,26 @@ body {
 
 @keyframes active-avatar-glow {
   0% {
-    box-shadow: 0 0 40px rgba(52, 168, 83, 0.4), 0 0 10px rgba(52, 168, 83, 0.2);
-    border-color: #34a853;
+    box-shadow: 0 0 35px rgba(234, 179, 8, 0.45), 0 0 12px rgba(250, 204, 21, 0.3);
+    border-color: #eab308;
   }
   100% {
-    box-shadow: 0 0 80px rgba(52, 168, 83, 0.7), 0 0 25px rgba(52, 168, 83, 0.4);
-    border-color: #34a853;
+    box-shadow: 0 0 75px rgba(234, 179, 8, 0.8), 0 0 25px rgba(250, 204, 21, 0.5);
+    border-color: #fde047;
   }
 }
 
 @keyframes spotlight-pulse {
   0% {
-    opacity: 0.1;
+    opacity: 0.15;
   }
   100% {
-    opacity: 0.25;
+    opacity: 0.35;
   }
 }
 
 .musician-card-stage.active .musician-avatar-stage {
-  background: linear-gradient(135deg, #34a853, #34a853);
+  background: linear-gradient(135deg, #eab308, #ca8a04);
   transform: translateY(-15px);
   animation: active-avatar-glow 1.8s ease-in-out infinite alternate;
 }
@@ -804,9 +804,9 @@ body {
   top: -200px;
   left: 50%;
   transform: translateX(-50%);
-  width: 300px;
-  height: 500px;
-  background: linear-gradient(to bottom, rgba(52, 168, 83, 0.12), transparent);
+  width: 320px;
+  height: 520px;
+  background: linear-gradient(to bottom, rgba(250, 204, 21, 0.22), rgba(234, 179, 8, 0.08) 65%, transparent);
   clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%);
   pointer-events: none;
   opacity: 0;
@@ -819,7 +819,7 @@ body {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 60%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.25) 0%, transparent 60%);
   animation: spotlight-pulse 2s ease-in-out infinite alternate;
   pointer-events: none;
 }
@@ -841,7 +841,7 @@ body {
 }
 
 .musician-card-stage.active .instrument-label {
-  color: #34a853;
+  color: #facc15;
 }
 
 @keyframes gatewayFadeIn {

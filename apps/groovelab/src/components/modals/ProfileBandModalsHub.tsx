@@ -964,26 +964,30 @@ export const ProfileBandModalsHub: React.FC<ProfileBandModalsHubProps> = ({
                       }
                     }}
                     onClick={async () => {
-                      if (avatarPickerType === 'band') {
-                        const { error } = await supabase.from('bands').update({ photo_url: av.url }).eq('id', selectedBandForProfile.id);
-                        if (error) {
-                          alert("Fehler beim Auswählen des Band-Profilbilds: " + error.message);
-                        } else {
-                          setSelectedBandForProfile({...selectedBandForProfile, photo_url: av.url});
-                          if (editingBand && editingBand.id === selectedBandForProfile.id) {
-                            setEditingBand({...editingBand, photo_url: av.url});
+                      try {
+                        if (avatarPickerType === 'band') {
+                          const { error } = await supabase.from('bands').update({ photo_url: av.url }).eq('id', selectedBandForProfile.id);
+                          if (error) {
+                            alert("Fehler beim Auswählen des Band-Profilbilds: " + error.message);
+                          } else {
+                            setSelectedBandForProfile({...selectedBandForProfile, photo_url: av.url});
+                            if (editingBand && editingBand.id === selectedBandForProfile.id) {
+                              setEditingBand({...editingBand, photo_url: av.url});
+                            }
+                            setShowAvatarPicker(false);
+                            if (user?.id) fetchDashboardData(user.id);
                           }
-                          setShowAvatarPicker(false);
-                          if (user?.id) fetchDashboardData(user.id);
+                        } else {
+                          const { error } = await supabase.from('users').update({ photo_url: av.url, avatar_url: av.url }).eq('id', user?.id);
+                          if (!error) {
+                            await supabase.from('avatars').update({ asset_path: av.url }).eq('user_id', user?.id);
+                            setUser({...user, photo_url: av.url, avatar_url: av.url});
+                            setShowAvatarPicker(false);
+                            if (user?.id) fetchDashboardData(user.id);
+                          }
                         }
-                      } else {
-                        const { error } = await supabase.from('users').update({ photo_url: av.url, avatar_url: av.url }).eq('id', user?.id);
-                        if (!error) {
-                          await supabase.from('avatars').update({ asset_path: av.url }).eq('user_id', user?.id);
-                          setUser({...user, photo_url: av.url, avatar_url: av.url});
-                          setShowAvatarPicker(false);
-                          if (user?.id) fetchDashboardData(user.id);
-                        }
+                      } catch (err: any) {
+                        console.error("Fehler beim Aktualisieren des Avatars:", err);
                       }
                     }}
                     style={{ 

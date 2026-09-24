@@ -60,41 +60,114 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         onRefreshMetrics();
       }
 
-      const { data: schoolData, error: schoolErr } = await supabase
-        .from('schools')
-        .select('*')
-        .order('name');
-
-      if (schoolErr) throw schoolErr;
-
-      let mergedSchools = (schoolData || []).filter(s => {
-        const name = (s.name || '').toLowerCase();
-        return !name.includes('groove academy');
-      });
-
-      // Attempt server-side authoritative overview RPC
+      // 1. Fetch from schools table (PostgREST)
+      let tableSchools: School[] = [];
       try {
-        const { data: rpcRows, error: rpcErr } = await supabase.rpc('get_master_schools_overview');
-        if (!rpcErr && Array.isArray(rpcRows) && rpcRows.length > 0) {
-          const rpcMap = new Map<string, any>(rpcRows.map((r: any) => [r.school_id, r]));
-          mergedSchools = mergedSchools.map(s => {
-            const rpc = rpcMap.get(s.id);
-            if (!rpc) return s;
-            return {
-              ...s,
-              operator_notes: rpc.operator_notes ?? s.operator_notes,
-              invite_token: rpc.invite_token ?? s.invite_token,
-              invite_expires_at: rpc.invite_expires_at ?? s.invite_expires_at,
-              avv_signed_at: rpc.avv_signed_at ?? s.avv_signed_at,
-              avv_signee_name: rpc.avv_signee_name ?? s.avv_signee_name,
-              phone_number: rpc.phone_number ?? s.phone_number,
-              last_session_at: rpc.last_session_at ?? s.last_session_at,
-            };
-          });
+        const { data: schoolData, error: schoolErr } = await supabase
+          .from('schools')
+          .select('*')
+          .order('name');
+        if (!schoolErr && Array.isArray(schoolData)) {
+          tableSchools = schoolData;
+        }
+      } catch (err) {
+        console.warn('Direct schools table query notice:', err);
+      }
+
+      // 2. Fetch authoritative master overview RPC (Security Definer - Bypasses table RLS)
+      let rpcRows: any[] = [];
+      try {
+        const { data, error: rpcErr } = await supabase.rpc('get_master_schools_overview');
+        if (!rpcErr && Array.isArray(data) && data.length > 0) {
+          rpcRows = data;
         }
       } catch (e) {
         console.warn('get_master_schools_overview RPC notice:', e);
       }
+
+      // 3. Union Map: Unify all schools across both sources so zero schools are dropped
+      const schoolMap = new Map<string, School>();
+
+      // Index table schools first
+      for (const s of tableSchools) {
+        if (s && s.id) {
+          schoolMap.set(s.id, { ...s });
+        }
+      }
+
+      // Merge / Inject RPC schools (Authoritative Master Ingestion)
+      for (const rpc of rpcRows) {
+        if (!rpc || !rpc.school_id) continue;
+        const existing = schoolMap.get(rpc.school_id);
+        if (existing) {
+          schoolMap.set(rpc.school_id, {
+            ...existing,
+            name: rpc.name || existing.name,
+            legal_name: rpc.legal_name ?? existing.legal_name,
+            zip_code: rpc.zip_code ?? existing.zip_code,
+            city: rpc.city ?? existing.city,
+            street: rpc.street ?? existing.street,
+            house_number: rpc.house_number ?? existing.house_number,
+            phone_number: rpc.phone_number ?? existing.phone_number,
+            billing_email: rpc.billing_email ?? existing.billing_email,
+            billing_contact_person: rpc.billing_contact_person ?? existing.billing_contact_person,
+            status: rpc.status ?? existing.status,
+            is_trial: rpc.is_trial ?? existing.is_trial,
+            trial_ends_at: rpc.trial_until ?? existing.trial_ends_at,
+            has_campus_subscription: rpc.has_campus_subscription ?? existing.has_campus_subscription,
+            has_groovelab_subscription: rpc.has_groovelab_subscription ?? existing.has_groovelab_subscription,
+            is_paused: rpc.is_paused ?? existing.is_paused,
+            subscription_bypass: rpc.subscription_bypass ?? existing.subscription_bypass,
+            storage_addon_gb: rpc.storage_addon_gb ?? existing.storage_addon_gb,
+            storage_addon_monthly_fee: rpc.storage_addon_monthly_fee ?? existing.storage_addon_monthly_fee,
+            created_at: rpc.created_at ?? existing.created_at,
+            operator_notes: rpc.operator_notes ?? existing.operator_notes,
+            invite_token: rpc.invite_token ?? existing.invite_token,
+            invite_expires_at: rpc.invite_expires_at ?? existing.invite_expires_at,
+            avv_signed_at: rpc.avv_signed_at ?? existing.avv_signed_at,
+            avv_signee_name: rpc.avv_signee_name ?? existing.avv_signee_name,
+            last_session_at: rpc.last_session_at ?? existing.last_session_at,
+            active_students_count: Number(rpc.campus_active_students || rpc.total_students || existing.active_students_count || 0),
+            teachers_count: Number(rpc.teacher_count || existing.teachers_count || 0),
+          });
+        } else {
+          // School was blocked by Table RLS or only exists in Master Overview: Add it directly!
+          schoolMap.set(rpc.school_id, {
+            id: rpc.school_id,
+            name: rpc.name || 'Unbenannte Schule',
+            legal_name: rpc.legal_name || null,
+            zip_code: rpc.zip_code || null,
+            city: rpc.city || null,
+            street: rpc.street || null,
+            house_number: rpc.house_number || null,
+            phone_number: rpc.phone_number || null,
+            billing_email: rpc.billing_email || null,
+            billing_contact_person: rpc.billing_contact_person || null,
+            status: rpc.status || 'active',
+            is_trial: Boolean(rpc.is_trial),
+            trial_ends_at: rpc.trial_until || null,
+            has_campus_subscription: Boolean(rpc.has_campus_subscription),
+            has_groovelab_subscription: Boolean(rpc.has_groovelab_subscription),
+            is_paused: Boolean(rpc.is_paused),
+            subscription_bypass: Boolean(rpc.subscription_bypass),
+            storage_addon_gb: rpc.storage_addon_gb || 0,
+            storage_addon_monthly_fee: rpc.storage_addon_monthly_fee || 0,
+            created_at: rpc.created_at || new Date().toISOString(),
+            operator_notes: rpc.operator_notes || null,
+            invite_token: rpc.invite_token || null,
+            invite_expires_at: rpc.invite_expires_at || null,
+            avv_signed_at: rpc.avv_signed_at || null,
+            avv_signee_name: rpc.avv_signee_name || null,
+            last_session_at: rpc.last_session_at || null,
+            primary_color: '#34a853',
+            logo_url: null,
+            active_students_count: Number(rpc.campus_active_students || rpc.total_students || 0),
+            teachers_count: Number(rpc.teacher_count || 0),
+          });
+        }
+      }
+
+      let mergedSchools = Array.from(schoolMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
       // Hybrid Multi-Source Telemetry: Ensure active dev schools reflect live activity
       try {

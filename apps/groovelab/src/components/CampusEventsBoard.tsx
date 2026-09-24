@@ -3334,56 +3334,13 @@ export function CampusEventsBoard({
         });
       }
 
-      // Merge active occurrences and pending changes directly from Stundenplan tab (localStorage)
-      try {
-        const activeCalStr = userId ? localStorage.getItem(`groovelab_calendar_active_occurrences_${userId}`) : null;
-        if (activeCalStr) {
-          const activeCalList = JSON.parse(activeCalStr);
-          if (Array.isArray(activeCalList) && activeCalList.length > 0) {
-            activeCalList.forEach((aOcc: any) => {
-              if (aOcc && aOcc.id && !aOcc.id.startsWith('vacant-')) {
-                const occTeacherId = aOcc.teacher_id || aOcc.teacherId;
-                if (role === 'teacher' && occTeacherId && String(occTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) {
-                  return;
-                }
-                const idx = occurrences.findIndex((o: any) => o.id === aOcc.id);
-                if (idx >= 0) {
-                  occurrences[idx] = { ...occurrences[idx], ...aOcc };
-                } else if (role !== 'teacher' || !occTeacherId || String(occTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
-                  occurrences.push(aOcc);
-                }
-              }
-            });
-          }
-        }
-
-        const pendingStr = (userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes');
-        if (pendingStr) {
-          const pendingMap = JSON.parse(pendingStr);
-          Object.values(pendingMap).forEach((pOcc: any) => {
-            if (pOcc && pOcc.id) {
-              const occTeacherId = pOcc.teacher_id || pOcc.teacherId;
-              if (role === 'teacher' && occTeacherId && String(occTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) {
-                return;
-              }
-              const idx = occurrences.findIndex((o: any) => o.id === pOcc.id);
-              if (idx >= 0) {
-                occurrences[idx] = { ...occurrences[idx], ...pOcc, is_moved: true, status: pOcc.status || 'pending_reschedule' };
-              } else if (role !== 'teacher' || !occTeacherId || String(occTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
-                occurrences.push({ ...pOcc, is_moved: true, status: pOcc.status || 'pending_reschedule' });
-              }
-            }
-          });
-        }
-
-        if (role === 'teacher' && userId) {
-          const cleanUserId = String(userId).replace(/^teacher-/i, '');
-          occurrences = occurrences.filter((o: any) => {
-            const tId = o.teacher_id || o.teacherId;
-            return !tId || String(tId).replace(/^teacher-/i, '') === cleanUserId;
-          });
-        }
-      } catch (e) {}
+      if (role === 'teacher' && userId) {
+        const cleanUserId = String(userId).replace(/^teacher-/i, '');
+        occurrences = occurrences.filter((o: any) => {
+          const tId = o.teacher_id || o.teacherId;
+          return !tId || String(tId).replace(/^teacher-/i, '') === cleanUserId;
+        });
+      }
 
       // Extract teacher's students to filter participant search
       if (role === 'teacher') {
@@ -10212,7 +10169,11 @@ export function CampusEventsBoard({
                     setEventStatus(id as any);
                     const activeEv = secretaryPlanningEvent || selectedEvent;
                     if (activeEv) {
-                      await supabase.from('campus_events').update({ planning_status: id }).eq('id', activeEv.id);
+                      try {
+                        await supabase.from('campus_events').update({ planning_status: id }).eq('id', activeEv.id);
+                      } catch (err) {
+                        console.error('Fehler beim Aktualisieren des Event-Status:', err);
+                      }
                     }
                   }}
                   className={`google-chip ${isSelected ? 'google-chip-selected' : ''}`}
@@ -12135,9 +12096,13 @@ export function CampusEventsBoard({
                                     <button
                                       type="button"
                                       onClick={async () => {
-                                        const { error } = await supabase.from('campus_event_program_points').delete().eq('id', pp.id);
-                                        if (!error) {
-                                          setProgramPoints(prev => prev.filter(p => p.id !== pp.id));
+                                        try {
+                                          const { error } = await supabase.from('campus_event_program_points').delete().eq('id', pp.id);
+                                          if (!error) {
+                                            setProgramPoints(prev => prev.filter(p => p.id !== pp.id));
+                                          }
+                                        } catch (err) {
+                                          console.error('Fehler beim Löschen des Programmpunkts:', err);
                                         }
                                       }}
                                       style={{
@@ -13951,8 +13916,12 @@ export function CampusEventsBoard({
                 {!ev.is_planning_active && (role === 'admin' || role === 'secretary') && (
                   <button
                     onClick={async () => {
-                      await handleActivatePlanning(ev);
-                      setSelectedEvent(null);
+                      try {
+                        await handleActivatePlanning(ev);
+                        setSelectedEvent(null);
+                      } catch (err) {
+                        console.error('Fehler beim Aktivieren der Ablaufplanung:', err);
+                      }
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',

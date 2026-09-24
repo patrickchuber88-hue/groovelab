@@ -11,12 +11,22 @@
 export type CurrencyCode = 'EUR' | 'CHF';
 
 /**
+ * Rappenrundung gemäss Art. 30 MWSTV (Schweiz):
+ * Rundet Beträge in CHF deterministisch auf 5 Rappen (CHF 0.05).
+ */
+export function roundToFiveRappen(amount: number): number {
+  return Math.round(amount * 20) / 20;
+}
+
+/**
  * Formatiert einen Betrag standardkonform nach deutschen bzw. Schweizer Konventionen.
+ * Inklusive kaufmännischer Rappenrundung auf CHF 0.05 gemäss Art. 30 MWSTV für CHF.
  * Fängt null, undefined und NaN defensiv ab.
  * 
  * @example
  * formatCurrency(14.9) => "14,90 €"
- * formatCurrency(14.9, 'CHF') => "CHF 14.90"
+ * formatCurrency(14.92, 'CHF') => "CHF 14.90"
+ * formatCurrency(14.93, 'CHF') => "CHF 14.95"
  * formatCurrency(null) => "0,00 €"
  */
 export function formatCurrency(
@@ -29,7 +39,8 @@ export function formatCurrency(
 
   const num = Number(amount);
   if (currency === 'CHF') {
-    return `CHF ${num.toFixed(2)}`;
+    const chfRounded = roundToFiveRappen(num);
+    return `CHF ${chfRounded.toFixed(2)}`;
   }
   return `${num.toFixed(2).replace('.', ',')} €`;
 }

@@ -115,9 +115,11 @@ export function useAdminCampusRooms({
           duration,
           status,
           notes,
-          schedule_id
+          schedule_id,
+          template_room_id,
+          room_override_id
         `)
-        .eq('school_id', schoolId)
+        .or(`school_id.eq.${schoolId},school_id.is.null`)
         .gte('date', minDate)
         .lte('date', maxDate);
 

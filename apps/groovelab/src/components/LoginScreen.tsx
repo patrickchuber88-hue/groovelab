@@ -20,6 +20,7 @@ import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvat
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { isLocalDevEnvironment } from '../utils/devEnvironment';
+import { invalidateActiveSessionsCache, optimisticallyInjectActiveSession } from '../repositories/scheduleRepository';
 
 
 
@@ -2247,6 +2248,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             alert('Fehler beim Erstellen der Sitzung: ' + sessErr.message);
           } else {
             console.log('[Login] Session created successfully:', sess.id);
+            invalidateActiveSessionsCache(user.school_id);
+            optimisticallyInjectActiveSession({
+              ...sess,
+              users: user,
+              stations: finalStationId ? { id: finalStationId } : null
+            }, user.school_id);
           }
         } else {
           console.log(`[Login] Home mode detected. No new session created.`);
@@ -2254,6 +2261,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       } else {
         console.log('[Login] Campus login: Bypassing session cleanup and creation, checking out any active sessions.');
         await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null);
+        invalidateActiveSessionsCache(user.school_id);
       }
 
       sessionStorage.setItem('groovelab_user_id', user.id);
@@ -3752,7 +3760,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     await finalizeLogin(user, loginStationId, isWithinAnyRoom, hidePresence);
   };
 
-  const isDevBuild = Boolean(import.meta.env.DEV && isLocalDevEnvironment());
+  const isDevBuild = Boolean(
+    import.meta.env.DEV || 
+    isLocalDevEnvironment() || 
+    (typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' || 
+      window.location.hostname === '0.0.0.0' || 
+      window.location.hostname.endsWith('.localhost') ||
+      window.location.hostname.endsWith('.local')
+    ))
+  );
   const isLocalhost = isDevBuild;
   const [geoDebug, setGeoDebug] = useState<any>(null);
 
@@ -4233,7 +4251,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: isGroovelabKiosk ? 'flex-start' : 'center',
+      justifyContent: 'flex-start',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
       background: isGroovelabKiosk ? '#ca8a04' : '#0a361c', // Chalkboard yellow/green
       backgroundImage: isGroovelabKiosk 
@@ -4386,6 +4404,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        margin: 'auto 0',
         position: 'relative',
         zIndex: 2
       }}>

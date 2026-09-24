@@ -416,12 +416,18 @@ export function useCampusRealtimeSync({
       document.addEventListener('visibilitychange', handleVisibilityChange);
 
       const dashboardInterval = isMasterAdmin ? null : setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          return; // Zero background polling when tab is inactive/hidden
+        }
         fetchDashboardData(loggedInUserId, false);
       }, 180000);
 
       const sessionLeaseInterval = setInterval(async () => {
         if (!user) return;
         if (user.role === 'teacher') return;
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          return; // Skip lease & presence reporting in background
+        }
 
         if (session?.id && !session.check_out_time) {
           try {

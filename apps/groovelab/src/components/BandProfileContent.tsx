@@ -1734,15 +1734,19 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                             <button 
                                               onClick={async (e) => {
                                                 e.stopPropagation();
-                                                const { error } = await supabase.from('band_song_slots').insert({
-                                                  band_song_id: prop.id,
-                                                  user_id: user.id,
-                                                  instrument: 'Vocals',
-                                                  part_number: slot.part,
-                                                  status: 'accepted'
-                                                });
-                                                if (error) alert('Fehler: ' + error.message);
-                                                else fetchSongProposals();
+                                                try {
+                                                  const { error } = await supabase.from('band_song_slots').insert({
+                                                    band_song_id: prop.id,
+                                                    user_id: user.id,
+                                                    instrument: 'Vocals',
+                                                    part_number: slot.part,
+                                                    status: 'accepted'
+                                                  });
+                                                  if (error) alert('Fehler: ' + error.message);
+                                                  else fetchSongProposals();
+                                                } catch (err: any) {
+                                                  console.error('Fehler bei Slot-Annahme:', err);
+                                                }
                                               }}
                                               style={{ background: '#34a853', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
                                             >
@@ -1751,15 +1755,19 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                             <button 
                                               onClick={async (e) => {
                                                 e.stopPropagation();
-                                                const { error } = await supabase.from('band_song_slots').insert({
-                                                  band_song_id: prop.id,
-                                                  user_id: user.id,
-                                                  instrument: 'Vocals',
-                                                  part_number: slot.part,
-                                                  status: 'declined'
-                                                });
-                                                if (error) alert('Fehler: ' + error.message);
-                                                else fetchSongProposals();
+                                                try {
+                                                  const { error } = await supabase.from('band_song_slots').insert({
+                                                    band_song_id: prop.id,
+                                                    user_id: user.id,
+                                                    instrument: 'Vocals',
+                                                    part_number: slot.part,
+                                                    status: 'declined'
+                                                  });
+                                                  if (error) alert('Fehler: ' + error.message);
+                                                  else fetchSongProposals();
+                                                } catch (err: any) {
+                                                  console.error('Fehler bei Slot-Ablehnung:', err);
+                                                }
                                               }}
                                               style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
                                             >

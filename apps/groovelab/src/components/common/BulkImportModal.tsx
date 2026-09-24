@@ -7,6 +7,15 @@ import {
 import { normalizeInstrument } from '../../utils/instruments';
 import { executeResilientBatch, BatchProgress } from '../../lib/batchOperations';
 import { supabase } from '../../lib/supabase';
+import { DpoIdCardModal } from '../DpoIdCardModal';
+
+// Blacklist für sensible Spalten (Herrenberg-Schutz & DSGVO Zero-Payroll Doktrin)
+export const FORBIDDEN_IMPORT_COLUMNS = new Set([
+  'iban', 'bic', 'konto', 'kontoinhaber', 'bank', 'sepa', 'mandat',
+  'gehalt', 'honorar', 'stundensatz', 'hourly_rate', 'deputat',
+  'steuernummer', 'tax_id', 'sozialversicherung', 'sv_nummer',
+  'adresse', 'strasse', 'plz', 'ort', 'wohnort', 'festnetz', 'telefon'
+]);
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -69,6 +78,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const [existingStudents, setExistingStudents] = useState<ExistingStudent[]>([]);
   const [existingRooms, setExistingRooms] = useState<ExistingRoom[]>([]);
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const [showIdCardModal, setShowIdCardModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing students and rooms from Supabase to enable Smart Delta-Sync (Optimierung 4 & 5)
@@ -355,13 +365,55 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
     let createdCount = 0;
 
-    if (newRows.length > 0 || (targetType === 'SCHEDULE' && parsedRows.length > 0)) {
-      const rowsToProcess = targetType === 'SCHEDULE' ? parsedRows.filter(r => r.status !== 'INVALID') : newRows;
+    try {
+      if ((targetType === 'STUDENT' || targetType === 'TEACHER') && newRows.length > 0) {
+        // 🛡️ Enterprise+ Atomarer Import via Migration 502 RPC
+        const batchId = crypto.randomUUID();
+        const effectiveSchoolId = String(schoolId);
 
-      const batchResult = await executeResilientBatch<ParsedRow, any>(
-        rowsToProcess,
-        async (row) => {
-          if (targetType === 'SCHEDULE') {
+        const stagingEntries = newRows.map(row => ({
+          school_id: effectiveSchoolId,
+          batch_id: batchId,
+          entity_type: targetType,
+          payload: {
+            sanitized_name: row.sanitizedName,
+            full_name: `${row.originalFirstName} ${row.originalLastName}`.trim(),
+            instrument: row.instrument,
+            email: targetType === 'TEACHER' ? row.email : undefined
+          },
+          validation_status: 'VALID'
+        }));
+
+        // 1. Bulk Staging Insert
+        const { error: stagingError } = await supabase
+          .from('migration_staging_records')
+          .insert(stagingEntries);
+
+        if (stagingError) {
+          throw new Error(`Staging fehlgeschlagen: ${stagingError.message}`);
+        }
+
+        // 2. Atomarer RPC Durchlauf (< 500 ms in PostgreSQL Transaktion)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('execute_legacy_migration', {
+          p_school_id: effectiveSchoolId,
+          p_batch_id: batchId
+        });
+
+        if (rpcError) {
+          throw new Error(`Atomarer Import abgebrochen: ${rpcError.message}`);
+        }
+
+        createdCount = targetType === 'STUDENT' 
+          ? (rpcData?.students_imported ?? newRows.length)
+          : (rpcData?.teachers_imported ?? newRows.length);
+
+      } else if (targetType === 'SCHEDULE' && parsedRows.length > 0) {
+        // SCHEDULE-Modus: Resilienter Verknüpfungs-Batch für Räume und Slots
+        const rowsToProcess = parsedRows.filter(r => r.status !== 'INVALID');
+
+        const batchResult = await executeResilientBatch<ParsedRow, any>(
+          rowsToProcess,
+          async (row) => {
             // 1. Ensure Room
             let effectiveRoomId = row.roomId;
             if (!effectiveRoomId && row.roomName) {
@@ -422,57 +474,32 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             }
 
             return { studentId: effectiveStudentId, roomId: effectiveRoomId };
-          } else if (targetType === 'STUDENT') {
-            const { data, error } = await supabase.from('users').insert([{
-              school_id: schoolId,
-              name: row.sanitizedName,
-              role: 'student',
-              instrument: row.instrument,
-              teacher_id: row.teacherId || null,
-              status: 'active',
-              is_campus_active: true,
-              is_groovelab_active: false,
-              created_at: new Date().toISOString()
-            }]).select();
-
-            if (error) throw error;
-            return data;
-          } else {
-            // Teacher Import
-            const { data, error } = await supabase.from('users').insert([{
-              school_id: schoolId,
-              name: `${row.originalFirstName} ${row.originalLastName}`.trim(),
-              role: 'teacher',
-              instrument: row.instrument,
-              email: row.email || null,
-              status: 'active',
-              created_at: new Date().toISOString()
-            }]).select();
-
-            if (error) throw error;
-            return data;
+          },
+          {
+            chunkSize: 10,
+            maxRetries: 3,
+            onProgress: (p) => setProgress(p)
           }
-        },
-        {
-          chunkSize: 10,
-          maxRetries: 3,
-          onProgress: (p) => setProgress(p)
+        );
+
+        if (batchResult.success) {
+          createdCount = batchResult.results.length;
+        } else {
+          setImportErrors(batchResult.failedItems.map(f => `Zeile ${f.index + 1}: ${f.error?.message || 'Fehler beim DB-Schreiben'}`));
+          setStep('PREVIEW');
+          return;
         }
-      );
-
-      if (batchResult.success) {
-        createdCount = batchResult.results.length;
-      } else {
-        setImportErrors(batchResult.failedItems.map(f => `Zeile ${f.index + 1}: ${f.error?.message || 'Fehler beim DB-Schreiben'}`));
-        setStep('PREVIEW');
-        return;
       }
-    }
 
-    setImportCount(createdCount);
-    setExistingPreservedCount(existingRows.length);
-    setStep('SUCCESS');
-    if (onImportComplete) onImportComplete(createdCount + existingRows.length);
+      setImportCount(createdCount);
+      setExistingPreservedCount(existingRows.length);
+      setStep('SUCCESS');
+      if (onImportComplete) onImportComplete(createdCount + existingRows.length);
+    } catch (err: any) {
+      console.error('[BulkImportModal] Import error:', err);
+      setImportErrors([err.message || 'Unerwarteter Fehler beim Importieren']);
+      setStep('PREVIEW');
+    }
   };
 
   const newRowsCount = parsedRows.filter(r => r.status === 'NEW').length;
@@ -946,25 +973,58 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  marginTop: '12px',
-                  background: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '12px 28px',
-                  fontWeight: 900,
-                  fontSize: '0.88rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)'
-                }}
-              >
-                Fertigstellen &amp; Übersicht aktualisieren
-              </button>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowIdCardModal(true)}
+                  style={{
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '12px 24px',
+                    fontWeight: 900,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(15, 23, 42, 0.2)'
+                  }}
+                >
+                  <ShieldCheck size={18} color="#38bdf8" />
+                  <span>Klassen-Ausweise drucken (DIN A4)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    background: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '12px 28px',
+                    fontWeight: 900,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)'
+                  }}
+                >
+                  Fertigstellen &amp; Übersicht aktualisieren
+                </button>
+              </div>
             </div>
+          )}
+
+          {/* Optionales ID Card Modal für den Sofortdruck */}
+          {showIdCardModal && (
+            <DpoIdCardModal
+              isOpen={showIdCardModal}
+              onClose={() => setShowIdCardModal(false)}
+              schoolName={schoolName}
+              schoolId={String(schoolId)}
+            />
           )}
 
         </div>

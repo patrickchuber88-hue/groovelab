@@ -46,9 +46,9 @@ fi
 TEMP_DUMP="$HOURLY_DIR/dump_temp_${TIMESTAMP}.sql.gz"
 TARGET_HOURLY="$HOURLY_DIR/backup_hourly_${TIMESTAMP}.sql.gz"
 
-# 2. Execute atomic pg_dump with snapshot isolation & gzip
+# 2. Execute atomic pg_dump with snapshot isolation & gzip (gzip -1 schützt vor 100% CPU-Spikes)
 echo "📦 Erstelle konsistenten PostgreSQL Dump..."
-docker exec -t "$CONTAINER_NAME" pg_dump -U "$DB_USER" --clean --if-exists --no-owner --no-privileges "$DB_NAME" | gzip -9 > "$TEMP_DUMP"
+docker exec -t "$CONTAINER_NAME" pg_dump -U "$DB_USER" --clean --if-exists --no-owner --no-privileges "$DB_NAME" | gzip -1 > "$TEMP_DUMP"
 
 # Verify dump file is non-empty (> 1 KB)
 FILE_SIZE=$(wc -c < "$TEMP_DUMP" | tr -d ' ')
