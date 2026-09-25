@@ -273,7 +273,9 @@ export interface ActiveSharedAlbum {
   icon: React.ReactNode;
   monthKey?: string;
   songTitle?: string;
-  variant?: 'vivid' | 'sleeve';
+  variant?: 'vivid' | 'sleeve' | 'disc';
+  monthNumber?: number;
+  monthCode?: string;
 }
 
 interface VinylRecordCoverProps {
@@ -286,7 +288,7 @@ interface VinylRecordCoverProps {
     textColor?: string;
     accentColor?: string;
   };
-  variant?: 'vivid' | 'sleeve';
+  variant?: 'vivid' | 'sleeve' | 'disc';
   icon?: React.ReactNode;
   monthNumber?: number;
   monthCode?: string;
@@ -319,10 +321,12 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
   maxWidth,
   ariaLabel
 }) => {
+  const isDisc = variant === 'disc';
   const isSleeve = variant === 'sleeve';
   const isLarge = size === 'large';
   const outerWidth = isLarge ? '116px' : '100%';
   const sleeveSize = isLarge ? 96 : undefined;
+  const discSize = isLarge ? 88 : 72;
 
   const countDisplay = totalCount !== undefined
     ? (totalCount === 1 ? '1 Take' : `${totalCount} Takes`)
@@ -336,6 +340,169 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
 
   const accentColor = theme.accentColor || theme.textColor || '#2563eb';
   const textColor = isSleeve ? '#0f172a' : (theme.textColor || '#0f172a');
+
+  if (isDisc) {
+    const isLightDisc = ['#facc15', '#eab308', '#d97706'].includes(theme.bg);
+    const discTextColor = theme.textColor || (isLightDisc ? '#0f172a' : '#ffffff');
+    const discMutedColor = isLightDisc ? '#334155' : 'rgba(255, 255, 255, 0.82)';
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel || `Vinyl Schallplatte: ${title}`}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          cursor: 'pointer',
+          userSelect: 'none',
+          outline: 'none',
+          width: outerWidth,
+          maxWidth: maxWidth || (isLarge ? '108px' : '82px'),
+          gap: '4px',
+          transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        }}
+        className="hover-scale-mini"
+      >
+        {/* 💽 Pure Colored Vinyl (Echte Farb-Schallplatte ohne störenden weißen Innenkreis) */}
+        <div
+          style={{
+            position: 'relative',
+            width: `${discSize}px`,
+            height: `${discSize}px`,
+            aspectRatio: '1 / 1',
+            borderRadius: '50%',
+            background: theme.bg,
+            border: isActive
+              ? '3px solid #0f172a'
+              : '2px solid rgba(255, 255, 255, 0.45)',
+            boxShadow: isActive
+              ? `0 8px 20px -2px ${accentColor}48, inset 0 0 0 2px rgba(0,0,0,0.06), inset 0 0 0 5px rgba(255,255,255,0.10), inset 0 0 0 8px rgba(0,0,0,0.04), inset 0 0 0 12px rgba(255,255,255,0.08), inset 0 0 0 17px rgba(0,0,0,0.04), inset 0 0 0 22px rgba(255,255,255,0.06)`
+              : `0 3px 8px rgba(15, 23, 42, 0.07), inset 0 0 0 2px rgba(0,0,0,0.05), inset 0 0 0 5px rgba(255,255,255,0.08), inset 0 0 0 8px rgba(0,0,0,0.04), inset 0 0 0 12px rgba(255,255,255,0.07), inset 0 0 0 17px rgba(0,0,0,0.03), inset 0 0 0 22px rgba(255,255,255,0.05)`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxSizing: 'border-box',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Typografie & Haptik direkt auf der Farb-Schallplatte */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+              position: 'relative',
+              zIndex: 2,
+              userSelect: 'none'
+            }}
+          >
+            {icon ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {icon}
+              </div>
+            ) : (
+              <>
+                {/* Monatskürzel oben */}
+                <span
+                  style={{
+                    fontSize: isLarge ? '0.62rem' : '0.48rem',
+                    fontWeight: 900,
+                    color: discMutedColor,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    lineHeight: 1,
+                    marginBottom: '1px'
+                  }}
+                >
+                  {monthCode || ''}
+                </span>
+
+                {/* Echtes Spindel-Zentrierloch in der Mitte */}
+                <div
+                  style={{
+                    width: isLarge ? '5px' : '4px',
+                    height: isLarge ? '5px' : '4px',
+                    borderRadius: '50%',
+                    background: '#0f172a',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.6)',
+                    margin: '1px 0 2px 0'
+                  }}
+                />
+
+                {/* Große, ruhige Monatsnummer unten */}
+                <span
+                  style={{
+                    fontSize: isLarge ? '1.25rem' : '1.02rem',
+                    fontWeight: 950,
+                    color: discTextColor,
+                    lineHeight: 1,
+                    letterSpacing: '-0.03em'
+                  }}
+                >
+                  {monthNumber ? (monthNumber < 10 ? `0${monthNumber}` : monthNumber) : ''}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Ruhiger Status unter der Platte: Voller Monatsname + Take-Badge */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1px',
+            width: '100%'
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              color: '#334155',
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              width: '100%',
+              lineHeight: 1.15
+            }}
+          >
+            {title}
+          </span>
+          <div
+            style={{
+              fontSize: '0.52rem',
+              fontWeight: 800,
+              color: takesNum > 0 ? (accentColor || '#15803d') : '#94a3b8',
+              background: takesNum > 0 ? `${accentColor}14` : '#f8fafc',
+              border: `1px solid ${takesNum > 0 ? `${accentColor}28` : '#e2e8f0'}`,
+              padding: '1px 5px',
+              borderRadius: '100px',
+              lineHeight: 1.1,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {badge || countDisplay}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -1257,35 +1424,35 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     };
   }, [teacherAudiosList, studentAudiosList, favoriteAudioUrls]);
 
-  // 🎨 Campus Studio Module Farbintensität (Chromatisch aufsteigender 360° Jahreszeiten-Farbkreis von Sep bis Aug)
+  // 🎨 Campus Studio Module Farbintensität (Chromatisch aufsteigender 360° Jahreszeiten-Farbkreis von Sep bis Aug - Swiss Uni-Colors)
   const getMonthlyMixedTheme = (monthNum: number) => {
     const palettes: Record<number, { bg: string; shadow: string; border: string; textColor: string; accentColor: string }> = {
       // 1. JANUAR: Eis-Violett / Tiefes Amethyst (Winterhöhepunkt)
-      1: { bg: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)', shadow: '0 6px 14px -2px rgba(124, 58, 237, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#7c3aed' },
+      1: { bg: '#7c3aed', shadow: '0 6px 14px -2px rgba(124, 58, 237, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#7c3aed' },
       // 2. FEBRUAR: Mitternachts-Indigo / Frostiges Royalblau
-      2: { bg: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', shadow: '0 6px 14px -2px rgba(79, 70, 229, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#4f46e5' },
+      2: { bg: '#4f46e5', shadow: '0 6px 14px -2px rgba(79, 70, 229, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#4f46e5' },
       // 3. MÄRZ: Klares Ozeanblau / Sky Blue (Tauwetter & Vorfrühling)
-      3: { bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', shadow: '0 6px 14px -2px rgba(2, 132, 199, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#0284c7' },
+      3: { bg: '#0284c7', shadow: '0 6px 14px -2px rgba(2, 132, 199, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#0284c7' },
       // 4. APRIL: Frisches Türkis / Aqua Mint (Frühlingserwachen)
-      4: { bg: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', shadow: '0 6px 14px -2px rgba(13, 148, 136, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#0d9488' },
+      4: { bg: '#0d9488', shadow: '0 6px 14px -2px rgba(13, 148, 136, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#0d9488' },
       // 5. MAI: Frisches Maigrün / Smaragd (Blütezeit)
-      5: { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', shadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#10b981' },
+      5: { bg: '#10b981', shadow: '0 6px 14px -2px rgba(16, 185, 129, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#10b981' },
       // 6. JUNI: Strahlendes Apfelgrün / Knackige Limette (Frühsommer)
-      6: { bg: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)', shadow: '0 6px 14px -2px rgba(132, 204, 22, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#65a30d' },
+      6: { bg: '#65a30d', shadow: '0 6px 14px -2px rgba(101, 163, 13, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#65a30d' },
       // 7. JULI: Warmes Sonnengelb (Hochsommer)
-      7: { bg: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', shadow: '0 6px 14px -2px rgba(234, 179, 8, 0.40)', border: 'rgba(255, 255, 255, 0.35)', textColor: '#0f172a', accentColor: '#d97706' },
+      7: { bg: '#eab308', shadow: '0 6px 14px -2px rgba(234, 179, 8, 0.35)', border: 'rgba(255, 255, 255, 0.35)', textColor: '#0f172a', accentColor: '#d97706' },
       // 8. AUGUST: Sonniges Mango / Warmes Mandarine (Spätsommer)
-      8: { bg: 'linear-gradient(135deg, #fb923c 0%, #f97316 100%)', shadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#ea580c' },
+      8: { bg: '#f97316', shadow: '0 6px 14px -2px rgba(249, 115, 22, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#ea580c' },
       // 9. SEPTEMBER: Warmes Bernstein-Gold (Schuljahresbeginn)
-      9: { bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', shadow: '0 6px 14px -2px rgba(245, 158, 11, 0.40)', border: 'rgba(255, 255, 255, 0.30)', textColor: '#ffffff', accentColor: '#b45309' },
+      9: { bg: '#d97706', shadow: '0 6px 14px -2px rgba(217, 119, 6, 0.35)', border: 'rgba(255, 255, 255, 0.30)', textColor: '#ffffff', accentColor: '#b45309' },
       // 10. OKTOBER: Kräftiges Kupfer-Orange / Herbstlaub
-      10: { bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', shadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#c2410c' },
+      10: { bg: '#ea580c', shadow: '0 6px 14px -2px rgba(234, 88, 12, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#c2410c' },
       // 11. NOVEMBER: Warmes Karminrot / Herbstrose
-      11: { bg: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)', shadow: '0 6px 14px -2px rgba(225, 29, 72, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#e11d48' },
+      11: { bg: '#e11d48', shadow: '0 6px 14px -2px rgba(225, 29, 72, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#e11d48' },
       // 12. DEZEMBER: Edles Festtags-Purpur / Beere (Winterbeginn)
-      12: { bg: 'linear-gradient(135deg, #c026d3 0%, #9333ea 100%)', shadow: '0 6px 14px -2px rgba(192, 38, 211, 0.40)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#a855f7' }
+      12: { bg: '#9333ea', shadow: '0 6px 14px -2px rgba(147, 51, 234, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#a855f7' }
     };
-    return palettes[monthNum] || { bg: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', shadow: '0 6px 14px -2px rgba(100, 116, 139, 0.35)', border: 'rgba(255, 255, 255, 0.25)', textColor: '#ffffff', accentColor: '#64748b' };
+    return palettes[monthNum] || { bg: '#475569', shadow: '0 6px 14px -2px rgba(71, 85, 105, 0.30)', border: 'rgba(255, 255, 255, 0.25)', textColor: '#ffffff', accentColor: '#64748b' };
   };
 
   // 📅 Alle 12 Monats-LPs in Schuljahres-Chronologie (Start: September bis August)
@@ -1407,6 +1574,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     return (
       <InlineAudioPlayer
         key={playerKey}
+        layout="two-line"
         id={playerKey}
         audioId={aud.id || aud.blobKey || aud.url}
         url={aud.url}
@@ -1466,6 +1634,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     return (
       <div key={playerKey} style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
         <InlineAudioPlayer
+          layout="two-line"
           id={playerKey}
           audioId={aud.id || aud.blobKey}
           url={aud.url}
@@ -1629,10 +1798,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
           margin: '0 auto',
           padding: isMobileOrSim
             ? '14px 12px calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom) + 32px) 12px'
-            : '20px 22px',
+            : '14px 18px',
           display: 'grid',
-          gridTemplateColumns: isMobileOrSim ? '1fr' : 'minmax(400px, 42%) 1fr',
-          gap: isMobileOrSim ? '16px' : '22px',
+          gridTemplateColumns: isMobileOrSim ? '1fr' : 'minmax(380px, 42%) 1fr',
+          gap: isMobileOrSim ? '14px' : '16px',
           alignItems: 'start',
           boxSizing: 'border-box'
         }}>
@@ -1642,21 +1811,21 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
+            gap: '12px',
             position: isMobileOrSim ? 'static' : 'sticky',
-            top: '20px',
+            top: '16px',
             alignSelf: 'start'
           }}>
             {/* 🎙️ Header & Studio Recording Stage */}
             <div style={{
               background: '#ffffff',
-              borderRadius: '22px',
-              padding: isMobileOrSim ? '14px 14px' : '18px 20px',
+              borderRadius: '20px',
+              padding: isMobileOrSim ? '12px 14px' : '14px 18px',
               border: '1.5px solid #e2e8f0',
               boxShadow: '0 4px 18px -2px rgba(15, 23, 42, 0.05)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '14px'
+              gap: '10px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2005,13 +2174,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
             {/* 🎧 Meine Studio-Aufnahmen (Schüler-Takes Fokus) */}
             <div style={{
               background: '#ffffff',
-              borderRadius: '20px',
-              padding: '16px 18px',
+              borderRadius: '18px',
+              padding: '12px 14px',
               border: '1.5px solid #e2e8f0',
               boxShadow: '0 2px 10px rgba(15, 23, 42, 0.03)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '8px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2021,25 +2190,25 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   </span>
                 </div>
                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 750 }}>
-                  {studentAudiosList.length > 5 ? `Letzte 5 von ${studentAudiosList.length} Takes` : `${studentAudiosList.length} Takes gesamt`}
+                  {studentAudiosList.length > 4 ? `Letzte 4 von ${studentAudiosList.length} Takes` : `${studentAudiosList.length} Takes gesamt`}
                 </span>
               </div>
 
               {studentAudiosList.length === 0 ? (
                 <div style={{
-                  padding: '24px 16px',
+                  padding: '20px 14px',
                   textAlign: 'center',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '10px',
+                  gap: '8px',
                   background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-                  borderRadius: '16px',
+                  borderRadius: '14px',
                   border: '1.5px dashed #cbd5e1'
                 }}>
                   <div style={{
-                    width: '38px',
-                    height: '38px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '50%',
                     background: '#ffffff',
                     border: '1px solid #e2e8f0',
@@ -2055,14 +2224,14 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#334155' }}>
                       Dein Studio ist bereit
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '3px', lineHeight: 1.35 }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.35 }}>
                       Tippe oben auf „Jetzt aufnehmen“, um deinen ersten Take einzuspielen!
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {studentAudiosList.slice(0, 5).map((aud, idx) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {studentAudiosList.slice(0, 4).map((aud, idx) => (
                     <div key={`student-take-${aud.id || aud.url || idx}`}>
                       {renderStudentPlayer(aud, `student-take-item-${idx}`, false)}
                     </div>
@@ -2077,22 +2246,22 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
           {/* ===================================================================== */}
           <div style={{
             background: '#ffffff',
-            borderRadius: '24px',
-            padding: isMobileOrSim ? '16px 14px' : '20px 22px',
+            borderRadius: '20px',
+            padding: isMobileOrSim ? '12px 10px' : '14px 16px',
             border: '1.5px solid #e2e8f0',
             boxShadow: '0 4px 18px -2px rgba(15, 23, 42, 0.05)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px'
+            gap: '12px'
           }}>
             {/* 1. DIE 5 KURATIERTEN EINZEL-LPS */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
                     Kuratierte Vinyl-LPs
                   </h3>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
                     Favoriten, Übe-Begleiter, Loops, Duette & Für Lehrer
                   </span>
                 </div>
@@ -2101,7 +2270,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
-                gap: isMobileOrSim ? '12px' : '12px',
+                gap: '8px',
                 justifyItems: 'center'
               }}>
                 <VinylRecordCover
@@ -2187,22 +2356,22 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
             </div>
 
             {/* 2. DIE 12 MONATS-LPS (4x3 Großformat in Schuljahres-Reihenfolge mit Uni-Farben) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
                     Schuljahr {currentSchoolYearLabel} • Monats-Chronik
                   </h3>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
                     12 Monats-Platten in Schuljahres-Reihenfolge ({startMonthName} – {endMonthName}) • 4×3 Studio-Regal
                   </span>
                 </div>
                 <div style={{
-                  padding: '3px 9px',
+                  padding: '2px 8px',
                   borderRadius: '100px',
                   background: '#f1f5f9',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.68rem',
+                  fontSize: '0.66rem',
                   fontWeight: 800,
                   color: '#475569'
                 }}>
@@ -2213,7 +2382,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobileOrSim ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)',
-                gap: isMobileOrSim ? '10px' : '14px',
+                gap: isMobileOrSim ? '8px 6px' : '8px 10px',
                 justifyItems: 'center'
               }}>
                 {allMonthsList.map((m) => {
@@ -2221,7 +2390,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   return (
                     <VinylRecordCover
                       key={`month-lp-${m.monthKey}`}
-                      variant="sleeve"
+                      variant="disc"
                       title={m.monthLabel.split(' ')[0]}
                       subtitle={`${m.year}`}
                       badge={`${m.totalCount} Takes`}
@@ -2229,16 +2398,18 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       monthNumber={m.monthNumber}
                       monthCode={m.monthCode}
                       totalCount={m.totalCount}
-                      maxWidth="132px"
+                      maxWidth="86px"
                       onClick={() => setActiveSharedAlbum({
                         type: 'month',
-                        variant: 'sleeve',
+                        variant: 'disc',
                         title: m.monthLabel,
                         subtitle: `${m.teacherCount} Lehrkraft • ${m.studentCount} Schüler`,
                         badge: `${m.totalCount} Takes`,
                         theme,
                         icon: <Calendar size={18} color={theme.accentColor || theme.textColor || '#0f172a'} strokeWidth={2.4} />,
-                        monthKey: m.monthKey
+                        monthKey: m.monthKey,
+                        monthNumber: m.monthNumber,
+                        monthCode: m.monthCode
                       })}
                     />
                   );
@@ -2351,9 +2522,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 title=""
                 size="large"
                 isActive={true}
-                variant={activeSharedAlbum.variant || (activeSharedAlbum.type === 'month' ? 'sleeve' : 'vivid')}
+                variant={activeSharedAlbum.variant || (activeSharedAlbum.type === 'month' ? 'disc' : 'vivid')}
                 theme={activeSharedAlbum.theme}
                 icon={activeSharedAlbum.icon}
+                monthNumber={activeSharedAlbum.monthNumber}
+                monthCode={activeSharedAlbum.monthCode}
                 onClick={() => setActiveSharedAlbum(null)}
               />
               <div style={{ display: 'flex', flexDirection: 'column' }}>

@@ -462,6 +462,7 @@ export interface InlineAudioPlayerProps {
   waveformPeaks?: number[];
   uiLevel?: 'junior' | 'teen' | 'pro';
   initialLoopLocator?: AudioLoopLocator | null;
+  layout?: 'single-line' | 'two-line' | 'auto';
 }
 
 export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({ 
@@ -498,8 +499,10 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   metronomeBpm,
   waveformPeaks,
   uiLevel = 'junior',
-  initialLoopLocator
+  initialLoopLocator,
+  layout = 'auto'
 }) => {
+  const isTwoLine = layout === 'two-line';
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -531,6 +534,27 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   // 🛡️ Stabiler Audio-Schlüssel für Notizen (bevorzugt ID / campus_blob Key vor volatilen blob: URLs)
   const persistentAudioKey = audioId || id || (url && !url.startsWith('blob:') ? url : '') || (resolvedUrl && !resolvedUrl.startsWith('blob:') ? resolvedUrl : '') || url || resolvedUrl;
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(persistentAudioKey));
+
+  // 📅 Schweizer Datum-Formatierung (Anti-ISO-String)
+  const formattedDate = useMemo(() => {
+    if (!date) return '';
+    try {
+      if (date.includes('T') || (date.includes('-') && date.length > 8)) {
+        const d = new Date(date);
+        if (!isNaN(d.getTime())) {
+          const now = new Date();
+          const isToday = d.toDateString() === now.toDateString();
+          const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          if (isToday) return `Heute, ${timeStr}`;
+          const dateStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+          return `${dateStr} • ${timeStr}`;
+        }
+      }
+      return date;
+    } catch {
+      return date;
+    }
+  }, [date]);
 
   // 🎛️ A/B Loop-Locator State (Non-destructive Übe-Schleife)
   const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => initialLoopLocator || getLoopLocator(persistentAudioKey || url || resolvedUrl, persistentAudioKey));
@@ -2410,7 +2434,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         </div>
       )}
 
-      {/* 1. Main Row: On Desktop, single line with title, waveform, time and action buttons */}
+      {/* 1. Main Row: Responsive Desktop single-line vs two-line vs Mobile */}
       {isMobile ? (
         <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
           {playButtonElement}
@@ -2420,6 +2444,33 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               {renderTimeDisplay(false)}
             </div>
             {renderWaveform(false)}
+          </div>
+        </div>
+      ) : isTwoLine ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+          {/* Zeile 1: Play-Button + voller Titel & Badges + Zeit/Datum */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+              {playButtonElement}
+              {renderTitleAndBadges(false)}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+              {formattedDate && (
+                <span style={{ fontSize: "0.68rem", color: "#64748b", fontWeight: 700 }}>
+                  {formattedDate}
+                </span>
+              )}
+              {renderTimeDisplay(true)}
+            </div>
+          </div>
+          {/* Zeile 2: Waveform über volle Breite + kompakte Werkzeuge */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
+            <div style={{ flex: 1, minWidth: 0, paddingLeft: "42px" }}>
+              {renderWaveform(true)}
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              {renderActionButtons}
+            </div>
           </div>
         </div>
       ) : (

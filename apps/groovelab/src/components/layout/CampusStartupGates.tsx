@@ -21,6 +21,7 @@ const ContractEndPrompt = lazy(() => import('../ContractEndPrompt').then(m => ({
 const MasterAdminDashboard = lazy(() => import('../MasterAdminDashboard').then(m => ({ default: m.MasterAdminDashboard })));
 const SecretaryDashboard = lazy(() => import('../SecretaryDashboard').then(m => ({ default: m.SecretaryDashboard })));
 const GhostSupportCapsule = lazy(() => import('../masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
+import { PrivateBetaGate } from './PrivateBetaGate';
 
 export interface CampusStartupGatesProps {
   location: any;
@@ -399,6 +400,43 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
       );
     }
 
+    // 🔒 VIP-Access & Private Preview Shield Check
+    const isVipUnlocked = (() => {
+      if (typeof window === 'undefined') return false;
+      try {
+        if (localStorage.getItem('campus_vip_access') === 'granted') return true;
+        const p = new URLSearchParams(window.location.search);
+        const c = p.get('code') || p.get('vip') || p.get('invite');
+        const valid = ['CAMPUS-2026', 'CAMPUS2026', 'GROOVE-VIP', 'GROOVEVIP', 'LAHR-2026', 'LAHR2026', 'LAHR-PREVIEW', 'LAHRPREVIEW', 'PILOT-2026', 'PILOT2026', 'PREVIEW'];
+        if (c && valid.includes(c.trim().toUpperCase())) {
+          localStorage.setItem('campus_vip_access', 'granted');
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    })();
+
+    if (!isVipUnlocked) {
+      return (
+        <>
+          <PrivateBetaGate
+            onUnlock={() => {
+              try {
+                localStorage.setItem('campus_vip_access', 'granted');
+              } catch (_) {}
+              window.location.reload();
+            }}
+            onGoToLogin={() => navigate('/login')}
+            onShowPrivacy={() => setShowPrivacy(true)}
+            onShowAgb={() => setShowAgb(true)}
+            onShowImpressum={() => setShowImpressum(true)}
+            onShowAccessibility={() => setShowAccessibility(true)}
+          />
+          {renderLegalModals()}
+        </>
+      );
+    }
+
     return (
       <Suspense fallback={<DashboardLoader />}>
         <Startseite 
@@ -418,6 +456,43 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
     if (loggedInUserId) {
       return <Navigate to="/dashboard" replace />;
     }
+
+    const isVipUnlocked2 = (() => {
+      if (typeof window === 'undefined') return false;
+      try {
+        if (localStorage.getItem('campus_vip_access') === 'granted') return true;
+        const p = new URLSearchParams(window.location.search);
+        const c = p.get('code') || p.get('vip') || p.get('invite');
+        const valid = ['CAMPUS-2026', 'CAMPUS2026', 'GROOVE-VIP', 'GROOVEVIP', 'LAHR-2026', 'LAHR2026', 'LAHR-PREVIEW', 'LAHRPREVIEW', 'PILOT-2026', 'PILOT2026', 'PREVIEW'];
+        if (c && valid.includes(c.trim().toUpperCase())) {
+          localStorage.setItem('campus_vip_access', 'granted');
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    })();
+
+    if (!isVipUnlocked2) {
+      return (
+        <>
+          <PrivateBetaGate
+            onUnlock={() => {
+              try {
+                localStorage.setItem('campus_vip_access', 'granted');
+              } catch (_) {}
+              window.location.reload();
+            }}
+            onGoToLogin={() => navigate('/login')}
+            onShowPrivacy={() => setShowPrivacy(true)}
+            onShowAgb={() => setShowAgb(true)}
+            onShowImpressum={() => setShowImpressum(true)}
+            onShowAccessibility={() => setShowAccessibility(true)}
+          />
+          {renderLegalModals()}
+        </>
+      );
+    }
+
     return (
       <Suspense fallback={<DashboardLoader />}>
         <Startseite2 
