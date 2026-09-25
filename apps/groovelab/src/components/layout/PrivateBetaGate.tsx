@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Sparkles, ArrowRight, ShieldCheck, AlertCircle, School } from 'lucide-react';
+import { Lock, Sparkles, ArrowRight, AlertCircle, School } from 'lucide-react';
 import { CampusGroovelabBrand } from '../CampusGroovelabBrand';
+import { supabase } from '../../lib/supabase';
 
 interface PrivateBetaGateProps {
   onUnlock: () => void;
@@ -10,20 +11,6 @@ interface PrivateBetaGateProps {
   onShowImpressum: () => void;
   onShowAccessibility: () => void;
 }
-
-const VALID_CODES = new Set([
-  'CAMPUS-2026',
-  'CAMPUS2026',
-  'GROOVE-VIP',
-  'GROOVEVIP',
-  'LAHR-2026',
-  'LAHR2026',
-  'LAHR-PREVIEW',
-  'LAHRPREVIEW',
-  'PILOT-2026',
-  'PILOT2026',
-  'PREVIEW'
-]);
 
 export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
   onUnlock,
@@ -37,42 +24,64 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auto-Unlock via URL query parameter (?code=... oder ?vip=...)
+  // Auto-Unlock via URL query parameter (?code=... oder ?vip=...) via authoritative RPC
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const urlCode = params.get('code') || params.get('vip') || params.get('invite');
-      if (urlCode && VALID_CODES.has(urlCode.trim().toUpperCase())) {
-        localStorage.setItem('campus_vip_access', 'granted');
-        onUnlock();
-      }
-    } catch (_) {}
+    let isMounted = true;
+    const checkUrlCode = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlCode = params.get('code') || params.get('vip') || params.get('invite');
+        if (!urlCode || urlCode.trim().length < 3) return;
+
+        const { data, error: rpcError } = await supabase.rpc('verify_vip_invite_code', {
+          p_code: urlCode.trim()
+        });
+
+        if (!rpcError && data?.success && isMounted) {
+          try {
+            localStorage.setItem('campus_vip_access', data.token || 'granted');
+          } catch (_) {}
+          onUnlock();
+        }
+      } catch (_) {}
+    };
+
+    checkUrlCode();
+    return () => { isMounted = false; };
   }, [onUnlock]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
     setError(null);
-    const cleaned = inviteCode.trim().toUpperCase();
+    const cleaned = inviteCode.trim();
 
-    if (!cleaned) {
+    if (!cleaned || cleaned.length < 3) {
       setError('Bitte geben Sie einen gültigen Einladungscode ein.');
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      if (VALID_CODES.has(cleaned)) {
-        try {
-          localStorage.setItem('campus_vip_access', 'granted');
-        } catch (_) {}
-        onUnlock();
-      } else {
-        setError('Ungültiger Einladungscode. Bitte prüfen Sie die Eingabe oder kontaktieren Sie uns für einen Zugang.');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('verify_vip_invite_code', {
+        p_code: cleaned
+      });
+
+      if (rpcError || !data?.success) {
+        setError(data?.message || 'Ungültiger Zugangscode. Bitte prüfen Sie die Eingabe.');
         setIsSubmitting(false);
+        return;
       }
-    }, 280);
+
+      try {
+        localStorage.setItem('campus_vip_access', data.token || 'granted');
+      } catch (_) {}
+      onUnlock();
+    } catch (_) {
+      setError('Verbindungsfehler bei der Code-Prüfung. Bitte versuchen Sie es erneut.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -190,14 +199,16 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
             <div style={{ position: 'relative' }}>
               <input
                 id="vip-invite-code"
-                type="text"
+                type="password"
+                name="vip-code"
                 value={inviteCode}
                 onChange={(e) => {
                   setInviteCode(e.target.value);
                   if (error) setError(null);
                 }}
-                placeholder="z. B. LAHR-2026"
-                autoCapitalize="characters"
+                placeholder="Zugangscode eingeben"
+                autoComplete="current-password"
+                autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck="false"
                 style={{
@@ -210,7 +221,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
                   fontSize: '1rem',
                   fontWeight: 800,
                   color: '#ffffff',
-                  letterSpacing: '0.05em',
+                  letterSpacing: '0.15em',
                   outline: 'none',
                   transition: 'all 0.2s ease'
                 }}

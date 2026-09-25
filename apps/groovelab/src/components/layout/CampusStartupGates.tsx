@@ -403,40 +403,33 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
       );
     }
 
-    // 🔒 VIP-Access & Private Preview Shield Check
+    // 🔒 VIP-Access & Private Preview Shield Check (Zero-Secret-Leakage: nur Token-Prüfung)
     const isVipUnlocked = (() => {
       if (typeof window === 'undefined') return false;
       try {
-        if (localStorage.getItem('campus_vip_access') === 'granted') return true;
-        const p = new URLSearchParams(window.location.search);
-        const c = p.get('code') || p.get('vip') || p.get('invite');
-        const valid = ['CAMPUS-2026', 'CAMPUS2026', 'GROOVE-VIP', 'GROOVEVIP', 'LAHR-2026', 'LAHR2026', 'LAHR-PREVIEW', 'LAHRPREVIEW', 'PILOT-2026', 'PILOT2026', 'PREVIEW'];
-        if (c && valid.includes(c.trim().toUpperCase())) {
-          localStorage.setItem('campus_vip_access', 'granted');
-          return true;
-        }
+        const stored = localStorage.getItem('campus_vip_access');
+        return Boolean(stored && stored.length > 0);
       } catch (_) {}
       return false;
     })();
 
     if (!isVipUnlocked) {
       return (
-        <>
-          <PrivateBetaGate
-            onUnlock={() => {
-              try {
-                localStorage.setItem('campus_vip_access', 'granted');
-              } catch (_) {}
-              window.location.reload();
-            }}
-            onGoToLogin={() => navigate('/login')}
-            onShowPrivacy={() => setShowPrivacy(true)}
-            onShowAgb={() => setShowAgb(true)}
-            onShowImpressum={() => setShowImpressum(true)}
-            onShowAccessibility={() => setShowAccessibility(true)}
-          />
-          {renderLegalModals()}
-        </>
+        <ErrorBoundary>
+          <Suspense fallback={<DashboardLoader />}>
+            <PrivateBetaGate
+              onUnlock={() => {
+                window.location.reload();
+              }}
+              onGoToLogin={() => navigate('/login')}
+              onShowPrivacy={() => setShowPrivacy(true)}
+              onShowAgb={() => setShowAgb(true)}
+              onShowImpressum={() => setShowImpressum(true)}
+              onShowAccessibility={() => setShowAccessibility(true)}
+            />
+            {renderLegalModals()}
+          </Suspense>
+        </ErrorBoundary>
       );
     }
 
@@ -463,36 +456,29 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
     const isVipUnlocked2 = (() => {
       if (typeof window === 'undefined') return false;
       try {
-        if (localStorage.getItem('campus_vip_access') === 'granted') return true;
-        const p = new URLSearchParams(window.location.search);
-        const c = p.get('code') || p.get('vip') || p.get('invite');
-        const valid = ['CAMPUS-2026', 'CAMPUS2026', 'GROOVE-VIP', 'GROOVEVIP', 'LAHR-2026', 'LAHR2026', 'LAHR-PREVIEW', 'LAHRPREVIEW', 'PILOT-2026', 'PILOT2026', 'PREVIEW'];
-        if (c && valid.includes(c.trim().toUpperCase())) {
-          localStorage.setItem('campus_vip_access', 'granted');
-          return true;
-        }
+        const stored = localStorage.getItem('campus_vip_access');
+        return Boolean(stored && stored.length > 0);
       } catch (_) {}
       return false;
     })();
 
     if (!isVipUnlocked2) {
       return (
-        <>
-          <PrivateBetaGate
-            onUnlock={() => {
-              try {
-                localStorage.setItem('campus_vip_access', 'granted');
-              } catch (_) {}
-              window.location.reload();
-            }}
-            onGoToLogin={() => navigate('/login')}
-            onShowPrivacy={() => setShowPrivacy(true)}
-            onShowAgb={() => setShowAgb(true)}
-            onShowImpressum={() => setShowImpressum(true)}
-            onShowAccessibility={() => setShowAccessibility(true)}
-          />
-          {renderLegalModals()}
-        </>
+        <ErrorBoundary>
+          <Suspense fallback={<DashboardLoader />}>
+            <PrivateBetaGate
+              onUnlock={() => {
+                window.location.reload();
+              }}
+              onGoToLogin={() => navigate('/login')}
+              onShowPrivacy={() => setShowPrivacy(true)}
+              onShowAgb={() => setShowAgb(true)}
+              onShowImpressum={() => setShowImpressum(true)}
+              onShowAccessibility={() => setShowAccessibility(true)}
+            />
+            {renderLegalModals()}
+          </Suspense>
+        </ErrorBoundary>
       );
     }
 
