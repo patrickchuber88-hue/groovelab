@@ -11,9 +11,9 @@ echo "🔍 Führe automatisierten Pre-Commit Secret-Scan durch (Root: $REPO_ROOT
 
 # List of files staged for commit, or all files in tracking if running standalone
 if [ "$1" == "--all" ]; then
-    FILES=$(git ls-files 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 'deploy/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' || find apps/groovelab/src packages scripts supabase/migrations deploy -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" -o -name "*.conf" -o -name "*.yml" -o -name "*.yaml" \) -print)
+    FILES=$(git ls-files 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 'deploy/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || find apps/groovelab/src packages scripts supabase/migrations deploy -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" -o -name "*.conf" -o -name "*.yml" -o -name "*.yaml" \) -print | grep -v 'pre_commit_secret_scanner.sh')
 else
-    FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/|^deploy/' | grep -v 'node_modules/' | grep -v '/dist/' || true)
+    FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/|^deploy/' | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || true)
 fi
 
 if [ -z "$FILES" ]; then
@@ -23,50 +23,48 @@ fi
 
 LEAKS_FOUND=0
 
-# Secret patterns to detect (OWASP ASVS L3 & Modern SaaS API Standards)
-PATTERNS=(
-    "-----BEGIN[ A-Z0-9_-]*PRIVATE KEY-----"
-    "SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=[[:space:]]*[\'\"][a-zA-Z0-9_\.\-]+[\'\"]"
-    "postgres:\/\/[^:\@]+:[^\@]+@[a-zA-Z0-9\.\-]+"
-    "sk_live_[0-9a-zA-Z]{24}"
-    "AKIA[0-9A-Z]{16}"
-    "repo1-cipher-pass=[^_\n[:space:]]{8,}"
-    "CampusGroovelabEnterprise2026SecureBackrestKey"
-    "(^|[^a-zA-Z0-9_])ghp_[0-9a-zA-Z]{36}"
-    "(^|[^a-zA-Z0-9_])github_pat_[0-9a-zA-Z_]{82}"
-    "(^|[^a-zA-Z0-9_])re_[a-zA-Z0-9]{24,}"
-    "(^|[^a-zA-Z0-9_])SG\.[0-9a-zA-Z_-]{22}\.[0-9a-zA-Z_-]{43}"
-    "(^|[^a-zA-Z0-9_])sk-ant-api[0-9]{2}-[0-9a-zA-Z_-]{80,}"
-    "(^|[^a-zA-Z0-9_])sk-(proj-)?[0-9a-zA-Z]{32,}"
-    "ADD[[:space:]]+COLUMN.*(password|passwort).*DEFAULT[[:space:]]+['\"][^'\"]+['\"]"
-    "master_admin_password[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]"
-)
+TMP_PATTERNS=$(mktemp)
+trap 'rm -f "$TMP_PATTERNS"' EXIT
 
-for file in $FILES; do
-    # Skip self, node_modules and build artifacts
-    if [[ "$file" == *"pre_commit_secret_scanner.sh" || "$file" == *"node_modules"* || "$file" == *"/dist/"* ]]; then
-        continue
-    fi
-    if [ -f "$file" ]; then
-        for pattern in "${PATTERNS[@]}"; do
-            MATCHES=$(grep -nE -e "$pattern" "$file" 2>/dev/null || true)
-            # Filter out environment variables like ${VAR} or template placeholders like __VAR__
-            if [ -n "$MATCHES" ]; then
-                if [[ "$pattern" == *"postgres:"* ]]; then
-                    MATCHES=$(echo "$MATCHES" | grep -vE '\$\{[a-zA-Z0-9_]+\}' || true)
-                fi
-                if [[ "$pattern" == *"repo1-cipher-pass="* ]]; then
-                    MATCHES=$(echo "$MATCHES" | grep -vE '__[a-zA-Z0-9_]+__' || true)
-                fi
+cat << 'PATTERNS_EOF' > "$TMP_PATTERNS"
+-----BEGIN[ A-Z0-9_-]*PRIVATE KEY-----
+SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=[[:space:]]*['"][a-zA-Z0-9_.-]+['"]
+postgres://[^:@]+:[^@]+@[a-zA-Z0-9.-]+
+sk_live_[0-9a-zA-Z]{24}
+AKIA[0-9A-Z]{16}
+repo1-cipher-pass=[^_\n[:space:]]{8,}
+CampusGroovelabEnterprise2026SecureBackrestKey
+(^|[^a-zA-Z0-9_])ghp_[0-9a-zA-Z]{36}
+(^|[^a-zA-Z0-9_])github_pat_[0-9a-zA-Z_]{82}
+(^|[^a-zA-Z0-9_])re_[a-zA-Z0-9]{24,}
+(^|[^a-zA-Z0-9_])SG\.[0-9a-zA-Z_-]{22}\.[0-9a-zA-Z_-]{43}
+(^|[^a-zA-Z0-9_])sk-ant-api[0-9]{2}-[0-9a-zA-Z_-]{80,}
+(^|[^a-zA-Z0-9_])sk-(proj-)?[0-9a-zA-Z]{32,}
+ADD[[:space:]]+COLUMN.*(password|passwort).*DEFAULT[[:space:]]+['"][^'"]+['"]
+master_admin_password[[:space:]]*=[[:space:]]*['"][^'"]+['"]
+PATTERNS_EOF
+
+# Schneller Batch-Scan mit xargs und grep -E -f (vermeidet tausende Child-Prozesse)
+RAW_MATCHES=$(echo "$FILES" | tr '\n' '\0' | xargs -0 grep -nE -f "$TMP_PATTERNS" 2>/dev/null || true)
+
+if [ -n "$RAW_MATCHES" ]; then
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        # Filter: Template-Variablen und Environment-Platzhalter tolerieren
+        if echo "$line" | grep -q "postgres://"; then
+            if echo "$line" | grep -qE '\$\{[a-zA-Z0-9_]+\}'; then
+                continue
             fi
-            if [ -n "$MATCHES" ]; then
-                echo "❌ [SECRET LEAK DETECTED] Datei: $file"
-                echo "   Gefundener Treffer: $MATCHES"
-                LEAKS_FOUND=$((LEAKS_FOUND + 1))
+        fi
+        if echo "$line" | grep -q "repo1-cipher-pass="; then
+            if echo "$line" | grep -qE '__[a-zA-Z0-9_]+__'; then
+                continue
             fi
-        done
-    fi
-done
+        fi
+        echo "❌ [SECRET LEAK DETECTED] $line"
+        LEAKS_FOUND=$((LEAKS_FOUND + 1))
+    done <<< "$RAW_MATCHES"
+fi
 
 if [ "$LEAKS_FOUND" -gt 0 ]; then
     echo "🚨 Secret-Scan FEHLGESCHLAGEN: $LEAKS_FOUND potenzielle Secret-Leaks gefunden!"
