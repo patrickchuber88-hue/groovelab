@@ -50,7 +50,7 @@ import {
   extractStudentTokensFromName,
   resolveCanonicalStudentFromList
 } from '../utils/nameHelper';
-import { checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
+import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal'));
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 import { validateChatMessageContent } from '../utils/chatRespectGuard';

@@ -273,7 +273,7 @@ export interface ActiveSharedAlbum {
   icon: React.ReactNode;
   monthKey?: string;
   songTitle?: string;
-  variant?: 'vivid' | 'sleeve' | 'disc';
+  variant?: 'vivid' | 'sleeve' | 'disc' | 'peeking-sleeve';
   monthNumber?: number;
   monthCode?: string;
 }
@@ -288,7 +288,7 @@ interface VinylRecordCoverProps {
     textColor?: string;
     accentColor?: string;
   };
-  variant?: 'vivid' | 'sleeve' | 'disc';
+  variant?: 'vivid' | 'sleeve' | 'disc' | 'peeking-sleeve';
   icon?: React.ReactNode;
   monthNumber?: number;
   monthCode?: string;
@@ -321,9 +321,11 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
   maxWidth,
   ariaLabel
 }) => {
+  const isPeekingSleeve = variant === 'peeking-sleeve';
   const isDisc = variant === 'disc';
   const isSleeve = variant === 'sleeve';
   const isLarge = size === 'large';
+  const [isHovered, setIsHovered] = useState(false);
   const outerWidth = isLarge ? '116px' : '100%';
   const sleeveSize = isLarge ? 96 : undefined;
   const discSize = isLarge ? 88 : 72;
@@ -340,6 +342,183 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
 
   const accentColor = theme.accentColor || theme.textColor || '#2563eb';
   const textColor = isSleeve ? '#0f172a' : (theme.textColor || '#0f172a');
+
+  // 1. 💽 PEEKING VINYL & SLEEVE (0,1% Goldstandard: Haptische Studio-Hülle + herausgleitende Farb-Schallplatte)
+  if (isPeekingSleeve) {
+    const pSleeveSize = isLarge ? 82 : 66;
+    const pDiscSize = isLarge ? 76 : 60;
+    const outerHeight = isLarge ? 86 : 70;
+    const discLeftOffset = isLarge
+      ? (isHovered ? 40 : 26)
+      : (isHovered ? 30 : 20);
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel || `Vinyl Monats-LP: ${title}, ${monthCode || ''} (${takesNum} Takes)`}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsHovered(true)}
+        onBlur={() => setIsHovered(false)}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          cursor: 'pointer',
+          userSelect: 'none',
+          outline: 'none',
+          width: isLarge ? '132px' : '100%',
+          maxWidth: maxWidth || (isLarge ? '132px' : '106px'),
+          height: `${outerHeight}px`,
+          boxSizing: 'border-box',
+          transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+        className="hover-scale-mini"
+      >
+        {/* 💽 Echte Farb-Schallplatte (Gleitet bei Hover geschmeidig nach rechts heraus) */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `${discLeftOffset}px`,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: `${pDiscSize}px`,
+            height: `${pDiscSize}px`,
+            borderRadius: '50%',
+            background: theme.bg,
+            border: '1.5px solid rgba(255, 255, 255, 0.55)',
+            boxShadow: isHovered
+              ? `0 6px 16px rgba(0, 0, 0, 0.22), 0 2px 8px ${accentColor}40`
+              : '0 3px 10px rgba(0, 0, 0, 0.14)',
+            zIndex: 1,
+            transition: 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Konzentrische Ton-in-Ton Vinyl-Rillen */}
+          <div style={{
+            position: 'absolute',
+            inset: '3px',
+            borderRadius: '50%',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            boxShadow: 'inset 0 0 0 3px rgba(255, 255, 255, 0.08), inset 0 0 0 6px rgba(0, 0, 0, 0.04), inset 0 0 0 9px rgba(255, 255, 255, 0.06), inset 0 0 0 13px rgba(0, 0, 0, 0.03)'
+          }} />
+
+          {/* Zentriertes Spindel-Loch mit feinem Kontrastring */}
+          <div style={{
+            width: isLarge ? '7px' : '5px',
+            height: isLarge ? '7px' : '5px',
+            borderRadius: '50%',
+            background: '#0f172a',
+            border: '1px solid rgba(255, 255, 255, 0.45)',
+            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.6)',
+            position: 'relative',
+            zIndex: 3
+          }} />
+        </div>
+
+        {/* 📦 Haptische Studio-Hülle (Off-White mit Monats-Spine & Schweizer Typografie) */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            width: `${pSleeveSize}px`,
+            height: `${pSleeveSize}px`,
+            borderRadius: '13px',
+            background: '#ffffff',
+            border: isActive
+              ? `2px solid ${accentColor}`
+              : (isHovered ? `1.5px solid ${accentColor}80` : '1.5px solid #e2e8f0'),
+            boxShadow: isActive
+              ? `0 6px 20px -2px ${accentColor}33, 0 2px 6px rgba(15, 23, 42, 0.06)`
+              : (isHovered
+                ? '0 6px 14px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04)'
+                : '0 2px 6px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02)'),
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: '6px 5px 6px 9px',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Linker Buchrücken-Akzent (Spine) in Monatsfarbe */}
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '4px',
+            background: accentColor,
+            borderRadius: '13px 0 0 13px'
+          }} />
+
+          {/* Oben: Monatskürzel & Monatsnummer */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', width: '100%', paddingRight: '2px' }}>
+            <span style={{
+              fontSize: isLarge ? '0.86rem' : '0.74rem',
+              fontWeight: 950,
+              color: '#0f172a',
+              letterSpacing: '0.04em',
+              lineHeight: 1
+            }}>
+              {monthCode || ''}
+            </span>
+            <span style={{
+              fontSize: isLarge ? '0.70rem' : '0.60rem',
+              fontWeight: 800,
+              color: accentColor,
+              letterSpacing: '-0.02em',
+              lineHeight: 1
+            }}>
+              {monthNumber ? (monthNumber < 10 ? `0${monthNumber}` : monthNumber) : ''}
+            </span>
+          </div>
+
+          {/* Unten: Monatsname & Take-Badge */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
+            <span style={{
+              fontSize: isLarge ? '0.66rem' : '0.56rem',
+              fontWeight: 750,
+              color: '#475569',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.15
+            }}>
+              {title}
+            </span>
+            <div style={{
+              alignSelf: 'flex-start',
+              fontSize: isLarge ? '0.56rem' : '0.48rem',
+              fontWeight: 850,
+              color: takesNum > 0 ? (accentColor || '#15803d') : '#94a3b8',
+              background: takesNum > 0 ? `${accentColor}14` : '#f8fafc',
+              border: `1px solid ${takesNum > 0 ? `${accentColor}28` : '#e2e8f0'}`,
+              padding: '1px 5px',
+              borderRadius: '100px',
+              lineHeight: 1.1,
+              whiteSpace: 'nowrap'
+            }}>
+              {badge || countDisplay}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isDisc) {
     const isLightDisc = ['#facc15', '#eab308', '#d97706'].includes(theme.bg);
@@ -2381,8 +2560,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: isMobileOrSim ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)',
-                gap: isMobileOrSim ? '8px 6px' : '8px 10px',
+                gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+                gap: isMobileOrSim ? '10px 8px' : '8px 12px',
                 justifyItems: 'center'
               }}>
                 {allMonthsList.map((m) => {
@@ -2390,7 +2569,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   return (
                     <VinylRecordCover
                       key={`month-lp-${m.monthKey}`}
-                      variant="disc"
+                      variant="peeking-sleeve"
                       title={m.monthLabel.split(' ')[0]}
                       subtitle={`${m.year}`}
                       badge={`${m.totalCount} Takes`}
@@ -2398,10 +2577,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       monthNumber={m.monthNumber}
                       monthCode={m.monthCode}
                       totalCount={m.totalCount}
-                      maxWidth="86px"
+                      maxWidth="104px"
                       onClick={() => setActiveSharedAlbum({
                         type: 'month',
-                        variant: 'disc',
+                        variant: 'peeking-sleeve',
                         title: m.monthLabel,
                         subtitle: `${m.teacherCount} Lehrkraft • ${m.studentCount} Schüler`,
                         badge: `${m.totalCount} Takes`,

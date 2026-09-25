@@ -84,34 +84,6 @@ export type {
   StickerUnlockContext,
   StickerUnlockResult
 };
-export {
-  ALL_STICKERS,
-  getUnifiedStickerStatus,
-  getUnifiedStickersMap,
-  cleanNotesText,
-  filterNotesForStudent,
-  isInternalMetadataNote,
-  checkIsAudioTresorActive,
-  checkIsAudioTresorReadOnly,
-  formatPageNumbers,
-  getCleanPageNotes,
-  getCleanTeacherHomeworkText,
-  formatStudentNoteDisplay,
-  parseStudentQuestionFromNotes,
-  parseStudentAnnotation,
-  parseSongArtistAndTitle,
-  SKILL_TAGS,
-  SpeechDictationButton,
-  InlineAudioPlayer,
-  RetroCassettePlayer,
-  MasterworkAudioCapsule,
-  CassetteIcon,
-  playCountInBeep,
-  areSongsIdentical,
-  levenshteinDistance,
-  normalizeSongStr,
-  extractSongArtistAndTitle
-};
 
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({
   student,
