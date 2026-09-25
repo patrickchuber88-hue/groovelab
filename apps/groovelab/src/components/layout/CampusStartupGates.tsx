@@ -359,6 +359,9 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
       for (const domain of mainDomains) {
         if (host.endsWith(domain)) {
           sub = host.substring(0, host.length - domain.length);
+          if (sub === 'www' || sub === 'admin' || sub === 'campus-groovelab' || sub === '') {
+            sub = null;
+          }
           break;
         }
       }

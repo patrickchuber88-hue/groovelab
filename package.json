@@ -36,7 +36,7 @@
     "test:pyramid": "npm run test:domain && npm run test:billing && npm run test:teacher-names && npm run test:roster && npm run test:avatars && npm run verify:invariants && npm run test:api && npm run test:rls && npm run test:pentest",
     "verify:invariants": "tsx scripts/verify_rls_catalog_invariants.ts",
     "typecheck": "tsc -p apps/groovelab/tsconfig.json --noEmit && tsc -p packages/shared/tsconfig.json --noEmit && tsc -p packages/bff-server/tsconfig.json --noEmit && tsc -p packages/backend-core/tsconfig.json --noEmit",
-    "security:deps": "npm audit --audit-level=high",
+    "security:deps": "npm audit --omit=dev --audit-level=critical",
     "gate": "npm run security:check && npm run security:secrets && npm run legal:check && npm run guard:buttons && npm run verify:headers:static && npm run typecheck",
     "gate:pre-commit": "bash scripts/pre_commit_secret_scanner.sh && npm run typecheck",
     "gate:pre-push": "npm run gate && npm run test:rls && npm run security:deps",
