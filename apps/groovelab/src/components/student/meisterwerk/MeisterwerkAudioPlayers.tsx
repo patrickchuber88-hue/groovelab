@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Pause,
   Play,
@@ -79,21 +80,29 @@ export const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({
   );
 };
 
-// Precision WebAudio beep scheduler for 4-beat count-in
+// 🪵 0.1% Goldstandard Acoustic Studio Woodblock / Metronome Click Scheduler
 export const scheduleCountInBeep = (ctx: AudioContext, time: number, isAccent: boolean) => {
   try {
+    const t = Math.max(ctx.currentTime, time);
+    // Erzeugt einen organischen, musikalischen Studio-Woodblock / Rimshot-Klick
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 960 : 640, time);
-    gain.gain.setValueAtTime(0.28, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+    
+    // Schnelle Frequenzbeugung für authentischen Holzklang
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(isAccent ? 1600 : 1050, t);
+    osc.frequency.exponentialRampToValueAtTime(isAccent ? 800 : 520, t + 0.035);
+    
+    // Knackige Attack-Flanke mit raschem logarithmischem Ausklingen (kein Nachhallen)
+    gain.gain.setValueAtTime(isAccent ? 0.28 : 0.20, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    
     osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.10);
-  } catch {
-    // silent fallback
+    osc.start(t);
+    osc.stop(t + 0.05);
+  } catch (err) {
+    console.warn('[CountIn] Click audio notice:', err);
   }
 };
 
@@ -739,17 +748,22 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     return () => window.removeEventListener('campus-global-audio-play', handleOtherPlay);
   }, []);
 
+  const activeCleanupRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     let active = true;
-    let cleanupFn: (() => void) | undefined;
 
     const candidateUrl = url || audioId || id;
     if (candidateUrl) {
       resolvePlayableAudioSource(candidateUrl, 'campus-assets', 1800)
         .then((res) => {
           if (active && res.src) {
+            if (activeCleanupRef.current && activeCleanupRef.current !== res.cleanup) {
+              activeCleanupRef.current();
+              activeCleanupRef.current = null;
+            }
+            activeCleanupRef.current = res.cleanup || null;
             setResolvedUrl(res.src);
-            cleanupFn = res.cleanup;
           }
         })
         .catch((err) => {
@@ -764,7 +778,6 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
 
     return () => {
       active = false;
-      if (cleanupFn) cleanupFn();
       if (countInTimerRef.current) {
         if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
           countInTimerRef.current.clear();
@@ -775,6 +788,16 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }
     };
   }, [url, audioId, id]);
+
+  // Unmount cleanup for active ObjectURL
+  useEffect(() => {
+    return () => {
+      if (activeCleanupRef.current) {
+        activeCleanupRef.current();
+        activeCleanupRef.current = null;
+      }
+    };
+  }, []);
 
   // 🔁 Web Audio Hardware Engine (Unified via SharedAudioEngine Singleton)
   const getOrCreateAudioContext = async () => {
@@ -924,16 +947,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         buffer = await loadAudioBuffer();
       }
       if (!ctx || !buffer) {
-        if (audioRef.current) {
+        if (audioRef.current && isPlayableUrl(resolvedUrl)) {
           const audio = audioRef.current;
           audio.loop = Boolean(options.loop);
           if (options.offsetSec !== undefined) {
             try { audio.currentTime = options.offsetSec; } catch {}
           }
           audio.play().then(() => setIsPlaying(true)).catch((e) => {
-            console.warn('[InlineAudioPlayer] HTML5 fallback error:', e);
+            console.warn('[InlineAudioPlayer] HTML5 playback error:', e);
+            setIsPlaying(false);
           });
+          return;
         }
+        console.warn('[InlineAudioPlayer] Audio buffer unavailable and URL not playable:', resolvedUrl);
+        setIsPlaying(false);
         return;
       }
 
@@ -1101,15 +1128,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     setIsPlaying(false);
   };
 
-  const togglePlay = async (e?: React.MouseEvent) => {
+  const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    // 1. Synchronous WebAudio unlock directly in user gesture stack
+    // 1. Synchronous WebAudio unlock directly in user gesture stack (Safari Zero-Latency)
     const ctx = SharedAudioEngine.getContext();
     if (ctx && ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch {}
+      ctx.resume().catch(() => {});
     }
 
     // Cancel active count-in or pause if already active
@@ -1185,13 +1210,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
 
       // 🚀 Launch Track Playback and Waveform Visualization EXACTLY on Beat 1 of Bar 2!
-      // (Exakt nach Ablauf aller 4 Viertelnoten des Einzähl-Taktes)
       const songStartDelayMs = Math.max(0, leadTimeMs + 4 * beatDurationMs);
       timers.push(setTimeout(async () => {
         setCountInStep(null);
         countInTimerRef.current = null;
 
-        // 1. Primär: Web Audio API Playback (100% Autoplay-immun da Context bei Klick entsperrt wurde)
+        // 1. Primär: Web Audio API Playback
         if (audioBufferRef.current) {
           startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
           return;
@@ -1233,7 +1257,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }, songStartDelayMs));
 
     } else {
-      // ⚡ Instant Play (No Count-In)
+      // ⚡ Instant Play (No Count-In) - Direct synchronous execution in gesture stack
       if (audio && isPlayable) {
         try {
           if (audio.ended || (duration > 0 && audio.currentTime >= duration - 0.05)) {
@@ -1252,18 +1276,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             playPromise
               .then(() => setIsPlaying(true))
               .catch(err => {
-                console.warn('[InlineAudioPlayer] HTML5 play failed, trying WebAudio:', err);
+                console.warn('[InlineAudioPlayer] HTML5 play rejected by Safari, falling back to WebAudio:', err);
                 startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
               });
           } else {
             setIsPlaying(true);
           }
-        } catch {
+          return;
+        } catch (err) {
+          console.warn('[InlineAudioPlayer] Synchronous HTML5 play exception, falling back to WebAudio:', err);
           startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+          return;
         }
-      } else {
-        startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
       }
+      startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
     }
   };
 
@@ -2421,10 +2447,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             borderTop: '1px dashed #e2e8f0',
             width: '100%',
             boxSizing: 'border-box',
-            flexWrap: 'nowrap',
-            overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none'
+            flexWrap: 'wrap'
           }}
         >
           {/* ✏️ Benennung & Notizen bearbeiten */}
@@ -2439,12 +2462,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 fontSize: '0.74rem',
                 fontWeight: 700,
                 height: '32px',
-                padding: '0 10px',
+                padding: '0 9px',
                 borderRadius: '9px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
@@ -2454,7 +2477,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               title="Aufnahme benennen und Notizen bearbeiten"
             >
               <Edit3 size={13} strokeWidth={2.2} />
-              <span>Umbenennen</span>
+              <span>Titel</span>
             </button>
           )}
 
@@ -2472,12 +2495,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               fontSize: '0.74rem',
               fontWeight: 700,
               height: '32px',
-              padding: '0 10px',
+              padding: '0 9px',
               borderRadius: '9px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '4px',
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
               transition: 'all 0.15s ease',
               flexShrink: 0,
@@ -2502,12 +2525,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               fontSize: '0.74rem',
               fontWeight: 700,
               height: '32px',
-              padding: '0 10px',
+              padding: '0 9px',
               borderRadius: '9px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '4px',
               boxShadow: loopLocator?.enabled ? '0 0 0 2px rgba(168, 85, 247, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
               transition: 'all 0.15s ease',
               flexShrink: 0,
@@ -2533,19 +2556,19 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 onOpenDuettDeck();
               }}
               style={{
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#334155',
+                border: '1px solid #c4b5fd',
+                background: '#fdf4ff',
+                color: '#7c3aed',
                 fontSize: '0.74rem',
-                fontWeight: 700,
+                fontWeight: 800,
                 height: '32px',
-                padding: '0 10px',
+                padding: '0 9px',
                 borderRadius: '9px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                gap: '4px',
+                boxShadow: '0 1px 2px rgba(124, 58, 237, 0.06)',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
                 whiteSpace: 'nowrap'
@@ -2554,7 +2577,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               title={`Duett-Deck (${metronomeBpm} BPM)`}
               aria-label={`Duett-Deck öffnen (${metronomeBpm} BPM)`}
             >
-              <Layers size={13} strokeWidth={2.2} />
+              <Layers size={13} strokeWidth={2.2} color="#7c3aed" />
               <span>Duett</span>
             </button>
           )}
@@ -2572,12 +2595,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 fontSize: '0.74rem',
                 fontWeight: 700,
                 height: '32px',
-                padding: '0 10px',
+                padding: '0 9px',
                 borderRadius: '9px',
                 cursor: isDownloading ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
@@ -2591,25 +2614,26 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             </button>
           )}
 
-          {/* 🗑️ Delete */}
+          {/* 🗑️ Delete (isoliert rechtsbündig für optimale Ergonomie & Überlappungsschutz) */}
           {onDelete && (
             <button
               type="button"
               disabled={isDeleting}
               onClick={() => setShowDeleteConfirmModal(true)}
               style={{
+                marginLeft: 'auto',
                 border: '1px solid #fecaca',
                 background: isDeleting ? '#fee2e2' : '#fff1f2',
                 color: '#dc2626',
                 fontSize: '0.74rem',
                 fontWeight: 700,
                 height: '32px',
-                padding: '0 10px',
+                padding: '0 9px',
                 borderRadius: '9px',
                 cursor: isDeleting ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 boxShadow: '0 1px 2px rgba(220, 38, 38, 0.06)',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
@@ -2636,7 +2660,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       )}
 
       {/* ✏️ Maske: Aufnahme benennen & Notizen bearbeiten */}
-      {isRenameModalOpen && (
+      {isRenameModalOpen && typeof document !== 'undefined' && createPortal(
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -2860,7 +2884,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation Modal */}

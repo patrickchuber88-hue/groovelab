@@ -10,7 +10,7 @@ import { WorldTourScorePlayer } from './WorldTourScorePlayer';
 import { WorldTourDiplomaModal } from './WorldTourDiplomaModal';
 
 interface WorldTourMapSpreadProps {
-  onBackToHub: () => void;
+  onBackToHub?: () => void;
   studentName?: string;
   studentInstrument?: string | null;
   uiLevel?: 'junior' | 'teen' | 'pro';
@@ -512,7 +512,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
               <ArrowLeft size={16} />
               <span>Zum Klang-Globus 🌍</span>
             </button>
-          ) : (
+          ) : onBackToHub ? (
             <button
               onClick={onBackToHub}
               aria-label="Zurück zum Studio"
@@ -535,7 +535,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
               <ArrowLeft size={16} />
               <span>Studio</span>
             </button>
-          )}
+          ) : null}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.5rem' }}>🌎</span>

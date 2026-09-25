@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Play, 
   Square, 
@@ -583,12 +584,13 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   };
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const startPercent = duration > 0 ? (startTime / duration) * 100 : 0;
   const endPercent = duration > 0 ? (endTime / duration) * 100 : 100;
   const playPercent = duration > 0 ? (currentPlayTime / duration) * 100 : startPercent;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -597,7 +599,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
       style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(15, 23, 42, 0.55)',
+      background: 'rgba(15, 23, 42, 0.65)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       zIndex: 99999,
@@ -629,17 +631,17 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               width: '38px',
               height: '38px',
               borderRadius: '12px',
-              background: '#dcfce7',
-              border: '1px solid #86efac',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#15803d'
+              color: '#0f172a'
             }}>
               {editorMode === 'locator' ? (
-                <Repeat size={20} strokeWidth={2.5} />
+                <Repeat size={19} strokeWidth={2.4} />
               ) : (
-                <Scissors size={20} strokeWidth={2.3} />
+                <Scissors size={19} strokeWidth={2.4} />
               )}
             </div>
             <div>
@@ -1363,7 +1365,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                 }}
                 style={{
                   flex: 1,
-                  background: '#16a34a',
+                  background: '#0f172a',
                   border: 'none',
                   borderRadius: '14px',
                   padding: '11px 16px',
@@ -1375,7 +1377,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.28)',
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)',
                   transition: 'all 0.15s ease',
                   minHeight: '44px',
                   touchAction: 'manipulation'
@@ -1532,6 +1534,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         )}
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

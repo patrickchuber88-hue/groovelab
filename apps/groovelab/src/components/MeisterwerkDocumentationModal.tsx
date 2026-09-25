@@ -402,35 +402,76 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const loadLehrwerke = useCallback(async () => {
     try {
       const { data } = await supabase.from('campus_lehrwerke').select('*');
-      if (data) setGlobalLehrwerke(data);
+      let combined = data ? [...data] : [];
+      try {
+        const localStored = localStorage.getItem('campus_lehrwerke');
+        const localBooks = localStored ? JSON.parse(localStored) : [];
+        for (const lb of localBooks) {
+          if (!combined.some(b => String(b.id) === String(lb.id) || b.title === lb.title)) {
+            combined.push(lb);
+          }
+        }
+      } catch {}
+      setGlobalLehrwerke(combined);
+
       const stored = localStorage.getItem('student_lehrwerke_progress');
       if (stored) {
         const parsed = JSON.parse(stored);
         setAssignedLehrwerke(parsed.filter((item: any) => item.studentId === student.id));
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[Meisterwerk] Error in loadLehrwerke:', e);
+    }
   }, [student.id]);
 
   const loadActiveSongSkills = useCallback(async () => {
     if (!student.id) return;
     try {
-      const { data } = await supabase
+      let combined: any[] = [];
+      const { data, error } = await supabase
         .from('user_song_skills')
         .select('*, songs(*)')
         .eq('user_id', student.id);
-      if (data) setActiveSongSkills(data);
-    } catch {}
+      if (!error && data) combined = [...data];
+
+      try {
+        const localStored = localStorage.getItem('campus_user_song_skills');
+        const localSkills = localStored ? JSON.parse(localStored) : [];
+        for (const ls of localSkills) {
+          if (String(ls.user_id) === String(student.id) && !combined.some(c => String(c.id) === String(ls.id))) {
+            combined.push(ls);
+          }
+        }
+      } catch {}
+
+      setActiveSongSkills(combined);
+    } catch (e) {
+      console.warn('[Meisterwerk] Error in loadActiveSongSkills:', e);
+    }
   }, [student.id]);
 
   const loadSongs = useCallback(async () => {
     const sId = student?.school_id || propSchoolId;
     try {
+      let combined: any[] = [];
       let query = supabase.from('songs').select('*');
       if (sId) {
         query = query.or(`school_id.eq.${sId},school_id.is.null`);
       }
-      const { data } = await query.order('title');
-      if (data) setSongs(data);
+      const { data, error } = await query.order('title');
+      if (!error && data) combined = [...data];
+
+      try {
+        const localStored = localStorage.getItem('campus_songs');
+        const localSongs = localStored ? JSON.parse(localStored) : [];
+        for (const ls of localSongs) {
+          if (!combined.some(c => String(c.id) === String(ls.id) || c.title === ls.title)) {
+            combined.push(ls);
+          }
+        }
+      } catch {}
+
+      setSongs(combined);
     } catch (e) {
       console.warn('[Meisterwerk] Error loading songs:', e);
     }
@@ -639,12 +680,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setAudioLabel,
     isUploadingAudio,
     recordCountInRemaining,
+    recordCountInMode,
     cancelActiveRecordCountIn,
     playAlongCountInRemaining,
     cancelPlayAlongCountIn,
     handleStartPlayAlongRecording,
     startRecordingAudio,
     stopRecordingAudio,
+    handleRetakeRecordingAudio,
     playMetronomeTick,
     formatRecordTime,
     recordingSavedToast,
@@ -1255,9 +1298,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, [progressItems, student.id, activeSongSkills, viewingWeekOffset, getTargetWeekIso, fetchProgress, loadActiveSongSkills, loadLehrwerke, notifyHomeworkChange, setIsCurrentHomework, setGeneralHomeworkNotes, setTeacherNotes, setHomeworkNotesList, setAssignedLehrwerke]);
 
   // 📖 Lehrwerk zuweisen
-  const handleAssignLehrwerk = useCallback((lehrwerkId: string) => {
+  const handleAssignLehrwerk = useCallback((lehrwerkId: string, directBookObj?: any) => {
     if (!lehrwerkId) return;
-    const book = globalLehrwerke.find(b => String(b.id) === String(lehrwerkId));
+    const book = directBookObj || globalLehrwerke.find(b => String(b.id) === String(lehrwerkId));
     if (!book) return;
 
     try {
@@ -1265,6 +1308,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const parsed = stored ? JSON.parse(stored) : [];
 
       if (parsed.some((item: any) => String(item.studentId) === String(student.id) && String(item.lehrwerkId) === String(lehrwerkId))) {
+        setActiveLehrwerkId(lehrwerkId);
+        setActiveSubView('lehrwerk');
         return;
       }
 
@@ -1273,7 +1318,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         lehrwerkId: lehrwerkId,
         bookTitle: book.title,
         lehrwerkTitle: book.title,
-        totalPages: book.totalPages || 50,
+        totalPages: book.totalPages || book.total_pages || 50,
         assignedAt: new Date().toISOString(),
         visibility: 'private',
         pageStates: {}
@@ -1284,10 +1329,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setAssignedLehrwerke(prev => [...prev.filter(a => String(a.lehrwerkId) !== String(lehrwerkId)), newAssignment]);
       loadLehrwerke();
       setActiveLehrwerkId(lehrwerkId);
+      setActiveSubView('lehrwerk');
     } catch (e) {
       console.error('Error assigning lehrwerk:', e);
     }
-  }, [globalLehrwerke, student.id, loadLehrwerke, setActiveLehrwerkId, setAssignedLehrwerke]);
+  }, [globalLehrwerke, student.id, loadLehrwerke, setActiveLehrwerkId, setActiveSubView, setAssignedLehrwerke]);
 
   // 🗑️ Seiten-Notiz löschen
   const handleDeletePageNote = useCallback(async (bookTitle: string, pageNum: number) => {
@@ -1402,13 +1448,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       } catch {}
 
-      handleAssignLehrwerk(createdBook.id);
+      setGlobalLehrwerke(prev => [...prev.filter(b => b.id !== createdBook.id), createdBook]);
+      handleAssignLehrwerk(createdBook.id, createdBook);
       await loadLehrwerke();
       notifyHomeworkChange();
       setNewLehrwerkTitle('');
       setNewLehrwerkPages('50');
       setShowCreateLehrwerkModal(false);
       setShowAssignDropdown(false);
+      setActiveLehrwerkId(createdBook.id);
+      setActiveSubView('lehrwerk');
     } catch (e) {
       console.error('[Meisterwerk] Error creating and assigning lehrwerk:', e);
     } finally {
@@ -2302,13 +2351,57 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [homeworkNotesList, student.id, setHomeworkNotesList, syncHomeworkNotes, notifyHomeworkChange, setProgressItems]);
 
+  // 🏷️ 2027 Goldstandard Song Tagging & Audio Customizations
+  const [audioSongTags, setAudioSongTags] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem(`campus_audio_song_tags_${student.id}`) || localStorage.getItem('campus_audio_song_tags');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const availableSongsForTagging = useMemo(() => {
+    const list: string[] = [];
+    (activeSongSkills || []).forEach(s => {
+      const title = s.songs?.title ? `${s.songs?.artist ? s.songs.artist + ' - ' : ''}${s.songs.title}` : (s.title || s.song_title);
+      if (title && !list.includes(title)) list.push(title);
+    });
+    return list;
+  }, [activeSongSkills]);
+
+  const handleUpdateAudioSongTag = useCallback((url: string, tag: string | null) => {
+    setAudioSongTags(prev => {
+      const next = { ...prev };
+      if (tag) next[url] = tag;
+      else delete next[url];
+      try {
+        localStorage.setItem(`campus_audio_song_tags_${student.id}`, JSON.stringify(next));
+        localStorage.setItem('campus_audio_song_tags', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [student.id]);
+
+  const handleSaveEditedTeacherAudio = useCallback(async (result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate'; is_edited?: boolean; loop_locator?: any }, originalIdx?: number, currentUrl?: string) => {
+    if (result.loop_locator) {
+      try {
+        const { saveLoopLocator } = await import('../utils/audioLoopLocatorStorage');
+        saveLoopLocator(result.url || currentUrl || '', result.loop_locator);
+      } catch (err) {
+        console.warn('Error saving loop locator:', err);
+      }
+    }
+  }, []);
+
   const handleAssignSongFromCatalog = useCallback(async (songId: string) => {
     if (!songId || !student.id) return;
 
     const existing = activeSongSkills.find((s: any) => s.song_id === songId);
     if (existing) {
       setSelectedActiveSongId(existing.id);
-      setActiveSubView('hub');
+      setActiveInputTab('active_song');
+      setActiveSubView('song');
       return;
     }
 
@@ -2319,31 +2412,52 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         globalLehrwerke.find(l => assignedLehrwerke.some(a => a.lehrwerkId === l.id))?.instrument ||
         'Gitarre';
 
-      const { data: newSkill, error } = await supabase
-        .from('user_song_skills')
-        .insert({
+      let newSkill: any = null;
+      try {
+        const { data, error } = await supabase
+          .from('user_song_skills')
+          .insert({
+            user_id: student.id,
+            song_id: songId,
+            instrument: defaultInstrument,
+            progress_percent: 0,
+            is_stage_ready: false
+          })
+          .select('*, songs(*)')
+          .single();
+        if (!error && data) newSkill = data;
+      } catch (dbErr) {
+        console.warn('[Meisterwerk] DB insert user_song_skills notice:', dbErr);
+      }
+
+      if (!newSkill) {
+        const catalogSong = songs.find(s => s.id === songId);
+        newSkill = {
+          id: `skill-${Date.now()}`,
           user_id: student.id,
           song_id: songId,
           instrument: defaultInstrument,
           progress_percent: 0,
-          is_stage_ready: false
-        })
-        .select('*, songs(*)')
-        .single();
-
-      if (error) throw error;
-
-      await loadActiveSongSkills();
-
-      if (newSkill) {
-        setSelectedActiveSongId(newSkill.id);
+          is_stage_ready: false,
+          songs: catalogSong || { id: songId, title: 'Neuer Song', artist: 'Unbekannt' }
+        };
+        try {
+          const localStored = localStorage.getItem('campus_user_song_skills');
+          const existingLocal = localStored ? JSON.parse(localStored) : [];
+          localStorage.setItem('campus_user_song_skills', JSON.stringify([...existingLocal, newSkill]));
+        } catch {}
       }
-      setActiveSubView('hub');
+
+      setActiveSongSkills(prev => [...prev.filter(s => s.id !== newSkill.id), newSkill]);
+      await loadActiveSongSkills();
+      setSelectedActiveSongId(newSkill.id);
+      setActiveInputTab('active_song');
+      setActiveSubView('song');
       notifyHomeworkChange();
     } catch (e) {
       console.error('Error assigning song from catalog:', e);
     }
-  }, [student, activeSongSkills, globalLehrwerke, assignedLehrwerke, loadActiveSongSkills, notifyHomeworkChange, setSelectedActiveSongId, setActiveSubView]);
+  }, [student, activeSongSkills, globalLehrwerke, assignedLehrwerke, songs, loadActiveSongSkills, notifyHomeworkChange, setSelectedActiveSongId, setActiveInputTab, setActiveSubView]);
 
   const handleCreateAndAssignSong = useCallback(async (titleOrEvent: any, optionalArtist?: string) => {
     let title = '';
@@ -2357,18 +2471,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     try {
       const sId = student.school_id || propSchoolId || null;
-      // 1. Insert into songs catalog
-      const { data: createdSong, error: songErr } = await supabase
-        .from('songs')
-        .insert({
+      let createdSong: any = null;
+
+      // 1. Insert into songs catalog (with fallback)
+      try {
+        const { data, error } = await supabase
+          .from('songs')
+          .insert({
+            title,
+            artist,
+            school_id: sId
+          })
+          .select()
+          .single();
+        if (!error && data) createdSong = data;
+      } catch (dbSongErr) {
+        console.warn('[Meisterwerk] DB insert songs notice:', dbSongErr);
+      }
+
+      if (!createdSong) {
+        createdSong = {
+          id: `song-${Date.now()}`,
           title,
           artist,
           school_id: sId
-        })
-        .select()
-        .single();
+        };
+        try {
+          const localStored = localStorage.getItem('campus_songs');
+          const existingLocal = localStored ? JSON.parse(localStored) : [];
+          localStorage.setItem('campus_songs', JSON.stringify([...existingLocal, createdSong]));
+        } catch {}
+      }
 
-      if (songErr) throw songErr;
+      setSongs(prev => [...prev.filter(s => s.id !== createdSong.id), createdSong]);
 
       // 2. Assign to student
       const defaultInstrument = (student as any)?.instrument ||
@@ -2377,31 +2512,52 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         globalLehrwerke.find(l => assignedLehrwerke.some(a => a.lehrwerkId === l.id))?.instrument ||
         'Gitarre';
 
-      const { data: newSkill, error: skillErr } = await supabase
-        .from('user_song_skills')
-        .insert({
+      let newSkill: any = null;
+      try {
+        const { data, error } = await supabase
+          .from('user_song_skills')
+          .insert({
+            user_id: student.id,
+            song_id: createdSong.id,
+            instrument: defaultInstrument,
+            progress_percent: 0,
+            is_stage_ready: false
+          })
+          .select('*, songs(*)')
+          .single();
+        if (!error && data) newSkill = data;
+      } catch (dbSkillErr) {
+        console.warn('[Meisterwerk] DB insert user_song_skills notice:', dbSkillErr);
+      }
+
+      if (!newSkill) {
+        newSkill = {
+          id: `skill-${Date.now()}`,
           user_id: student.id,
           song_id: createdSong.id,
           instrument: defaultInstrument,
           progress_percent: 0,
-          is_stage_ready: false
-        })
-        .select('*, songs(*)')
-        .single();
+          is_stage_ready: false,
+          songs: createdSong
+        };
+        try {
+          const localStored = localStorage.getItem('campus_user_song_skills');
+          const existingLocal = localStored ? JSON.parse(localStored) : [];
+          localStorage.setItem('campus_user_song_skills', JSON.stringify([...existingLocal, newSkill]));
+        } catch {}
+      }
 
-      if (skillErr) throw skillErr;
-
+      setActiveSongSkills(prev => [...prev.filter(s => s.id !== newSkill.id), newSkill]);
       await Promise.all([loadSongs(), loadActiveSongSkills()]);
 
-      if (newSkill) {
-        setSelectedActiveSongId(newSkill.id);
-      }
-      setActiveSubView('hub');
+      setSelectedActiveSongId(newSkill.id);
+      setActiveInputTab('active_song');
+      setActiveSubView('song');
       notifyHomeworkChange();
     } catch (e) {
       console.error('[Meisterwerk] Error creating and assigning song:', e);
     }
-  }, [student, propSchoolId, activeSongSkills, globalLehrwerke, assignedLehrwerke, loadSongs, loadActiveSongSkills, notifyHomeworkChange, setSelectedActiveSongId, setActiveSubView]);
+  }, [student, propSchoolId, activeSongSkills, globalLehrwerke, assignedLehrwerke, loadSongs, loadActiveSongSkills, notifyHomeworkChange, setSelectedActiveSongId, setActiveInputTab, setActiveSubView]);
 
   const handleRemoveSong = useCallback(async (skillId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -2449,6 +2605,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
     onClose?.();
   }, [triggerImmediateAutoSave, isRecordingAudio, stopRecordingAudio, isTtsSpeaking, handleStopSpeaking, onClose]);
+
+  const handleBackToHub = useCallback(() => {
+    setActiveSubView('hub');
+    setActiveLehrwerkId(null);
+    setActivePageNumber(null);
+    setSelectedActiveSongId(null);
+    setActiveInputTab('free');
+  }, []);
 
   // F-Key Fullscreen & Escape Key Modal-Close Listener (WAI-ARIA & WCAG 2.2 AA)
   useEffect(() => {
@@ -2739,6 +2903,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         recordingSearchQuery={recordingSearchQuery}
         setRecordingSearchQuery={setRecordingSearchQuery}
         onOpenAssignModal={onOpenAssignModal}
+        onBackToHub={handleBackToHub}
         renderFullscreenButton={renderFullscreenButton}
         renderCloseButton={renderCloseButton}
         setOnboardingStep={setOnboardingStep}
@@ -2897,39 +3062,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             boxSizing: 'border-box',
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
           }}>
-            {/* 🔙 Zurück zum Aufgabenheft */}
-            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => { setActiveViewMode('document'); setHubTab('modules'); }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
-                  color: '#334155',
-                  padding: '6px 14px',
-                  borderRadius: '100px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  userSelect: 'none',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  touchAction: 'manipulation'
-                }}
-                className="hover-scale"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveViewMode('document'); setHubTab('modules'); } }}
-                aria-label="Zurück zum Aufgabenheft"
-                title="Zurück zum Aufgabenheft"
-              >
-                <ArrowLeft size={14} strokeWidth={2.5} />
-                <span>Zurück zum Aufgabenheft</span>
-              </button>
-            </div>
             <GroovePracticeCompanion
               useNotebookLayout={useNotebookLayout}
               isCampusModule={true}
@@ -2957,7 +3089,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Stimmgerät...</div>}>
               <CampusTuner
                 uiLevel={uiLevel}
-                onBack={() => { setActiveViewMode('document'); setHubTab('modules'); }}
               />
             </Suspense>
           </div>
@@ -3000,7 +3131,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             overflow: 'hidden'
           }}>
             <WorldTourMapSpread
-              onBackToHub={() => { setActiveViewMode('document'); setHubTab('modules'); }}
               studentName={displayedStudentName}
               studentInstrument={(student as any)?.instrument || (student as any)?.resolved_instrument || 'Klavier'}
               uiLevel={uiLevel}
@@ -3017,39 +3147,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             boxSizing: 'border-box',
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
           }}>
-            {/* 🔙 Zurück zum Aufgabenheft */}
-            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => { setActiveViewMode('document'); setHubTab('modules'); }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
-                  color: '#334155',
-                  padding: '6px 14px',
-                  borderRadius: '100px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  userSelect: 'none',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  touchAction: 'manipulation'
-                }}
-                className="hover-scale"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveViewMode('document'); setHubTab('modules'); } }}
-                aria-label="Zurück zum Aufgabenheft"
-                title="Zurück zum Aufgabenheft"
-              >
-                <ArrowLeft size={14} strokeWidth={2.5} />
-                <span>Zurück zum Aufgabenheft</span>
-              </button>
-            </div>
             <MeisterwerkRecordingsTab
               isTeacherTools={isTeacherTools}
               readOnly={readOnly}
@@ -3057,24 +3154,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               activeSongSkills={activeSongSkills}
               audioDuration={audioDuration}
               audioLabel={audioLabel}
-              audioSongTags={{}}
+              audioSongTags={audioSongTags}
               availablePlaylists={[]}
-              availableSongsForTagging={[]}
+              availableSongsForTagging={availableSongsForTagging}
               expandedStudentAudioWeeks={expandedStudentAudioWeeks}
               expandedTeacherAudioWeeks={expandedTeacherAudioWeeks}
               favoriteAudioUrls={favoriteAudioUrls}
               formatRecordTime={formatRecordTime}
               getISOWeek={getISOWeek}
-              getMonthAlbumTheme={() => 'Aufnahmen'}
+              getMonthAlbumTheme={(monthKey: string) => {
+                const monthNum = parseInt((monthKey || '').split('-')[1] || '1', 10);
+                // 💎 Weltklasse 0,1% Goldstandard 12 Uni-Farben (Reine Farben ohne Schwarz/Grau)
+                const palettes: Record<number, { bg: string; shadow: string; textColor?: string }> = {
+                  1: { bg: '#0891b2', shadow: 'rgba(8, 145, 178, 0.40)' },   // Polar-Cyan (Januar)
+                  2: { bg: '#4f46e5', shadow: 'rgba(79, 70, 229, 0.40)' },  // Tiefsee-Indigo (Februar)
+                  3: { bg: '#7c3aed', shadow: 'rgba(124, 58, 237, 0.40)' },  // Iris-Violett (März)
+                  4: { bg: '#9333ea', shadow: 'rgba(147, 51, 234, 0.40)' },  // Orchideen-Purpur (April)
+                  5: { bg: '#65a30d', shadow: 'rgba(101, 163, 13, 0.40)' },  // Pistazie-Limette (Mai)
+                  6: { bg: '#059669', shadow: 'rgba(5, 150, 105, 0.40)' },   // Minze-Jade (Juni)
+                  7: { bg: '#0f766e', shadow: 'rgba(15, 118, 110, 0.40)' },  // Karibik-Petrol (Juli)
+                  8: { bg: '#db2777', shadow: 'rgba(219, 39, 119, 0.40)' },  // Sommer-Himbeere (August)
+                  9: { bg: '#b45309', shadow: 'rgba(180, 83, 9, 0.40)' },   // Safran-Kupfer (September)
+                  10: { bg: '#ea580c', shadow: 'rgba(234, 88, 12, 0.40)' }, // Kürbis-Orange (Oktober)
+                  11: { bg: '#e11d48', shadow: 'rgba(225, 29, 72, 0.40)' },  // Terrakotta-Koralle (November)
+                  12: { bg: '#c026d3', shadow: 'rgba(192, 38, 211, 0.40)' }  // Winter-Pflaume (Dezember)
+                };
+                return palettes[monthNum] || { bg: '#3b82f6', shadow: 'rgba(59, 130, 246, 0.40)' };
+              }}
               getNormalizedSongTitle={(s: any) => typeof s === 'string' ? s : (s?.topic_name || '')}
               handleDeleteNote={handleDeleteNote}
               handleDeleteStudentAudio={handleDeleteStudentAudio}
               handleRenameStudentAudio={handleRenameStudentAudio}
               handleRenameTeacherAudio={handleRenameTeacherAudio}
-              handleSaveEditedTeacherAudio={async () => {}}
+              handleSaveEditedTeacherAudio={handleSaveEditedTeacherAudio}
               handleRevertTeacherAudioToOriginal={async () => {}}
               handleSaveShareToPlaylist={async () => {}}
-              handleUpdateAudioSongTag={() => {}}
+              handleUpdateAudioSongTag={handleUpdateAudioSongTag}
               hasTresorStorage={propHasTresor ?? false}
               homeworkNotes={generalHomeworkNotes}
               homeworkNotesList={homeworkNotesList}
@@ -3137,7 +3252,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               songs={songs}
               startRecordingAudio={startRecordingAudio}
               stopRecordingAudio={stopRecordingAudio}
+              handleRetakeRecordingAudio={handleRetakeRecordingAudio}
               recordCountInRemaining={recordCountInRemaining}
+              recordCountInMode={recordCountInMode}
               cancelActiveRecordCountIn={cancelActiveRecordCountIn}
               justRecordedAudioUrl={justRecordedAudioUrl}
               justRecordedAudioLabel={justRecordedAudioLabel}
@@ -3261,13 +3378,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             handleAddCustomTag={handleAddCustomTag}
             handleAssignLehrwerk={handleAssignLehrwerk}
             handleAssignSongFromCatalog={handleAssignSongFromCatalog}
-            handleBackToHub={() => {
-              setActiveSubView('hub');
-              setActiveLehrwerkId(null);
-              setActivePageNumber(null);
-              setSelectedActiveSongId(null);
-              setActiveInputTab('free');
-            }}
+            handleBackToHub={handleBackToHub}
             handleCheckMatch={handleCheckMatch}
             handleCommitStudentRating={handleCommitStudentRating}
             handleCopyShareLink={handleCopyShareLink}

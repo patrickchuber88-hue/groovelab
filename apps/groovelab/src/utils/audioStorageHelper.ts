@@ -86,12 +86,23 @@ export async function resolvePlayableAudioSource(
     } catch {}
   }
 
+  const inferMime = (k: string, fb = 'audio/wav') => {
+    const l = k.toLowerCase();
+    if (l.endsWith('.wav')) return 'audio/wav';
+    if (l.endsWith('.mp3')) return 'audio/mpeg';
+    if (l.endsWith('.mp4') || l.endsWith('.m4a')) return 'audio/mp4';
+    if (l.endsWith('.ogg')) return 'audio/ogg';
+    if (l.endsWith('.webm')) return 'audio/webm';
+    return fb;
+  };
+
   // 4. Binary blob storage keys ("campus_blob_...", "campus_audio_...")
   if (trimmed.startsWith('campus_blob_') || trimmed.startsWith('campus_audio_')) {
     try {
       const raw = await getBlob(trimmed);
       if (raw) {
-        const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+        const mime = raw instanceof Blob && raw.type ? raw.type : inferMime(trimmed);
+        const finalBlob = raw instanceof Blob ? (raw.type ? raw : new Blob([raw], { type: mime })) : new Blob([raw], { type: mime });
         const objectUrl = URL.createObjectURL(finalBlob);
         return {
           src: objectUrl,
@@ -146,7 +157,8 @@ export async function resolvePlayableAudioSource(
   try {
     const raw = await getBlob(trimmed);
     if (raw) {
-      const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+      const mime = raw instanceof Blob && raw.type ? raw.type : inferMime(trimmed);
+      const finalBlob = raw instanceof Blob ? (raw.type ? raw : new Blob([raw], { type: mime })) : new Blob([raw], { type: mime });
       const objectUrl = URL.createObjectURL(finalBlob);
       return {
         src: objectUrl,

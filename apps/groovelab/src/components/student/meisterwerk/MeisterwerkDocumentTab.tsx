@@ -5,7 +5,7 @@ import {
   ChevronRight, Clock, Compass, Copy, Disc, Edit3, FileText, Globe, Hash, Headphones, HelpCircle, History, Lightbulb,
   Lock, Mail, Mic, Moon, Music, Pin, Play, Plus, Radio, RotateCcw, Search, Settings, Share2, Sliders,
   Sparkles, Square, Star, Target, Timer, Trash2, User, Volume2, VolumeX, AlertCircle,
-  EyeOff, Hand, Info, MessageSquare, Printer, RefreshCw, RotateCw, Unlock, Wrench, Zap, X, Send
+  Eye, EyeOff, Hand, Info, MessageSquare, Pencil, Printer, RefreshCw, RotateCw, Unlock, Users, Wrench, Zap, X, Send
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { AudioTrackCarousel } from '../../AudioTrackCarousel';
@@ -582,6 +582,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   });
   const [activeSectionId, setActiveSectionId] = useState<string>('sec-chorus');
   const [hasPracticedSectionToday, setHasPracticedSectionToday] = useState<boolean>(false);
+  const [textbookPageFilter, setTextbookPageFilter] = useState<'all' | 'homework' | 'focus'>('all');
 
   // Load song sections whenever selectedActiveSongId changes
   useEffect(() => {
@@ -773,6 +774,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [activeMetronomeBpm, setActiveMetronomeBpm] = useState<number | null>(null);
   const metronomeTimerRef = useRef<any>(null);
+  const playMetronomeTickRef = useRef(playMetronomeTick);
+
+  useEffect(() => {
+    playMetronomeTickRef.current = playMetronomeTick;
+  }, [playMetronomeTick]);
 
   const toggleContinuousMetronome = useCallback((bpm: number) => {
     if (activeMetronomeBpm === bpm) {
@@ -786,15 +792,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         clearInterval(metronomeTimerRef.current);
       }
       setActiveMetronomeBpm(bpm);
-      playMetronomeTick(true);
+      playMetronomeTickRef.current?.(true);
       const intervalMs = Math.max(100, Math.round(60000 / bpm));
       let beat = 1;
       metronomeTimerRef.current = setInterval(() => {
         beat = (beat % 4) + 1;
-        playMetronomeTick(beat === 1);
+        playMetronomeTickRef.current?.(beat === 1);
       }, intervalMs);
     }
-  }, [activeMetronomeBpm, playMetronomeTick]);
+  }, [activeMetronomeBpm]);
 
   useEffect(() => {
     return () => {
@@ -886,9 +892,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     activeBookAssigned: any,
     pageNumber: number | null,
     currentExercises: LehrwerkExercise[]
-  ): { nextNum: number; prefix: string } => {
+  ): { nextNum: number | string; prefix: string } => {
     // 1. Gather all page states hybrid from active state + localStorage
-    let combinedPageStates: Record<number, any> = { ...(activeBookAssigned?.pageStates || {}) };
+    let combinedPageStates: Record<string | number, any> = { ...(activeBookAssigned?.pageStates || {}) };
     let storedBookPrefix: string | undefined = activeBookAssigned?.exercisePrefix;
 
     try {
@@ -935,14 +941,54 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
       .filter(n => n > 0);
 
     if (currentNums.length > 0) {
-      return { nextNum: Math.max(...currentNums) + 1, prefix: finalPrefix };
+      const currentMax = Math.max(...currentNums);
+      const candidateNum = currentMax + 1;
+
+      // 🛡️ Predictive Collision Check on subsequent pages (p > pageNumber)
+      let hasCollisionLater = false;
+      if (pageNumber) {
+        for (const [pStr, pState] of Object.entries(combinedPageStates)) {
+          const p = parseInt(pStr, 10);
+          if (!isNaN(p) && p > pageNumber) {
+            const pExs: LehrwerkExercise[] = pState?.exercises || [];
+            if (pExs.some(ex => {
+              const m = ex.label?.match(/\d+/);
+              return m && parseInt(m[0], 10) === candidateNum;
+            })) {
+              hasCollisionLater = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (hasCollisionLater) {
+        // Find existing letter suffixes for currentMax (e.g. 5a, 5b)
+        const existingSuffixes = (currentExercises || [])
+          .map(ex => {
+            const m = ex.label?.match(new RegExp(`${currentMax}([a-z])`, 'i'));
+            return m ? m[1].toLowerCase() : null;
+          })
+          .filter(Boolean) as string[];
+
+        if (existingSuffixes.length > 0) {
+          const lastChar = existingSuffixes.sort()[existingSuffixes.length - 1];
+          const nextChar = String.fromCharCode(lastChar.charCodeAt(0) + 1);
+          return { nextNum: `${currentMax}${nextChar}`, prefix: finalPrefix };
+        } else {
+          return { nextNum: `${currentMax}b`, prefix: finalPrefix };
+        }
+      }
+
+      return { nextNum: candidateNum, prefix: finalPrefix };
     }
 
     // 4. If current page has no exercises, scan all preceding pages in the book for the highest exercise number
     let maxPreviousNum = 0;
     if (pageNumber && pageNumber > 1) {
       for (let p = 1; p < pageNumber; p++) {
-        const pExercises: LehrwerkExercise[] = combinedPageStates[p]?.exercises || [];
+        const pState = combinedPageStates[p] || combinedPageStates[String(p)];
+        const pExercises: LehrwerkExercise[] = pState?.exercises || [];
         for (const ex of pExercises) {
           const match = ex.label?.match(/\d+/);
           if (match) {
@@ -2037,39 +2083,128 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   };
                 }
                 const bookColor = getLehrwerkColor(book.title);
-                const pct = assignedBook ? Math.min(100, Math.round((Object.values(assignedBook.pageStates || {}).filter((p: any) => p.status === 'mastered').length / (book.totalPages || 50)) * 100)) : 0;
-                const pages = Array.from({ length: book.totalPages || 50 }, (_, i) => i + 1);
+                const totalBookPages = Number(assignedBook?.totalPages || assignedBook?.total_pages || book?.totalPages || book?.total_pages || 50);
+                const pct = assignedBook ? Math.min(100, Math.round((Object.values(assignedBook.pageStates || {}).filter((p: any) => p.status === 'mastered').length / totalBookPages) * 100)) : 0;
+                const pages = Array.from({ length: totalBookPages }, (_, i) => i + 1);
                 const currentVisibility = assignedBook?.visibility || 'private';
+
+                const handleUpdateBookPages = (newTotal: number) => {
+                  if (isNaN(newTotal) || newTotal < 1) return;
+                  const safeTotal = Math.min(999, Math.max(1, Math.round(newTotal)));
+
+                  try {
+                    const stored = localStorage.getItem('student_lehrwerke_progress');
+                    const parsed = stored ? JSON.parse(stored) : [];
+                    let found = false;
+                    const updated = parsed.map((item: any) => {
+                      if ((student?.id ? String(item.studentId) === String(student.id) : true) && String(item.lehrwerkId) === String(activeLehrwerkId)) {
+                        found = true;
+                        return {
+                          ...item,
+                          totalPages: safeTotal,
+                          total_pages: safeTotal
+                        };
+                      }
+                      return item;
+                    });
+                    if (!found) {
+                      updated.push({
+                        studentId: student?.id,
+                        lehrwerkId: activeLehrwerkId,
+                        bookTitle: book.title,
+                        totalPages: safeTotal,
+                        total_pages: safeTotal,
+                        assignedAt: new Date().toISOString(),
+                        visibility: 'private',
+                        pageStates: {}
+                      });
+                    }
+                    localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+                  } catch (err) {
+                    console.warn('[handleUpdateBookPages] localStorage error:', err);
+                  }
+
+                  if (typeof setAssignedLehrwerke === 'function') {
+                    setAssignedLehrwerke((prev: any[]) => {
+                      const exists = prev.some(a => String(a.lehrwerkId) === String(activeLehrwerkId));
+                      if (exists) {
+                        return prev.map(a => String(a.lehrwerkId) === String(activeLehrwerkId) ? { ...a, totalPages: safeTotal, total_pages: safeTotal } : a);
+                      } else {
+                        return [...prev, {
+                          studentId: student?.id,
+                          lehrwerkId: activeLehrwerkId,
+                          bookTitle: book.title,
+                          totalPages: safeTotal,
+                          total_pages: safeTotal,
+                          pageStates: {}
+                        }];
+                      }
+                    });
+                  }
+
+                  book.totalPages = safeTotal;
+                  book.total_pages = safeTotal;
+                  if (assignedBook) {
+                    assignedBook.totalPages = safeTotal;
+                    assignedBook.total_pages = safeTotal;
+                  }
+
+                  try {
+                    supabase.from('campus_lehrwerke').update({ total_pages: safeTotal }).eq('id', activeLehrwerkId).then(() => {});
+                  } catch {}
+
+                  if (activePageNumber > safeTotal) {
+                    selectTextbookPage(activeLehrwerkId, safeTotal);
+                  }
+                };
+
+                const handleAddPage = () => {
+                  const currentTotal = totalBookPages;
+                  const newTotal = currentTotal + 1;
+                  handleUpdateBookPages(newTotal);
+                  selectTextbookPage(activeLehrwerkId, newTotal);
+                };
+
+                const handleRemovePage = () => {
+                  const currentTotal = totalBookPages;
+                  if (currentTotal <= 1) {
+                    alert('Ein Lehrwerk muss mindestens eine Seite haben.');
+                    return;
+                  }
+                  const lastPage = currentTotal;
+                  const lastPageState = assignedBook?.pageStates?.[lastPage];
+                  const lastPageExercises = (lastPageState?.exercises || []).length;
+                  const hasContent = Boolean(lastPageState?.homeworkNotes || lastPageState?.homework_notes || lastPageState?.status === 'mastered' || lastPageState?.status === 'homework' || lastPageExercises > 0);
+                  
+                  if (hasContent) {
+                    const confirmDelete = window.confirm(`Auf Seite ${lastPage} sind bereits Hausaufgaben oder Übungen notiert. Möchtest du Seite ${lastPage} wirklich entfernen?`);
+                    if (!confirmDelete) return;
+                  }
+                  
+                  const newTotal = currentTotal - 1;
+                  handleUpdateBookPages(newTotal);
+                  if (activePageNumber >= lastPage) {
+                    selectTextbookPage(activeLehrwerkId, newTotal);
+                  }
+                };
+
+                const handlePromptSetPages = () => {
+                  const currentTotal = totalBookPages;
+                  const input = window.prompt(`Wie viele Seiten hat dieses Lehrwerk insgesamt? (Aktuell: ${currentTotal})`, String(currentTotal));
+                  if (input !== null) {
+                    const parsed = parseInt(input.trim(), 10);
+                    if (!isNaN(parsed) && parsed >= 1 && parsed <= 999) {
+                      if (parsed < currentTotal) {
+                        const confirmShrink = window.confirm(`Möchtest du die Seitenanzahl wirklich von ${currentTotal} auf ${parsed} reduzieren?`);
+                        if (!confirmShrink) return;
+                      }
+                      handleUpdateBookPages(parsed);
+                    }
+                  }
+                };
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    {/* Zurück zum Aufgabenheft Header Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleBackToHub()}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: '#ffffff',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '8px 14px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        color: '#0f172a',
-                        cursor: 'pointer',
-                        alignSelf: 'flex-start',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                      aria-label="Zurück zum Aufgabenheft"
-                    >
-                      <ChevronLeft size={16} strokeWidth={2.5} />
-                      <span>Zurück zum Aufgabenheft</span>
-                    </button>
-
                     {/* Textbook Cover Card */}
                     <div style={{
                       background: 'white',
@@ -2085,25 +2220,26 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       <div style={{
                         width: '54px',
                         height: '70px',
-                        background: bookColor ? `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})` : '#e2e8f0',
-                        borderRadius: '6px',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                        border: 'none',
+                        background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
+                        borderRadius: '10px',
+                        boxShadow: `0 6px 16px ${bookColor.from}40`,
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0
                       }}>
-                        {bookColor && <BookOpen size={22} color={bookColor.text} />}
+                        <BookOpen size={22} color="#ffffff" strokeWidth={1.8} />
                         <div style={{
                           position: 'absolute',
                           left: 0,
                           top: 0,
                           bottom: 0,
-                          width: '6px',
-                          background: 'rgba(0,0,0,0.08)',
-                          borderRight: '1px solid rgba(255,255,255,0.1)'
+                          width: '7px',
+                          background: 'rgba(255,255,255,0.22)',
+                          borderRight: '1px solid rgba(0,0,0,0.15)',
+                          borderTopLeftRadius: '10px',
+                          borderBottomLeftRadius: '10px'
                         }} />
                       </div>
                       <div style={{ flex: 1, minWidth: '220px' }}>
@@ -2119,20 +2255,20 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   {book.title}
                                 </h4>
                                 {isStudentCreated ? (
-                                  <span style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 800, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '10px' }}>
-                                    🙋 Eigenes Lehrwerk
+                                  <span style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 800, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <BookOpen size={11} strokeWidth={2} style={{ color: '#64748b' }} /> Eigenes Lehrwerk
                                   </span>
                                 ) : isStudentViewingTeacherBook ? (
                                   <span style={{ color: '#166534', fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                    👨‍🏫 Von deiner Lehrkraft begleitet
+                                    <Users size={11} strokeWidth={2} style={{ color: '#16a34a' }} /> Von deiner Lehrkraft begleitet
                                   </span>
                                 ) : activeLehrwerkId.startsWith('custom-') || book.is_custom || assignedBook?.createdByRole === 'teacher' || book.created_by_teacher ? (
-                                  <span style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 800, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '10px' }}>
-                                    👨‍🏫 Vom Lehrer angelegt
+                                  <span style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 800, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <Users size={11} strokeWidth={2} style={{ color: '#64748b' }} /> Vom Lehrer angelegt
                                   </span>
                                 ) : (
-                                  <span style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 800, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '10px' }}>
-                                    🎓 Lehrwerk
+                                  <span style={{ color: '#475569', fontSize: '0.72rem', fontWeight: 800, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <BookOpen size={11} strokeWidth={2} style={{ color: '#64748b' }} /> Lehrwerk
                                   </span>
                                 )}
                               </div>
@@ -2151,8 +2287,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   flexWrap: 'wrap',
                                   gap: '8px'
                                 }}>
-                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span>🛡️</span> Sichtbarkeit & Rechte:
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <Lock size={12} strokeWidth={2} style={{ color: '#64748b' }} /> Sichtbarkeit & Rechte:
                                   </span>
                                   <div style={{
                                     display: 'inline-flex',
@@ -2181,7 +2317,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         gap: '4px'
                                       }}
                                     >
-                                      🔒 Privat
+                                      <Lock size={11} strokeWidth={2} /> Privat
                                     </button>
 
                                     <button
@@ -2203,7 +2339,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         gap: '4px'
                                       }}
                                     >
-                                      👁️ Lehrer liest mit
+                                      <Eye size={11} strokeWidth={2} /> Lehrer liest mit
                                     </button>
 
                                     <button
@@ -2225,7 +2361,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         gap: '4px'
                                       }}
                                     >
-                                      🤝 Lehrer darf eintragen
+                                      <Users size={11} strokeWidth={2} /> Lehrer darf eintragen
                                     </button>
                                   </div>
                                 </div>
@@ -2236,9 +2372,95 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   von {book.author}
                                 </p>
                               )}
-                              <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                                📖 {book.totalPages || 50} Seiten • {pct}% gemeistert
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', margin: '4px 0 2px 0' }}>
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  background: '#f8fafc',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '11px',
+                                  padding: '2px',
+                                  gap: '2px'
+                                }}>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemovePage}
+                                    disabled={totalBookPages <= 1}
+                                    title={`Letzte Seite (Seite ${totalBookPages}) entfernen`}
+                                    aria-label="Letzte Seite entfernen"
+                                    style={{
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '8px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: totalBookPages <= 1 ? '#cbd5e1' : '#475569',
+                                      fontSize: '0.9rem',
+                                      fontWeight: 900,
+                                      cursor: totalBookPages <= 1 ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    −
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handlePromptSetPages}
+                                    title="Klicken, um Gesamtseitenzahl direkt anzupassen"
+                                    aria-label="Gesamtseitenzahl anpassen"
+                                    style={{
+                                      border: 'none',
+                                      background: '#ffffff',
+                                      color: '#0f172a',
+                                      padding: '3px 8px',
+                                      borderRadius: '7px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    <BookOpen size={11} strokeWidth={2} style={{ color: '#475569' }} />
+                                    <span>{totalBookPages} Seiten</span>
+                                    <Pencil size={9} strokeWidth={2} style={{ color: '#94a3b8' }} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleAddPage}
+                                    title="Neue Seite am Ende anhängen"
+                                    aria-label="Neue Seite hinzufügen"
+                                    style={{
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '8px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: '#166534',
+                                      fontSize: '0.9rem',
+                                      fontWeight: 900,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+                                  {pct}% gemeistert
+                                </span>
+                              </div>
                               <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
                                 <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #34a853)', transition: 'width 0.4s ease' }} />
                               </div>
@@ -2248,36 +2470,52 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       </div>
                     </div>
 
-                    {/* Teacher-Only Brush Panel (For students, completely eliminated to gain 120px height) */}
+                    {/* 🖌️ Pinsel zum Einfärben (Lehrkraft: 4 Pinsel, Schüler: Mein Fokus Pinsel) */}
                     {(() => {
                       const isStudentCreated = Boolean(assignedBook?.isStudentCreated || assignedBook?.createdByRole === 'student' || book.created_by_role === 'student');
                       const isStudentViewingTeacherBook = Boolean(readOnly && !isStudentCreated);
 
-                      if (isStudentViewingTeacherBook) {
-                        return null; // 🚀 100% Goldstandard: Student has compact Focus Toggle directly in the grid header below!
-                      }
+                      const focusCount = pages.filter(p => assignedBook.pageStates?.[p]?.studentFocus).length;
+
+                      const brushes = isStudentViewingTeacherBook
+                        ? [
+                            {
+                              mode: 'STUDENT_FOCUS',
+                              color: '#c084fc',
+                              border: '#9333ea',
+                              label: `Mein Fokus (Max. 3)${focusCount > 0 ? ` (${focusCount}/3)` : ''}`
+                            }
+                          ]
+                        : [
+                            { mode: 'LOCKED', color: '#e2e8f0', label: 'grau = offen' },
+                            { mode: 'HOMEWORK', color: '#fde047', label: 'gelb = Hausaufgabe' },
+                            { mode: 'MASTERED', color: '#86efac', label: 'grün = erledigt' },
+                            { mode: 'STUDENT_FOCUS', color: '#c084fc', border: '#9333ea', label: `lila = Mein Fokus (Max. 3)${focusCount > 0 ? ` (${focusCount}/3)` : ''}` }
+                          ];
 
                       return (
                         <div style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '8px',
+                          gap: '6px',
                           background: 'white',
                           borderRadius: '18px',
-                          padding: '12px 16px',
-                          border: '1px solid rgba(0, 0, 0, 0.08)',
-                          boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
+                          padding: isStudentViewingTeacherBook ? '10px 16px' : '12px 16px',
+                          border: isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS'
+                            ? '1.5px solid #a855f7'
+                            : '1px solid rgba(0, 0, 0, 0.08)',
+                          boxShadow: isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS'
+                            ? '0 3px 12px rgba(168, 85, 247, 0.12)'
+                            : '0 4px 15px rgba(0,0,0,0.02)',
+                          transition: 'all 0.15s ease'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>🖌️</span> Pinsel zum Einfärben:
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <Edit3 size={13} strokeWidth={2.2} style={{ color: isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS' ? '#7e22ce' : '#4b5563' }} />
+                              <span>{isStudentViewingTeacherBook ? 'Pinsel für deinen Fokus:' : 'Pinsel zum Einfärben:'}</span>
                             </span>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {[
-                                { mode: 'LOCKED', color: '#e2e8f0', label: 'grau = offen' },
-                                { mode: 'HOMEWORK', color: '#fde047', label: 'gelb = Hausaufgabe' },
-                                { mode: 'MASTERED', color: '#86efac', label: 'grün = erledigt' }
-                              ].map(b => {
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {brushes.map(b => {
                                 const isActive = activeBrush === b.mode;
                                 return (
                                   <button
@@ -2288,22 +2526,68 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
                                     }}
                                     style={{
-                                      width: '28px',
-                                      height: '28px',
-                                      borderRadius: '50%',
-                                      background: b.color,
-                                      border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
+                                      height: isStudentViewingTeacherBook ? '30px' : '28px',
+                                      borderRadius: isStudentViewingTeacherBook ? '12px' : '50%',
+                                      padding: isStudentViewingTeacherBook ? '0 12px' : '0',
+                                      minWidth: isStudentViewingTeacherBook ? 'auto' : '28px',
+                                      background: isActive
+                                        ? (b.mode === 'STUDENT_FOCUS' ? '#9333ea' : b.color)
+                                        : (isStudentViewingTeacherBook ? '#f3e8ff' : b.color),
+                                      border: isActive
+                                        ? (b.mode === 'STUDENT_FOCUS' ? '2.5px solid #6b21a8' : '3px solid #0f172a')
+                                        : (b.border ? `1.5px solid ${b.border}` : '1.5px solid #cbd5e1'),
+                                      color: isActive ? '#ffffff' : (isStudentViewingTeacherBook ? '#6b21a8' : '#334155'),
                                       cursor: 'pointer',
                                       transition: 'all 0.15s ease',
-                                      transform: isActive ? 'scale(1.15)' : 'none',
-                                      outline: 'none'
+                                      transform: isActive ? 'scale(1.05)' : 'none',
+                                      outline: 'none',
+                                      boxShadow: isActive
+                                        ? (b.mode === 'STUDENT_FOCUS' ? '0 2px 10px rgba(147, 51, 234, 0.35)' : '0 2px 6px rgba(0,0,0,0.15)')
+                                        : 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '6px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 850
                                     }}
+                                    className="hover-scale-mini"
                                     title={b.label}
-                                  />
+                                  >
+                                    {isStudentViewingTeacherBook ? (
+                                      <>
+                                        <span style={{
+                                          width: '7px',
+                                          height: '7px',
+                                          borderRadius: '50%',
+                                          background: isActive ? '#ffffff' : '#9333ea'
+                                        }} />
+                                        <span>{isActive ? '✓ Pinsel aktiv' : 'Mein Fokus (Max. 3)'}</span>
+                                        <span style={{
+                                          fontSize: '0.66rem',
+                                          fontWeight: 800,
+                                          opacity: 0.85
+                                        }}>
+                                          ({focusCount}/3)
+                                        </span>
+                                      </>
+                                    ) : (
+                                      b.mode === 'STUDENT_FOCUS' && focusCount > 0 && (
+                                        <span style={{ fontSize: '0.62rem', fontWeight: 950, color: isActive ? '#ffffff' : '#6b21a8' }}>
+                                          {focusCount}
+                                        </span>
+                                      )
+                                    )}
+                                  </button>
                                 );
                               })}
                             </div>
                           </div>
+                          {isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS' && (
+                            <div style={{ fontSize: '0.68rem', color: '#7e22ce', fontWeight: 700, paddingLeft: '18px' }}>
+                              Tippe auf Seiten in der Übersicht, um bis zu 3 Fokus-Seiten einzufärben!
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -2317,82 +2601,122 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                           return (
                             <>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px', flexWrap: 'wrap', gap: '8px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7d7d82' }}>Seitenübersicht:</span>
-                                  {(() => {
-                                    const quickHwPage = pages.find(p => assignedBook.pageStates?.[p]?.status === 'homework' || assignedBook.pageStates?.[p]?.isCurrentHomework);
-                                    const quickFocusPage = pages.find(p => assignedBook.pageStates?.[p]?.studentFocus);
-                                    const targetPage = quickHwPage || quickFocusPage;
-                                    if (!targetPage || activePageNumber === targetPage) return null;
-                                    return (
+                              {(() => {
+                                const homeworkCount = pages.filter(p => assignedBook.pageStates?.[p]?.status === 'homework' || assignedBook.pageStates?.[p]?.isCurrentHomework).length;
+                                const focusCount = pages.filter(p => assignedBook.pageStates?.[p]?.studentFocus).length;
+
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                                    {/* Apple 2027 Segmented Control Filter */}
+                                    <div style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      background: '#f1f5f9',
+                                      padding: '3px',
+                                      borderRadius: '12px',
+                                      gap: '2px',
+                                      border: '1px solid #e2e8f0'
+                                    }}>
                                       <button
                                         type="button"
-                                        onClick={() => selectTextbookPage(activeLehrwerkId!, targetPage)}
+                                        onClick={() => setTextbookPageFilter('all')}
                                         style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          background: '#fef9c3',
-                                          border: '1.5px solid #fde047',
-                                          color: '#854d0e',
-                                          padding: '3px 9px',
-                                          borderRadius: '999px',
-                                          fontSize: '0.69rem',
+                                          padding: '4px 10px',
+                                          borderRadius: '9px',
+                                          border: 'none',
+                                          background: textbookPageFilter === 'all' ? '#ffffff' : 'transparent',
+                                          color: textbookPageFilter === 'all' ? '#0f172a' : '#64748b',
                                           fontWeight: 800,
+                                          fontSize: '0.72rem',
                                           cursor: 'pointer',
+                                          boxShadow: textbookPageFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                                           transition: 'all 0.15s ease'
                                         }}
-                                        className="hover-scale-mini"
-                                        title={`Sofort zu Seite ${targetPage} springen`}
                                       >
-                                        <Zap size={11} fill="#eab308" color="#eab308" />
-                                        <span>Zur Hausaufgabe (S. {targetPage})</span>
+                                        Alle ({pages.length})
                                       </button>
-                                    );
-                                  })()}
-                                </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setTextbookPageFilter('homework')}
+                                        style={{
+                                          padding: '4px 10px',
+                                          borderRadius: '9px',
+                                          border: 'none',
+                                          background: textbookPageFilter === 'homework' ? '#ffffff' : 'transparent',
+                                          color: textbookPageFilter === 'homework' ? '#854d0e' : '#64748b',
+                                          fontWeight: 800,
+                                          fontSize: '0.72rem',
+                                          cursor: 'pointer',
+                                          boxShadow: textbookPageFilter === 'homework' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                          transition: 'all 0.15s ease',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#eab308' }} />
+                                        <span>Hausaufgaben ({homeworkCount})</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setTextbookPageFilter('focus')}
+                                        style={{
+                                          padding: '4px 10px',
+                                          borderRadius: '9px',
+                                          border: 'none',
+                                          background: textbookPageFilter === 'focus' ? '#ffffff' : 'transparent',
+                                          color: textbookPageFilter === 'focus' ? '#6b21a8' : '#64748b',
+                                          fontWeight: 800,
+                                          fontSize: '0.72rem',
+                                          cursor: 'pointer',
+                                          boxShadow: textbookPageFilter === 'focus' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                          transition: 'all 0.15s ease',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                        title="Mein Fokus (Max. 3 Seiten)"
+                                        aria-label="Mein Fokus (Max. 3 Seiten)"
+                                      >
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9333ea' }} />
+                                        <span>Mein Fokus (Max. 3){focusCount > 0 ? ` (${focusCount}/3)` : ''}</span>
+                                      </button>
+                                    </div>
 
-                                {/* Compact Focus Toggle (Always available for both student and teacher) */}
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveBrush(prev => prev === 'STUDENT_FOCUS' ? 'NONE' : 'STUDENT_FOCUS')}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '4px 10px',
-                                    borderRadius: '999px',
-                                    background: activeBrush === 'STUDENT_FOCUS' ? '#f3e8ff' : '#ffffff',
-                                    border: activeBrush === 'STUDENT_FOCUS' ? '1.5px solid #c084fc' : '1.5px solid #cbd5e1',
-                                    color: activeBrush === 'STUDENT_FOCUS' ? '#6b21a8' : '#475569',
-                                    fontWeight: 800,
-                                    fontSize: '0.70rem',
-                                    cursor: 'pointer',
-                                    boxShadow: activeBrush === 'STUDENT_FOCUS' ? '0 1px 4px rgba(168, 85, 247, 0.2)' : 'none',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="tactile-btn"
-                                  title={activeBrush === 'STUDENT_FOCUS' ? 'Fokus-Pinsel beenden' : 'Tippe im Raster auf Seiten, um deinen Übe-Fokus zu setzen (Max. 3)'}
-                                >
-                                  <span style={{
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    background: '#9333ea',
-                                    display: 'inline-block'
-                                  }} />
-                                  <span>{activeBrush === 'STUDENT_FOCUS' ? 'Mein Fokus aktiv' : 'Mein Fokus'}</span>
-                                </button>
-                              </div>
-
-                              {/* Flat, Calm Color Legend directly above the page grid */}
-                              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', padding: '4px 0 8px 0', borderBottom: '1px solid #f1f5f9', fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
-                                <span><span style={{ color: '#facc15' }}>●</span> Gelb (Hausaufgabe)</span>
-                                <span><span style={{ color: '#22c55e' }}>●</span> Grün (erledigt)</span>
-                                <span><span style={{ color: '#cbd5e1' }}>●</span> Grau (offen)</span>
-                                <span><span style={{ color: '#a855f7' }}>●</span> Lila (Mein Fokus)</span>
-                              </div>
+                                    {(() => {
+                                      const quickHwPage = pages.find(p => assignedBook.pageStates?.[p]?.status === 'homework' || assignedBook.pageStates?.[p]?.isCurrentHomework);
+                                      const quickFocusPage = pages.find(p => assignedBook.pageStates?.[p]?.studentFocus);
+                                      const targetPage = quickHwPage || quickFocusPage;
+                                      if (!targetPage || activePageNumber === targetPage) return null;
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() => selectTextbookPage(activeLehrwerkId!, targetPage)}
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            background: '#fef9c3',
+                                            border: '1.5px solid #fde047',
+                                            color: '#854d0e',
+                                            padding: '3px 9px',
+                                            borderRadius: '999px',
+                                            fontSize: '0.69rem',
+                                            fontWeight: 800,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          className="hover-scale-mini"
+                                          title={`Sofort zu Seite ${targetPage} springen`}
+                                        >
+                                          <Zap size={11} strokeWidth={2.5} style={{ color: '#854d0e' }} />
+                                          <span>Zur Hausaufgabe (S. {targetPage})</span>
+                                        </button>
+                                      );
+                                    })()}
+                                  </div>
+                                );
+                              })()}
                             </>
                           );
                         })()}
@@ -2438,10 +2762,37 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           padding: '4px'
                         }}>
                           {(() => {
-                            const totalChunks = Math.ceil(pages.length / 60);
+                            const baseFilteredPages = textbookPageFilter === 'homework'
+                              ? pages.filter(p => assignedBook.pageStates?.[p]?.status === 'homework' || assignedBook.pageStates?.[p]?.isCurrentHomework)
+                              : (textbookPageFilter === 'focus'
+                                  ? pages.filter(p => assignedBook.pageStates?.[p]?.studentFocus)
+                                  : pages);
+
+                            if (baseFilteredPages.length === 0) {
+                              return (
+                                <div style={{
+                                  gridColumn: '1 / -1',
+                                  padding: '32px 16px',
+                                  textAlign: 'center',
+                                  background: '#f8fafc',
+                                  borderRadius: '16px',
+                                  border: '1.5px dashed #cbd5e1',
+                                  color: '#64748b',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 650,
+                                  lineHeight: 1.5
+                                }}>
+                                  {textbookPageFilter === 'focus' 
+                                    ? 'Noch keine Fokus-Seiten gewählt. Wähle bis zu 3 Seiten aus, auf die du dich konzentrieren möchtest (Klick auf „Zu Mein Fokus (Max. 3)“ auf der Seite).'
+                                    : 'In diesem Lehrwerk sind aktuell keine Hausaufgaben aufgegeben.'}
+                                </div>
+                              );
+                            }
+
+                            const totalChunks = Math.ceil(baseFilteredPages.length / 60);
                             const activeChunkIndex = Math.min(textbookPageChunkIndex, Math.max(0, totalChunks - 1));
-                            const displayedPages = pages.length > 60 ? pages.slice(activeChunkIndex * 60, (activeChunkIndex + 1) * 60) : pages;
-                            return displayedPages.map(num => {
+                            const displayedPages = baseFilteredPages.length > 60 ? baseFilteredPages.slice(activeChunkIndex * 60, (activeChunkIndex + 1) * 60) : baseFilteredPages;
+                            const pageButtons = displayedPages.map(num => {
                               const pageState = assignedBook.pageStates?.[num] || { status: 'locked' };
                               const globalPage = book.globalPageStates?.[num] === 'purple';
                               const status = globalPage ? 'purple' : (pageState.status || 'locked');
@@ -2590,7 +2941,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   )}
                                   {isStudentFocus && (
                                     <span 
-                                      title="Mein Fokus" 
+                                      title="Mein Fokus (Max. 3)" 
                                       style={{
                                         position: 'absolute',
                                         top: '-3px',
@@ -2608,6 +2959,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 </button>
                               );
                             });
+
+                            return pageButtons;
                           })()}
                         </div>
                       </div>
@@ -2624,33 +2977,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    {/* Zurück zum Aufgabenheft Header Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleBackToHub()}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: '#ffffff',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '8px 14px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        color: '#0f172a',
-                        cursor: 'pointer',
-                        alignSelf: 'flex-start',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                      aria-label="Zurück zum Aufgabenheft"
-                    >
-                      <ChevronLeft size={16} strokeWidth={2.5} />
-                      <span>Zurück zum Aufgabenheft</span>
-                    </button>
-
                     {/* 🎵 0.1% Goldstandard 2027 Song Hero Card */}
                     <div style={{
                       display: 'flex',
@@ -4745,14 +5071,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <span style={{
                                 fontSize: '0.62rem',
                                 fontWeight: 900,
-                                color: bookColor.text || '#ffffff',
+                                color: '#ffffff',
                                 textAlign: 'center',
                                 lineHeight: 1.15,
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical',
                                 overflow: 'hidden',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                                textShadow: '0 1px 3px rgba(0,0,0,0.35)'
                               }}>
                                 {book.title}
                               </span>
@@ -4826,8 +5152,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             </h4>
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: '#475569', fontWeight: 750 }}>
-                              <span>{total} S.</span>
-                              <span style={{ color: worked > 0 ? '#15803d' : '#64748b', fontWeight: 800 }}>{worked} gem.</span>
+                              <span>{total} Seiten</span>
+                              <span style={{ color: worked > 0 ? '#15803d' : '#64748b', fontWeight: 800 }}>
+                                {worked > 0 ? `${worked} gemeistert` : '0 gemeistert'}
+                              </span>
                             </div>
 
                             {/* Subtle Progress Bar */}
@@ -6111,8 +6439,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       {/* Internal teacher notes */}
                       {!readOnly && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
-                            🔒 Interne Notiz (nur für Lehrer)
+                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Lock size={13} strokeWidth={2} style={{ color: '#64748b' }} />
+                            <span>Interne Notiz (nur für Lehrer)</span>
                           </label>
                           <div style={{
                             width: '100%', minHeight: '60px', padding: '12px 14px', borderRadius: '16px',
@@ -6170,49 +6499,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               borderRadius: '999px',
                               boxShadow: '0 1px 3px rgba(109, 40, 217, 0.1)'
                             }}>
-                              <span>🟣</span>
-                              <span>{readOnly ? 'Mein Fokus' : 'Schüler-Übefokus'}</span>
+                              <Target size={12} strokeWidth={2.2} style={{ color: '#6d28d9', flexShrink: 0 }} />
+                              <span>{readOnly ? 'Mein Fokus (Max. 3)' : 'Schüler-Übefokus (Max. 3)'}</span>
                             </span>
                           )}
                         </div>
 
-                        {/* Right side controls: If student, show focus toggle; otherwise teacher color buttons */}
-                        {(readOnly || isStudentViewingTeacherBook) ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (activeLehrwerkId && activePageNumber) {
-                                handleToggleStudentFocus(activeLehrwerkId, activePageNumber);
-                              }
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '5px 12px',
-                              borderRadius: '999px',
-                              background: isCurrentPageStudentFocused ? '#f3e8ff' : '#ffffff',
-                              border: isCurrentPageStudentFocused ? '1.5px solid #c084fc' : '1.5px solid #cbd5e1',
-                              color: isCurrentPageStudentFocused ? '#6b21a8' : '#475569',
-                              fontWeight: 800,
-                              fontSize: '0.72rem',
-                              cursor: 'pointer',
-                              boxShadow: isCurrentPageStudentFocused ? '0 1px 4px rgba(168, 85, 247, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="tactile-btn"
-                            title={isCurrentPageStudentFocused ? "Aus Mein Fokus entfernen" : "Zu Mein Fokus hinzufügen (Max. 3)"}
-                          >
-                            <span style={{
-                              width: '7px',
-                              height: '7px',
-                              borderRadius: '50%',
-                              background: '#9333ea',
-                              display: 'inline-block'
-                            }} />
-                            <span>{isCurrentPageStudentFocused ? 'In Mein Fokus' : 'Zu Mein Fokus'}</span>
-                          </button>
-                        ) : (
+                        {/* Right side controls: Teacher color buttons (student focus is controlled via left-hand palette brush) */}
+                        {!(readOnly || isStudentViewingTeacherBook) && (
                           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                             {[
                               { mode: 'LOCKED', color: '#e2e8f0', label: 'Grau (offen)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', false); } },
@@ -6277,7 +6571,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           animation: 'pulse 2s infinite'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', fontWeight: 800, color: '#854d0e' }}>
-                            <span style={{ fontSize: '1.05rem' }}>⏱️</span>
+                            <Clock size={16} strokeWidth={2.2} style={{ color: '#854d0e', flexShrink: 0 }} />
                             <span>Metronom läuft kontinuierlich: <strong>{activeMetronomeBpm} BPM</strong></span>
                           </div>
                           <button
@@ -6345,7 +6639,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           const cleanLabel = ex.label.replace(/[✓✔]/g, '').trim();
                           // Canonical standard is "Nr. X" (cleanly maps legacy "Üb. X" and "Eigene Üb. X")
                           const displayLabel = cleanLabel.replace(/^(?:Eigene\s*Üb\.|Üb\.|Übung)\s*/i, 'Nr. ');
-                          const canDeleteEx = !isStudentViewingTeacherBook || ex.createdBy === 'student';
+                          const canDeleteEx = true;
 
                           return (
                             <div
@@ -6395,6 +6689,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   transition: 'all 0.15s ease'
                                 }}
                                 title={isMastered ? 'Als noch zu üben markieren' : 'Als erledigt markieren'}
+                                aria-label={isMastered ? 'Als noch zu üben markieren' : 'Als erledigt markieren'}
                               >
                                 {isMastered && <Check size={11} strokeWidth={3} />}
                               </button>
@@ -6405,21 +6700,28 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 onClick={() => setSelectedExerciseId(isSelected ? null : ex.id)}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
-                                  const custom = window.prompt('Übungsbezeichnung anpassen (z. B. Nr. 1, Groove 1, 1):', displayLabel);
-                                  if (custom && custom.trim()) {
+                                  const custom = window.prompt('Übungsbezeichnung anpassen (z. B. Nr. 1, Groove 1, 1). Leer lassen zum Löschen:', displayLabel);
+                                  if (custom !== null) {
                                     const trimmed = custom.trim();
-                                    const prefixMatch = trimmed.match(/^([^\d]*)(\d+)/);
-                                    if (prefixMatch) {
-                                      const newPrefix = prefixMatch[1];
-                                      updateBookExercisePrefix(newPrefix);
+                                    if (!trimmed) {
+                                      // Empty input -> delete exercise!
+                                      const updated = currentExercises.filter(item => item.id !== ex.id);
+                                      updateExercisesForCurrentPage(updated);
+                                      if (selectedExerciseId === ex.id) setSelectedExerciseId(null);
+                                    } else {
+                                      const prefixMatch = trimmed.match(/^([^\d]*)(\d+)/);
+                                      if (prefixMatch) {
+                                        const newPrefix = prefixMatch[1];
+                                        updateBookExercisePrefix(newPrefix);
+                                      }
+                                      const updated = currentExercises.map(item =>
+                                        item.id === ex.id ? { ...item, label: trimmed } : item
+                                      );
+                                      updateExercisesForCurrentPage(updated);
                                     }
-                                    const updated = currentExercises.map(item =>
-                                      item.id === ex.id ? { ...item, label: trimmed } : item
-                                    );
-                                    updateExercisesForCurrentPage(updated);
                                   }
                                 }}
-                                title={`${displayLabel} • Doppelklick zum Umbenennen`}
+                                title={`${displayLabel} • Doppelklick zum Umbenennen (oder Leer lassen zum Löschen)`}
                                 style={{
                                   background: 'transparent',
                                   border: 'none',
@@ -6449,22 +6751,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     gap: '3px',
                                     padding: '2px 5px',
                                     borderRadius: '6px',
-                                    background: isMetronomeActiveForEx ? '#854d0e' : '#fef08a',
-                                    color: isMetronomeActiveForEx ? '#ffffff' : '#854d0e',
-                                    border: '1px solid #ca8a04',
+                                    background: isMetronomeActiveForEx ? '#0f172a' : '#f8fafc',
+                                    color: isMetronomeActiveForEx ? '#ffffff' : '#0f172a',
+                                    border: isMetronomeActiveForEx ? '1px solid #0f172a' : '1px solid #cbd5e1',
                                     fontSize: '0.68rem',
                                     fontWeight: 900,
                                     cursor: 'pointer'
                                   }}
                                   title={`Metronom ${ex.targetBpm} BPM`}
+                                  aria-label={`Metronom ${ex.targetBpm} BPM`}
                                 >
-                                  {isMetronomeActiveForEx ? <Square size={9} fill="#ffffff" /> : <Play size={9} fill="#854d0e" />}
+                                  {isMetronomeActiveForEx ? <Square size={9} fill="#ffffff" /> : <Play size={9} fill="#0f172a" />}
                                   <span>{ex.targetBpm}</span>
                                 </button>
                               )}
 
-                              {/* Delete button: Only visible when chip is selected to eliminate visual noise */}
-                              {canDeleteEx && isSelected && (
+                              {/* Delete button: Permanently visible (User Requirement & 0.1% Goldstandard) */}
+                              {canDeleteEx && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -6477,26 +6780,29 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    width: '16px',
-                                    height: '16px',
+                                    width: '18px',
+                                    height: '18px',
                                     borderRadius: '50%',
-                                    background: 'transparent',
-                                    color: '#94a3b8',
-                                    border: 'none',
+                                    background: isSelected ? 'rgba(0,0,0,0.06)' : '#f1f5f9',
+                                    color: '#475569',
+                                    border: '1px solid #cbd5e1',
                                     cursor: 'pointer',
                                     padding: 0,
-                                    marginLeft: '2px'
+                                    marginLeft: '3px',
+                                    transition: 'all 0.15s ease'
                                   }}
                                   title="Übung entfernen"
+                                  aria-label="Übung entfernen"
+                                  className="tactile-btn hover-scale-mini"
                                 >
-                                  <X size={12} />
+                                  <X size={11} strokeWidth={2.5} />
                                 </button>
                               )}
                             </div>
                           );
                         })}
 
-                        {/* Add Exercise Button: Clean, Compact & Predictable (0.1% Goldstandard) */}
+                        {/* 0.1% Goldstandard Placeholder Button to Add Exercise Numbers */}
                         {(() => {
                           const { nextNum, prefix } = getSmartNextExerciseInfo(activeBookAssigned, activePageNumber, currentExercises);
                           const cleanPrefix = (prefix && !/^(?:Üb\.|Eigene\s*Üb\.|Übung)\s*/i.test(prefix)) ? prefix : 'Nr. ';
@@ -6513,29 +6819,166 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 updateExercisesForCurrentPage([...currentExercises, newEx]);
                                 setSelectedExerciseId(newEx.id);
                               }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                const custom = window.prompt(`Übungsbezeichnung eingeben (z. B. ${cleanPrefix}${nextNum}, Groove 1, Etüde 3):`, `${cleanPrefix}${nextNum}`);
+                                if (custom && custom.trim()) {
+                                  const trimmed = custom.trim();
+                                  const prefixMatch = trimmed.match(/^([^\d]*)(\d+)/);
+                                  if (prefixMatch) {
+                                    const newPrefix = prefixMatch[1];
+                                    updateBookExercisePrefix(newPrefix);
+                                  }
+                                  const newEx: LehrwerkExercise = {
+                                    id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                                    label: trimmed,
+                                    status: 'homework',
+                                    createdBy: readOnly ? 'student' : 'teacher'
+                                  };
+                                  updateExercisesForCurrentPage([...currentExercises, newEx]);
+                                  setSelectedExerciseId(newEx.id);
+                                }
+                              }}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '4px',
+                                gap: '5px',
                                 padding: '5px 12px',
                                 borderRadius: '10px',
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
+                                background: 'rgba(248, 250, 252, 0.85)',
+                                border: '1.5px dashed #94a3b8',
                                 color: '#475569',
-                                fontWeight: 750,
+                                fontWeight: 800,
                                 fontSize: '0.78rem',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease'
                               }}
                               className="tactile-btn hover-scale-mini"
-                              title={`Übung ${cleanPrefix}${nextNum} anlegen`}
+                              title={`Übung ${cleanPrefix}${nextNum} anlegen (Klick) oder anpassen (Doppelklick)`}
+                              aria-label={`Übung ${cleanPrefix}${nextNum} anlegen`}
                             >
-                              <Plus size={13} strokeWidth={2.5} />
-                              <span>{cleanPrefix}{nextNum}</span>
+                              <Plus size={13} strokeWidth={2.5} style={{ color: '#64748b' }} />
+                              <span>+ {cleanPrefix}{nextNum}</span>
                             </button>
                           );
                         })()}
                       </div>
+
+                      {/* 🎯 Kompakte Übungs-Fokusleiste für Schüler (0.1% Goldstandard) */}
+                      {selectedEx && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '10px',
+                          padding: '8px 14px',
+                          background: selectedEx.status === 'mastered' ? '#f0fdf4' : '#fefce8',
+                          border: selectedEx.status === 'mastered' ? '1.5px solid #86efac' : '1.5px solid #fde047',
+                          borderRadius: '12px',
+                          fontSize: '0.80rem',
+                          color: '#0f172a',
+                          fontWeight: 750,
+                          flexWrap: 'wrap',
+                          animation: 'fadeIn 0.15s ease'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                            <span style={{
+                              fontWeight: 900,
+                              color: selectedEx.status === 'mastered' ? '#15803d' : '#854d0e',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Target size={14} strokeWidth={2.2} />
+                              <span>{selectedEx.label}</span>
+                            </span>
+
+                            {/* Metronom Trigger if BPM exists */}
+                            {selectedEx.targetBpm && (
+                              <button
+                                type="button"
+                                onClick={() => toggleContinuousMetronome(selectedEx.targetBpm!)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: activeMetronomeBpm === selectedEx.targetBpm ? '#0f172a' : '#ffffff',
+                                  color: activeMetronomeBpm === selectedEx.targetBpm ? '#ffffff' : '#0f172a',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
+                                className="tactile-btn"
+                                title="Metronom für diese Übung starten"
+                              >
+                                <Play size={10} fill={activeMetronomeBpm === selectedEx.targetBpm ? '#ffffff' : '#0f172a'} />
+                                <span>{selectedEx.targetBpm} BPM</span>
+                              </button>
+                            )}
+
+                            {/* Optional micro note / tip */}
+                            {selectedEx.notes && (
+                              <span style={{ color: '#475569', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                💡 {selectedEx.notes}
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {/* 1-Tap Status Toggle */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextStatus = selectedEx.status === 'mastered' ? 'homework' : 'mastered';
+                                const updated = currentExercises.map(item => item.id === selectedEx.id ? { ...item, status: nextStatus as any } : item);
+                                updateExercisesForCurrentPage(updated);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 9px',
+                                borderRadius: '8px',
+                                background: selectedEx.status === 'mastered' ? '#16a34a' : '#eab308',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer'
+                              }}
+                              className="tactile-btn"
+                            >
+                              <Check size={11} strokeWidth={2.5} />
+                              <span>{selectedEx.status === 'mastered' ? 'Gemeistert' : 'Als erledigt markieren'}</span>
+                            </button>
+
+                            {/* Close / Return to whole page */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedExerciseId(null)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#64748b',
+                                cursor: 'pointer'
+                              }}
+                              title="Fokus aufheben (Ganze Seite)"
+                              aria-label="Fokus aufheben"
+                            >
+                              <X size={13} strokeWidth={2.5} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Smart-Parser 1-Tap Assistant Banner (When no exercises are set, but notes contain exercises) */}
                       {currentExercises.length === 0 && detectedFromNotes.length > 0 && (
@@ -6597,7 +7040,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          📝 Hausaufgabe & Notiz für diese Seite:
+                          <FileText size={15} strokeWidth={2.2} style={{ color: '#0f172a' }} />
+                          <span>Hausaufgabe & Notiz für diese Seite:</span>
                         </label>
                         <SpeechDictationButton
                           onTranscript={(text) => {
@@ -6738,13 +7182,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         })}
                       </div>
 
-                      {/* Presets Grid */}
+                      {/* Presets Grid (0.1% Monochrome Goldstandard) */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                         {[
-                          { label: '🎯 Ziel-Tempo', text: '🎯 Ziel-Tempo: Metronom schrittweise auf Ziel-Geschwindigkeit steigern.' },
-                          { label: '🐢 Langsam & sauber', text: '🐢 Langsam & sauber: Knifflige Takte isoliert im Schnecken-Tempo üben.' },
-                          { label: '🔂 3x fehlerfrei', text: '🔂 3x-Regel: Den Übergang 3 Mal hintereinander fehlerfrei wiederholen.' },
-                          { label: '🎵 Dynamik', text: '🎵 Dynamik: Auf präzisen Ausdruck und Laut-Leise-Kontraste achten.' }
+                          { icon: <Target size={11} strokeWidth={2.2} />, label: 'Ziel-Tempo', text: 'Ziel-Tempo: Metronom schrittweise auf Ziel-Geschwindigkeit steigern.' },
+                          { icon: <Clock size={11} strokeWidth={2.2} />, label: 'Langsam & sauber', text: 'Langsam & sauber: Knifflige Takte isoliert im Schnecken-Tempo üben.' },
+                          { icon: <RotateCcw size={11} strokeWidth={2.2} />, label: '3x fehlerfrei', text: '3x-Regel: Den Übergang 3 Mal hintereinander fehlerfrei wiederholen.' },
+                          { icon: <Activity size={11} strokeWidth={2.2} />, label: 'Dynamik', text: 'Dynamik: Auf präzisen Ausdruck und Laut-Leise-Kontraste achten.' }
                         ].map((tpl, i) => (
                           <button
                             key={i}
@@ -6755,6 +7199,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               triggerDebouncedAutoSave();
                             }}
                             style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
                               background: '#f8fafc',
                               color: '#334155',
                               border: '1.5px solid #e2e8f0',
@@ -6767,7 +7214,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }}
                             className="hover-scale"
                           >
-                            {tpl.label}
+                            {tpl.icon}
+                            <span>{tpl.label}</span>
                           </button>
                         ))}
                       </div>
@@ -6785,7 +7233,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           gap: '6px'
                         }}>
                           <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>🧑‍🎓 Schüler-Übenotiz / Rückmeldung vom Schüler:</span>
+                            <User size={13} strokeWidth={2.2} style={{ color: '#166534' }} />
+                            <span>Schüler-Übenotiz / Rückmeldung vom Schüler:</span>
                           </div>
                           <div style={{ fontSize: '0.84rem', fontWeight: 650, color: '#14532d', whiteSpace: 'pre-wrap' }}>
                             {studentNotes}
@@ -6812,7 +7261,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             gap: '6px'
                           }}>
                             <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>👨‍🏫 Hausaufgabe von deiner Lehrkraft:</span>
+                              <Users size={13} strokeWidth={2.2} style={{ color: '#b45309' }} />
+                              <span>Hausaufgabe von deiner Lehrkraft:</span>
                             </div>
                             <div style={{ fontSize: '0.94rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: '1.55' }}>
                               {displayText}
@@ -6832,7 +7282,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                           <label style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            💬 Frage oder Notiz an deine Lehrkraft:
+                            <MessageSquare size={16} strokeWidth={2.2} style={{ color: '#0f172a' }} />
+                            <span>Frage oder Notiz an deine Lehrkraft:</span>
                           </label>
 
                           <SpeechDictationButton
@@ -6868,6 +7319,200 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           }}
                         />
                       </div>
+
+                      {/* 0.1% Goldstandard Apple Practice Companion (Closing the White Desert) */}
+                      <div style={{
+                        background: '#ffffff',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '20px',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                            <Activity size={15} strokeWidth={2.2} style={{ color: '#0f172a' }} />
+                            <span>Übe-Assistent & Tempo-Trainer</span>
+                          </div>
+                          {activeMetronomeBpm && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              color: '#16a34a',
+                              background: '#dcfce7',
+                              padding: '2px 8px',
+                              borderRadius: '999px'
+                            }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+                              Aktiv ({activeMetronomeBpm} BPM)
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Quick BPM Selector + Play/Stop Stepper */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          background: '#f8fafc',
+                          padding: '8px 12px',
+                          borderRadius: '14px',
+                          border: '1px solid #e2e8f0',
+                          flexWrap: 'wrap'
+                        }}>
+                          {/* Quick BPM Pills */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            {[60, 80, 100, 120].map((bpm) => {
+                              const isCurrentActive = activeMetronomeBpm === bpm;
+                              return (
+                                <button
+                                  key={bpm}
+                                  type="button"
+                                  onClick={() => toggleContinuousMetronome(bpm)}
+                                  style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    border: isCurrentActive ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                                    background: isCurrentActive ? '#0f172a' : '#ffffff',
+                                    color: isCurrentActive ? '#ffffff' : '#334155',
+                                    fontWeight: 800,
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="tactile-btn hover-scale-mini"
+                                  title={`${bpm} BPM ${isCurrentActive ? 'stoppen' : 'starten'}`}
+                                >
+                                  {bpm} BPM
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Stepper + Big Toggle Button */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextBpm = Math.max(40, (activeMetronomeBpm || 80) - 5);
+                                toggleContinuousMetronome(nextBpm);
+                              }}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                color: '#0f172a',
+                                fontWeight: 800,
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="-5 BPM"
+                              aria-label="-5 BPM"
+                            >
+                              −
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextBpm = Math.min(240, (activeMetronomeBpm || 80) + 5);
+                                toggleContinuousMetronome(nextBpm);
+                              }}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                color: '#0f172a',
+                                fontWeight: 800,
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="+5 BPM"
+                              aria-label="+5 BPM"
+                            >
+                              +
+                            </button>
+                            {activeMetronomeBpm ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleContinuousMetronome(activeMetronomeBpm)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '5px 12px',
+                                  borderRadius: '9px',
+                                  background: '#0f172a',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontWeight: 800,
+                                  fontSize: '0.74rem',
+                                  cursor: 'pointer'
+                                }}
+                                className="tactile-btn"
+                                title="Metronom anhalten"
+                              >
+                                <Square size={11} fill="#ffffff" />
+                                <span>Stopp</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => toggleContinuousMetronome(80)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '5px 12px',
+                                  borderRadius: '9px',
+                                  background: '#0f172a',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontWeight: 800,
+                                  fontSize: '0.74rem',
+                                  cursor: 'pointer'
+                                }}
+                                className="tactile-btn"
+                                title="Metronom mit 80 BPM starten"
+                              >
+                                <Play size={11} fill="#ffffff" />
+                                <span>Start</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Interactive Übe-Tipp Box */}
+                        <div style={{
+                          background: '#f8fafc',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          border: '1px solid #f1f5f9'
+                        }}>
+                          <Clock size={16} strokeWidth={2} style={{ color: '#64748b', flexShrink: 0 }} />
+                          <div style={{ fontSize: '0.76rem', color: '#475569', lineHeight: '1.45' }}>
+                            <strong style={{ color: '#0f172a' }}>Tipp:</strong> Starte zunächst 15–20 BPM unter deinem Zieltempo und steigere erst, wenn du den Übergang 3× hintereinander fehlerfrei spielen kannst.
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                     {!readOnly && (
@@ -6881,8 +7526,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         flexDirection: 'column',
                         gap: '10px'
                       }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>👁️ Live-Vorschau (im Hausaufgaben-Widget des Schülers):</span>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Eye size={12} strokeWidth={2.2} style={{ color: '#b45309' }} />
+                          <span>Live-Vorschau (im Hausaufgaben-Widget des Schülers):</span>
                         </div>
                         {(() => {
                           const book = globalLehrwerke.find(b => b.id === activeLehrwerkId);
@@ -6943,7 +7589,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.2)',
                                 alignSelf: 'flex-start'
                               }}>
-                                <span>📄 {formattedPagesStr ? formattedPagesStr : `S. ${activePageNumber}`}</span>
+                                <FileText size={11} strokeWidth={2} style={{ color: '#64748b' }} />
+                                <span>{formattedPagesStr ? formattedPagesStr : `S. ${activePageNumber}`}</span>
                               </div>
 
                               {/* Stacked notes for all homework pages in this book */}
@@ -6998,7 +7645,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span>🔒 Interne Notiz (nur für Lehrer)</span>
+                          <Lock size={12} strokeWidth={2} style={{ color: '#64748b' }} />
+                          <span>Interne Notiz (nur für Lehrer)</span>
                           <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>• Didaktischer Verlauf (Keine Diagnosen gem. Art. 9 DSGVO)</span>
                         </label>
                         <SpeechDictationButton
@@ -7280,7 +7928,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                             <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span>🔒 Interne Notiz (nur für Lehrer):</span>
+                              <Lock size={12} strokeWidth={2} style={{ color: '#64748b' }} />
+                              <span>Interne Notiz (nur für Lehrer):</span>
                               <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>• Didaktischer Verlauf (Keine Diagnosen gem. Art. 9 DSGVO)</span>
                             </label>
                             <SpeechDictationButton
@@ -10009,15 +10658,25 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         borderBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '1px solid rgba(0,0,0,0.06)' : 'none'
                                       }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                          <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            minWidth: 0,
-                                            flex: 1,
-                                            opacity: isFutureWeek ? 0.38 : 1,
-                                            transition: 'opacity 0.15s ease'
-                                          }}>
+                                          <div
+                                            onClick={() => {
+                                              if (bookObj) {
+                                                setActiveLehrwerkId(bookObj.id);
+                                                if (item.pages[0]) selectTextbookPage(bookObj.id, item.pages[0]);
+                                                setActiveSubView('lehrwerk');
+                                              }
+                                            }}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '8px',
+                                              minWidth: 0,
+                                              flex: 1,
+                                              cursor: bookObj ? 'pointer' : 'default',
+                                              opacity: isFutureWeek ? 0.38 : 1,
+                                              transition: 'opacity 0.15s ease'
+                                            }}
+                                          >
                                             <div style={{
                                               width: '26px',
                                               height: '30px',
@@ -10045,26 +10704,51 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                             {readOnly ? (
-                                              /* Kompakte zusammenhängende Seiten-Pille für Schüler (z.B. S. 1–3) */
-                                              <span
-                                                aria-label={formatPageNumbersGerman(item.pages)}
-                                                title={formatPageNumbersGerman(item.pages)}
-                                                style={{
-                                                  fontSize: '0.82rem',
-                                                  fontWeight: 850,
-                                                  color: '#15803d',
-                                                  background: '#dcfce7',
-                                                  padding: '4px 11px',
-                                                  borderRadius: '99px',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  letterSpacing: '-0.01em',
-                                                  opacity: isFutureWeek ? 0.45 : 1,
-                                                  transition: 'opacity 0.15s ease'
-                                                }}
-                                              >
-                                                {formatPageNumbers(item.pages)}
-                                              </span>
+                                              /* Kompakte zusammenhängende Seiten- & Übungs-Pille für Schüler */
+                                              (() => {
+                                                const activeHwExercises = assignedBook
+                                                  ? item.pages.flatMap((p: number) => {
+                                                      const pState = assignedBook.pageStates?.[p];
+                                                      return (pState?.exercises || [])
+                                                        .filter((e: any) => e.status === 'homework')
+                                                        .map((e: any) => e.label.replace(/^(?:Nr\.|Üb\.|Übung)\s*/i, '').trim());
+                                                    })
+                                                  : [];
+                                                const pagesLabel = formatPageNumbers(item.pages);
+                                                const pillText = activeHwExercises.length > 0
+                                                  ? `${pagesLabel} • Nr. ${activeHwExercises.slice(0, 3).join(', ')}${activeHwExercises.length > 3 ? '…' : ''}`
+                                                  : pagesLabel;
+                                                return (
+                                                  <span
+                                                    onClick={() => {
+                                                      if (bookObj) {
+                                                        setActiveLehrwerkId(bookObj.id);
+                                                        if (item.pages[0]) selectTextbookPage(bookObj.id, item.pages[0]);
+                                                        setActiveSubView('lehrwerk');
+                                                      }
+                                                    }}
+                                                    aria-label={formatPageNumbersGerman(item.pages)}
+                                                    title={`${formatPageNumbersGerman(item.pages)} öffnen`}
+                                                    style={{
+                                                      fontSize: '0.82rem',
+                                                      fontWeight: 850,
+                                                      color: '#15803d',
+                                                      background: '#dcfce7',
+                                                      padding: '4px 11px',
+                                                      borderRadius: '99px',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      letterSpacing: '-0.01em',
+                                                      opacity: isFutureWeek ? 0.45 : 1,
+                                                      cursor: bookObj ? 'pointer' : 'default',
+                                                      transition: 'all 0.15s ease'
+                                                    }}
+                                                    className="tactile-btn hover-scale-mini"
+                                                  >
+                                                    {pillText}
+                                                  </span>
+                                                );
+                                              })()
                                             ) : (
                                               /* Granular Page Badges for Teachers (mit Einzelseiten-Löschen) */
                                               <div style={{

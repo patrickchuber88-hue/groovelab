@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../../../lib/supabase';
-import { processPureRawBlob, processStudioMastering } from '../../../../utils/audioMasteringEngine';
+import { processPureRawBlob, processStudioMastering, audioBufferToWavBlob, ensureCenteredStereoAudioBuffer } from '../../../../utils/audioMasteringEngine';
 import { storeBlob, deleteBlob } from '../../../../utils/blobStorage';
 import { validateMediaBlob } from '../../../../utils/mediaSecurityValidator';
 import { fixWebmDuration } from '../../../../utils/webmDurationPatcher';
 import { buildCanonicalAudioStoragePath, getSecureAudioUrl } from '../../../../utils/audioStorageHelper';
 import { acquireAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../../../services/audioPermissionService';
 import { playCountInBeep } from '../MeisterwerkAudioPlayers';
+import { SharedAudioEngine } from '../../../../utils/sharedAudioEngine';
 import { cleanSongOrBookTitle, formatHarmonizedAudioTitle } from '../../../../utils/audioNamingHelper';
 import { getSimulatedNow } from '../../studentDateUtils';
 import { Student } from '../../meisterwerk.types';
@@ -88,6 +89,8 @@ export function useMeisterwerkAudioRecording({
   const [activeRecordingSongId, setActiveRecordingSongId] = useState<string | null>(null);
 
   const [recordCountInRemaining, setRecordCountInRemaining] = useState<number | null>(null);
+  const [recordCountInMode, setRecordCountInMode] = useState<'get_ready' | 'metronome' | null>(null);
+  const isPcmCaptureActiveRef = useRef<boolean>(false);
   const [playAlongCountInRemaining, setPlayAlongCountInRemaining] = useState<number | null>(null);
   const [recordingSavedToast, setRecordingSavedToast] = useState<string | null>(null);
   const [justRecordedAudioUrl, setJustRecordedAudioUrl] = useState<string | null>(null);
@@ -108,6 +111,7 @@ export function useMeisterwerkAudioRecording({
   const isStoppingAudioRef = useRef<boolean>(false);
   const recordCountInIntervalRef = useRef<any>(null);
   const playAlongCountInIntervalRef = useRef<any>(null);
+  const recordingMetronomeIntervalRef = useRef<any>(null);
 
   const isRecordingMetronomeActiveRef = useRef(isRecordingMetronomeActive);
   isRecordingMetronomeActiveRef.current = isRecordingMetronomeActive;
@@ -150,6 +154,7 @@ export function useMeisterwerkAudioRecording({
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
       if (recordCountInIntervalRef.current) clearInterval(recordCountInIntervalRef.current);
       if (playAlongCountInIntervalRef.current) clearInterval(playAlongCountInIntervalRef.current);
+      if (recordingMetronomeIntervalRef.current) clearInterval(recordingMetronomeIntervalRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try {
           mediaRecorderRef.current.stop();
@@ -164,6 +169,16 @@ export function useMeisterwerkAudioRecording({
       recordCountInIntervalRef.current = null;
     }
     setRecordCountInRemaining(null);
+    setRecordCountInMode(null);
+    isPcmCaptureActiveRef.current = false;
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try {
+        rec.stop();
+        if (rec.stream) rec.stream.getTracks().forEach(t => t.stop());
+      } catch {}
+      mediaRecorderRef.current = null;
+    }
   };
 
   const cancelPlayAlongCountIn = () => {
@@ -174,13 +189,29 @@ export function useMeisterwerkAudioRecording({
     setPlayAlongCountInRemaining(null);
   };
 
-  const playMetronomeTick = (accent = false) => {
+let sharedMetronomeAudioCtx: AudioContext | null = null;
+
+const getSharedMetronomeAudioCtx = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null;
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return null;
+  try {
+    if (!sharedMetronomeAudioCtx || sharedMetronomeAudioCtx.state === 'closed') {
+      sharedMetronomeAudioCtx = new AudioCtx();
+    }
+    if (sharedMetronomeAudioCtx.state === 'suspended') {
+      sharedMetronomeAudioCtx.resume().catch(() => {});
+    }
+  } catch (err) {
+    console.warn('[AudioRecording] Error initializing shared AudioContext:', err);
+  }
+  return sharedMetronomeAudioCtx;
+};
+
+  const playMetronomeTick = useCallback((accent = false) => {
     try {
-      if (typeof window === 'undefined') return;
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      if (ctx.state === 'suspended') ctx.resume();
+      const ctx = getSharedMetronomeAudioCtx();
+      if (!ctx) return;
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -193,14 +224,10 @@ export function useMeisterwerkAudioRecording({
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.06);
-
-      setTimeout(() => {
-        try {
-          ctx.close();
-        } catch {}
-      }, 150);
-    } catch {}
-  };
+    } catch (err) {
+      console.warn('[AudioRecording] Metronome tick error:', err);
+    }
+  }, []);
 
   const prepareRecordingEngine = async (
     overrideSongId?: string | React.MouseEvent,
@@ -213,6 +240,54 @@ export function useMeisterwerkAudioRecording({
 
       const songId = typeof overrideSongId === 'string' ? overrideSongId : selectedActiveSongId;
       setActiveRecordingSongId(songId || null);
+
+      // 🎙️ Universal Web Audio PCM capture setup (100% Safari WebKit & Chromium compatible)
+      const audioCtx = SharedAudioEngine.getContext();
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume().catch(() => {});
+      }
+
+      const pcmChunksL: Float32Array[] = [];
+      const pcmChunksR: Float32Array[] = [];
+      let totalPcmSamples = 0;
+      let pcmSourceNode: MediaStreamAudioSourceNode | null = null;
+      let pcmProcessorNode: ScriptProcessorNode | null = null;
+      let pcmSilentGain: GainNode | null = null;
+
+      try {
+        pcmSourceNode = audioCtx.createMediaStreamSource(stream);
+        pcmProcessorNode = audioCtx.createScriptProcessor(4096, 2, 2);
+        pcmSilentGain = audioCtx.createGain();
+        pcmSilentGain.gain.setValueAtTime(0, audioCtx.currentTime); // Prevent echo feedback to speakers
+
+        pcmProcessorNode.onaudioprocess = (e) => {
+          if (!isPcmCaptureActiveRef.current) return;
+          const inL = e.inputBuffer.getChannelData(0);
+          let inR = inL;
+          if (e.inputBuffer.numberOfChannels > 1) {
+            const rawR = e.inputBuffer.getChannelData(1);
+            let hasSignal = false;
+            for (let i = 0; i < rawR.length; i += 16) {
+              if (Math.abs(rawR[i]) > 0.0001) {
+                hasSignal = true;
+                break;
+              }
+            }
+            if (hasSignal) {
+              inR = rawR;
+            }
+          }
+          pcmChunksL.push(new Float32Array(inL));
+          pcmChunksR.push(new Float32Array(inR));
+          totalPcmSamples += inL.length;
+        };
+
+        pcmSourceNode.connect(pcmProcessorNode);
+        pcmProcessorNode.connect(pcmSilentGain);
+        pcmSilentGain.connect(audioCtx.destination);
+      } catch (pcmErr) {
+        console.warn('[useMeisterwerkAudioRecording] PCM stream capture init fallback:', pcmErr);
+      }
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -230,32 +305,66 @@ export function useMeisterwerkAudioRecording({
       };
 
       recorder.onstop = async () => {
+        // Disconnect PCM recording graph
+        try {
+          if (pcmProcessorNode) {
+            pcmProcessorNode.onaudioprocess = null;
+            pcmProcessorNode.disconnect();
+          }
+          if (pcmSilentGain) pcmSilentGain.disconnect();
+          if (pcmSourceNode) pcmSourceNode.disconnect();
+        } catch {}
+
         stream.getTracks().forEach(track => track.stop());
         setIsUploadingAudio(true);
 
-        const rawBlob = new Blob(audioChunks, { type: recorder.mimeType || 'audio/webm' });
         const timeStamp = Date.now();
         const exactElapsedSec = Math.max(0.1, (Date.now() - (recordStartTimeRef.current || Date.now())) / 1000);
 
-        // EBML WebM duration patch with exactElapsedSec (NOT multiplied by 1000)
-        const patchedBlob = await fixWebmDuration(rawBlob, exactElapsedSec).catch(() => rawBlob);
-
-        // DSP Loudness Processing
-        let processedBlob: Blob = patchedBlob;
+        let processedBlob: Blob | null = null;
         let dspDuration = 0;
-        try {
-          if (isMasterworkSong) {
-            const res = await processStudioMastering(patchedBlob);
-            processedBlob = res.masteredBlob;
-            dspDuration = res.durationSec || 0;
-          } else {
-            const res = await processPureRawBlob(patchedBlob, { padActive: isRecordingPadActiveRef.current });
-            processedBlob = res.processedBlob;
-            dspDuration = res.durationSec || 0;
+
+        // 1. Primary: High-fidelity uncompressed PCM WAV generation
+        if (totalPcmSamples > 0 && pcmChunksL.length > 0) {
+          try {
+            const rawBuffer = audioCtx.createBuffer(2, totalPcmSamples, audioCtx.sampleRate);
+            const chanL = rawBuffer.getChannelData(0);
+            const chanR = rawBuffer.getChannelData(1);
+            let offset = 0;
+            for (let i = 0; i < pcmChunksL.length; i++) {
+              chanL.set(pcmChunksL[i], offset);
+              chanR.set(pcmChunksR[i], offset);
+              offset += pcmChunksL[i].length;
+            }
+            const capturedBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawBuffer);
+            dspDuration = capturedBuffer.duration;
+            processedBlob = audioBufferToWavBlob(capturedBuffer, {
+              title: overrideLabel || audioLabelRef.current || 'Aufnahme',
+              artist: isTeacherModeRef.current ? 'Lehrkraft' : (student?.name || 'Schüler')
+            });
+          } catch (pcmWavErr) {
+            console.warn('[useMeisterwerkAudioRecording] PCM WAV export error:', pcmWavErr);
           }
-        } catch (e) {
-          console.warn('[useMeisterwerkAudioRecording] DSP processing fallback:', e);
-          processedBlob = patchedBlob;
+        }
+
+        // 2. Secondary fallback: MediaRecorder blob processing
+        if (!processedBlob) {
+          const rawBlob = new Blob(audioChunks, { type: recorder.mimeType || 'audio/webm' });
+          const patchedBlob = await fixWebmDuration(rawBlob, exactElapsedSec).catch(() => rawBlob);
+          try {
+            if (isMasterworkSong) {
+              const res = await processStudioMastering(patchedBlob);
+              processedBlob = res.masteredBlob;
+              dspDuration = res.durationSec || 0;
+            } else {
+              const res = await processPureRawBlob(patchedBlob, { padActive: isRecordingPadActiveRef.current });
+              processedBlob = res.processedBlob;
+              dspDuration = res.durationSec || 0;
+            }
+          } catch (e) {
+            console.warn('[useMeisterwerkAudioRecording] DSP processing fallback:', e);
+            processedBlob = patchedBlob;
+          }
         }
 
         const recDuration = Math.max(
@@ -264,8 +373,8 @@ export function useMeisterwerkAudioRecording({
           Math.ceil(exactElapsedSec)
         );
 
-        const fileExt = hasTresorStorage ? 'wav' : (processedBlob.type.includes('wav') ? 'wav' : processedBlob.type.includes('webm') ? 'webm' : processedBlob.type.includes('ogg') ? 'ogg' : 'mp3');
-        const contentType = hasTresorStorage ? 'audio/wav' : (processedBlob.type || 'audio/webm');
+        const fileExt = (processedBlob.type && processedBlob.type.includes('wav')) ? 'wav' : (processedBlob.type && processedBlob.type.includes('mp4') ? 'mp4' : (processedBlob.type && processedBlob.type.includes('webm') ? 'webm' : 'wav'));
+        const contentType = processedBlob.type || 'audio/wav';
         const uniqueRecId = `rec-${student?.id || 'stud'}-${timeStamp}`;
         const localBlobKey = `campus_blob_${student?.id || 'stud'}_${timeStamp}.${fileExt}`;
 
@@ -515,52 +624,132 @@ export function useMeisterwerkAudioRecording({
   };
 
   const startRecordingAudio = async (overrideSongId?: any, overrideLabel?: string, isMasterworkSong = false) => {
+    // ⚡ Synchrones WebAudio Pre-Unlocking & Session Audio Routing (Safari/iOS Fix)
+    try {
+      const ctx = SharedAudioEngine.getContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      SharedAudioEngine.startSessionAudioBypass();
+    } catch {}
+
     const prep = await prepareRecordingEngine(overrideSongId, overrideLabel, isMasterworkSong);
-    if (!prep) return;
+    if (!prep) {
+      try { SharedAudioEngine.stopSessionAudioBypass(); } catch {}
+      return;
+    }
 
     cancelActiveRecordCountIn();
-    let count = 4;
-    setRecordCountInRemaining(count);
-    playCountInBeep(true);
+    const isMetronomeActive = Boolean(isRecordingMetronomeActiveRef.current);
 
-    const effectiveBpm = isRecordingMetronomeActive ? recordingBpm : 100;
-    const intervalMs = (60 / effectiveBpm) * 1000;
+    if (!isMetronomeActive) {
+      // 🌟 MODUS A: Kein Metronom aktiv -> Entspannter 3-Sekunden "Bereit machen... 3, 2, 1 -> Los!" Countdown
+      // Audio-Gate bleibt ZU (isPcmCaptureActiveRef.current = false), damit der Vorlauf NICHT in der Aufnahme landet!
+      isPcmCaptureActiveRef.current = false;
+      setRecordCountInMode('get_ready');
+      let count = 3;
+      setRecordCountInRemaining(count);
 
-    recordCountInIntervalRef.current = setInterval(() => {
-      count -= 1;
-      if (count > 0) {
-        setRecordCountInRemaining(count);
-        playCountInBeep(false);
-      } else {
-        if (recordCountInIntervalRef.current) {
-          clearInterval(recordCountInIntervalRef.current);
-          recordCountInIntervalRef.current = null;
-        }
-        setRecordCountInRemaining(null);
-
-        setAudioDuration(0);
-        setIsRecordingAudio(true);
-        recordStartTimeRef.current = Date.now();
-        prep.recorder.start(100);
-        mediaRecorderRef.current = prep.recorder;
-
-        const maxSec = hasTresorStorage ? 420 : 60;
-        recordingTimerRef.current = setInterval(() => {
-          const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
-          setAudioDuration(elapsed);
-          if (elapsed >= maxSec) {
-            stopRecordingAudio(prep.recorder);
+      recordCountInIntervalRef.current = setInterval(() => {
+        count -= 1;
+        if (count > 0) {
+          setRecordCountInRemaining(count);
+        } else {
+          if (recordCountInIntervalRef.current) {
+            clearInterval(recordCountInIntervalRef.current);
+            recordCountInIntervalRef.current = null;
           }
-        }, 500);
-      }
-    }, intervalMs);
+          setRecordCountInRemaining(null);
+          setRecordCountInMode(null);
+
+          // 🔴 EXAKT HIER startet die Aufnahme: Sekunde 0.000, 0 ms Preroll!
+          isPcmCaptureActiveRef.current = true;
+          setAudioDuration(0);
+          setIsRecordingAudio(true);
+          recordStartTimeRef.current = Date.now();
+          prep.recorder.start(100);
+          mediaRecorderRef.current = prep.recorder;
+
+          const maxSec = hasTresorStorage ? 420 : 60;
+          recordingTimerRef.current = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
+            setAudioDuration(elapsed);
+            if (elapsed >= maxSec) {
+              stopRecordingAudio(prep.recorder);
+            }
+          }, 500);
+        }
+      }, 1000);
+    } else {
+      // ⏱️ MODUS B: Metronom AKTIV -> Musikalischer 1-Takt-Einzähler im Ziel-BPM-Tempo
+      // Audio-Gate geht SOFORT AUF, damit das Einzählen autoritativ mit aufgenommen wird!
+      isPcmCaptureActiveRef.current = true;
+      setRecordCountInMode('metronome');
+      let count = 4;
+      setRecordCountInRemaining(count);
+
+      const activeBpm = Math.max(40, Math.min(240, recordingBpmRef.current || 100));
+      const metroIntervalMs = (60 / activeBpm) * 1000;
+
+      // Start MediaRecorder & PCM capture immediately so the count-in is recorded
+      prep.recorder.start(100);
+      mediaRecorderRef.current = prep.recorder;
+      playCountInBeep(true);
+
+      recordCountInIntervalRef.current = setInterval(() => {
+        count -= 1;
+        if (count > 0) {
+          setRecordCountInRemaining(count);
+          playCountInBeep(false);
+        } else {
+          if (recordCountInIntervalRef.current) {
+            clearInterval(recordCountInIntervalRef.current);
+            recordCountInIntervalRef.current = null;
+          }
+          setRecordCountInRemaining(null);
+          setRecordCountInMode(null);
+
+          setAudioDuration(0);
+          setIsRecordingAudio(true);
+          recordStartTimeRef.current = Date.now();
+
+          // ⏱️ Klick-Track läuft synchron während der Aufnahme weiter
+          let beatCount = 0;
+          playCountInBeep(true); // Downbeat auf Takt 1
+          if (recordingMetronomeIntervalRef.current) clearInterval(recordingMetronomeIntervalRef.current);
+          recordingMetronomeIntervalRef.current = setInterval(() => {
+            beatCount = (beatCount + 1) % 4;
+            playCountInBeep(beatCount === 0);
+          }, metroIntervalMs);
+
+          const maxSec = hasTresorStorage ? 420 : 60;
+          recordingTimerRef.current = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
+            setAudioDuration(elapsed);
+            if (elapsed >= maxSec) {
+              stopRecordingAudio(prep.recorder);
+            }
+          }, 500);
+        }
+      }, metroIntervalMs);
+    }
   };
 
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
     if (isStoppingAudioRef.current) return;
     isStoppingAudioRef.current = true;
+    isPcmCaptureActiveRef.current = false;
+    setRecordCountInMode(null);
     cancelActiveRecordCountIn();
     cancelPlayAlongCountIn();
+
+    if (recordingMetronomeIntervalRef.current) {
+      clearInterval(recordingMetronomeIntervalRef.current);
+      recordingMetronomeIntervalRef.current = null;
+    }
+    try {
+      SharedAudioEngine.stopSessionAudioBypass();
+    } catch {}
 
     const rec = activeRecorder || mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
@@ -583,6 +772,34 @@ export function useMeisterwerkAudioRecording({
     }
     setIsRecordingAudio(false);
     setActiveRecordingSongId(null);
+  };
+
+  const handleRetakeRecordingAudio = () => {
+    cancelActiveRecordCountIn();
+    cancelPlayAlongCountIn();
+    if (recordingMetronomeIntervalRef.current) {
+      clearInterval(recordingMetronomeIntervalRef.current);
+      recordingMetronomeIntervalRef.current = null;
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    const rec = mediaRecorderRef.current;
+    if (rec) {
+      rec.onstop = null;
+      try {
+        if (rec.state !== 'inactive') rec.stop();
+        if (rec.stream) rec.stream.getTracks().forEach(t => t.stop());
+      } catch {}
+    }
+    mediaRecorderRef.current = null;
+    setIsRecordingAudio(false);
+    setAudioDuration(0);
+    isStoppingAudioRef.current = false;
+    setTimeout(() => {
+      startRecordingAudio();
+    }, 120);
   };
 
   const handleStartPlayAlongRecording = async () => {
@@ -650,6 +867,35 @@ export function useMeisterwerkAudioRecording({
       }
     }, intervalMs);
   };
+
+  // ⏱️ Reaktivität: Metronom während laufender Aufnahme dynamisch umschalten
+  useEffect(() => {
+    if (!isRecordingAudio) {
+      if (recordingMetronomeIntervalRef.current) {
+        clearInterval(recordingMetronomeIntervalRef.current);
+        recordingMetronomeIntervalRef.current = null;
+      }
+      return;
+    }
+
+    if (isRecordingMetronomeActive) {
+      if (!recordingMetronomeIntervalRef.current) {
+        let beatCount = 0;
+        const activeBpm = Math.max(40, Math.min(240, recordingBpm || 100));
+        const metroIntervalMs = (60 / activeBpm) * 1000;
+        playCountInBeep(true);
+        recordingMetronomeIntervalRef.current = setInterval(() => {
+          beatCount = (beatCount + 1) % 4;
+          playCountInBeep(beatCount === 0);
+        }, metroIntervalMs);
+      }
+    } else {
+      if (recordingMetronomeIntervalRef.current) {
+        clearInterval(recordingMetronomeIntervalRef.current);
+        recordingMetronomeIntervalRef.current = null;
+      }
+    }
+  }, [isRecordingAudio, isRecordingMetronomeActive, recordingBpm]);
 
   const toggleFavoriteAudio = (url: string) => {
     setFavoriteAudioUrls(prev => {
@@ -845,6 +1091,7 @@ export function useMeisterwerkAudioRecording({
     isUploadingAudio,
     activeRecordingSongId,
     recordCountInRemaining,
+    recordCountInMode,
     cancelActiveRecordCountIn,
     playAlongCountInRemaining,
     cancelPlayAlongCountIn,
@@ -856,6 +1103,7 @@ export function useMeisterwerkAudioRecording({
     handleToggleAudioVisibility,
     startRecordingAudio,
     stopRecordingAudio,
+    handleRetakeRecordingAudio,
     handleStartPlayAlongRecording,
     playMetronomeTick,
     audioLabel,

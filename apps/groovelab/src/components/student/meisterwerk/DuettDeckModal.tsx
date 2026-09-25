@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Play, 
   Pause, 
@@ -14,7 +15,8 @@ import {
   Wand2,
   Headphones,
   ShieldCheck,
-  Download
+  Download,
+  Users
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../../utils/blobStorage';
 import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
@@ -752,7 +754,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
   const teacherWaveform = teacherPeaks && teacherPeaks.length > 0 ? teacherPeaks : [30, 45, 70, 50, 80, 95, 65, 40, 85, 90, 60, 45, 80, 100, 75, 55, 70, 85, 60, 40, 50, 75, 90, 65, 80, 95, 70, 45, 60, 85, 90, 65, 50, 70, 85, 60, 45, 35, 25, 20];
   const studentWaveform = studentPeaks && studentPeaks.length > 0 ? studentPeaks : [25, 40, 60, 45, 75, 90, 70, 45, 80, 85, 65, 50, 85, 95, 70, 50, 65, 80, 65, 45, 55, 70, 85, 60, 75, 90, 65, 50, 65, 80, 85, 60, 45, 65, 80, 55, 40, 30, 20, 15];
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -803,19 +805,19 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 height: isMobile ? '36px' : '40px',
                 minWidth: isMobile ? '36px' : '40px',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+                background: '#0f172a',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 3px 10px rgba(21, 128, 61, 0.28)',
+                boxShadow: '0 3px 10px rgba(15, 23, 42, 0.18)',
                 flexShrink: 0
               }}
             >
               <Layers size={isMobile ? 18 : 20} strokeWidth={2.4} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.66rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div style={{ fontSize: '0.66rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Synchrones Duett-Deck • Web Audio Clock
               </div>
               <h3 style={{ margin: 0, fontSize: isMobile ? '0.96rem' : '1.08rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1090,17 +1092,18 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Headphones size={13} color="#7c3aed" />
+                      <Headphones size={13} color="#0f172a" />
                       Kopfhörer-Monitoring während der Aufnahme:
                     </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '6px' }}>
                     {[
-                      { key: 'full_teacher', label: '🟢 Mitspiel-Duett', desc: 'Lehrer 100% + Klick' },
-                      { key: 'guide_teacher', label: '🟡 Guide-Spur', desc: 'Lehrer leise (25%)' },
-                      { key: 'metronome_only', label: '🟣 Studio-Challenge', desc: 'NUR Metronom (Blind)' }
+                      { key: 'full_teacher', Icon: Users, label: 'Mitspiel-Duett', desc: 'Lehrer 100% + Klick' },
+                      { key: 'guide_teacher', Icon: Headphones, label: 'Guide-Spur', desc: 'Lehrer leise (25%)' },
+                      { key: 'metronome_only', Icon: Sliders, label: 'Studio-Challenge', desc: 'NUR Metronom (Blind)' }
                     ].map(opt => {
                       const isActive = monitoringMode === opt.key;
+                      const IconComp = opt.Icon;
                       return (
                         <button
                           key={opt.key}
@@ -1109,23 +1112,26 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           style={{
                             padding: '8px 10px',
                             borderRadius: '12px',
-                            border: isActive ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
-                            background: isActive ? '#ede9fe' : '#ffffff',
-                            color: isActive ? '#5b21b6' : '#475569',
+                            border: isActive ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                            background: isActive ? '#f8fafc' : '#ffffff',
+                            color: isActive ? '#0f172a' : '#475569',
                             textAlign: 'center',
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '2px',
+                            gap: '3px',
                             minHeight: '44px',
                             transition: 'all 0.15s ease',
-                            boxShadow: isActive ? '0 2px 8px rgba(124, 58, 237, 0.16)' : 'none'
+                            boxShadow: isActive ? '0 2px 8px rgba(15, 23, 42, 0.08)' : 'none'
                           }}
                           className="hover-scale-mini"
                         >
-                          <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>{opt.label}</span>
-                          <span style={{ fontSize: '0.64rem', color: isActive ? '#6d28d9' : '#64748b', fontWeight: 650 }}>{opt.desc}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <IconComp size={13} color={isActive ? '#0f172a' : '#64748b'} />
+                            <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>{opt.label}</span>
+                          </div>
+                          <span style={{ fontSize: '0.64rem', color: isActive ? '#334155' : '#64748b', fontWeight: 650 }}>{opt.desc}</span>
                         </button>
                       );
                     })}
@@ -1647,15 +1653,15 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 minHeight: isMobile ? '44px' : '48px',
                 borderRadius: '50%',
                 background: isPlaying
-                  ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)'
-                  : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+                  ? '#0f172a'
+                  : '#1e293b',
                 color: '#ffffff',
                 border: 'none',
                 cursor: isLoadingTeacher ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)',
+                boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"
@@ -1786,6 +1792,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

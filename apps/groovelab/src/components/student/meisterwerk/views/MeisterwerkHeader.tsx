@@ -29,6 +29,7 @@ export interface MeisterwerkHeaderProps {
   recordingSearchQuery: string;
   setRecordingSearchQuery: (q: string) => void;
   onOpenAssignModal?: () => void;
+  onBackToHub?: () => void;
   renderFullscreenButton: () => React.ReactNode;
   renderCloseButton: () => React.ReactNode;
   setOnboardingStep: (step: number) => void;
@@ -64,6 +65,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
   recordingSearchQuery,
   setRecordingSearchQuery,
   onOpenAssignModal,
+  onBackToHub,
   renderFullscreenButton,
   renderCloseButton,
   setOnboardingStep,
@@ -85,6 +87,20 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
   const isCurrentModuleInactive =
     (activeViewMode === 'loopstation' && uiLevel === 'junior' && !overrides?.loopstation) ||
     (activeSubView === 'history' && activeViewMode === 'document' && uiLevel !== 'pro' && !overrides?.archive);
+
+  const handleUniversalBack = () => {
+    if (onBackToHub) {
+      onBackToHub();
+    }
+    setActiveModalTab('document');
+    setActiveViewMode('document');
+    setActiveSubView('hub');
+    setHubTab('modules');
+  };
+
+  const desktopBackLabel = (activeSubView === 'lehrwerk' || activeSubView === 'song')
+    ? 'Zurück zum Aufgabenheft'
+    : 'Zurück zu den Modulen';
 
   return (
     <>
@@ -297,12 +313,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
             >
               <button
                 type="button"
-                onClick={() => {
-                  setActiveModalTab('document');
-                  setActiveViewMode('document');
-                  setActiveSubView('hub');
-                  setHubTab('modules');
-                }}
+                onClick={handleUniversalBack}
                 style={{
                   background: 'rgba(255, 255, 255, 0.18)',
                   backdropFilter: 'blur(16px)',
@@ -325,7 +336,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                 className="hover-scale"
               >
                 <ArrowLeft size={15} color="#ffffff" strokeWidth={2.6} />
-                <span>Zurück zu den Modulen</span>
+                <span>{desktopBackLabel}</span>
               </button>
 
               {activeViewMode === 'recordings' && (
@@ -429,12 +440,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
             {isMobileOrSim && (activeViewMode !== 'document' || activeModalTab !== 'document' || activeSubView !== 'hub' || hubTab === 'protocol') && (
               <button
                 type="button"
-                onClick={() => {
-                  setActiveModalTab('document');
-                  setActiveViewMode('document');
-                  setActiveSubView('hub');
-                  setHubTab('modules');
-                }}
+                onClick={handleUniversalBack}
                 style={{
                   background: 'rgba(255, 255, 255, 0.20)',
                   border: '1px solid rgba(255, 255, 255, 0.35)',

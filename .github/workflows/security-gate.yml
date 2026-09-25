@@ -1,0 +1,45 @@
+name: "Campus-Groovelab Enterprise Security Gate"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-and-compliance-audit:
+    name: "OWASP ASVS L3 & 360° Forensic Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: "1. Checkout Repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "2. Setup Node.js (v20 LTS)"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: "3. Clean Install Dependencies"
+        run: npm ci
+
+      - name: "4. Gitleaks Secret & Private Key Scanner"
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "5. Software Supply Chain & Vulnerability Audit"
+        run: npm run security:deps
+
+      - name: "6. Campus-Groovelab Core Quality Gate (Drift, Legal, Buttons, Headers, Typecheck)"
+        run: npm run gate
+
+      - name: "7. PostgreSQL Multi-Tenancy & RLS Isolation Tests"
+        run: npm run test:rls
+
+      - name: "8. Users-View Airgap & Leakage Penetration Suite"
+        run: npm run test:leakage

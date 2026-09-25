@@ -1248,6 +1248,10 @@ export const Startseite: React.FC<StartseiteProps> = ({
           onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.()}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.(); } }}
         >Barrierefreiheit</div>
+
+        <div style={{ width: '100%', fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.4, marginTop: '4px' }}>
+          Hinweis: Campus-Groovelab ist eine unabhängige Plattform und steht in keiner Verbindung zum GrooveLAB-Projekt der Städtischen Musikschule Lahr bzw. deren Freundeskreis e.V.
+        </div>
       </footer>
 
       {/* Secret Master Admin Authentication Modal */}

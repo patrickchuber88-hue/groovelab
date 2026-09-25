@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Trophy, 
   Flame, 
   Sparkles, 
   Target, 
   Play, 
-  Layers, 
-  Activity, 
   CircleDot,
-  Eye,
-  EyeOff,
-  Pencil,
-  Filter,
-  ShieldCheck,
-  Music,
-  Zap,
-  Shuffle,
-  Dices,
-  Sun,
-  School,
-  Guitar
+  Eye, 
+  EyeOff, 
+  Pencil, 
+  ShieldCheck, 
+  Music, 
+  Zap, 
+  Shuffle, 
+  Dices, 
+  Sun, 
+  School, 
+  Guitar,
+  Crown,
+  Medal,
+  Lock
 } from 'lucide-react';
 import { StudentNicknameSetupModal } from '../student/modals/StudentNicknameSetupModal';
 import { supabase } from '../../lib/supabase';
@@ -36,6 +36,7 @@ export interface LeaderboardEntry {
   maxStreak: number;
   bpm: number;
   isCurrentUser?: boolean;
+  isGhost?: boolean;
 }
 
 interface GrooveLeaderboardWidgetProps {
@@ -51,12 +52,13 @@ interface GrooveLeaderboardWidgetProps {
     bpm: number;
   } | null;
   useNotebookLayout?: boolean;
+  showHeader?: boolean;
 }
 
 const LEVEL_TABS: { id: RhythmLevel; label: string; icon: any; color: string }[] = [
   { id: 'viertel', label: '1. Viertel', icon: CircleDot, color: '#f59e0b' },
   { id: 'rock_mix', label: '2. Rock', icon: Music, color: '#10b981' },
-  { id: 'synkopen', label: '3. Off-Beat', icon: Activity, color: '#6366f1' },
+  { id: 'synkopen', label: '3. Off-Beat', icon: Zap, color: '#6366f1' },
   { id: 'galopp', label: '4. Galopp', icon: Zap, color: '#ec4899' },
   { id: 'latin_bossa', label: '5. Bossa', icon: Sun, color: '#0ea5e9' },
   { id: 'funk_master', label: '6. Funk', icon: Sparkles, color: '#8b5cf6' },
@@ -70,7 +72,8 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
   student,
   onPlayLevel,
   latestScore,
-  useNotebookLayout = false
+  useNotebookLayout = false,
+  showHeader = false
 }) => {
   const schoolName = student?.school_name || student?.schools?.name || 'Musikschule';
   const studentInstrument = student?.instrument || 'Gitarre';
@@ -149,7 +152,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
   }, [student?.id, student?.school_id]);
 
   // 🎯 Zero Dummy Architecture: Lade echte Ranglisten-Einträge aus Supabase
-  const loadLeaderboardData = async () => {
+  const loadLeaderboardData = useCallback(async () => {
     setIsLoadingScores(true);
     try {
       const instrumentParam = filterMode === 'instrument' ? studentInstrument : null;
@@ -170,11 +173,20 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
     } finally {
       setIsLoadingScores(false);
     }
-  };
+  }, [filterMode, selectedLevel, student?.school_id, studentInstrument]);
 
   useEffect(() => {
     loadLeaderboardData();
-  }, [filterMode, selectedLevel, student?.school_id, studentInstrument]);
+  }, [loadLeaderboardData]);
+
+  // ⚡ Live-Event-Listener für sofortige Reaktivität nach einer Übesession
+  useEffect(() => {
+    const handleScoreRecorded = () => {
+      loadLeaderboardData();
+    };
+    window.addEventListener('cg_groove_score_recorded', handleScoreRecorded);
+    return () => window.removeEventListener('cg_groove_score_recorded', handleScoreRecorded);
+  }, [loadLeaderboardData]);
 
   // Load and merge student personal highscore per level
   const [personalScores, setPersonalScores] = useState<Record<RhythmLevel, { accuracy: number; streak: number; bpm: number; score?: number }>>(() => {
@@ -218,26 +230,65 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`cg_rhythm_pr_${student.id}_${level}`, JSON.stringify(updated));
       }
-      setTimeout(() => loadLeaderboardData(), 300);
+      setTimeout(() => loadLeaderboardData(), 200);
     }
-  }, [latestScore, student?.id]);
+  }, [latestScore, student?.id, loadLeaderboardData, personalScores]);
 
   const currentLevelPr = personalScores[selectedLevel];
 
-  // Echte Einträge aus der Datenbank
-  const entries: LeaderboardEntry[] = dbEntries;
+  // 🏆 Self-Inclusion Engine: Nahtlose Zusammenführung von Server-Einträgen & eigenem Rekord
+  const effectiveEntries = useMemo<LeaderboardEntry[]>(() => {
+    const list: LeaderboardEntry[] = [...dbEntries];
+    const userAlreadyInDb = list.some(e => e.isCurrentUser);
 
-  // Compute student position
-  let myRank: number | null = null;
-  const userEntryIndex = entries.findIndex(e => e.isCurrentUser);
-  if (userEntryIndex !== -1) {
-    myRank = userEntryIndex + 1;
-  }
+    const userBestScore = currentLevelPr?.score || currentLevelPr?.accuracy || 0;
+
+    // Falls der Schüler noch nicht im DB-Ergebnis ist (weil z. B. Ghost-Modus is_public = false),
+    // aber lokal eine Leistung erbracht hat, binden wir ihn nahtlos mit ein
+    if (!userAlreadyInDb && student?.id && userBestScore > 0) {
+      const matchesFilter = filterMode === 'school' || !studentInstrument || 
+        studentInstrument.toLowerCase() === (student?.instrument || '').toLowerCase();
+
+      if (matchesFilter) {
+        list.push({
+          id: `self-${student.id}`,
+          rank: 0, // wird unten berechnet
+          name: studentNickname || 'Du (Privat)',
+          instrument: studentInstrument,
+          score: currentLevelPr.score || currentLevelPr.accuracy,
+          accuracy: currentLevelPr.accuracy,
+          maxStreak: currentLevelPr.streak,
+          bpm: currentLevelPr.bpm,
+          isCurrentUser: true,
+          isGhost: !isPublic
+        });
+      }
+    }
+
+    // Sortierung nach autoritativem Goldstandard:
+    // 1. Score DESC -> 2. Accuracy DESC -> 3. BPM DESC
+    list.sort((a, b) => {
+      const scoreA = a.score || a.accuracy || 0;
+      const scoreB = b.score || b.accuracy || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+      return (b.bpm || 0) - (a.bpm || 0);
+    });
+
+    // Ränge neu nummerieren (1 bis 10)
+    return list.slice(0, 10).map((entry, idx) => ({
+      ...entry,
+      rank: idx + 1
+    }));
+  }, [dbEntries, currentLevelPr, student?.id, student?.instrument, studentNickname, studentInstrument, filterMode, isPublic]);
+
+  // Compute student position in effective leaderboard
+  const userEntryIndex = effectiveEntries.findIndex(e => e.isCurrentUser);
+  const myRank: number | null = userEntryIndex !== -1 ? userEntryIndex + 1 : null;
 
   // Umschalten Ghost-Modus <-> Öffentliche Teilnahme
   const handleTogglePublic = async () => {
     if (!isPublic) {
-      // Möchte öffentlich teilnehmen: Falls noch kein Nickname gewählt -> Modal öffnen
       if (!studentNickname) {
         setIsNicknameModalOpen(true);
         return;
@@ -251,11 +302,11 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
           p_nickname: studentNickname,
           p_is_public: true
         });
+        loadLeaderboardData();
       } catch (e) {
         console.warn('Backend update note:', e);
       }
     } else {
-      // Zurück in den Ghost-Modus (Privat)
       setIsPublic(false);
       if (typeof localStorage !== 'undefined' && student?.id) {
         localStorage.setItem(`cg_student_ranking_public_${student.id}`, 'false');
@@ -265,6 +316,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
           p_nickname: studentNickname || 'GhostMusician',
           p_is_public: false
         });
+        loadLeaderboardData();
       } catch (e) {
         console.warn('Backend update note:', e);
       }
@@ -278,406 +330,431 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
       localStorage.setItem(`cg_student_ranking_nickname_${student.id}`, savedNickname);
       localStorage.setItem(`cg_student_ranking_public_${student.id}`, JSON.stringify(isPub));
     }
+    loadLeaderboardData();
   };
+
+  const activeLevelConfig = LEVEL_TABS.find(t => t.id === selectedLevel) || LEVEL_TABS[0];
 
   return (
     <div style={{
-      width: '100%',
-      height: '100%',
-      minHeight: '0',
-      maxHeight: '100%',
-      background: '#ffffff',
-      borderRadius: useNotebookLayout ? '24px' : '20px',
-      border: '1.5px solid #fed7aa',
-      boxShadow: useNotebookLayout
-        ? '0 12px 36px -8px rgba(217, 119, 6, 0.10), 0 2px 8px rgba(0, 0, 0, 0.03)'
-        : '0 10px 30px -6px rgba(0, 0, 0, 0.05)',
-      padding: useNotebookLayout ? '14px 18px' : '14px 16px',
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'space-between',
-      boxSizing: 'border-box',
-      gap: '10px',
+      gap: '14px',
       overflow: 'hidden'
     }}>
-      {/* 1. Header: Titel & Schul-Badge */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Optionaler Einzel-Header (nur falls Standalone außerhalb Modal) */}
+      {showHeader && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: '12px',
+          borderBottom: '1px solid #f1f5f9'
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              background: '#ea580c',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(217, 119, 6, 0.30)'
+              color: '#ffffff'
             }}>
-              <Trophy size={22} color="#ffffff" strokeWidth={2.4} />
+              <Trophy size={18} strokeWidth={2.4} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
                   Hall of Groove
                 </h3>
                 <span style={{
                   background: '#fef3c7',
                   color: '#b45309',
-                  fontSize: '0.68rem',
+                  fontSize: '0.66rem',
                   fontWeight: 900,
-                  padding: '2px 8px',
+                  padding: '2px 7px',
                   borderRadius: '100px'
                 }}>
                   Live
                 </span>
               </div>
-              <p style={{ margin: '1px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
                 {schoolName} • Rhythmus-Rangliste
               </p>
             </div>
           </div>
-
-          <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            padding: '4px 10px',
-            fontSize: '0.72rem',
-            fontWeight: 850,
-            color: '#475569',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px'
-          }}>
-            <Sparkles size={13} color="#f59e0b" />
-            <span>Top 5</span>
-          </div>
         </div>
+      )}
 
-        {/* 2. Kategorie Tabs: 8 Didaktische Rhythmus-Welten (4x2 Raster) */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '4px',
-          background: '#f8fafc',
-          padding: '4px',
-          borderRadius: '14px',
-          border: '1px solid #e2e8f0'
-        }}>
-          {LEVEL_TABS.map(tab => {
-            const isSel = selectedLevel === tab.id;
-            const TabIcon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => onSelectLevel(tab.id)}
-                style={{
-                  border: 'none',
-                  background: isSel ? '#ffffff' : 'transparent',
-                  color: isSel ? '#0f172a' : '#64748b',
-                  borderRadius: '10px',
-                  padding: '6px 2px',
-                  fontSize: '0.70rem',
-                  fontWeight: isSel ? 950 : 750,
-                  cursor: 'pointer',
-                  boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '2px',
-                  transition: 'all 0.12s ease'
-                }}
-                className="hover-scale-mini"
-              >
-                <TabIcon size={14} color={isSel ? tab.color : '#94a3b8'} strokeWidth={2.4} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 2b. 🏛️ Segmented Toggle: Gesamte Musikschule vs. Mein Instrument */}
-        <div style={{
-          display: 'flex',
-          background: '#f1f5f9',
-          borderRadius: '12px',
-          padding: '3px',
-          gap: '3px'
-        }}>
-          <button
-            type="button"
-            onClick={() => setFilterMode('school')}
-            style={{
-              flex: 1,
-              border: 'none',
-              borderRadius: '9px',
-              padding: '6px 8px',
-              fontSize: '0.74rem',
-              fontWeight: filterMode === 'school' ? 950 : 750,
-              background: filterMode === 'school' ? '#ffffff' : 'transparent',
-              color: filterMode === 'school' ? '#0f172a' : '#64748b',
-              boxShadow: filterMode === 'school' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.12s ease'
-            }}
-          >
-            <School size={14} color={filterMode === 'school' ? '#d97706' : '#64748b'} strokeWidth={2.4} />
-            <span>Gesamte Schule</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFilterMode('instrument')}
-            style={{
-              flex: 1,
-              border: 'none',
-              borderRadius: '9px',
-              padding: '6px 8px',
-              fontSize: '0.74rem',
-              fontWeight: filterMode === 'instrument' ? 950 : 750,
-              background: filterMode === 'instrument' ? '#ffffff' : 'transparent',
-              color: filterMode === 'instrument' ? '#0f172a' : '#64748b',
-              boxShadow: filterMode === 'instrument' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.12s ease'
-            }}
-          >
-            <Guitar size={14} color={filterMode === 'instrument' ? '#16a34a' : '#64748b'} strokeWidth={2.4} />
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Mein Instrument ({studentInstrument})
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* 3. Rangliste: Zero-Dummy Architecture (Echte User + motivierende freie Plätze) */}
+      {/* 1. Kategorie Tabs: 8 Didaktische Rhythmus-Welten (Kompaktes 4x2 Raster) */}
       <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px',
-        flex: 1,
-        justifyContent: 'flex-start'
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '4px',
+        background: '#f8fafc',
+        padding: '4px',
+        borderRadius: '14px',
+        border: '1px solid #e2e8f0'
       }}>
-        {/* Top 5 Slots rendering: echte Einträge + unbesetzte Plätze */}
-        {[1, 2, 3, 4, 5].map((slotRank) => {
-          const entry = entries.find(e => e.rank === slotRank);
-          const isGold = slotRank === 1;
-          const isSilver = slotRank === 2;
-          const isBronze = slotRank === 3;
-
-          if (entry) {
-            return (
-              <div
-                key={entry.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  borderRadius: '14px',
-                  background: isGold 
-                    ? 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)' 
-                    : (isSilver ? '#f8fafc' : (isBronze ? '#fff7ed' : '#ffffff')),
-                  border: isGold 
-                    ? '1.5px solid #fde68a' 
-                    : (isSilver ? '1px solid #e2e8f0' : (isBronze ? '1px solid #ffedd5' : '1px solid #f1f5f9')),
-                  boxShadow: isGold ? '0 2px 8px rgba(245, 158, 11, 0.12)' : 'none',
-                  transition: 'all 0.10s ease'
-                }}
-              >
-                {/* Rank & Musiker-Nickname */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.80rem',
-                    fontWeight: 950,
-                    background: isGold ? '#f59e0b' : (isSilver ? '#94a3b8' : (isBronze ? '#d97706' : '#f1f5f9')),
-                    color: isGold || isSilver || isBronze ? '#ffffff' : '#64748b'
-                  }}>
-                    {entry.rank}
-                  </span>
-
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
-                        {entry.name}
-                      </span>
-                      {entry.isCurrentUser && (
-                        <span style={{
-                          background: '#dcfce7',
-                          color: '#15803d',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          padding: '1px 5px',
-                          borderRadius: '6px'
-                        }}>
-                          Du
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
-                      {entry.instrument} • {entry.bpm} BPM
-                    </span>
-                  </div>
-                </div>
-
-                {/* Score, Accuracy & Streak */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px',
-                    fontSize: '0.70rem',
-                    fontWeight: 850,
-                    color: '#b45309',
-                    background: '#fef3c7',
-                    padding: '2px 7px',
-                    borderRadius: '6px'
-                  }} title="Beste Streak">
-                    <Flame size={11} color="#d97706" />
-                    <span>{entry.maxStreak}</span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <span style={{
-                      fontSize: '0.92rem',
-                      fontWeight: 950,
-                      color: '#15803d',
-                      minWidth: '50px',
-                      textAlign: 'right',
-                      lineHeight: 1.1
-                    }}>
-                      {entry.score ? `${entry.score} Pkt` : `${entry.accuracy}%`}
-                    </span>
-                    <span style={{
-                      fontSize: '0.66rem',
-                      fontWeight: 750,
-                      color: '#64748b'
-                    }}>
-                      {entry.accuracy}% • {entry.bpm} BPM
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          // Unbesetzter Platz (Zero Dummy Architecture)
+        {LEVEL_TABS.map(tab => {
+          const isSel = selectedLevel === tab.id;
+          const TabIcon = tab.icon;
           return (
-            <div
-              key={`empty-${slotRank}`}
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onSelectLevel(tab.id)}
               style={{
+                border: 'none',
+                background: isSel ? '#ffffff' : 'transparent',
+                color: isSel ? '#0f172a' : '#64748b',
+                borderRadius: '10px',
+                padding: '7px 4px',
+                fontSize: '0.72rem',
+                fontWeight: isSel ? 950 : 700,
+                cursor: 'pointer',
+                boxShadow: isSel ? '0 1px 4px rgba(0, 0, 0, 0.08)' : 'none',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 12px',
-                borderRadius: '14px',
-                background: '#fafafa',
-                border: '1px dashed #e2e8f0'
+                gap: '3px',
+                transition: 'all 0.12s ease'
               }}
+              className="hover-scale-mini"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.80rem',
-                  fontWeight: 900,
-                  background: '#f1f5f9',
-                  color: '#94a3b8'
-                }}>
-                  {slotRank}
-                </span>
-
-                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#94a3b8', fontStyle: 'italic' }}>
-                  Noch unbesetzt • Hol dir Platz {slotRank}!
-                </span>
-              </div>
-
-              {onPlayLevel && (
-                <button
-                  type="button"
-                  onClick={() => onPlayLevel(selectedLevel)}
-                  style={{
-                    border: 'none',
-                    background: '#fef3c7',
-                    color: '#b45309',
-                    fontSize: '0.70rem',
-                    fontWeight: 900,
-                    padding: '3px 8px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  className="hover-scale-mini"
-                >
-                  <Play size={10} fill="#b45309" />
-                  <span>Jetzt spielen</span>
-                </button>
-              )}
-            </div>
+              <TabIcon size={14} color={isSel ? '#ea580c' : '#94a3b8'} strokeWidth={2.4} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                {tab.label}
+              </span>
+            </button>
           );
         })}
       </div>
 
-      {/* 4. Deine Bestleistung (Sticky My-Record Box) mit Ghost-Mode & Nickname-Steuerung */}
+      {/* 2. Segmented Toggle: Gesamte Musikschule vs. Mein Instrument */}
       <div style={{
-        background: isPublic 
-          ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
-          : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        border: isPublic ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
-        borderRadius: '18px',
-        padding: '12px 14px',
+        display: 'flex',
+        background: '#f1f5f9',
+        borderRadius: '12px',
+        padding: '3px',
+        gap: '3px'
+      }}>
+        <button
+          type="button"
+          onClick={() => setFilterMode('school')}
+          style={{
+            flex: 1,
+            border: 'none',
+            borderRadius: '9px',
+            padding: '7px 10px',
+            fontSize: '0.74rem',
+            fontWeight: filterMode === 'school' ? 950 : 700,
+            background: filterMode === 'school' ? '#ffffff' : 'transparent',
+            color: filterMode === 'school' ? '#0f172a' : '#64748b',
+            boxShadow: filterMode === 'school' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            transition: 'all 0.12s ease'
+          }}
+        >
+          <School size={14} color={filterMode === 'school' ? '#ea580c' : '#64748b'} strokeWidth={2.4} />
+          <span>Gesamte Schule</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterMode('instrument')}
+          style={{
+            flex: 1,
+            border: 'none',
+            borderRadius: '9px',
+            padding: '7px 10px',
+            fontSize: '0.74rem',
+            fontWeight: filterMode === 'instrument' ? 950 : 700,
+            background: filterMode === 'instrument' ? '#ffffff' : 'transparent',
+            color: filterMode === 'instrument' ? '#0f172a' : '#64748b',
+            boxShadow: filterMode === 'instrument' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            transition: 'all 0.12s ease'
+          }}
+        >
+          <Guitar size={14} color={filterMode === 'instrument' ? '#15803d' : '#64748b'} strokeWidth={2.4} />
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Mein Instrument ({studentInstrument})
+          </span>
+        </button>
+      </div>
+
+      {/* 3. Rangliste / Podest Showcase (0,1% Swiss Design) */}
+      <div style={{
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        boxShadow: isPublic 
-          ? '0 4px 14px rgba(22, 101, 52, 0.08)' 
-          : '0 4px 12px rgba(0, 0, 0, 0.04)'
+        minHeight: '200px',
+        justifyContent: 'flex-start'
+      }}>
+        {effectiveEntries.length === 0 ? (
+          /* 🌟 Hero Challenger State statt 5x leere Platzhalter */
+          <div style={{
+            background: '#fffdfa',
+            border: '1.5px dashed #fed7aa',
+            borderRadius: '18px',
+            padding: '24px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: '12px'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '16px',
+              background: '#fff7ed',
+              border: '1px solid #ffedd5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ea580c'
+            }}>
+              <Crown size={24} strokeWidth={2.2} />
+            </div>
+
+            <div>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '0.96rem', fontWeight: 950, color: '#0f172a' }}>
+                Noch kein Eintrag in „{activeLevelConfig.label}“
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 650, maxWidth: '360px', lineHeight: 1.4 }}>
+                Sei der erste Rhythmus-Champion deiner Musikschule! Spiele jetzt eine Runde und sichere dir Platz 1 auf dem Siegerpodest.
+              </p>
+            </div>
+
+            {onPlayLevel && (
+              <button
+                type="button"
+                onClick={() => onPlayLevel(selectedLevel)}
+                style={{
+                  marginTop: '4px',
+                  background: '#ea580c',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 18px',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 3px 10px rgba(234, 88, 12, 0.25)',
+                  minHeight: '44px'
+                }}
+                className="hover-scale-mini"
+              >
+                <Play size={14} fill="#ffffff" color="#ffffff" />
+                <span>Groove starten & Platz 1 sichern</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          /* 🥇🥈🥉 Echtes Podest mit Top-3-Karten & schlanker Liste */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {effectiveEntries.map(entry => {
+              const isGold = entry.rank === 1;
+              const isSilver = entry.rank === 2;
+              const isBronze = entry.rank === 3;
+
+              // Hintergrund & Rahmen nach 0,1% Swiss Design (Solid Uni-Colors)
+              let cardBg = '#ffffff';
+              let cardBorder = '1px solid #f1f5f9';
+              let badgeBg = '#f1f5f9';
+              let badgeColor = '#64748b';
+
+              if (isGold) {
+                cardBg = '#fffdf5';
+                cardBorder = '1.5px solid #fde68a';
+                badgeBg = '#f59e0b';
+                badgeColor = '#ffffff';
+              } else if (isSilver) {
+                cardBg = '#f8fafc';
+                cardBorder = '1px solid #e2e8f0';
+                badgeBg = '#94a3b8';
+                badgeColor = '#ffffff';
+              } else if (isBronze) {
+                cardBg = '#fffaf5';
+                cardBorder = '1px solid #fed7aa';
+                badgeBg = '#d97706';
+                badgeColor = '#ffffff';
+              }
+
+              if (entry.isCurrentUser) {
+                cardBorder = isGold ? '2px solid #f59e0b' : '1.5px solid #22c55e';
+              }
+
+              return (
+                <div
+                  key={entry.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: isGold ? '10px 14px' : '8px 12px',
+                    borderRadius: '14px',
+                    background: cardBg,
+                    border: cardBorder,
+                    boxShadow: isGold ? '0 2px 8px rgba(245, 158, 11, 0.10)' : 'none',
+                    transition: 'all 0.12s ease'
+                  }}
+                >
+                  {/* Rank & Musiker */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{
+                      width: isGold ? '30px' : '26px',
+                      height: isGold ? '30px' : '26px',
+                      borderRadius: '9px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: isGold ? '0.86rem' : '0.78rem',
+                      fontWeight: 950,
+                      background: badgeBg,
+                      color: badgeColor
+                    }}>
+                      {isGold ? <Crown size={14} strokeWidth={2.4} /> : entry.rank}
+                    </span>
+
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: isGold ? '0.88rem' : '0.82rem',
+                          fontWeight: 950,
+                          color: '#0f172a'
+                        }}>
+                          {entry.name}
+                        </span>
+
+                        {entry.isCurrentUser && (
+                          <span style={{
+                            background: '#dcfce7',
+                            color: '#15803d',
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            padding: '1px 6px',
+                            borderRadius: '6px'
+                          }}>
+                            Du
+                          </span>
+                        )}
+
+                        {entry.isGhost && (
+                          <span style={{
+                            background: '#f1f5f9',
+                            color: '#64748b',
+                            fontSize: '0.60rem',
+                            fontWeight: 800,
+                            padding: '1px 5px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            <Lock size={9} />
+                            <span>Privat</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <span style={{ fontSize: '0.68rem', fontWeight: 650, color: '#64748b' }}>
+                        {entry.instrument} • {entry.bpm} BPM
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Score & Streak */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {entry.maxStreak > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        fontSize: '0.70rem',
+                        fontWeight: 850,
+                        color: '#b45309',
+                        background: '#fef3c7',
+                        padding: '2px 7px',
+                        borderRadius: '6px'
+                      }} title="Beste Streak">
+                        <Flame size={11} color="#d97706" />
+                        <span>{entry.maxStreak}</span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                      <span style={{
+                        fontSize: isGold ? '1.02rem' : '0.90rem',
+                        fontWeight: 950,
+                        color: isGold ? '#b45309' : '#15803d',
+                        minWidth: '50px',
+                        textAlign: 'right',
+                        lineHeight: 1.1
+                      }}>
+                        {entry.score ? `${entry.score} Pkt` : `${entry.accuracy}%`}
+                      </span>
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 700,
+                        color: '#64748b'
+                      }}>
+                        {entry.accuracy}% Treffer
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Deine Bestleistung (Sticky My-Record Box) - 100% Swiss Uni-Colors */}
+      <div style={{
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+        borderRadius: '16px',
+        padding: '12px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
       }}>
         {/* Status Zeile */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Target size={15} color={isPublic ? '#15803d' : '#475569'} strokeWidth={2.6} />
+            <Target size={15} color="#ea580c" strokeWidth={2.6} />
             <span style={{ 
-              fontSize: '0.76rem', 
+              fontSize: '0.72rem', 
               fontWeight: 950, 
-              color: isPublic ? '#166534' : '#334155', 
+              color: '#334155', 
               textTransform: 'uppercase', 
-              letterSpacing: '0.02em' 
+              letterSpacing: '0.04em' 
             }}>
-              Deine Bestleistung
+              Deine Bestleistung ({activeLevelConfig.label})
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {/* Ghost-Mode / Public Badge */}
             <span style={{
-              background: isPublic ? '#ffffff' : '#e2e8f0',
+              background: isPublic ? '#dcfce7' : '#f1f5f9',
               border: isPublic ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
-              color: isPublic ? '#15803d' : '#475569',
+              color: isPublic ? '#15803d' : '#64748b',
               fontSize: '0.68rem',
               fontWeight: 900,
               padding: '2px 8px',
@@ -689,12 +766,12 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
               {isPublic ? (
                 <>
                   <Eye size={10} color="#15803d" />
-                  <span>{myRank !== null ? `Platz ${myRank} (${filterMode === 'school' ? 'Schule' : studentInstrument})` : 'Noch nicht in den Top 10'}</span>
+                  <span>{myRank !== null ? `Platz ${myRank}` : 'In Rangliste'}</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck size={10} color="#64748b" />
-                  <span>Privat (Ghost-Modus)</span>
+                  <span>Privat (Ghost)</span>
                 </>
               )}
             </span>
@@ -706,76 +783,76 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.88rem', fontWeight: 950, color: '#0f172a' }}>
-                {isPublic && studentNickname ? studentNickname : 'Dein Profil (Privat)'}
+                {studentNickname || 'Musiker'}
               </span>
-              {studentNickname && (
-                <button
-                  type="button"
-                  onClick={() => setIsNicknameModalOpen(true)}
-                  title="Musiker-Nickname ändern"
-                  aria-label="Musiker-Nickname ändern"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: '#64748b'
-                  }}
-                >
-                  <Pencil size={12} />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsNicknameModalOpen(true)}
+                title="Musiker-Nickname ändern"
+                aria-label="Musiker-Nickname ändern"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#64748b'
+                }}
+              >
+                <Pencil size={12} />
+              </button>
             </div>
-            <span style={{ fontSize: '0.70rem', color: isPublic ? '#166534' : '#64748b', fontWeight: 750 }}>
+            <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 700 }}>
               Streak: {currentLevelPr?.streak || 0} • {currentLevelPr?.bpm || 85} BPM ({studentInstrument})
             </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <span style={{ fontSize: '1.24rem', fontWeight: 950, color: isPublic ? '#15803d' : '#334155', lineHeight: 1.1 }}>
+            <span style={{ fontSize: '1.20rem', fontWeight: 950, color: '#0f172a', lineHeight: 1.1 }}>
               {currentLevelPr?.score ? `${currentLevelPr.score} Pkt` : `${currentLevelPr?.accuracy || 0}%`}
             </span>
             {Boolean(currentLevelPr?.score) && (
-              <span style={{ fontSize: '0.66rem', fontWeight: 750, color: isPublic ? '#166534' : '#64748b' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#15803d' }}>
                 {currentLevelPr?.accuracy}% Treffer
               </span>
             )}
           </div>
         </div>
 
-        {/* 1-Klick Privacy / Leaderboard Toggle */}
+        {/* 1-Klick Privacy / Action Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
           <button
             type="button"
             onClick={handleTogglePublic}
             style={{
               flex: 1,
-              background: isPublic ? '#f1f5f9' : '#0284c7',
-              border: isPublic ? '1px solid #cbd5e1' : 'none',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
               borderRadius: '10px',
-              padding: '6px 10px',
-              color: isPublic ? '#475569' : '#ffffff',
+              padding: '8px 10px',
+              color: '#334155',
               fontSize: '0.72rem',
               fontWeight: 850,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '5px',
-              transition: 'all 0.12s ease'
+              gap: '6px',
+              transition: 'all 0.12s ease',
+              minHeight: '40px'
             }}
+            className="hover-scale-mini"
           >
             {isPublic ? (
               <>
-                <EyeOff size={12} />
-                <span>Auf Privat schalten (Ghost-Modus)</span>
+                <EyeOff size={13} color="#64748b" />
+                <span>Auf Privat maskieren</span>
               </>
             ) : (
               <>
-                <Eye size={12} color="#ffffff" />
-                <span>In Hall of Groove eintragen</span>
+                <Eye size={13} color="#ea580c" />
+                <span style={{ color: '#ea580c', fontWeight: 950 }}>Öffentlich anzeigen 🚀</span>
               </>
             )}
           </button>
@@ -786,23 +863,24 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
               onClick={() => onPlayLevel(selectedLevel)}
               style={{
                 flex: 1,
-                background: '#15803d',
+                background: '#ea580c',
                 border: 'none',
                 borderRadius: '10px',
-                padding: '6px 10px',
+                padding: '8px 10px',
                 color: '#ffffff',
-                fontSize: '0.72rem',
+                fontSize: '0.74rem',
                 fontWeight: 900,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '5px',
-                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.20)'
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(234, 88, 12, 0.20)',
+                minHeight: '40px'
               }}
               className="hover-scale-mini"
             >
-              <Play size={12} fill="#ffffff" color="#ffffff" />
+              <Play size={13} fill="#ffffff" color="#ffffff" />
               <span>Rekord angreifen</span>
             </button>
           )}

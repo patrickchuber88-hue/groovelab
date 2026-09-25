@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Play, 
   Square, 
@@ -1179,7 +1180,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   const progressPercent = notes.length > 0 ? Math.round((practicedCount / notes.length) * 100) : 0;
 
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
@@ -1524,7 +1525,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                       }}
                       style={{
                         position: 'absolute',
-                        bottom: '-4px',
+                        top: 0,
+                        bottom: 0,
                         left: `${pinPercent}%`,
                         transform: 'translateX(-50%)',
                         display: 'flex',
@@ -1534,7 +1536,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                         zIndex: isDraggingThis ? 50 : 35,
                         userSelect: 'none',
                         touchAction: (!isStudent || note.authorRole === 'student') ? 'none' : 'manipulation',
-                        padding: isMobile ? '8px 10px' : '4px'
+                        padding: 0,
+                        pointerEvents: 'auto'
                       }}
                       title={`Marker #${idx + 1} (${rainbowColor.label}) • ${formatTime(note.time)}: ${note.text} (Klick: Vorhören mit Pre-Roll · Ziehen: Verschieben)`}
                       className="hover-scale-mini"
@@ -1542,6 +1545,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                       {/* Pin Bubble (Bunt nach Regenbogen-Palette) */}
                       <div
                         style={{
+                          position: 'relative',
+                          top: '-8px',
                           width: isMobile ? '22px' : '20px',
                           height: isMobile ? '22px' : '20px',
                           borderRadius: '50%',
@@ -1552,7 +1557,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           boxShadow: `0 2px 8px ${rainbowColor.border}66`,
-                          transition: 'background 0.2s ease, transform 0.15s ease'
+                          transition: 'background 0.2s ease, transform 0.15s ease',
+                          flexShrink: 0
                         }}
                       >
                         {isPracticed ? (
@@ -1567,7 +1573,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                         <div
                           style={{
                             position: 'absolute',
-                            top: '-24px',
+                            top: '-32px',
                             background: '#0f172a',
                             color: '#ffffff',
                             fontSize: '0.65rem',
@@ -1586,10 +1592,9 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                       <div
                         style={{
                           width: '1.5px',
-                          height: '76px',
+                          flex: 1,
                           background: rainbowColor.bg,
-                          opacity: 0.65,
-                          marginTop: '-18px'
+                          opacity: 0.65
                         }}
                       />
                     </div>
@@ -2623,4 +2628,6 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

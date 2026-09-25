@@ -577,6 +577,15 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 Deutschland
               </div>
 
+              {/* ⚖️ Rechtlicher Abgrenzungs-Disclaimer gem. § 4 Nr. 3 UWG / § 5 MarkenG */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '16px 18px', fontSize: '0.82rem', lineHeight: 1.55, color: '#334155' }}>
+                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⚖️</span>
+                  <span>Hinweis zur Markenkennzeichnung &amp; Projekt-Abgrenzung:</span>
+                </div>
+                „Campus-Groovelab“ ist eine eigenständige Software- und Bildungsplattform für Musikschulen, entwickelt und betrieben von Patrick Huber. Es besteht <strong>keinerlei rechtliche, gesellschaftsrechtliche, organisatorische oder wirtschaftliche Verbindung</strong> zu dem pädagogischen Unterrichtskonzept „GrooveLAB“ der Städtischen Musikschule Lahr bzw. des Freundeskreises der Städtischen Musikschule Lahr e.V.
+              </div>
+
               <div>
                 <strong style={{ color: '#0f172a' }}>Elektronische Kontaktaufnahme &amp; Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07 / Art. 3 UWG CH):</strong><br />
                 E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />

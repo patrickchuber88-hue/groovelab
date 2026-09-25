@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Trophy, Star, Sparkles, Clock, Flame, Play, X, CheckCircle2 } from 'lucide-react';
 
 export interface GrooveSessionCelebrationModalProps {
@@ -6,6 +7,7 @@ export interface GrooveSessionCelebrationModalProps {
   onClose: () => void;
   onPlayAgain: () => void;
   onCompleteAndExit?: () => void;
+  onOpenLeaderboard?: () => void;
   xpEarned: number;
   practiceSeconds: number;
   accuracy: number;
@@ -24,6 +26,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
   onClose,
   onPlayAgain,
   onCompleteAndExit,
+  onOpenLeaderboard,
   xpEarned,
   practiceSeconds,
   accuracy,
@@ -49,7 +52,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
   const stars = accuracy >= 90 ? 3 : (accuracy >= 70 ? 2 : 1);
   const practiceMinutes = Math.max(1, Math.round(practiceSeconds / 60));
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -306,6 +309,34 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
             <span>Nochmal spielen ➔</span>
           </button>
 
+          {onOpenLeaderboard && (
+            <button
+              type="button"
+              onClick={onOpenLeaderboard}
+              style={{
+                width: '100%',
+                background: '#fffbeb',
+                border: '1.5px solid #fde68a',
+                borderRadius: '16px',
+                padding: '13px 20px',
+                color: '#92400e',
+                fontSize: '0.96rem',
+                fontWeight: 950,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.12)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <Trophy size={18} color="#d97706" />
+              <span>In Hall of Groove eintragen ➔</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onCompleteAndExit || onClose}
@@ -333,6 +364,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

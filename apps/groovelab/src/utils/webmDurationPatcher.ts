@@ -83,23 +83,8 @@ export async function fixWebmDuration(blob: Blob, durationSeconds: number): Prom
       return new Blob([patchedBuffer], { type: blob.type });
     }
 
-    // 4. If Duration is missing, inject Duration tag (0x44 0x89 0x84 [Float32]) into Info section
-    // EBML float 32-bit Duration element: [0x44, 0x89, 0x84, B0, B1, B2, B3] (7 bytes)
-    const durationTag = new Uint8Array(7);
-    durationTag[0] = 0x44;
-    durationTag[1] = 0x89;
-    durationTag[2] = 0x84; // 4-byte float length indicator
-    const tempDv = new DataView(durationTag.buffer);
-    tempDv.setFloat32(3, durationMs, false); // Big endian
-
-    // Insert duration right after Info header + length (approx infoOffset + 8)
-    const insertPoint = infoOffset + 8;
-    const newBuffer = new Uint8Array(uint8.length + durationTag.length);
-    newBuffer.set(uint8.subarray(0, insertPoint), 0);
-    newBuffer.set(durationTag, insertPoint);
-    newBuffer.set(uint8.subarray(insertPoint), insertPoint + durationTag.length);
-
-    return new Blob([newBuffer.buffer], { type: blob.type });
+    // 4. If Duration element is not present in Info header, return original intact blob safely
+    return blob;
   } catch (err) {
     console.warn('[webmDurationPatcher] Could not patch WebM duration header:', err);
     return blob;

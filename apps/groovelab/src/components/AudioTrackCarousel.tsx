@@ -801,6 +801,10 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     const clearTimers = () => timers.forEach(t => clearTimeout(t));
     countInTimerRef.current = { clear: clearTimers };
 
+    const playNative = () => {
+      startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+    };
+
     const leadTimeMs = Math.round(leadTime * 1000);
     timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
     timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
@@ -808,7 +812,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     timers.push(setTimeout(() => {
       setCountInStep(null);
       countInTimerRef.current = null;
-      startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+      playNative();
     }, leadTimeMs + 4 * beatDurationMs));
   };
 
@@ -1914,6 +1918,10 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     const clearTimers = () => timers.forEach(t => clearTimeout(t));
     countInTimerRef.current = { clear: clearTimers };
 
+    const playNative = () => {
+      startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+    };
+
     const leadTimeMs = Math.round(leadTime * 1000);
     timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
     timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
@@ -1921,7 +1929,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     timers.push(setTimeout(() => {
       setCountInStep(null);
       countInTimerRef.current = null;
-      startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
+      playNative();
     }, leadTimeMs + 4 * beatDurationMs));
   };
 

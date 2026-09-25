@@ -2249,6 +2249,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveDocument('accessibility' as any); } }}
             >Barrierefreiheit</span>
           </div>
+
+          <div style={{ width: '100%', fontSize: '11.5px', color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: '12px', textAlign: 'center', lineHeight: 1.5 }}>
+            Hinweis: Campus-Groovelab ist eine unabhängige Bildungs- und Softwareplattform und steht in keiner geschäftlichen oder organisatorischen Verbindung zum pädagogischen Projekt „GrooveLAB“ der Städtischen Musikschule Lahr bzw. des Freundeskreises der Städtischen Musikschule Lahr e.V.
+          </div>
         </div>
       </footer>
  
