@@ -1,29 +1,44 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Volume2,
-  VolumeX,
   Play,
-  RotateCcw,
   Sparkles,
-  Check,
   X,
-  ChevronRight,
-  Award,
-  Zap,
-  Flame,
-  Music,
-  Sliders,
   Trophy,
-  Target,
-  ArrowLeft,
   Radio,
-  Clock,
   Lightbulb,
   Headphones,
-  HelpCircle,
-  Compass,
-  ArrowRightLeft
+  Sliders,
+  Music,
+  Mic,
+  Flame,
+  Activity,
+  Check,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  RotateCcw,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
+import { 
+  earSynth, 
+  SoundEngineTimbre, 
+  IntervalPlaybackMode, 
+  ChordPlaybackMode 
+} from '../../services/audio/EarSynthEngine';
+import { 
+  RealtimePitchStream, 
+  YinPitchResult, 
+  evaluatePitchMatch, 
+  midiToNoteName, 
+  midiToFreq 
+} from '../../services/audio/YinPitchDetectionEngine';
+import { EarLeaderboardWidget, EarDiscipline, EarVdmLevel } from './EarLeaderboardWidget';
+import { supabase } from '../../lib/supabase';
+
+export type TrainingPillar = 'intervals' | 'chords' | 'pitch_match';
+export type VdmLevel = 'd1' | 'd2' | 'd3';
 
 export interface EarLabStudioModalProps {
   student?: any;
@@ -35,22 +50,19 @@ export interface EarLabStudioModalProps {
   useNotebookLayout?: boolean;
 }
 
-type TrainingPillar = 'intervals' | 'chords' | 'rhythm';
-type VdmLevel = 'd1' | 'd2' | 'd3';
-type SoundEngineTimbre = 'rhodes' | 'grand_piano';
-type IntervalPlaybackMode = 'ascending' | 'descending' | 'harmonic';
-type ChordPlaybackMode = 'block' | 'arpeggio_up' | 'arpeggio_down';
-
 interface IntervalItem {
   id: string;
   semitones: number;
   name: string;
   shortName: string;
   juniorName: string;
-  juniorIcon: string;
+  visualDots: string;
+  songAnchorShort: string;
+  proShort: string;
+  proClassification: string;
   vdmLevel: VdmLevel;
   songAnchor: string;
-  anchorNotes: number[]; // semitone offsets from root for song preview
+  anchorNotes: number[]; // Halbtöne relativ zum Grundton
 }
 
 interface ChordItem {
@@ -61,28 +73,26 @@ interface ChordItem {
   vdmLevel: VdmLevel;
   description: string;
   juniorName: string;
-  color: string;
+  visualSymbol: string;
+  songAnchorShort: string;
+  proShort: string;
+  proClassification: string;
 }
 
-interface RhythmPattern {
-  id: string;
-  title: string;
-  beats: number;
-  notes: { step: number; isHit: boolean }[];
-  vdmLevel: VdmLevel;
-}
-
-// 🎼 D1–D3 Intervall-Katalog mit Melodie-Ankern
+// 🎼 Didaktisch modernisierte Song-Anker & didaktische Intervalle (D1–D3)
 const INTERVAL_CATALOG: IntervalItem[] = [
   {
     id: 'p1',
     semitones: 0,
     name: 'Reine Prime',
     shortName: '1',
-    juniorName: 'Gleicher Ton (Zwilling)',
-    juniorIcon: '👯',
+    juniorName: 'Zwilling',
+    visualDots: '● = ●',
+    songAnchorShort: 'Gleicher Ton • 0 HT',
+    proShort: 'P1',
+    proClassification: 'Einklang • 0 HT',
     vdmLevel: 'd1',
-    songAnchor: 'Gleicher Ton / Wiederholung',
+    songAnchor: 'Ton-Wiederholung (Gleicher Ton)',
     anchorNotes: [0, 0, 0]
   },
   {
@@ -90,10 +100,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 1,
     name: 'Kleine Sekunde',
     shortName: 'k2',
-    juniorName: 'Schleich-Schritt (Der weiße Hai)',
-    juniorIcon: '🦈',
+    juniorName: 'Schleichen',
+    visualDots: '● ↗ ●',
+    songAnchorShort: 'Der weiße Hai • 1 HT',
+    proShort: 'm2',
+    proClassification: 'Halbtonschritt • 1 HT',
     vdmLevel: 'd2',
-    songAnchor: 'Der weiße Hai (Jaws) / Pink Panther',
+    songAnchor: 'Der weiße Hai / Billie Eilish – Bad Guy',
     anchorNotes: [0, 1, 0, 1]
   },
   {
@@ -101,10 +114,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 2,
     name: 'Große Sekunde',
     shortName: 'g2',
-    juniorName: 'Enten-Schritt (1 Treppenstufe)',
-    juniorIcon: '🦆',
+    juniorName: 'Schritt',
+    visualDots: '● ↗ ●',
+    songAnchorShort: 'Happy Birthday • 2 HT',
+    proShort: 'M2',
+    proClassification: 'Ganztonschritt • 2 HT',
     vdmLevel: 'd1',
-    songAnchor: 'Alle meine Entchen / Happy Birthday',
+    songAnchor: 'Happy Birthday / Alle meine Entchen',
     anchorNotes: [0, 2, 4, 5, 7, 7]
   },
   {
@@ -112,10 +128,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 3,
     name: 'Kleine Terz',
     shortName: 'k3',
-    juniorName: 'Kuckucks-Ruf (3 Stufen)',
-    juniorIcon: '🐦',
-    vdmLevel: 'd2',
-    songAnchor: 'Kuckuck, Kuckuck / Smoke on the Water',
+    juniorName: 'Kuckuck',
+    visualDots: '● ↘ ●',
+    songAnchorShort: 'Smoke on the Water • 3 HT',
+    proShort: 'm3',
+    proClassification: 'Moll-Terz • 3 HT',
+    vdmLevel: 'd1',
+    songAnchor: 'Smoke on the Water / Axel F',
     anchorNotes: [3, 0]
   },
   {
@@ -123,10 +142,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 4,
     name: 'Große Terz',
     shortName: 'g3',
-    juniorName: 'Sonnen-Sprung (4 Stufen)',
-    juniorIcon: '☀️',
+    juniorName: 'Sonne',
+    visualDots: '● ↗ ⬤',
+    songAnchorShort: 'Oh When the Saints • 4 HT',
+    proShort: 'M3',
+    proClassification: 'Dur-Terz • 4 HT',
     vdmLevel: 'd1',
-    songAnchor: 'Kumbaya / Oh When the Saints / Die Moldau',
+    songAnchor: 'Oh When the Saints / Kumbaya',
     anchorNotes: [0, 4, 7]
   },
   {
@@ -134,19 +156,25 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 5,
     name: 'Reine Quarte',
     shortName: '4',
-    juniorName: 'Tatort-Signal / Tannenbaum',
-    juniorIcon: '🌲',
+    juniorName: 'Tatü-Tata',
+    visualDots: '● ↗ ⬤',
+    songAnchorShort: 'Feuerwehr (Tatü) • 5 HT',
+    proShort: 'P4',
+    proClassification: 'Subdominante • 5 HT',
     vdmLevel: 'd1',
-    songAnchor: 'Tatort-Melodie / Oh Tannenbaum / Amazing Grace',
+    songAnchor: 'Feuerwehr (Tatü-Tata) / Harry Potter / Amazing Grace',
     anchorNotes: [0, 5, 0, 5]
   },
   {
     id: 'tritone',
     semitones: 6,
-    name: 'Tritonus (ü4 / v5)',
+    name: 'Tritonus',
     shortName: 'TT',
-    juniorName: 'Geister-Intervall (Simpsons)',
-    juniorIcon: '👻',
+    juniorName: 'Geisterton',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'The Simpsons • 6 HT',
+    proShort: 'TT',
+    proClassification: 'ü4 / v5 • 6 HT',
     vdmLevel: 'd3',
     songAnchor: 'The Simpsons / Maria (West Side Story)',
     anchorNotes: [0, 6, 7]
@@ -156,10 +184,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 7,
     name: 'Reine Quinte',
     shortName: '5',
-    juniorName: 'Star Wars Helden-Ruf',
-    juniorIcon: '🚀',
+    juniorName: 'Helden-Ruf',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'Star Wars • 7 HT',
+    proShort: 'P5',
+    proClassification: 'Dominante • 7 HT',
     vdmLevel: 'd1',
-    songAnchor: 'Star Wars / Twinkle Twinkle / ABC-Lied',
+    songAnchor: 'Star Wars Theme / Twinkle Twinkle',
     anchorNotes: [0, 7, 5, 4, 2, 12]
   },
   {
@@ -167,8 +198,11 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 8,
     name: 'Kleine Sexte',
     shortName: 'k6',
-    juniorName: 'Für-Elise Sprung',
-    juniorIcon: '🎹',
+    juniorName: 'Elise-Sprung',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'Für Elise • 8 HT',
+    proShort: 'm6',
+    proClassification: 'kl. Sexte • 8 HT',
     vdmLevel: 'd2',
     songAnchor: 'Für Elise (Auftakt) / The Entertainer',
     anchorNotes: [8, 7, 8, 7, 8]
@@ -178,10 +212,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 9,
     name: 'Große Sexte',
     shortName: 'g6',
-    juniorName: 'Ozean-Ruf (My Bonnie)',
-    juniorIcon: '⛵',
+    juniorName: 'Ozean-Ruf',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'My Bonnie • 9 HT',
+    proShort: 'M6',
+    proClassification: 'gr. Sexte • 9 HT',
     vdmLevel: 'd2',
-    songAnchor: 'My Bonnie Lies Over the Ocean / NBC Chime',
+    songAnchor: 'My Bonnie Lies Over the Ocean / NBC Glockenspiel',
     anchorNotes: [0, 9, 7]
   },
   {
@@ -189,8 +226,11 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 10,
     name: 'Kleine Septime',
     shortName: 'k7',
-    juniorName: 'Weltraum-Signal (Star Trek)',
-    juniorIcon: '🌌',
+    juniorName: 'Blues-Sprung',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'The Winner Takes It All • 10 HT',
+    proShort: 'm7',
+    proClassification: 'kl. Septime • 10 HT',
     vdmLevel: 'd2',
     songAnchor: 'The Winner Takes It All / Star Trek Theme',
     anchorNotes: [0, 10, 8]
@@ -200,10 +240,13 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 11,
     name: 'Große Septime',
     shortName: 'g7',
-    juniorName: 'Superman Weitsprung',
-    juniorIcon: '🦸',
+    juniorName: 'Weitsprung',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'Take On Me • 11 HT',
+    proShort: 'M7',
+    proClassification: 'gr. Septime • 11 HT',
     vdmLevel: 'd2',
-    songAnchor: 'Take On Me / Superman Theme',
+    songAnchor: 'Take On Me (A-ha) / Superman Theme',
     anchorNotes: [0, 11]
   },
   {
@@ -211,80 +254,140 @@ const INTERVAL_CATALOG: IntervalItem[] = [
     semitones: 12,
     name: 'Reine Oktave',
     shortName: '8',
-    juniorName: 'Regenbogen-Himmel (Oktave)',
-    juniorIcon: '🌈',
+    juniorName: 'Riesensprung',
+    visualDots: '● ⤢ ⬤',
+    songAnchorShort: 'Over the Rainbow • 12 HT',
+    proShort: 'P8',
+    proClassification: 'Volle Oktave • 12 HT',
     vdmLevel: 'd1',
     songAnchor: 'Somewhere Over the Rainbow / Singin\' in the Rain',
     anchorNotes: [0, 12, 11, 7, 8, 9]
   }
 ];
 
-// 🎹 D1–D3 Akkord- & Kadenzen-Katalog
+// 🎹 Akkord- & Kadenzen-Katalog (D1–D3)
 const CHORD_CATALOG: ChordItem[] = [
-  { id: 'major', name: 'Dur-Dreiklang', shortName: 'Dur', juniorName: 'Fröhlicher Sonnen-Akkord', intervals: [0, 4, 7], vdmLevel: 'd1', description: 'Hell, strahlend, konsonant (Grundton, große Terz, Quinte)', color: '#16a34a' },
-  { id: 'minor', name: 'Moll-Dreiklang', shortName: 'Moll', juniorName: 'Gemütlicher Kuschel-Akkord', intervals: [0, 3, 7], vdmLevel: 'd1', description: 'Melancholisch, getragen (Grundton, kleine Terz, Quinte)', color: '#2563eb' },
-  { id: 'diminished', name: 'Vermindert', shortName: 'verm.', juniorName: 'Spannungs-Akkord', intervals: [0, 3, 6], vdmLevel: 'd2', description: 'Spannungsgeladen, eng, instabil (Zwei kleine Terzen)', color: '#d97706' },
-  { id: 'augmented', name: 'Übermäßig', shortName: 'überm.', juniorName: 'Geheimnis-Akkord', intervals: [0, 4, 8], vdmLevel: 'd2', description: 'Schwebend, mystisch, offen (Zwei große Terzen)', color: '#7c3aed' },
-  { id: 'dom7', name: 'Dominantseptakkord (7)', shortName: '7', juniorName: 'Blues-Akkord', intervals: [0, 4, 7, 10], vdmLevel: 'd3', description: 'Bluesig, drängend nach Auflösung (Dur + kleine 7)', color: '#db2777' },
-  { id: 'maj7', name: 'Major 7 (maj7)', shortName: 'maj7', juniorName: 'Jazz-Samt-Akkord', intervals: [0, 4, 7, 11], vdmLevel: 'd3', description: 'Jazzig, samtig, träumerisch (Dur + große 7)', color: '#0891b2' },
-  { id: 'min7', name: 'Moll-Septakkord (m7)', shortName: 'm7', juniorName: 'Soul-Akkord', intervals: [0, 3, 7, 10], vdmLevel: 'd3', description: 'Warm, soulig, entspannt (Moll + kleine 7)', color: '#059669' },
-  { id: 'm7b5', name: 'Halbvermindert (m7b5)', shortName: 'ø', juniorName: 'Moll-Jazz-Akkord', intervals: [0, 3, 6, 10], vdmLevel: 'd3', description: 'Typischer Jazz-II-Akkord in Moll', color: '#ea580c' }
+  {
+    id: 'major',
+    name: 'Dur-Dreiklang',
+    shortName: 'Dur',
+    juniorName: 'Fröhlich',
+    visualSymbol: '▲ Dur',
+    songAnchorShort: 'Dur • Hell & Fröhlich',
+    proShort: 'Maj',
+    proClassification: 'Dur-Dreiklang (1-3-5)',
+    intervals: [0, 4, 7],
+    vdmLevel: 'd1',
+    description: 'Hell, strahlend, fröhlich (Grundton, große Terz, Quinte)'
+  },
+  {
+    id: 'minor',
+    name: 'Moll-Dreiklang',
+    shortName: 'Moll',
+    juniorName: 'Traurig',
+    visualSymbol: '▼ Moll',
+    songAnchorShort: 'Moll • Sanft & Traurig',
+    proShort: 'Min',
+    proClassification: 'Moll-Dreiklang (1-b3-5)',
+    intervals: [0, 3, 7],
+    vdmLevel: 'd1',
+    description: 'Melancholisch, getragen, traurig (Grundton, kleine Terz, Quinte)'
+  },
+  {
+    id: 'diminished',
+    name: 'Vermindert',
+    shortName: 'verm.',
+    juniorName: 'Gruselig',
+    visualSymbol: '◆ Verm.',
+    songAnchorShort: 'Vermindert • Schauder & Spannung',
+    proShort: 'dim',
+    proClassification: 'Vermindert (1-b3-b5)',
+    intervals: [0, 3, 6],
+    vdmLevel: 'd2',
+    description: 'Schaurig, instabil, drängend (Zwei kleine Terzen)'
+  },
+  {
+    id: 'augmented',
+    name: 'Übermäßig',
+    shortName: 'überm.',
+    juniorName: 'Zauber',
+    visualSymbol: '✦ Überm.',
+    songAnchorShort: 'Übermäßig • Schwebend & Mystisch',
+    proShort: 'aug',
+    proClassification: 'Übermäßig (1-3-#5)',
+    intervals: [0, 4, 8],
+    vdmLevel: 'd2',
+    description: 'Schwebend, mystisch, wie verzaubert (Zwei große Terzen)'
+  },
+  {
+    id: 'dom7',
+    name: 'Dominantseptakkord (7)',
+    shortName: '7',
+    juniorName: 'Blues-Klang',
+    visualSymbol: '■ 7',
+    songAnchorShort: 'Dominant 7 • Bluesig & Drängend',
+    proShort: '7',
+    proClassification: 'Dominantsept (1-3-5-b7)',
+    intervals: [0, 4, 7, 10],
+    vdmLevel: 'd3',
+    description: 'Bluesig, drängend nach Auflösung (Dur + kleine 7)'
+  },
+  {
+    id: 'maj7',
+    name: 'Major 7 (maj7)',
+    shortName: 'maj7',
+    juniorName: 'Traum-Klang',
+    visualSymbol: '✦ maj7',
+    songAnchorShort: 'Major 7 • Samtig & Träumerisch',
+    proShort: 'maj7',
+    proClassification: 'Dur-Sept (1-3-5-7)',
+    intervals: [0, 4, 7, 11],
+    vdmLevel: 'd3',
+    description: 'Jazzig, samtig, träumerisch (Dur + große 7)'
+  },
+  {
+    id: 'min7',
+    name: 'Moll-Septakkord (m7)',
+    shortName: 'm7',
+    juniorName: 'Abend-Klang',
+    visualSymbol: '● m7',
+    songAnchorShort: 'Moll 7 • Warm & Entspannt',
+    proShort: 'm7',
+    proClassification: 'Moll-Sept (1-b3-5-b7)',
+    intervals: [0, 3, 7, 10],
+    vdmLevel: 'd3',
+    description: 'Warm, soulig, entspannt (Moll + kleine 7)'
+  },
+  {
+    id: 'm7b5',
+    name: 'Halbvermindert (m7b5)',
+    shortName: 'ø',
+    juniorName: 'Nebel-Klang',
+    visualSymbol: '◇ ø',
+    songAnchorShort: 'Halbvermindert • Geheimnisvoll',
+    proShort: 'm7b5',
+    proClassification: 'Halbvermindert (1-b3-b5-b7)',
+    intervals: [0, 3, 6, 10],
+    vdmLevel: 'd3',
+    description: 'Typischer Jazz-Stufen-Akkord, unbestimmt schwebend'
+  }
 ];
 
-// 🥁 Rhythmus-Motive
-const RHYTHM_CATALOG: RhythmPattern[] = [
-  {
-    id: 'rhy_1',
-    title: 'Viertel & Halbe',
-    beats: 8,
-    vdmLevel: 'd1',
-    notes: [
-      { step: 0, isHit: true },
-      { step: 2, isHit: true },
-      { step: 4, isHit: true },
-      { step: 6, isHit: true }
-    ]
-  },
-  {
-    id: 'rhy_2',
-    title: 'Achtel-Puls & Pause',
-    beats: 8,
-    vdmLevel: 'd1',
-    notes: [
-      { step: 0, isHit: true },
-      { step: 1, isHit: true },
-      { step: 2, isHit: true },
-      { step: 4, isHit: true },
-      { step: 6, isHit: true }
-    ]
-  },
-  {
-    id: 'rhy_3',
-    title: 'Synkope / Off-Beat',
-    beats: 8,
-    vdmLevel: 'd2',
-    notes: [
-      { step: 0, isHit: true },
-      { step: 1, isHit: false },
-      { step: 2, isHit: true },
-      { step: 3, isHit: true },
-      { step: 5, isHit: true },
-      { step: 6, isHit: true }
-    ]
-  },
-  {
-    id: 'rhy_4',
-    title: 'Funk & Clave Vorhalt',
-    beats: 8,
-    vdmLevel: 'd3',
-    notes: [
-      { step: 0, isHit: true },
-      { step: 3, isHit: true },
-      { step: 4, isHit: false },
-      { step: 6, isHit: true },
-      { step: 7, isHit: true }
-    ]
-  }
+// 🎤 Sing-Back Ton-Pool (D1–D3)
+const PITCH_MATCH_NOTES: { midi: number; label: string; vdmLevel: VdmLevel }[] = [
+  { midi: 60, label: 'C4', vdmLevel: 'd1' },
+  { midi: 62, label: 'D4', vdmLevel: 'd1' },
+  { midi: 64, label: 'E4', vdmLevel: 'd1' },
+  { midi: 65, label: 'F4', vdmLevel: 'd1' },
+  { midi: 67, label: 'G4', vdmLevel: 'd1' },
+  { midi: 69, label: 'A4', vdmLevel: 'd1' },
+  { midi: 71, label: 'B4', vdmLevel: 'd2' },
+  { midi: 72, label: 'C5', vdmLevel: 'd2' },
+  { midi: 61, label: 'C#4', vdmLevel: 'd3' },
+  { midi: 63, label: 'D#4', vdmLevel: 'd3' },
+  { midi: 66, label: 'F#4', vdmLevel: 'd3' },
+  { midi: 68, label: 'G#4', vdmLevel: 'd3' },
+  { midi: 70, label: 'A#4', vdmLevel: 'd3' }
 ];
 
 export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
@@ -296,1823 +399,1993 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
   embedded = false,
   useNotebookLayout = false
 }) => {
-  const isNotebook = Boolean(useNotebookLayout || embedded);
-  // Navigation & Ausbildungs-Stufen
+  // Navigation: Studio vs. Hall of Ear
+  const [activeView, setActiveView] = useState<'studio' | 'hall_of_ear'>('studio');
+
+  // 3 Tonale Säulen (Rhythmus obsolet)
   const [activePillar, setActivePillar] = useState<TrainingPillar>('intervals');
   const [vdmLevel, setVdmLevel] = useState<VdmLevel>('d1');
   const [soundTimbre, setSoundTimbre] = useState<SoundEngineTimbre>('rhodes');
 
-  // Audio Context & Busy State
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const [isAudioBusy, setIsAudioBusy] = useState(false);
+  // Key Center Drone (Tonika-Bordun)
+  const [isDroneEnabled, setIsDroneEnabled] = useState<boolean>(false);
+  const [droneRootMidi, setDroneRootMidi] = useState<number>(48); // C3
 
   // 1. Intervall-Labor State
   const [intervalPlayMode, setIntervalPlayMode] = useState<IntervalPlaybackMode>('ascending');
   const [currentIntervalQuestion, setCurrentIntervalQuestion] = useState<{ rootMidi: number; interval: IntervalItem } | null>(null);
   const [selectedIntervalAnswer, setSelectedIntervalAnswer] = useState<string | null>(null);
-  const [isIntervalAnswerSubmitted, setIsIntervalAnswerSubmitted] = useState(false);
+  const [isIntervalAnswerSubmitted, setIsIntervalAnswerSubmitted] = useState<boolean>(false);
+  const [lastChosenInterval, setLastChosenInterval] = useState<IntervalItem | null>(null);
 
   // 2. Akkord-Labor State
   const [chordPlayMode, setChordPlayMode] = useState<ChordPlaybackMode>('block');
   const [currentChordQuestion, setCurrentChordQuestion] = useState<{ rootMidi: number; chord: ChordItem } | null>(null);
   const [selectedChordAnswer, setSelectedChordAnswer] = useState<string | null>(null);
-  const [isChordAnswerSubmitted, setIsChordAnswerSubmitted] = useState(false);
+  const [isChordAnswerSubmitted, setIsChordAnswerSubmitted] = useState<boolean>(false);
+  const [lastChosenChord, setLastChosenChord] = useState<ChordItem | null>(null);
 
-  // 3. Rhythmus-Labor State
-  const [currentRhythmQuestion, setCurrentRhythmQuestion] = useState<RhythmPattern>(RHYTHM_CATALOG[0]);
-  const [isRhythmPlaying, setIsRhythmPlaying] = useState(false);
-  const [userRhythmHits, setUserRhythmHits] = useState<number[]>([]);
-  const [rhythmEvaluationScore, setRhythmEvaluationScore] = useState<number | null>(null);
-  const rhythmStartTimeRef = useRef<number>(0);
+  // 3. Sing-Back / Pitch-Match State (YIN)
+  const [currentPitchQuestion, setCurrentPitchQuestion] = useState<{ midi: number; label: string } | null>(null);
+  const [isPitchListening, setIsPitchListening] = useState<boolean>(false);
+  const [livePitchResult, setLivePitchResult] = useState<YinPitchResult | null>(null);
+  const [pitchMatchLockCountdown, setPitchMatchLockCountdown] = useState<number>(0);
+  const [isPitchLockedIn, setIsPitchLockedIn] = useState<boolean>(false);
+  const pitchStreamRef = useRef<RealtimePitchStream | null>(null);
+  const pitchHoldTimerRef = useRef<any>(null);
 
-  // Gamification, Spaced Repetition & Streak
+  // Gamification & Session Metrics
   const [challengeProgress, setChallengeProgress] = useState({ current: 1, total: 10, correctCount: 0 });
-  const [streak, setStreak] = useState(0);
-  const [sessionXpEarned, setSessionXpEarned] = useState(0);
-  const [isCompletedCelebration, setIsCompletedCelebration] = useState(false);
-  const spacedRepetitionQueueRef = useRef<Array<{ rootMidi: number; interval: IntervalItem }>>([]);
-  const hasCompletedDailyChallengeTodayRef = useRef<boolean>(false);
+  const [streak, setStreak] = useState<number>(0);
+  const [maxSessionStreak, setMaxSessionStreak] = useState<number>(0);
+  const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
+  const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
+  const [responseTimes, setResponseTimes] = useState<number[]>([]);
+  const [isCompletedCelebration, setIsCompletedCelebration] = useState<boolean>(false);
+  const [latestRecordedSession, setLatestRecordedSession] = useState<{
+    discipline: EarDiscipline;
+    vdmLevel: EarVdmLevel;
+    score: number;
+    accuracy: number;
+    streak: number;
+    avgResponseTimeMs: number;
+  } | null>(null);
 
-  // Initialisiere AudioContext bei erstem Klick
-  const getAudioContext = useCallback(() => {
-    if (!audioCtxRef.current) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      audioCtxRef.current = new AudioContextClass();
-    }
-    if (audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
-    }
-    return audioCtxRef.current;
-  }, []);
+  // Timbre an Synth übergeben
+  useEffect(() => {
+    earSynth.setTimbre(soundTimbre);
+  }, [soundTimbre]);
 
-  // Frequenzformel: A4 = 440 Hz
-  const midiToFreq = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
-
-  // 🎵 Synthesizer Note Player: Dual-Engine (Rhodes vs. Flügel)
-  const playTone = useCallback((freq: number, startTime: number, duration: number, velocity: number = 0.3) => {
-    const ctx = getAudioContext();
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    if (soundTimbre === 'rhodes') {
-      // Warmes Rhodes: Sinus + Dreieck + weicher Anschlag
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, startTime);
-
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(freq, startTime);
-
-      const attackTime = 0.03;
-      const decayTime = duration * 0.45;
-      gainNode.gain.setValueAtTime(0.0001, startTime);
-      gainNode.gain.linearRampToValueAtTime(velocity, startTime + attackTime);
-      gainNode.gain.exponentialRampToValueAtTime(velocity * 0.6, startTime + attackTime + decayTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  // Key Center Drone Lifecycle
+  useEffect(() => {
+    if (isDroneEnabled) {
+      earSynth.startKeyCenterDrone(droneRootMidi);
     } else {
-      // Flügel: Perkussiver Hammer-Anschlag (Dreieck + Sinus mit schnellem Attack)
-      osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(freq, startTime);
-
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 2, startTime); // Oktave-Oberton
-
-      const attackTime = 0.01;
-      gainNode.gain.setValueAtTime(0.0001, startTime);
-      gainNode.gain.linearRampToValueAtTime(velocity * 1.1, startTime + attackTime);
-      gainNode.gain.exponentialRampToValueAtTime(velocity * 0.4, startTime + attackTime + 0.15);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      earSynth.stopKeyCenterDrone();
     }
+    return () => {
+      earSynth.stopKeyCenterDrone();
+    };
+  }, [isDroneEnabled, droneRootMidi]);
 
-    osc1.connect(gainNode);
-    osc2.connect(gainNode);
-    gainNode.connect(ctx.destination);
+  // Filterung nach VdM-Stufe
+  const availableIntervals = useMemo(() => {
+    return INTERVAL_CATALOG.filter(item => {
+      if (vdmLevel === 'd1') return item.vdmLevel === 'd1';
+      if (vdmLevel === 'd2') return item.vdmLevel === 'd1' || item.vdmLevel === 'd2';
+      return true;
+    });
+  }, [vdmLevel]);
 
-    osc1.start(startTime);
-    osc2.start(startTime);
-    osc1.stop(startTime + duration + 0.05);
-    osc2.stop(startTime + duration + 0.05);
-  }, [getAudioContext, soundTimbre]);
+  const availableChords = useMemo(() => {
+    return CHORD_CATALOG.filter(item => {
+      if (vdmLevel === 'd1') return item.vdmLevel === 'd1';
+      if (vdmLevel === 'd2') return item.vdmLevel === 'd1' || item.vdmLevel === 'd2';
+      return true;
+    });
+  }, [vdmLevel]);
 
-  // 🔔 Stimmgabel-Referenzton (A4 = 440 Hz oder C4 = 261.63 Hz)
-  const playReferencePitch = (type: 'A4' | 'C4') => {
-    const ctx = getAudioContext();
-    const freq = type === 'A4' ? 440.0 : 261.63;
-    playTone(freq, ctx.currentTime, 2.0, 0.35);
-  };
+  const availablePitchNotes = useMemo(() => {
+    return PITCH_MATCH_NOTES.filter(item => {
+      if (vdmLevel === 'd1') return item.vdmLevel === 'd1';
+      if (vdmLevel === 'd2') return item.vdmLevel === 'd1' || item.vdmLevel === 'd2';
+      return true;
+    });
+  }, [vdmLevel]);
 
-  // 🥁 Klick-Synthesizer für Rhythmus & Vorzähler
-  const playClick = useCallback((time: number, isAccent: boolean = false) => {
-    const ctx = getAudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
-    osc.frequency.exponentialRampToValueAtTime(100, time + 0.04);
-
-    gain.gain.setValueAtTime(isAccent ? 0.4 : 0.25, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(time);
-    osc.stop(time + 0.06);
-  }, [getAudioContext]);
-
-  // Filterung nach Ausbildungs-Stufe
-  const availableIntervals = INTERVAL_CATALOG.filter(item => {
-    if (vdmLevel === 'd1') return item.vdmLevel === 'd1';
-    if (vdmLevel === 'd2') return item.vdmLevel === 'd1' || item.vdmLevel === 'd2';
-    return true;
-  });
-
-  const availableChords = CHORD_CATALOG.filter(item => {
-    if (vdmLevel === 'd1') return item.vdmLevel === 'd1';
-    if (vdmLevel === 'd2') return item.vdmLevel === 'd1' || item.vdmLevel === 'd2';
-    return true;
-  });
-
-  // Generiere neue Intervall-Aufgabe (unter Einbeziehung der Spaced-Repetition-Queue)
+  // Generiere Intervall-Frage
   const generateNewIntervalQuestion = useCallback(() => {
-    let nextQuestion: { rootMidi: number; interval: IntervalItem };
-
-    // Wenn etwas in der Wiederholungs-Queue liegt und wir bei Frage > 4 sind:
-    if (spacedRepetitionQueueRef.current.length > 0 && Math.random() > 0.4) {
-      nextQuestion = spacedRepetitionQueueRef.current.shift()!;
-    } else {
-      const randomInterval = availableIntervals[Math.floor(Math.random() * availableIntervals.length)];
-      const rootMidi = 48 + Math.floor(Math.random() * 16); // C3 bis G4
-      nextQuestion = { rootMidi, interval: randomInterval };
-    }
-
-    setCurrentIntervalQuestion(nextQuestion);
+    const randomInterval = availableIntervals[Math.floor(Math.random() * availableIntervals.length)];
+    const rootMidi = 48 + Math.floor(Math.random() * 14); // C3 bis D4
+    setCurrentIntervalQuestion({ rootMidi, interval: randomInterval });
     setSelectedIntervalAnswer(null);
+    setLastChosenInterval(null);
     setIsIntervalAnswerSubmitted(false);
+    setQuestionStartTime(Date.now());
   }, [availableIntervals]);
 
-  // Generiere neue Akkord-Aufgabe
+  // Generiere Akkord-Frage
   const generateNewChordQuestion = useCallback(() => {
     const randomChord = availableChords[Math.floor(Math.random() * availableChords.length)];
     const rootMidi = 48 + Math.floor(Math.random() * 12);
     setCurrentChordQuestion({ rootMidi, chord: randomChord });
     setSelectedChordAnswer(null);
+    setLastChosenChord(null);
     setIsChordAnswerSubmitted(false);
+    setQuestionStartTime(Date.now());
   }, [availableChords]);
 
-  // Audio-Wiedergabe: Intervall
-  const playCurrentInterval = useCallback(() => {
-    if (!currentIntervalQuestion) return;
-    const ctx = getAudioContext();
-    const now = ctx.currentTime + 0.05;
-    const rootFreq = midiToFreq(currentIntervalQuestion.rootMidi);
-    const targetFreq = midiToFreq(currentIntervalQuestion.rootMidi + currentIntervalQuestion.interval.semitones);
+  // Generiere Pitch-Match Frage
+  const generateNewPitchQuestion = useCallback(() => {
+    const randomNote = availablePitchNotes[Math.floor(Math.random() * availablePitchNotes.length)];
+    setCurrentPitchQuestion(randomNote);
+    setIsPitchLockedIn(false);
+    setLivePitchResult(null);
+    setPitchMatchLockCountdown(0);
+    setQuestionStartTime(Date.now());
+  }, [availablePitchNotes]);
 
-    setIsAudioBusy(true);
-
-    if (intervalPlayMode === 'ascending') {
-      playTone(rootFreq, now, 0.7);
-      playTone(targetFreq, now + 0.65, 0.9);
-      setTimeout(() => setIsAudioBusy(false), 1600);
-    } else if (intervalPlayMode === 'descending') {
-      playTone(targetFreq, now, 0.7);
-      playTone(rootFreq, now + 0.65, 0.9);
-      setTimeout(() => setIsAudioBusy(false), 1600);
-    } else {
-      // Harmonisch (simultan)
-      playTone(rootFreq, now, 1.3, 0.25);
-      playTone(targetFreq, now, 1.3, 0.25);
-      setTimeout(() => setIsAudioBusy(false), 1400);
-    }
-  }, [currentIntervalQuestion, intervalPlayMode, getAudioContext, playTone]);
-
-  // Didaktischer A/B-Hörvergleich bei Fehlern (Spielt Falsch vs. Richtig)
-  const playABComparison = useCallback(() => {
-    if (!currentIntervalQuestion || !selectedIntervalAnswer) return;
-    const ctx = getAudioContext();
-    const now = ctx.currentTime + 0.05;
-    const rootFreq = midiToFreq(currentIntervalQuestion.rootMidi);
-
-    const wrongIntervalItem = INTERVAL_CATALOG.find(i => i.id === selectedIntervalAnswer);
-    const correctIntervalItem = currentIntervalQuestion.interval;
-
-    if (!wrongIntervalItem) return;
-
-    setIsAudioBusy(true);
-    const wrongTargetFreq = midiToFreq(currentIntervalQuestion.rootMidi + wrongIntervalItem.semitones);
-    const correctTargetFreq = midiToFreq(currentIntervalQuestion.rootMidi + correctIntervalItem.semitones);
-
-    // 1. Dein Tipp (falsch)
-    playTone(rootFreq, now, 0.5);
-    playTone(wrongTargetFreq, now + 0.45, 0.65);
-
-    // Pause (450ms)
-
-    // 2. Das gesuchte Intervall (richtig)
-    const secondNow = now + 1.25;
-    playTone(rootFreq, secondNow, 0.6);
-    playTone(correctTargetFreq, secondNow + 0.55, 0.85);
-
-    setTimeout(() => setIsAudioBusy(false), 2400);
-  }, [currentIntervalQuestion, selectedIntervalAnswer, getAudioContext, playTone]);
-
-  // Song-Anker Melodie vorspielen
-  const playSongAnchorMelody = useCallback(() => {
-    if (!currentIntervalQuestion) return;
-    const ctx = getAudioContext();
-    const now = ctx.currentTime + 0.05;
-    const rootMidi = currentIntervalQuestion.rootMidi;
-    const { anchorNotes } = currentIntervalQuestion.interval;
-
-    setIsAudioBusy(true);
-    anchorNotes.forEach((offset, idx) => {
-      playTone(midiToFreq(rootMidi + offset), now + idx * 0.32, 0.38, 0.28);
-    });
-
-    setTimeout(() => setIsAudioBusy(false), (anchorNotes.length * 0.32 + 0.5) * 1000);
-  }, [currentIntervalQuestion, getAudioContext, playTone]);
-
-  // Audio-Wiedergabe: Akkord
-  const playCurrentChord = useCallback(() => {
-    if (!currentChordQuestion) return;
-    const ctx = getAudioContext();
-    const now = ctx.currentTime + 0.05;
-    const { rootMidi, chord } = currentChordQuestion;
-
-    setIsAudioBusy(true);
-
-    if (chordPlayMode === 'block') {
-      chord.intervals.forEach(offset => {
-        playTone(midiToFreq(rootMidi + offset), now, 1.6, 0.22);
-      });
-      setTimeout(() => setIsAudioBusy(false), 1700);
-    } else if (chordPlayMode === 'arpeggio_up') {
-      chord.intervals.forEach((offset, idx) => {
-        playTone(midiToFreq(rootMidi + offset), now + idx * 0.25, 0.8, 0.25);
-      });
-      setTimeout(() => setIsAudioBusy(false), (chord.intervals.length * 0.25 + 0.9) * 1000);
-    } else {
-      const reversed = [...chord.intervals].reverse();
-      reversed.forEach((offset, idx) => {
-        playTone(midiToFreq(rootMidi + offset), now + idx * 0.25, 0.8, 0.25);
-      });
-      setTimeout(() => setIsAudioBusy(false), (reversed.length * 0.25 + 0.9) * 1000);
-    }
-  }, [currentChordQuestion, chordPlayMode, getAudioContext, playTone]);
-
-  // Audio-Wiedergabe: Rhythmus-Motiv
-  const playCurrentRhythm = useCallback(() => {
-    if (isRhythmPlaying) return;
-    const ctx = getAudioContext();
-    const bpm = 90;
-    const stepDuration = 60 / bpm / 2;
-    const now = ctx.currentTime + 0.05;
-
-    setIsRhythmPlaying(true);
-    setUserRhythmHits([]);
-    setRhythmEvaluationScore(null);
-
-    // 4 Klicks Vorzähler
-    for (let c = 0; c < 4; c++) {
-      playClick(now + c * (stepDuration * 2), c === 0);
-    }
-
-    const rhythmStartTime = now + 4 * (stepDuration * 2);
-    rhythmStartTimeRef.current = rhythmStartTime;
-
-    currentRhythmQuestion.notes.forEach(note => {
-      if (note.isHit) {
-        playTone(440, rhythmStartTime + note.step * stepDuration, 0.15, 0.35);
-      }
-    });
-
-    const totalDuration = (4 * (stepDuration * 2) + currentRhythmQuestion.beats * stepDuration + 0.5) * 1000;
-    setTimeout(() => {
-      setIsRhythmPlaying(false);
-    }, totalDuration);
-  }, [isRhythmPlaying, currentRhythmQuestion, getAudioContext, playClick, playTone]);
-
-  const handleRhythmTap = () => {
-    const ctx = getAudioContext();
-    playClick(ctx.currentTime, true);
-
-    const hitTime = ctx.currentTime;
-    const relativeTime = hitTime - rhythmStartTimeRef.current;
-    if (relativeTime > 0) {
-      setUserRhythmHits(prev => [...prev, relativeTime]);
-    }
-  };
-
-  const evaluateRhythm = () => {
-    const stepDuration = 60 / 90 / 2;
-    const targetHitTimes = currentRhythmQuestion.notes
-      .filter(n => n.isHit)
-      .map(n => n.step * stepDuration);
-
-    if (userRhythmHits.length === 0) {
-      setRhythmEvaluationScore(0);
-      return;
-    }
-
-    let hitMatches = 0;
-    targetHitTimes.forEach(targetTime => {
-      const matched = userRhythmHits.some(userTime => Math.abs(userTime - targetTime) <= 0.12);
-      if (matched) hitMatches++;
-    });
-
-    const score = Math.round((hitMatches / targetHitTimes.length) * 100);
-    setRhythmEvaluationScore(score);
-
-    if (score >= 75) {
-      handleCorrectAnswer(score >= 90 ? 25 : 15, 'Rhythmus-Treffer gemeistert');
-    }
-  };
-
-  // Initialisiere erste Fragen bei Mount oder Level-Wechsel
+  // Initialisiere erste Frage bei Pillar- oder Stufenwechsel
   useEffect(() => {
-    generateNewIntervalQuestion();
-    generateNewChordQuestion();
-  }, [vdmLevel, generateNewIntervalQuestion, generateNewChordQuestion]);
+    setChallengeProgress({ current: 1, total: 10, correctCount: 0 });
+    setStreak(0);
+    setMaxSessionStreak(0);
+    setResponseTimes([]);
+    setIsCompletedCelebration(false);
+    setSessionStartTime(Date.now());
 
-  // ESC-Key & Spacebar Audio-Trigger
+    if (activePillar === 'intervals') {
+      generateNewIntervalQuestion();
+    } else if (activePillar === 'chords') {
+      generateNewChordQuestion();
+    } else if (activePillar === 'pitch_match') {
+      generateNewPitchQuestion();
+    }
+  }, [activePillar, vdmLevel, generateNewIntervalQuestion, generateNewChordQuestion, generateNewPitchQuestion]);
+
+  // Intervall abspielen
+  const handlePlayCurrentInterval = useCallback(() => {
+    if (!currentIntervalQuestion) return;
+    earSynth.playInterval(
+      currentIntervalQuestion.rootMidi,
+      currentIntervalQuestion.interval.semitones,
+      intervalPlayMode,
+      0.8,
+      soundTimbre
+    );
+  }, [currentIntervalQuestion, intervalPlayMode, soundTimbre]);
+
+  // Akkord abspielen
+  const handlePlayCurrentChord = useCallback(() => {
+    if (!currentChordQuestion) return;
+    earSynth.playChord(
+      currentChordQuestion.rootMidi,
+      currentChordQuestion.chord.intervals,
+      chordPlayMode,
+      2.0,
+      soundTimbre
+    );
+  }, [currentChordQuestion, chordPlayMode, soundTimbre]);
+
+  // Pitch-Match Referenzton abspielen
+  const handlePlayTargetPitch = useCallback(() => {
+    if (!currentPitchQuestion) return;
+    earSynth.playNote(currentPitchQuestion.midi, 1.8, 0.4, 0, soundTimbre);
+  }, [currentPitchQuestion, soundTimbre]);
+
+  // Kadenz zur Einstimmung abspielen
+  const handlePlayCadence = () => {
+    earSynth.playCadence(60, soundTimbre);
+  };
+
+  // Session abschließen und autoritativ in DB persistieren
+  const handleCompleteSession = useCallback(async (finalCorrectCount: number, finalStreak: number, finalTimes: number[]) => {
+    const accuracy = Math.round((finalCorrectCount / challengeProgress.total) * 100);
+    const avgResponseTimeMs = finalTimes.length > 0 
+      ? Math.round(finalTimes.reduce((a, b) => a + b, 0) / finalTimes.length) 
+      : 2000;
+
+    // Speed-Weighted Score
+    const speedFactor = Math.max(0.5, Math.min(2.0, 3000 / Math.max(600, avgResponseTimeMs)));
+    const levelMult = vdmLevel === 'd3' ? 1.5 : vdmLevel === 'd2' ? 1.25 : 1.0;
+    const calculatedScore = Math.round((accuracy * speedFactor * levelMult) + (finalStreak * 5));
+
+    // XP Formel (mindestens 15 XP, bis zu 75 XP bei Meisterschaft)
+    const earnedXp = Math.max(15, Math.round((accuracy * 0.5) + (finalStreak * 3)));
+
+    const discipline = activePillar as EarDiscipline;
+    const sessionPayload = {
+      discipline,
+      vdmLevel,
+      score: calculatedScore,
+      accuracy,
+      streak: finalStreak,
+      avgResponseTimeMs
+    };
+
+    setLatestRecordedSession(sessionPayload);
+    setIsCompletedCelebration(true);
+
+    // 1. Speichere autoritativ in Supabase
+    try {
+      if (student?.id) {
+        await supabase.rpc('record_ear_training_session', {
+          p_discipline: discipline,
+          p_vdm_level: vdmLevel,
+          p_accuracy: accuracy,
+          p_streak: finalStreak,
+          p_avg_response_time_ms: avgResponseTimeMs,
+          p_instrument: student?.instrument || null,
+          p_score: calculatedScore,
+          p_xp: onRewardXp ? 0 : earnedXp,
+          p_student_id: student?.id || null
+        });
+        window.dispatchEvent(new CustomEvent('cg_ear_score_recorded'));
+      }
+    } catch (err) {
+      console.warn('[EarLab] Could not persist ear training score to Supabase:', err);
+    }
+
+    // 2. Rufe Parent-Callbacks auf (für XP-Animation und Klang-Skill-Radar)
+    if (onRewardXp) {
+      onRewardXp(earnedXp, `Gehörtraining (${discipline.toUpperCase()} • ${vdmLevel.toUpperCase()})`);
+    }
+    if (onSessionComplete) {
+      onSessionComplete({
+        vdmLevel,
+        pillar: activePillar,
+        accuracy,
+        xp: earnedXp
+      });
+    }
+  }, [challengeProgress.total, vdmLevel, activePillar, student?.id, student?.instrument, onRewardXp, onSessionComplete]);
+
+  // Nächste Frage oder Session-Abschluss
+  const advanceToNextStep = useCallback((isCorrect: boolean) => {
+    const elapsed = Date.now() - questionStartTime;
+    const updatedTimes = [...responseTimes, elapsed];
+    setResponseTimes(updatedTimes);
+
+    const newCorrect = isCorrect ? challengeProgress.correctCount + 1 : challengeProgress.correctCount;
+    const newStreak = isCorrect ? streak + 1 : 0;
+    const newMaxStreak = Math.max(maxSessionStreak, newStreak);
+    setStreak(newStreak);
+    setMaxSessionStreak(newMaxStreak);
+
+    if (challengeProgress.current >= challengeProgress.total) {
+      handleCompleteSession(newCorrect, newMaxStreak, updatedTimes);
+    } else {
+      setChallengeProgress(prev => ({
+        ...prev,
+        current: prev.current + 1,
+        correctCount: newCorrect
+      }));
+
+      if (activePillar === 'intervals') {
+        generateNewIntervalQuestion();
+      } else if (activePillar === 'chords') {
+        generateNewChordQuestion();
+      } else if (activePillar === 'pitch_match') {
+        generateNewPitchQuestion();
+      }
+    }
+  }, [challengeProgress, questionStartTime, responseTimes, streak, maxSessionStreak, handleCompleteSession, activePillar, generateNewIntervalQuestion, generateNewChordQuestion, generateNewPitchQuestion]);
+
+  // Intervall-Antwort prüfen mit didaktischer Feedback-Kassette
+  const handleSelectIntervalAnswer = (intervalId: string) => {
+    if (isIntervalAnswerSubmitted || !currentIntervalQuestion) return;
+    const chosen = availableIntervals.find(i => i.id === intervalId) || null;
+    setSelectedIntervalAnswer(intervalId);
+    setLastChosenInterval(chosen);
+    setIsIntervalAnswerSubmitted(true);
+    const isCorrect = intervalId === currentIntervalQuestion.interval.id;
+    // Wenn richtig: Kurze Genuss-Pause (1.6s) mit automatischem Übergang
+    // Wenn falsch: Bleibt stehen, damit der Schüler den A/B Vergleich und Song-Anker anhören kann
+    if (isCorrect) {
+      setTimeout(() => {
+        advanceToNextStep(true);
+      }, 1600);
+    }
+  };
+
+  // Akkord-Antwort prüfen mit didaktischer Feedback-Kassette
+  const handleSelectChordAnswer = (chordId: string) => {
+    if (isChordAnswerSubmitted || !currentChordQuestion) return;
+    const chosen = availableChords.find(c => c.id === chordId) || null;
+    setSelectedChordAnswer(chordId);
+    setLastChosenChord(chosen);
+    setIsChordAnswerSubmitted(true);
+    const isCorrect = chordId === currentChordQuestion.chord.id;
+    if (isCorrect) {
+      setTimeout(() => {
+        advanceToNextStep(true);
+      }, 1600);
+    }
+  };
+
+  // A/B Vergleich Audio-Player
+  const handlePlayHeardInterval = () => {
+    if (!currentIntervalQuestion) return;
+    earSynth.playInterval(
+      currentIntervalQuestion.rootMidi,
+      currentIntervalQuestion.interval.semitones,
+      intervalPlayMode,
+      0.8,
+      soundTimbre
+    );
+  };
+
+  const handlePlayChosenInterval = () => {
+    if (!currentIntervalQuestion || !lastChosenInterval) return;
+    earSynth.playInterval(
+      currentIntervalQuestion.rootMidi,
+      lastChosenInterval.semitones,
+      intervalPlayMode,
+      0.8,
+      soundTimbre
+    );
+  };
+
+  const handlePlayHeardChord = () => {
+    if (!currentChordQuestion) return;
+    earSynth.playChord(
+      currentChordQuestion.rootMidi,
+      currentChordQuestion.chord.intervals,
+      chordPlayMode,
+      2.0,
+      soundTimbre
+    );
+  };
+
+  const handlePlayChosenChord = () => {
+    if (!currentChordQuestion || !lastChosenChord) return;
+    earSynth.playChord(
+      currentChordQuestion.rootMidi,
+      lastChosenChord.intervals,
+      chordPlayMode,
+      2.0,
+      soundTimbre
+    );
+  };
+
+  const handleManualAdvanceInterval = () => {
+    if (!currentIntervalQuestion || !selectedIntervalAnswer) return;
+    const isCorrect = selectedIntervalAnswer === currentIntervalQuestion.interval.id;
+    advanceToNextStep(isCorrect);
+  };
+
+  const handleManualAdvanceChord = () => {
+    if (!currentChordQuestion || !selectedChordAnswer) return;
+    const isCorrect = selectedChordAnswer === currentChordQuestion.chord.id;
+    advanceToNextStep(isCorrect);
+  };
+
+  // Sing-Back / Pitch-Match Mikrofon Steuerung
+  const togglePitchListening = async () => {
+    if (isPitchListening) {
+      pitchStreamRef.current?.stop();
+      setIsPitchListening(false);
+      setLivePitchResult(null);
+    } else {
+      if (!pitchStreamRef.current) {
+        pitchStreamRef.current = new RealtimePitchStream();
+      }
+      const ok = await pitchStreamRef.current.start((result) => {
+        setLivePitchResult(result);
+
+        // Prüfe ob Ton im Zielfenster liegt
+        if (currentPitchQuestion && result.pitch && result.isAudible) {
+          const targetFreq = midiToFreq(currentPitchQuestion.midi);
+          const score = evaluatePitchMatch(result.pitch, targetFreq, 30);
+
+          if (score.isMatched) {
+            setPitchMatchLockCountdown(prev => {
+              if (prev >= 100) {
+                // Ton erfolgreich gehalten!
+                if (!isPitchLockedIn) {
+                  setIsPitchLockedIn(true);
+                  pitchStreamRef.current?.stop();
+                  setIsPitchListening(false);
+                  setTimeout(() => {
+                    advanceToNextStep(true);
+                  }, 900);
+                }
+                return 100;
+              }
+              return Math.min(100, prev + 25);
+            });
+          } else {
+            setPitchMatchLockCountdown(prev => Math.max(0, prev - 15));
+          }
+        }
+      });
+      setIsPitchListening(ok);
+    }
+  };
+
+  // Unmount Cleanup
+  useEffect(() => {
+    return () => {
+      pitchStreamRef.current?.stop();
+      clearTimeout(pitchHoldTimerRef.current);
+      earSynth.stopAll();
+    };
+  }, []);
+
+  // Escape-Taste schließt den Dialog barrierefrei (BFSG / WCAG 2.2 AA)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && onClose) {
         onClose();
       }
-      if (e.code === 'Space' && (e.target as HTMLElement)?.tagName !== 'INPUT' && (e.target as HTMLElement)?.tagName !== 'TEXTAREA') {
-        if (!isAudioBusy) {
-          e.preventDefault();
-          if (activePillar === 'intervals') playCurrentInterval();
-          else if (activePillar === 'chords') playCurrentChord();
-          else if (activePillar === 'rhythm') playCurrentRhythm();
-        }
-      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isAudioBusy, activePillar, playCurrentInterval, playCurrentChord, playCurrentRhythm]);
+  }, [onClose]);
 
-  // Antwort-Logik mit XP-Ökonomie & Daily-Cap
-  const handleCorrectAnswer = (baseXp: number, reason: string) => {
-    const isFreeMode = hasCompletedDailyChallengeTodayRef.current;
-    const awardedXp = isFreeMode ? 2 : baseXp;
-
-    setStreak(prev => prev + 1);
-    setSessionXpEarned(prev => prev + awardedXp);
-    setChallengeProgress(prev => ({
-      ...prev,
-      correctCount: prev.correctCount + 1
-    }));
-
-    if (onRewardXp) {
-      onRewardXp(awardedXp, reason);
-    }
-  };
-
-  const handleWrongAnswer = (questionItem: { rootMidi: number; interval: IntervalItem }) => {
-    setStreak(0);
-    // Spaced-Repetition: In die Wiederholungs-Queue für diesen Durchgang legen
-    spacedRepetitionQueueRef.current.push(questionItem);
-  };
-
-  const submitIntervalAnswer = (intervalId: string) => {
-    if (isIntervalAnswerSubmitted || !currentIntervalQuestion) return;
-    setSelectedIntervalAnswer(intervalId);
-    setIsIntervalAnswerSubmitted(true);
-
-    const isCorrect = intervalId === currentIntervalQuestion.interval.id;
-    if (isCorrect) {
-      handleCorrectAnswer(10, `Intervall erkannt: ${currentIntervalQuestion.interval.name}`);
-    } else {
-      handleWrongAnswer(currentIntervalQuestion);
-    }
-  };
-
-  const submitChordAnswer = (chordId: string) => {
-    if (isChordAnswerSubmitted || !currentChordQuestion) return;
-    setSelectedChordAnswer(chordId);
-    setIsChordAnswerSubmitted(true);
-
-    const isCorrect = chordId === currentChordQuestion.chord.id;
-    if (isCorrect) {
-      handleCorrectAnswer(10, `Akkord erkannt: ${currentChordQuestion.chord.name}`);
-    } else {
-      setStreak(0);
-    }
-  };
-
-  const nextChallengeQuestion = () => {
-    if (challengeProgress.current < challengeProgress.total) {
-      setChallengeProgress(prev => ({ ...prev, current: prev.current + 1 }));
-      if (activePillar === 'intervals') {
-        generateNewIntervalQuestion();
-      } else if (activePillar === 'chords') {
-        generateNewChordQuestion();
-      }
-    } else {
-      // 10 Fragen abgeschlossen -> Schülernahe Erfolgsfeier & Auszeichnung!
-      finishDailyChallenge();
-    }
-  };
-
-  const finishDailyChallenge = () => {
-    setIsCompletedCelebration(true);
-    hasCompletedDailyChallengeTodayRef.current = true;
-
-    // Bonus-Kalkulation: +50 XP Challenge-Bonus, +25 XP bei 100% Streak
-    let bonusXp = 50;
-    if (challengeProgress.correctCount === challengeProgress.total) {
-      bonusXp += 25;
-    }
-
-    const totalSessionXp = sessionXpEarned + bonusXp;
-    setSessionXpEarned(prev => prev + bonusXp);
-    if (onRewardXp) {
-      onRewardXp(bonusXp, `Tages-Challenge ${vdmLevel.toUpperCase()} gemeistert (${challengeProgress.correctCount}/${challengeProgress.total})`);
-    }
-
-    if (onSessionComplete) {
-      onSessionComplete({
-        vdmLevel,
-        pillar: activePillar,
-        accuracy: Math.round((challengeProgress.correctCount / challengeProgress.total) * 100),
-        xp: totalSessionXp
-      });
-    }
-  };
-
-  const restartNewSession = () => {
-    setIsCompletedCelebration(false);
-    setChallengeProgress({ current: 1, total: 10, correctCount: 0 });
-    setStreak(0);
-    spacedRepetitionQueueRef.current = [];
-    generateNewIntervalQuestion();
-    generateNewChordQuestion();
-  };
-
-  const modalContent = (
-    <div
-      style={{
-        background: isNotebook ? 'transparent' : '#ffffff',
-        borderRadius: isNotebook ? '0px' : '24px',
-        border: isNotebook ? 'none' : '1.5px solid #e2e8f0',
-        boxShadow: isNotebook ? 'none' : (embedded ? '0 8px 24px -4px rgba(0, 0, 0, 0.06)' : '0 25px 50px -12px rgba(0, 0, 0, 0.35)'),
-        maxWidth: isNotebook ? '860px' : (embedded ? '100%' : '780px'),
-        width: '100%',
-        maxHeight: isNotebook || embedded ? 'none' : '94vh',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: isNotebook ? '14px' : '0px',
-        overflow: isNotebook || embedded ? 'visible' : 'hidden',
-        animation: embedded ? undefined : 'scaleUp 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <style>{`
-        @keyframes earLabWavePulse {
-          0% { transform: scaleY(0.35); }
-          50% { transform: scaleY(1.0); }
-          100% { transform: scaleY(0.45); }
-        }
-      `}</style>
-        {/* 1. Header mit Status, Referenzton, XP & Close */}
-        <div
-          style={{
-            padding: isNotebook ? '2px 4px 6px 4px' : '16px 20px',
-            borderBottom: isNotebook ? 'none' : '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: isNotebook ? 'transparent' : 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-            gap: '12px',
-            flexWrap: 'wrap'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: isNotebook ? '14px' : '12px' }}>
-            <div
-              style={{
-                width: isNotebook ? '46px' : '42px',
-                height: isNotebook ? '46px' : '42px',
-                borderRadius: '14px',
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(139, 92, 246, 0.28)',
-                flexShrink: 0
-              }}
-            >
-              <Headphones size={isNotebook ? 24 : 22} color="#ffffff" strokeWidth={2.3} />
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontSize: isNotebook ? '1.24rem' : '1.15rem',
-                    fontWeight: 950,
-                    color: '#0f172a',
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.2
-                  }}
-                >
-                  {uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining'}
-                </h2>
-                <span
-                  style={{
-                    fontSize: '0.70rem',
-                    fontWeight: 900,
-                    background: '#f3e8ff',
-                    color: '#6d28d9',
-                    border: '1px solid #e9d5ff',
-                    padding: '2px 8px',
-                    borderRadius: '100px',
-                    letterSpacing: '0.02em'
-                  }}
-                >
-                  {uiLevel === 'junior' ? 'Zauber-Gehör' : `Stufe ${vdmLevel.toUpperCase()}`}
-                </span>
-              </div>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 650 }}>
-                {uiLevel === 'junior' ? 'Finde die magischen Töne & Kuckucks-Rufe!' : 'Gehörbildungs- & Theorie-Studio'}
-              </p>
-            </div>
-          </div>
-
-          {/* Quick-Controls: Referenzton, Streak, XP, Close */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* 🔔 Stimmgabel-Referenzton A4 */}
-            <button
-              type="button"
-              onClick={() => playReferencePitch('A4')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: '#ffffff',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: '12px',
-                padding: isNotebook ? '6px 12px' : '5px 9px',
-                fontSize: isNotebook ? '0.78rem' : '0.74rem',
-                fontWeight: 850,
-                color: '#334155',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-              title="Kammerton A4 (440 Hz) als Orientierungshilfe anspielen"
-            >
-              <Radio size={14} color="#16a34a" />
-              <span>A4 (440Hz)</span>
-            </button>
-
-            {/* Streak */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: '#fffbeb',
-                color: '#92400e',
-                border: '1.5px solid #fde68a',
-                padding: isNotebook ? '6px 12px' : '5px 9px',
-                borderRadius: '12px',
-                fontSize: isNotebook ? '0.80rem' : '0.76rem',
-                fontWeight: 950
-              }}
-              title="Aktuelle fehlerfreie Trefferserie"
-            >
-              <Flame size={14} color="#d97706" />
-              <span>{streak}</span>
-            </div>
-
-            {/* XP */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                color: '#15803d',
-                border: '1.5px solid #86efac',
-                padding: isNotebook ? '6px 12px' : '5px 9px',
-                borderRadius: '12px',
-                fontSize: isNotebook ? '0.80rem' : '0.76rem',
-                fontWeight: 950,
-                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.10)'
-              }}
-              title="In dieser Session verdiente Campus-XP"
-            >
-              <Zap size={14} color="#16a34a" fill="#16a34a" />
-              <span>+{sessionXpEarned} XP</span>
-            </div>
-
-            {onClose && !isNotebook && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Schließen"
-                style={{
-                  background: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '50%',
-                  width: '34px',
-                  height: '34px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748b'
-                }}
-              >
-                <X size={17} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 2. Sub-Header: Säulen-Umschalter, Klangfarbe & D-Stufen */}
-        <div
-          style={{
-            padding: isNotebook ? '6px' : '10px 20px',
-            background: '#f8fafc',
-            borderRadius: isNotebook ? '20px' : '0px',
-            border: isNotebook ? '1px solid #e2e8f0' : 'none',
-            borderBottom: isNotebook ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '8px'
-          }}
-        >
-          {/* Säulen-Auswahl */}
-          <div
-            style={{
-              display: 'flex',
-              background: '#e2e8f0',
-              borderRadius: '14px',
-              padding: '3px',
-              gap: '3px'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setActivePillar('intervals')}
-              style={{
-                background: activePillar === 'intervals' ? '#ffffff' : 'transparent',
-                color: activePillar === 'intervals' ? '#0f172a' : '#64748b',
-                fontWeight: activePillar === 'intervals' ? 950 : 700,
-                fontSize: isNotebook ? '0.82rem' : '0.78rem',
-                border: 'none',
-                borderRadius: '11px',
-                padding: isNotebook ? '8px 14px' : '6px 12px',
-                cursor: 'pointer',
-                boxShadow: activePillar === 'intervals' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              1. Intervall-Labor
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePillar('chords')}
-              style={{
-                background: activePillar === 'chords' ? '#ffffff' : 'transparent',
-                color: activePillar === 'chords' ? '#0f172a' : '#64748b',
-                fontWeight: activePillar === 'chords' ? 950 : 700,
-                fontSize: isNotebook ? '0.82rem' : '0.78rem',
-                border: 'none',
-                borderRadius: '11px',
-                padding: isNotebook ? '8px 14px' : '6px 12px',
-                cursor: 'pointer',
-                boxShadow: activePillar === 'chords' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              2. Akkord-Labor
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePillar('rhythm')}
-              style={{
-                background: activePillar === 'rhythm' ? '#ffffff' : 'transparent',
-                color: activePillar === 'rhythm' ? '#0f172a' : '#64748b',
-                fontWeight: activePillar === 'rhythm' ? 950 : 700,
-                fontSize: isNotebook ? '0.82rem' : '0.78rem',
-                border: 'none',
-                borderRadius: '11px',
-                padding: isNotebook ? '8px 14px' : '6px 12px',
-                cursor: 'pointer',
-                boxShadow: activePillar === 'rhythm' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              3. Rhythmus-Diktat
-            </button>
-          </div>
-
-          {/* Sound-Klangfarbe & Stufe */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Dual Sound Timbre Toggle */}
-            <div
-              style={{
-                display: 'flex',
-                background: '#e2e8f0',
-                borderRadius: '10px',
-                padding: '3px',
-                gap: '3px'
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setSoundTimbre('rhodes')}
-                style={{
-                  background: soundTimbre === 'rhodes' ? '#ffffff' : 'transparent',
-                  color: soundTimbre === 'rhodes' ? '#0f172a' : '#64748b',
-                  fontSize: '0.74rem',
-                  fontWeight: 850,
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  boxShadow: soundTimbre === 'rhodes' ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                }}
-                title="Studio-Rhodes: Warm, weich, obertongestützt"
-              >
-                Rhodes
-              </button>
-              <button
-                type="button"
-                onClick={() => setSoundTimbre('grand_piano')}
-                style={{
-                  background: soundTimbre === 'grand_piano' ? '#ffffff' : 'transparent',
-                  color: soundTimbre === 'grand_piano' ? '#0f172a' : '#64748b',
-                  fontSize: '0.74rem',
-                  fontWeight: 850,
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  boxShadow: soundTimbre === 'grand_piano' ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                }}
-                title="Konzertflügel: Perkussiver, akustischer Klavierklang"
-              >
-                Flügel
-              </button>
-            </div>
-
-            {/* D-Stufen Toggles */}
-            {uiLevel !== 'junior' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {(['d1', 'd2', 'd3'] as VdmLevel[]).map(lvl => {
-                  const isActive = vdmLevel === lvl;
-                  const label = lvl === 'd1' ? 'D1' : lvl === 'd2' ? 'D2' : 'D3';
-                  return (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => setVdmLevel(lvl)}
-                      style={{
-                        border: isActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-                        background: isActive ? '#dcfce7' : '#ffffff',
-                        color: isActive ? '#15803d' : '#475569',
-                        fontSize: '0.74rem',
-                        fontWeight: 900,
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        boxShadow: isActive ? '0 1px 4px rgba(22, 163, 74, 0.15)' : 'none'
-                      }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 3. Modal Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: isNotebook ? 'visible' : 'auto',
-            padding: isNotebook ? '8px 0' : '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: isNotebook ? '18px' : '16px',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* FEIERLICHE ABSCHLUSSKARTE (Nach 10 Fragen) */}
-          {isCompletedCelebration ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                gap: '16px',
-                padding: '24px 16px',
-                animation: 'scaleUp 0.2s ease'
-              }}
-            >
-              <div
-                style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '24px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  boxShadow: '0 12px 24px -4px rgba(245, 158, 11, 0.4)'
-                }}
-              >
-                <Trophy size={44} color="#ffffff" strokeWidth={2.3} />
-              </div>
-
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 950, color: '#0f172a' }}>
-                  {uiLevel === 'junior' ? '🎉 Zauber-Ohr Urkunde!' : `🎯 Stufe ${vdmLevel.toUpperCase()} gemeistert!`}
-                </h3>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                  Du hast {challengeProgress.correctCount} von {challengeProgress.total} Hörübungen richtig erkannt ({Math.round((challengeProgress.correctCount / challengeProgress.total) * 100)}% Trefferquote).
-                </p>
-              </div>
-
-              {/* Auszeichnung Badge */}
-              <div
-                style={{
-                  background: '#f0fdf4',
-                  border: '1.5px solid #86efac',
-                  borderRadius: '16px',
-                  padding: '12px 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}
-              >
-                <Award size={22} color="#16a34a" />
-                <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#15803d' }}>
-                  +{sessionXpEarned} Campus-XP gutgeschrieben & im Profil verewigt!
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={restartNewSession}
-                  style={{
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '12px 24px',
-                    fontSize: '0.92rem',
-                    fontWeight: 950,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)'
-                  }}
-                >
-                  <RotateCcw size={16} />
-                  <span>Weiter trainieren (Freier Modus)</span>
-                </button>
-
-                {onClose && (
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    style={{
-                      background: '#f1f5f9',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '14px',
-                      padding: '12px 20px',
-                      fontSize: '0.92rem',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Zum Hausaufgabenheft
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* SÄULE 1: INTERVALL-LABOR */}
-              {activePillar === 'intervals' && currentIntervalQuestion && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {/* Playback Controls & Mode Toggle */}
-                  {/* Elevated Tactile Playback Stage */}
-                  <div
-                    style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: '24px',
-                      padding: '22px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '18px',
-                      boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)'
-                    }}
-                  >
-                    {/* Top row: Mode selector + Progress pill */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#64748b', padding: '0 8px' }}>Richtung:</span>
-                        {[
-                          { id: 'ascending', label: '▲ Aufsteigend' },
-                          { id: 'descending', label: '▼ Absteigend' },
-                          { id: 'harmonic', label: '◆ Harmonisch' }
-                        ].map(mode => {
-                          const isSel = intervalPlayMode === mode.id;
-                          return (
-                            <button
-                              key={mode.id}
-                              type="button"
-                              onClick={() => setIntervalPlayMode(mode.id as IntervalPlaybackMode)}
-                              style={{
-                                padding: '5px 11px',
-                                borderRadius: '10px',
-                                border: isSel ? '1.5px solid #16a34a' : '1px solid transparent',
-                                background: isSel ? '#ffffff' : 'transparent',
-                                color: isSel ? '#15803d' : '#475569',
-                                fontSize: '0.74rem',
-                                fontWeight: isSel ? 950 : 800,
-                                cursor: 'pointer',
-                                boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              {mode.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
-                          padding: '5px 14px',
-                          borderRadius: '100px'
-                        }}
-                      >
-                        <Volume2 size={13} color="#16a34a" />
-                        <span style={{ fontSize: '0.76rem', fontWeight: 950, color: '#15803d' }}>
-                          Frage {challengeProgress.current} von {challengeProgress.total}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Großer Taktiler Play-Button mit Leertasten-Hinweis */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={playCurrentInterval}
-                        disabled={isAudioBusy}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '24px',
-                          padding: '16px 36px',
-                          fontSize: '1.04rem',
-                          fontWeight: 950,
-                          cursor: isAudioBusy ? 'wait' : 'pointer',
-                          boxShadow: '0 8px 24px -4px rgba(22, 163, 74, 0.45)',
-                          transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
-                          minHeight: '56px'
-                        }}
-                        className="hover-scale"
-                      >
-                        {isAudioBusy ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '24px' }}>
-                            {[0.4, 0.8, 1, 0.6, 0.9, 0.5, 0.7, 0.3].map((h, i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  width: '4px',
-                                  height: `${h * 20}px`,
-                                  background: '#ffffff',
-                                  borderRadius: '2px',
-                                  transformOrigin: 'bottom',
-                                  animation: `earLabWavePulse 0.5s ease-in-out infinite alternate ${i * 0.07}s`
-                                }}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <Volume2 size={24} color="#ffffff" strokeWidth={2.3} />
-                        )}
-                        <span>{isAudioBusy ? 'Spielt Intervall...' : 'Intervall anhören'}</span>
-                      </button>
-
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.02em' }}>
-                        Tipp: Drücke <kbd style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', fontSize: '0.70rem', color: '#475569', fontWeight: 800 }}>Leertaste ␣</kbd> zum Abspielen
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Intervall-Antwort-Pads: Junior (große Klangtreppen) vs. Pro (Matrix) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.86rem', fontWeight: 950, color: '#0f172a' }}>
-                        {uiLevel === 'junior' ? 'Welchen Klang hast du gehört?' : 'Welches Intervall hast du gehört?'}
-                      </span>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
-                        {availableIntervals.length} Intervalle zur Auswahl
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: uiLevel === 'junior' ? 'repeat(auto-fill, minmax(170px, 1fr))' : 'repeat(auto-fill, minmax(140px, 1fr))',
-                        gap: '10px'
-                      }}
-                    >
-                      {availableIntervals.map(inv => {
-                        const isSelected = selectedIntervalAnswer === inv.id;
-                        const isCorrect = isIntervalAnswerSubmitted && inv.id === currentIntervalQuestion.interval.id;
-                        const isWrongSelection = isIntervalAnswerSubmitted && isSelected && !isCorrect;
-
-                        let bg = '#ffffff';
-                        let border = '1.5px solid #e2e8f0';
-                        let color = '#0f172a';
-                        let shadow = '0 2px 8px rgba(0,0,0,0.03)';
-
-                        if (isCorrect) {
-                          bg = '#dcfce7';
-                          border = '2px solid #16a34a';
-                          color = '#15803d';
-                          shadow = '0 4px 14px rgba(22, 163, 74, 0.25)';
-                        } else if (isWrongSelection) {
-                          bg = '#fee2e2';
-                          border = '2px solid #dc2626';
-                          color = '#b91c1c';
-                          shadow = '0 4px 14px rgba(220, 38, 38, 0.20)';
-                        } else if (isSelected) {
-                          bg = '#f1f5f9';
-                          border = '2px solid #475569';
-                        }
-
-                        return (
-                          <button
-                            key={inv.id}
-                            type="button"
-                            disabled={isIntervalAnswerSubmitted}
-                            onClick={() => submitIntervalAnswer(inv.id)}
-                            style={{
-                              background: bg,
-                              border: border,
-                              color: color,
-                              borderRadius: '20px',
-                              padding: uiLevel === 'junior' ? '16px 12px' : '14px 10px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              cursor: isIntervalAnswerSubmitted ? 'default' : 'pointer',
-                              boxShadow: shadow,
-                              transition: 'all 0.15s ease',
-                              minHeight: '74px',
-                              position: 'relative'
-                            }}
-                            className={isIntervalAnswerSubmitted ? '' : 'hover-scale-mini'}
-                          >
-                            {uiLevel === 'junior' ? (
-                              <>
-                                <span style={{ fontSize: '1.6rem' }}>{inv.juniorIcon}</span>
-                                <span style={{ fontSize: '0.86rem', fontWeight: 950 }}>{inv.juniorName}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span style={{ fontSize: '1.15rem', fontWeight: 950, letterSpacing: '-0.02em' }}>{inv.shortName}</span>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, opacity: 0.9 }}>{inv.name}</span>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
-                                  {inv.semitones} HT
-                                </span>
-                              </>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Feedback, A/B Vergleich & Interaktiver Song-Anker */}
-                  {isIntervalAnswerSubmitted && (
-                    <div
-                      style={{
-                        background: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#f0fdf4' : '#fef2f2',
-                        border: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
-                        borderRadius: '20px',
-                        padding: '18px 20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
-                        animation: 'fadeIn 0.2s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {selectedIntervalAnswer === currentIntervalQuestion.interval.id ? (
-                            <div style={{ background: '#16a34a', color: '#ffffff', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Check size={18} strokeWidth={3} />
-                            </div>
-                          ) : (
-                            <div style={{ background: '#dc2626', color: '#ffffff', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <X size={18} strokeWidth={3} />
-                            </div>
-                          )}
-                          <div>
-                            <span style={{ fontSize: '0.96rem', fontWeight: 950, color: '#0f172a', display: 'block' }}>
-                              {selectedIntervalAnswer === currentIntervalQuestion.interval.id
-                                ? `Perfekt gelöst! Das war die ${currentIntervalQuestion.interval.name}.`
-                                : `Fast! Das war die ${currentIntervalQuestion.interval.name} (${currentIntervalQuestion.interval.semitones} Halbtöne).`}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Nächste Frage Button */}
-                        <button
-                          type="button"
-                          onClick={nextChallengeQuestion}
-                          style={{
-                            background: '#0f172a',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '14px',
-                            padding: '11px 22px',
-                            fontSize: '0.88rem',
-                            fontWeight: 950,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span>{challengeProgress.current < challengeProgress.total ? 'Nächste Frage' : 'Zur Auswertung'}</span>
-                          <ChevronRight size={16} />
-                        </button>
-                      </div>
-
-                      {/* A/B Hörvergleich Button (nur bei Fehlern!) */}
-                      {selectedIntervalAnswer !== currentIntervalQuestion.interval.id && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button
-                            type="button"
-                            onClick={playABComparison}
-                            disabled={isAudioBusy}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              background: '#ffffff',
-                              border: '1.5px solid #dc2626',
-                              color: '#b91c1c',
-                              padding: '8px 14px',
-                              borderRadius: '12px',
-                              fontSize: '0.80rem',
-                              fontWeight: 900,
-                              cursor: isAudioBusy ? 'wait' : 'pointer',
-                              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.10)'
-                            }}
-                          >
-                            <ArrowRightLeft size={15} />
-                            <span>Didaktischer A/B-Vergleich (Tipp vs. Richtig anhören)</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Interaktive Audio-Brücke: Song-Anker zum Vorhören */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          background: '#ffffff',
-                          borderRadius: '14px',
-                          padding: '10px 16px',
-                          border: '1px solid #e2e8f0',
-                          flexWrap: 'wrap',
-                          gap: '8px'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Lightbulb size={18} color="#d97706" />
-                          <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 700 }}>
-                            <strong>Melodie-Anker:</strong> „{currentIntervalQuestion.interval.songAnchor}“
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={playSongAnchorMelody}
-                          disabled={isAudioBusy}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: '#f1f5f9',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '10px',
-                            padding: '6px 12px',
-                            fontSize: '0.76rem',
-                            fontWeight: 850,
-                            color: '#0f172a',
-                            cursor: isAudioBusy ? 'wait' : 'pointer'
-                          }}
-                          className="hover-scale-mini"
-                          title="Motiv-Melodie anhören"
-                        >
-                          <Play size={13} color="#16a34a" fill="#16a34a" />
-                          <span>Motiv anhören</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SÄULE 2: AKKORD- & KADENZEN-LABOR */}
-              {activePillar === 'chords' && currentChordQuestion && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Elevated Tactile Playback Stage */}
-                  <div
-                    style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: '24px',
-                      padding: '22px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '18px',
-                      boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)'
-                    }}
-                  >
-                    {/* Top row: Mode selector + Progress pill */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#64748b', padding: '0 8px' }}>Spielweise:</span>
-                        {[
-                          { id: 'block', label: '◆ Block' },
-                          { id: 'arpeggio_up', label: '▲ Arpeggio auf' },
-                          { id: 'arpeggio_down', label: '▼ Arpeggio ab' }
-                        ].map(mode => {
-                          const isSel = chordPlayMode === mode.id;
-                          return (
-                            <button
-                              key={mode.id}
-                              type="button"
-                              onClick={() => setChordPlayMode(mode.id as ChordPlaybackMode)}
-                              style={{
-                                padding: '5px 11px',
-                                borderRadius: '10px',
-                                border: isSel ? '1.5px solid #2563eb' : '1px solid transparent',
-                                background: isSel ? '#ffffff' : 'transparent',
-                                color: isSel ? '#1d4ed8' : '#475569',
-                                fontSize: '0.74rem',
-                                fontWeight: isSel ? 950 : 800,
-                                cursor: 'pointer',
-                                boxShadow: isSel ? '0 2px 6px rgba(37,99,235,0.08)' : 'none',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              {mode.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: '#eff6ff',
-                          border: '1px solid #bfdbfe',
-                          padding: '5px 14px',
-                          borderRadius: '100px'
-                        }}
-                      >
-                        <Volume2 size={13} color="#2563eb" />
-                        <span style={{ fontSize: '0.76rem', fontWeight: 950, color: '#2563eb' }}>
-                          Frage {challengeProgress.current} von {challengeProgress.total}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Großer Taktiler Play-Button */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={playCurrentChord}
-                        disabled={isAudioBusy}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '24px',
-                          padding: '16px 36px',
-                          fontSize: '1.04rem',
-                          fontWeight: 950,
-                          cursor: isAudioBusy ? 'wait' : 'pointer',
-                          boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.45)',
-                          transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
-                          minHeight: '56px'
-                        }}
-                        className="hover-scale"
-                      >
-                        {isAudioBusy ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '24px' }}>
-                            {[0.4, 0.8, 1, 0.6, 0.9, 0.5, 0.7, 0.3].map((h, i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  width: '4px',
-                                  height: `${h * 20}px`,
-                                  background: '#ffffff',
-                                  borderRadius: '2px',
-                                  transformOrigin: 'bottom',
-                                  animation: `earLabWavePulse 0.5s ease-in-out infinite alternate ${i * 0.07}s`
-                                }}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <Volume2 size={24} color="#ffffff" strokeWidth={2.3} />
-                        )}
-                        <span>{isAudioBusy ? 'Spielt Akkord...' : 'Akkord anhören'}</span>
-                      </button>
-
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.02em' }}>
-                        Tipp: Drücke <kbd style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', fontSize: '0.70rem', color: '#475569', fontWeight: 800 }}>Leertaste ␣</kbd> zum Abspielen
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Akkord-Pads */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.86rem', fontWeight: 950, color: '#0f172a' }}>
-                        {uiLevel === 'junior' ? 'Welcher Klang-Freund ist das?' : 'Welchen Akkord-Typ hast du gehört?'}
-                      </span>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
-                        {availableChords.length} Akkorde zur Auswahl
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                        gap: '10px'
-                      }}
-                    >
-                      {availableChords.map(ch => {
-                        const isSelected = selectedChordAnswer === ch.id;
-                        const isCorrect = isChordAnswerSubmitted && ch.id === currentChordQuestion.chord.id;
-                        const isWrongSelection = isChordAnswerSubmitted && isSelected && !isCorrect;
-
-                        let bg = '#ffffff';
-                        let border = '1.5px solid #e2e8f0';
-                        let color = '#0f172a';
-                        let shadow = '0 2px 8px rgba(0,0,0,0.03)';
-
-                        if (isCorrect) {
-                          bg = '#dcfce7';
-                          border = '2px solid #16a34a';
-                          color = '#15803d';
-                          shadow = '0 4px 14px rgba(22, 163, 74, 0.25)';
-                        } else if (isWrongSelection) {
-                          bg = '#fee2e2';
-                          border = '2px solid #dc2626';
-                          color = '#b91c1c';
-                          shadow = '0 4px 14px rgba(220, 38, 38, 0.20)';
-                        } else if (isSelected) {
-                          bg = '#f1f5f9';
-                          border = '2px solid #475569';
-                        }
-
-                        return (
-                          <button
-                            key={ch.id}
-                            type="button"
-                            disabled={isChordAnswerSubmitted}
-                            onClick={() => submitChordAnswer(ch.id)}
-                            style={{
-                              background: bg,
-                              border: border,
-                              color: color,
-                              borderRadius: '20px',
-                              padding: '14px 10px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              cursor: isChordAnswerSubmitted ? 'default' : 'pointer',
-                              boxShadow: shadow,
-                              transition: 'all 0.15s ease',
-                              minHeight: '74px'
-                            }}
-                            className={isChordAnswerSubmitted ? '' : 'hover-scale-mini'}
-                          >
-                            <span style={{ fontSize: '1.15rem', fontWeight: 950, letterSpacing: '-0.02em' }}>{ch.shortName}</span>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, opacity: 0.9 }}>
-                              {uiLevel === 'junior' ? ch.juniorName : ch.name}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Feedback & Theorie */}
-                  {isChordAnswerSubmitted && (
-                    <div
-                      style={{
-                        background: selectedChordAnswer === currentChordQuestion.chord.id ? '#f0fdf4' : '#fef2f2',
-                        border: selectedChordAnswer === currentChordQuestion.chord.id ? '1.5px solid #86efac' : '1.5px solid #fca5a5',
-                        borderRadius: '20px',
-                        padding: '18px 20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
-                        animation: 'fadeIn 0.2s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {selectedChordAnswer === currentChordQuestion.chord.id ? (
-                            <div style={{ background: '#16a34a', color: '#ffffff', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Check size={18} strokeWidth={3} />
-                            </div>
-                          ) : (
-                            <div style={{ background: '#dc2626', color: '#ffffff', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <X size={18} strokeWidth={3} />
-                            </div>
-                          )}
-                          <div>
-                            <span style={{ fontSize: '0.96rem', fontWeight: 950, color: '#0f172a', display: 'block' }}>
-                              {selectedChordAnswer === currentChordQuestion.chord.id
-                                ? `Hervorragend erkannt! Das war ein ${currentChordQuestion.chord.name}.`
-                                : `Auflösung: Es war ein ${currentChordQuestion.chord.name}.`}
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={nextChallengeQuestion}
-                          style={{
-                            background: '#0f172a',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '14px',
-                            padding: '11px 22px',
-                            fontSize: '0.88rem',
-                            fontWeight: 950,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span>{challengeProgress.current < challengeProgress.total ? 'Nächste Frage' : 'Zur Auswertung'}</span>
-                          <ChevronRight size={16} />
-                        </button>
-                      </div>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          background: '#ffffff',
-                          borderRadius: '14px',
-                          padding: '10px 16px',
-                          border: '1px solid #e2e8f0'
-                        }}
-                      >
-                        <Lightbulb size={18} color="#d97706" />
-                        <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 700 }}>
-                          <strong>Klang-Charakter:</strong> {currentChordQuestion.chord.description}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SÄULE 3: RHYTHMUS-DIKTAT & TIME-MATCHER */}
-              {activePillar === 'rhythm' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-                    {RHYTHM_CATALOG.map(rhy => (
-                      <button
-                        key={rhy.id}
-                        type="button"
-                        onClick={() => {
-                          setCurrentRhythmQuestion(rhy);
-                          setUserRhythmHits([]);
-                          setRhythmEvaluationScore(null);
-                        }}
-                        style={{
-                          padding: '8px 14px',
-                          borderRadius: '12px',
-                          border: currentRhythmQuestion.id === rhy.id ? '2px solid #ea580c' : '1px solid #cbd5e1',
-                          background: currentRhythmQuestion.id === rhy.id ? '#fff7ed' : '#ffffff',
-                          color: currentRhythmQuestion.id === rhy.id ? '#c2410c' : '#475569',
-                          fontSize: '0.78rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {rhy.title} ({rhy.vdmLevel.toUpperCase()})
-                      </button>
-                    ))}
-                  </div>
-
-                  <div
-                    style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: '24px',
-                      padding: '24px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '18px',
-                      boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)'
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={playCurrentRhythm}
-                      disabled={isRhythmPlaying}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '20px',
-                        padding: '12px 24px',
-                        fontSize: '0.94rem',
-                        fontWeight: 950,
-                        cursor: isRhythmPlaying ? 'wait' : 'pointer',
-                        boxShadow: '0 6px 16px -2px rgba(249, 115, 22, 0.35)'
-                      }}
-                    >
-                      <Play size={20} color="#ffffff" />
-                      <span>{isRhythmPlaying ? 'Spiele Motiv vor...' : 'Motiv anhören & vorbereiten'}</span>
-                    </button>
-
-                    {/* Haptisches Tap-Pad */}
-                    <button
-                      type="button"
-                      onClick={handleRhythmTap}
-                      style={{
-                        width: '100%',
-                        maxWidth: '380px',
-                        minHeight: '140px',
-                        borderRadius: '24px',
-                        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                        border: '3px solid #334155',
-                        color: '#ffffff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        boxShadow: '0 12px 30px -6px rgba(15, 23, 42, 0.3)',
-                        transition: 'all 0.1s ease',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none'
-                      }}
-                      className="hover-scale-mini"
-                    >
-                      <Target size={36} color="#f97316" />
-                      <span style={{ fontSize: '1.05rem', fontWeight: 950 }}>HIER TIPPEN</span>
-                      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                        {userRhythmHits.length} Schläge erfasst
-                      </span>
-                    </button>
-
-                    <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '380px' }}>
-                      <button
-                        type="button"
-                        onClick={evaluateRhythm}
-                        disabled={userRhythmHits.length === 0}
-                        style={{
-                          flex: 2,
-                          background: '#16a34a',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '14px',
-                          padding: '12px',
-                          fontSize: '0.86rem',
-                          fontWeight: 950,
-                          cursor: userRhythmHits.length === 0 ? 'not-allowed' : 'pointer',
-                          opacity: userRhythmHits.length === 0 ? 0.6 : 1
-                        }}
-                      >
-                        Timing auswerten
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUserRhythmHits([]);
-                          setRhythmEvaluationScore(null);
-                        }}
-                        style={{
-                          flex: 1,
-                          background: '#e2e8f0',
-                          color: '#475569',
-                          border: 'none',
-                          borderRadius: '14px',
-                          padding: '12px',
-                          fontSize: '0.86rem',
-                          fontWeight: 800,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Reset
-                      </button>
-                    </div>
-
-                    {rhythmEvaluationScore !== null && (
-                      <div
-                        style={{
-                          background: rhythmEvaluationScore >= 75 ? '#f0fdf4' : '#fffbeb',
-                          border: rhythmEvaluationScore >= 75 ? '1.5px solid #86efac' : '1.5px solid #fde68a',
-                          borderRadius: '16px',
-                          padding: '14px 20px',
-                          width: '100%',
-                          maxWidth: '380px',
-                          textAlign: 'center',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <div style={{ fontSize: '1.35rem', fontWeight: 950, color: rhythmEvaluationScore >= 75 ? '#15803d' : '#b45309' }}>
-                          {rhythmEvaluationScore}% Timing-Präzision!
-                        </div>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                          {rhythmEvaluationScore >= 90
-                            ? '🎯 Goldstandard! In the Pocket!'
-                            : rhythmEvaluationScore >= 75
-                            ? '⭐ Sehr gutes Timing! Stufe gemeistert!'
-                            : 'Übe das Motiv noch einmal langsam mit Metronom.'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* 4. Footer: Status & Fortschritt */}
-        <div
-          style={{
-            padding: isNotebook ? '14px 18px' : '12px 20px',
-            borderTop: isNotebook ? 'none' : '1px solid #e2e8f0',
-            borderRadius: isNotebook ? '20px' : '0px',
-            background: isNotebook ? '#f8fafc' : '#ffffff',
-            border: isNotebook ? '1.5px solid #e2e8f0' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '10px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Trophy size={16} color="#d97706" />
-            <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#334155' }}>
-              Tages-Challenge: {challengeProgress.correctCount} von {challengeProgress.total} gelöst
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 900,
-                color: '#15803d',
-                background: '#dcfce7',
-                border: '1px solid #bbf7d0',
-                padding: '3px 10px',
-                borderRadius: '100px'
-              }}
-            >
-              Gehörbildungs-Studio • Campus-Groovelab
-            </span>
-          </div>
-        </div>
-      </div>
-  );
-
-  if (embedded) {
-    return (
-      <div style={{ width: '100%', maxWidth: isNotebook ? '860px' : '820px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {onClose && !isNotebook && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: '#ffffff',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '8px 16px',
-                fontSize: '0.84rem',
-                fontWeight: 800,
-                color: '#334155',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-            >
-              <ArrowLeft size={16} color="#16a34a" />
-              <span>← Zurück zu den Modulen</span>
-            </button>
-          </div>
-        )}
-        {modalContent}
-      </div>
-    );
-  }
+  const activeInterval = currentIntervalQuestion?.interval;
+  const activeChord = currentChordQuestion?.chord;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Gehörtraining-Studio"
+      aria-label={uiLevel === 'junior' ? 'Klang-Detektiv Studio' : 'Gehörtraining Studio'}
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15, 23, 42, 0.75)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        width: '100%',
+        maxWidth: '720px',
+        margin: '0 auto',
+        background: '#ffffff',
+        borderRadius: '24px',
+        border: '1.5px solid rgba(139, 92, 246, 0.25)',
+        padding: embedded ? '16px' : '22px',
+        boxShadow: embedded ? 'none' : '0 12px 36px -4px rgba(139, 92, 246, 0.14), 0 2px 8px rgba(0, 0, 0, 0.02)',
+        boxSizing: 'border-box',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        padding: '12px',
-        boxSizing: 'border-box'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && onClose) onClose();
+        flexDirection: 'column',
+        gap: '12px',
+        fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif",
+        color: '#0f172a'
       }}
     >
-      {modalContent}
+      {/* 1. Header: Titel, Ansichten-Switch (Studio vs. Hall of Ear) & Schließen */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: '8px',
+        borderBottom: '1px solid #f1f5f9'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px -2px rgba(139, 92, 246, 0.45)'
+          }}>
+            <Headphones size={20} strokeWidth={2.4} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
+              {uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining'}
+            </h2>
+            <span style={{ fontSize: '0.70rem', color: '#7c3aed', fontWeight: 750 }}>
+              0,1% Goldstandard • 3 Tonale Säulen
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Hall of Ear Toggle */}
+          <button
+            type="button"
+            onClick={() => setActiveView(prev => prev === 'studio' ? 'hall_of_ear' : 'studio')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '10px',
+              border: activeView === 'hall_of_ear' ? '1px solid #7c3aed' : '1.5px solid #e2e8f0',
+              background: activeView === 'hall_of_ear' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : '#f8fafc',
+              color: activeView === 'hall_of_ear' ? '#ffffff' : '#6d28d9',
+              fontSize: '0.74rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              boxShadow: activeView === 'hall_of_ear' ? '0 4px 12px rgba(139, 92, 246, 0.35)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Trophy size={14} strokeWidth={2.4} />
+            <span>Hall of Ear</span>
+          </button>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Schließen"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '10px',
+                border: '1.5px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#64748b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} strokeWidth={2.4} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Ansicht: HALL OF EAR */}
+      {activeView === 'hall_of_ear' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <EarLeaderboardWidget
+            selectedDiscipline={activePillar as EarDiscipline}
+            selectedLevel={vdmLevel}
+            student={student}
+            latestSession={latestRecordedSession}
+            showHeader={false}
+          />
+          <button
+            type="button"
+            onClick={() => setActiveView('studio')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '12px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+              color: '#ffffff',
+              fontSize: '0.80rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.35)'
+            }}
+          >
+            <Headphones size={15} strokeWidth={2.4} />
+            <span>Zurück zum Trainings-Studio</span>
+          </button>
+        </div>
+      ) : (
+        /* Ansicht: TRAINING STUDIO */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* 2. Säulen-Leiste (3 didaktische Säulen) */}
+          <div
+            role="tablist"
+            aria-label="Didaktische Gehör-Säulen"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '6px',
+              background: '#f8fafc',
+              padding: '4px',
+              borderRadius: '14px',
+              border: '1.5px solid #e2e8f0'
+            }}
+          >
+            <button
+              id="tab-ear-intervals"
+              role="tab"
+              aria-selected={activePillar === 'intervals'}
+              aria-controls="panel-ear-intervals"
+              type="button"
+              onClick={() => setActivePillar('intervals')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 6px',
+                borderRadius: '10px',
+                border: 'none',
+                background: activePillar === 'intervals' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                color: activePillar === 'intervals' ? '#ffffff' : '#64748b',
+                fontWeight: activePillar === 'intervals' ? 900 : 700,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                boxShadow: activePillar === 'intervals' ? '0 4px 12px rgba(139, 92, 246, 0.30)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Music size={14} strokeWidth={2.4} />
+              <span>Intervalle</span>
+            </button>
+
+            <button
+              id="tab-ear-chords"
+              role="tab"
+              aria-selected={activePillar === 'chords'}
+              aria-controls="panel-ear-chords"
+              type="button"
+              onClick={() => setActivePillar('chords')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 6px',
+                borderRadius: '10px',
+                border: 'none',
+                background: activePillar === 'chords' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                color: activePillar === 'chords' ? '#ffffff' : '#64748b',
+                fontWeight: activePillar === 'chords' ? 900 : 700,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                boxShadow: activePillar === 'chords' ? '0 4px 12px rgba(139, 92, 246, 0.30)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Sliders size={14} strokeWidth={2.4} />
+              <span>Akkordfarben</span>
+            </button>
+
+            <button
+              id="tab-ear-pitch-match"
+              role="tab"
+              aria-selected={activePillar === 'pitch_match'}
+              aria-controls="panel-ear-pitch-match"
+              type="button"
+              onClick={() => setActivePillar('pitch_match')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 6px',
+                borderRadius: '10px',
+                border: 'none',
+                background: activePillar === 'pitch_match' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                color: activePillar === 'pitch_match' ? '#ffffff' : '#64748b',
+                fontWeight: activePillar === 'pitch_match' ? 900 : 700,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                boxShadow: activePillar === 'pitch_match' ? '0 4px 12px rgba(139, 92, 246, 0.30)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Mic size={14} strokeWidth={2.4} />
+              <span>Sing-Back</span>
+            </button>
+          </div>
+
+          {/* 3. Utility-Leiste: VdM-Level, Timbre & Key Center Drone */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '6px',
+            fontSize: '0.72rem'
+          }}>
+            {/* VdM Level Stufen */}
+            <div style={{ display: 'flex', gap: '3px', background: '#f1f5f9', padding: '3px', borderRadius: '10px' }}>
+              {(['d1', 'd2', 'd3'] as VdmLevel[]).map(lvl => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setVdmLevel(lvl)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: vdmLevel === lvl ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                    color: vdmLevel === lvl ? '#ffffff' : '#64748b',
+                    fontWeight: vdmLevel === lvl ? 900 : 650,
+                    fontSize: '0.70rem',
+                    cursor: 'pointer',
+                    boxShadow: vdmLevel === lvl ? '0 2px 8px rgba(139, 92, 246, 0.25)' : 'none'
+                  }}
+                >
+                  {lvl.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Timbre & Key Center Drone Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Klangfarbe */}
+              <div style={{ display: 'flex', gap: '2px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSoundTimbre('rhodes')}
+                  style={{
+                    padding: '3px 7px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: soundTimbre === 'rhodes' ? '#ffffff' : 'transparent',
+                    color: soundTimbre === 'rhodes' ? '#0f172a' : '#64748b',
+                    fontSize: '0.65rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Rhodes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSoundTimbre('grand_piano')}
+                  style={{
+                    padding: '3px 7px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: soundTimbre === 'grand_piano' ? '#ffffff' : 'transparent',
+                    color: soundTimbre === 'grand_piano' ? '#0f172a' : '#64748b',
+                    fontSize: '0.65rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Flügel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSoundTimbre('strings')}
+                  style={{
+                    padding: '3px 7px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: soundTimbre === 'strings' ? '#ffffff' : 'transparent',
+                    color: soundTimbre === 'strings' ? '#0f172a' : '#64748b',
+                    fontSize: '0.65rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Streicher
+                </button>
+              </div>
+
+              {/* Tonika Bordun Drone */}
+              <button
+                type="button"
+                onClick={() => setIsDroneEnabled(!isDroneEnabled)}
+                title="Tonika-Bordun (C): Fördert das Hören nach Skalenstufen"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  background: isDroneEnabled ? '#0f172a' : '#ffffff',
+                  color: isDroneEnabled ? '#ffffff' : '#475569',
+                  fontSize: '0.66rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease'
+                }}
+              >
+                <Radio size={11} strokeWidth={2.4} />
+                <span>Bordun {isDroneEnabled ? 'AN' : 'AUS'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4. Challenge-Fortschritt & Streak */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '6px 12px',
+            fontSize: '0.72rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                Runde {challengeProgress.current} von {challengeProgress.total}
+              </span>
+              <span style={{ color: '#94a3b8' }}>•</span>
+              <span style={{ color: '#64748b', fontWeight: 600 }}>
+                {challengeProgress.correctCount} Richtig
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {streak > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#0f172a', fontWeight: 850 }}>
+                  <Flame size={13} strokeWidth={2.4} />
+                  <span>{streak}x Streak</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handlePlayCadence}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#475569',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  fontSize: '0.68rem'
+                }}
+              >
+                <Sparkles size={11} strokeWidth={2.2} />
+                <span>Kadenz</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 5. Kern-Bereich je nach Pillar */}
+          {isCompletedCelebration ? (
+            /* Celebration Screen */
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '24px 16px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#0f172a',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Trophy size={22} strokeWidth={2.4} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 950, color: '#0f172a' }}>
+                Challenge Gemeistert!
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', maxWidth: '380px' }}>
+                Du hast {challengeProgress.correctCount} von {challengeProgress.total} Aufgaben richtig gelöst.
+                Dein Ergebnis wurde in der Hall of Ear verankert!
+              </p>
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                margin: '8px 0'
+              }}>
+                <div style={{
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
+                    {latestRecordedSession?.score || 0}
+                  </span>
+                  <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>PUNKTE</span>
+                </div>
+                <div style={{
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
+                    {latestRecordedSession?.accuracy || 0}%
+                  </span>
+                  <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>GENAUIGKEIT</span>
+                </div>
+                <div style={{
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
+                    {latestRecordedSession?.streak || 0}
+                  </span>
+                  <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>MAX STREAK</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCompletedCelebration(false);
+                    setChallengeProgress({ current: 1, total: 10, correctCount: 0 });
+                    setStreak(0);
+                    if (activePillar === 'intervals') generateNewIntervalQuestion();
+                    else if (activePillar === 'chords') generateNewChordQuestion();
+                    else generateNewPitchQuestion();
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Erneut spielen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveView('hall_of_ear')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Hall of Ear ansehen
+                </button>
+              </div>
+            </div>
+          ) : activePillar === 'intervals' ? (
+            /* ========================================================
+               SÄULE 1: INTERVALLE & MELODIEN
+               ======================================================== */
+            <div
+              role="tabpanel"
+              id="panel-ear-intervals"
+              aria-labelledby="tab-ear-intervals"
+              tabIndex={0}
+              style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+            >
+              {/* Play & Anchor Controls */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={handlePlayCurrentInterval}
+                    style={{
+                      width: '52px',
+                      height: '52px',
+                      borderRadius: '16px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 6px 18px rgba(139, 92, 246, 0.40)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                    title="Intervall anhören (Leertaste)"
+                  >
+                    <Play size={22} fill="#ffffff" strokeWidth={0} />
+                  </button>
+                  <div>
+                    <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', display: 'block' }}>
+                      Intervall anhören
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Klicke zum Abspielen • Höre die Ton-Distanz
+                    </span>
+                  </div>
+                </div>
+
+                {/* Abspielmodus: Aufsteigend, Absteigend, Harmonisch */}
+                <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                  {(['ascending', 'descending', 'harmonic'] as IntervalPlaybackMode[]).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setIntervalPlayMode(mode)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: intervalPlayMode === mode ? '#ffffff' : 'transparent',
+                        color: intervalPlayMode === mode ? '#7c3aed' : '#64748b',
+                        fontSize: '0.70rem',
+                        fontWeight: intervalPlayMode === mode ? 900 : 700,
+                        cursor: 'pointer',
+                        boxShadow: intervalPlayMode === mode ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                      }}
+                    >
+                      {mode === 'ascending' ? '▲ Auf' : mode === 'descending' ? '▼ Ab' : '◆ Zusammen'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Intervall-Auswahlkacheln (0,1% Goldstandard 3-Ebenen & Einzeilen-Schutz) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
+                gap: '8px'
+              }}>
+                {availableIntervals.map(item => {
+                  const isSubmitted = isIntervalAnswerSubmitted;
+                  const isChosen = selectedIntervalAnswer === item.id;
+                  const isCorrect = currentIntervalQuestion?.interval.id === item.id;
+
+                  let bg = '#ffffff';
+                  let border = '#e2e8f0';
+                  let text = '#0f172a';
+                  let badgeBg = 'rgba(139, 92, 246, 0.10)';
+                  let badgeColor = '#7c3aed';
+                  let subColor = '#64748b';
+
+                  if (isSubmitted) {
+                    if (isCorrect) {
+                      bg = '#ecfdf5';
+                      border = '#10b981';
+                      text = '#065f46';
+                      badgeBg = '#10b981';
+                      badgeColor = '#ffffff';
+                      subColor = '#047857';
+                    } else if (isChosen && !isCorrect) {
+                      bg = '#fff1f2';
+                      border = '#f43f5e';
+                      text = '#9f1239';
+                      badgeBg = '#f43f5e';
+                      badgeColor = '#ffffff';
+                      subColor = '#be123c';
+                    } else {
+                      bg = '#f8fafc';
+                      border = '#e2e8f0';
+                      text = '#94a3b8';
+                      badgeBg = '#f1f5f9';
+                      badgeColor = '#94a3b8';
+                      subColor = '#cbd5e1';
+                    }
+                  }
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={isSubmitted}
+                      onClick={() => handleSelectIntervalAnswer(item.id)}
+                      style={{
+                        padding: '10px 12px',
+                        minHeight: '60px',
+                        borderRadius: '14px',
+                        border: `1.5px solid ${border}`,
+                        background: bg,
+                        color: text,
+                        cursor: isSubmitted ? 'default' : 'pointer',
+                        textAlign: 'left',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        gap: '3px',
+                        transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow: isChosen ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
+                        overflow: 'hidden'
+                      }}
+                      className={!isSubmitted ? 'hover-scale' : ''}
+                      title={`${item.name} (${item.semitones} Halbtöne)`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
+                        <span style={{
+                          fontWeight: 900,
+                          fontSize: 'clamp(0.78rem, 1.1vw, 0.88rem)',
+                          letterSpacing: '-0.01em',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: 'calc(100% - 38px)'
+                        }}>
+                          {uiLevel === 'junior' ? item.juniorName : item.name}
+                        </span>
+                        <span style={{
+                          fontSize: uiLevel === 'junior' ? '0.64rem' : '0.70rem',
+                          fontWeight: 850,
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          background: badgeBg,
+                          color: badgeColor,
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap',
+                          letterSpacing: uiLevel === 'junior' ? '0.04em' : 'normal'
+                        }}>
+                          {uiLevel === 'junior'
+                            ? item.visualDots
+                            : uiLevel === 'pro'
+                            ? item.proShort
+                            : item.shortName}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        color: subColor,
+                        fontWeight: 650,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {uiLevel === 'junior'
+                          ? item.name
+                          : uiLevel === 'pro'
+                          ? item.proClassification
+                          : item.songAnchorShort}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Didaktische Feedback-Kassette & A/B-Hörvergleich */}
+              {isIntervalAnswerSubmitted && currentIntervalQuestion && (
+                <div style={{
+                  background: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#ecfdf5' : '#fff1f2',
+                  border: `1.5px solid ${selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#10b981' : '#f43f5e'}`,
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {selectedIntervalAnswer === currentIntervalQuestion.interval.id ? (
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <Check size={18} strokeWidth={3} />
+                        </div>
+                      ) : (
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#f43f5e',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <X size={18} strokeWidth={3} />
+                        </div>
+                      )}
+                      <div>
+                        <span style={{
+                          fontSize: '0.88rem',
+                          fontWeight: 900,
+                          color: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#065f46' : '#9f1239',
+                          display: 'block'
+                        }}>
+                          {selectedIntervalAnswer === currentIntervalQuestion.interval.id
+                            ? uiLevel === 'junior'
+                              ? `Super gehört! Richtig: ${currentIntervalQuestion.interval.juniorName}`
+                              : `Perfekt! Das war eine ${currentIntervalQuestion.interval.name} (${currentIntervalQuestion.interval.semitones} Halbtöne)`
+                            : uiLevel === 'junior'
+                              ? `Fast! Richtig war: ${currentIntervalQuestion.interval.juniorName} (${currentIntervalQuestion.interval.name})`
+                              : `Fast! Es war eine ${currentIntervalQuestion.interval.name} (${currentIntervalQuestion.interval.semitones} Halbtöne)`}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
+                          {uiLevel === 'junior'
+                            ? `Tipp: ${currentIntervalQuestion.interval.songAnchor}`
+                            : `Song-Anker: ${currentIntervalQuestion.interval.songAnchor}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Nächste Frage Button */}
+                    <button
+                      type="button"
+                      onClick={handleManualAdvanceInterval}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '9px 18px',
+                        fontSize: '0.80rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        boxShadow: '0 3px 12px rgba(139, 92, 246, 0.40)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span>Nächste Frage</span>
+                      <ArrowRight size={15} strokeWidth={2.6} />
+                    </button>
+                  </div>
+
+                  {/* A/B Hörvergleich Kontrast-Leiste */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    paddingTop: '8px',
+                    borderTop: '1px solid rgba(0,0,0,0.06)',
+                    flexWrap: 'wrap'
+                  }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#475569' }}>
+                      A/B Hörvergleich:
+                    </span>
+
+                    {/* Taste 1: Gehörtes Intervall */}
+                    <button
+                      type="button"
+                      onClick={handlePlayHeardInterval}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: '#ffffff',
+                        border: '1.5px solid #10b981',
+                        color: '#065f46',
+                        borderRadius: '8px',
+                        padding: '5px 11px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                      title="Gehörtes Intervall erneut abspielen"
+                    >
+                      <Volume2 size={13} strokeWidth={2.5} />
+                      <span>▶ Gehört ({uiLevel === 'junior' ? currentIntervalQuestion.interval.juniorName : currentIntervalQuestion.interval.name})</span>
+                    </button>
+
+                    {/* Taste 2: Deine Wahl (falls abweichend) */}
+                    {lastChosenInterval && lastChosenInterval.id !== currentIntervalQuestion.interval.id && (
+                      <button
+                        type="button"
+                        onClick={handlePlayChosenInterval}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: '#ffffff',
+                          border: '1.5px solid #f43f5e',
+                          color: '#9f1239',
+                          borderRadius: '8px',
+                          padding: '5px 11px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                        className="hover-scale"
+                        title="Deine gewählte Antwort zum Vergleich anhören"
+                      >
+                        <Volume2 size={13} strokeWidth={2.5} />
+                        <span>▶ Deine Wahl ({uiLevel === 'junior' ? lastChosenInterval.juniorName : lastChosenInterval.name})</span>
+                      </button>
+                    )}
+
+                    {/* Taste 3: Song-Anker Melodie */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        earSynth.playSongAnchor(
+                          currentIntervalQuestion.rootMidi,
+                          currentIntervalQuestion.interval.anchorNotes,
+                          0.35,
+                          soundTimbre
+                        );
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: 'rgba(139, 92, 246, 0.12)',
+                        border: '1.5px solid rgba(139, 92, 246, 0.35)',
+                        color: '#7c3aed',
+                        borderRadius: '8px',
+                        padding: '5px 11px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                      title="Melodie des Song-Ankers abspielen"
+                    >
+                      <Sparkles size={13} strokeWidth={2.4} />
+                      <span>Song-Anker hören</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : activePillar === 'chords' ? (
+            /* ========================================================
+               SÄULE 2: AKKORDFARBEN & KADENZEN
+               ======================================================== */
+            <div
+              role="tabpanel"
+              id="panel-ear-chords"
+              aria-labelledby="tab-ear-chords"
+              tabIndex={0}
+              style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+            >
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={handlePlayCurrentChord}
+                    style={{
+                      width: '52px',
+                      height: '52px',
+                      borderRadius: '16px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 6px 18px rgba(139, 92, 246, 0.40)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                    title="Akkord anhören (Leertaste)"
+                  >
+                    <Play size={22} fill="#ffffff" strokeWidth={0} />
+                  </button>
+                  <div>
+                    <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', display: 'block' }}>
+                      Akkord anhören
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Höre die Klangfarbe (Dur, Moll, Jazz...)
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                  {(['block', 'arpeggio_up', 'arpeggio_down'] as ChordPlaybackMode[]).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setChordPlayMode(mode)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: chordPlayMode === mode ? '#ffffff' : 'transparent',
+                        color: chordPlayMode === mode ? '#7c3aed' : '#64748b',
+                        fontSize: '0.70rem',
+                        fontWeight: chordPlayMode === mode ? 900 : 700,
+                        cursor: 'pointer',
+                        boxShadow: chordPlayMode === mode ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                      }}
+                    >
+                      {mode === 'block' ? '◆ Block' : mode === 'arpeggio_up' ? '▲ Arpeggio' : '▼ Arp Ab'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Akkord-Auswahlkacheln (0,1% Goldstandard 3-Ebenen & Einzeilen-Schutz) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
+                gap: '8px'
+              }}>
+                {availableChords.map(item => {
+                  const isSubmitted = isChordAnswerSubmitted;
+                  const isChosen = selectedChordAnswer === item.id;
+                  const isCorrect = currentChordQuestion?.chord.id === item.id;
+
+                  let bg = '#ffffff';
+                  let border = '#e2e8f0';
+                  let text = '#0f172a';
+                  let badgeBg = 'rgba(139, 92, 246, 0.10)';
+                  let badgeColor = '#7c3aed';
+                  let subColor = '#64748b';
+
+                  if (isSubmitted) {
+                    if (isCorrect) {
+                      bg = '#ecfdf5';
+                      border = '#10b981';
+                      text = '#065f46';
+                      badgeBg = '#10b981';
+                      badgeColor = '#ffffff';
+                      subColor = '#047857';
+                    } else if (isChosen && !isCorrect) {
+                      bg = '#fff1f2';
+                      border = '#f43f5e';
+                      text = '#9f1239';
+                      badgeBg = '#f43f5e';
+                      badgeColor = '#ffffff';
+                      subColor = '#be123c';
+                    } else {
+                      bg = '#f8fafc';
+                      border = '#e2e8f0';
+                      text = '#94a3b8';
+                      badgeBg = '#f1f5f9';
+                      badgeColor = '#94a3b8';
+                      subColor = '#cbd5e1';
+                    }
+                  }
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={isSubmitted}
+                      onClick={() => handleSelectChordAnswer(item.id)}
+                      style={{
+                        padding: '10px 12px',
+                        minHeight: '60px',
+                        borderRadius: '14px',
+                        border: `1.5px solid ${border}`,
+                        background: bg,
+                        color: text,
+                        cursor: isSubmitted ? 'default' : 'pointer',
+                        textAlign: 'left',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        gap: '3px',
+                        transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow: isChosen ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
+                        overflow: 'hidden'
+                      }}
+                      className={!isSubmitted ? 'hover-scale' : ''}
+                      title={`${item.name}: ${item.description}`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
+                        <span style={{
+                          fontWeight: 900,
+                          fontSize: 'clamp(0.78rem, 1.1vw, 0.88rem)',
+                          letterSpacing: '-0.01em',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: 'calc(100% - 38px)'
+                        }}>
+                          {uiLevel === 'junior' ? item.juniorName : item.name}
+                        </span>
+                        <span style={{
+                          fontSize: uiLevel === 'junior' ? '0.64rem' : '0.70rem',
+                          fontWeight: 850,
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          background: badgeBg,
+                          color: badgeColor,
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {uiLevel === 'junior'
+                            ? item.visualSymbol
+                            : uiLevel === 'pro'
+                            ? item.proShort
+                            : item.shortName}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        color: subColor,
+                        fontWeight: 650,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {uiLevel === 'junior'
+                          ? item.name
+                          : uiLevel === 'pro'
+                          ? item.proClassification
+                          : item.songAnchorShort}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Didaktische Feedback-Kassette & A/B-Hörvergleich für Akkorde */}
+              {isChordAnswerSubmitted && currentChordQuestion && (
+                <div style={{
+                  background: selectedChordAnswer === currentChordQuestion.chord.id ? '#ecfdf5' : '#fff1f2',
+                  border: `1.5px solid ${selectedChordAnswer === currentChordQuestion.chord.id ? '#10b981' : '#f43f5e'}`,
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {selectedChordAnswer === currentChordQuestion.chord.id ? (
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <Check size={18} strokeWidth={3} />
+                        </div>
+                      ) : (
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#f43f5e',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <X size={18} strokeWidth={3} />
+                        </div>
+                      )}
+                      <div>
+                        <span style={{
+                          fontSize: '0.88rem',
+                          fontWeight: 900,
+                          color: selectedChordAnswer === currentChordQuestion.chord.id ? '#065f46' : '#9f1239',
+                          display: 'block'
+                        }}>
+                          {selectedChordAnswer === currentChordQuestion.chord.id
+                            ? uiLevel === 'junior'
+                              ? `Super gehört! Richtig: ${currentChordQuestion.chord.juniorName} (${currentChordQuestion.chord.name})`
+                              : `Perfekt! Das war ein ${currentChordQuestion.chord.name}`
+                            : uiLevel === 'junior'
+                              ? `Fast! Richtig war: ${currentChordQuestion.chord.juniorName} (${currentChordQuestion.chord.name})`
+                              : `Fast! Es war ein ${currentChordQuestion.chord.name}`}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
+                          Klangfarbe: {currentChordQuestion.chord.description}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Nächste Frage Button */}
+                    <button
+                      type="button"
+                      onClick={handleManualAdvanceChord}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '9px 18px',
+                        fontSize: '0.80rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        boxShadow: '0 3px 12px rgba(139, 92, 246, 0.40)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span>Nächste Frage</span>
+                      <ArrowRight size={15} strokeWidth={2.6} />
+                    </button>
+                  </div>
+
+                  {/* A/B Hörvergleich Kontrast-Leiste */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    paddingTop: '8px',
+                    borderTop: '1px solid rgba(0,0,0,0.06)',
+                    flexWrap: 'wrap'
+                  }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#475569' }}>
+                      A/B Hörvergleich:
+                    </span>
+
+                    {/* Taste 1: Gehörter Akkord */}
+                    <button
+                      type="button"
+                      onClick={handlePlayHeardChord}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: '#ffffff',
+                        border: '1.5px solid #10b981',
+                        color: '#065f46',
+                        borderRadius: '8px',
+                        padding: '5px 11px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                      title="Gehörten Akkord erneut abspielen"
+                    >
+                      <Volume2 size={13} strokeWidth={2.5} />
+                      <span>▶ Gehört ({uiLevel === 'junior' ? currentChordQuestion.chord.juniorName : currentChordQuestion.chord.name})</span>
+                    </button>
+
+                    {/* Taste 2: Deine Wahl (falls abweichend) */}
+                    {lastChosenChord && lastChosenChord.id !== currentChordQuestion.chord.id && (
+                      <button
+                        type="button"
+                        onClick={handlePlayChosenChord}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: '#ffffff',
+                          border: '1.5px solid #f43f5e',
+                          color: '#9f1239',
+                          borderRadius: '8px',
+                          padding: '5px 11px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                        className="hover-scale"
+                        title="Deine gewählte Antwort zum Vergleich anhören"
+                      >
+                        <Volume2 size={13} strokeWidth={2.5} />
+                        <span>▶ Deine Wahl ({uiLevel === 'junior' ? lastChosenChord.juniorName : lastChosenChord.name})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ========================================================
+               SÄULE 3: SING-BACK & PITCH-MATCH (YIN)
+               ======================================================== */
+            <div
+              role="tabpanel"
+              id="panel-ear-pitch-match"
+              aria-labelledby="tab-ear-pitch-match"
+              tabIndex={0}
+              style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+            >
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '14px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={handlePlayTargetPitch}
+                      style={{
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '16px',
+                        border: 'none',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 6px 18px rgba(139, 92, 246, 0.40)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale"
+                      title="Zielton vorhören"
+                    >
+                      <Volume2 size={22} strokeWidth={2.4} />
+                    </button>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
+                          Zielton: {currentPitchQuestion?.label}
+                        </span>
+                        <span style={{
+                          fontSize: '0.70rem',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          background: 'rgba(139, 92, 246, 0.12)',
+                          color: '#7c3aed'
+                        }}>
+                          {Math.round(midiToFreq(currentPitchQuestion?.midi || 60))} Hz
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        Höre den Ton und singe ihn präzise nach (Oktav-tolerant)
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={togglePitchListening}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '9px 18px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: isPitchListening
+                        ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#ffffff',
+                      fontSize: '0.80rem',
+                      fontWeight: 850,
+                      cursor: 'pointer',
+                      boxShadow: isPitchListening
+                        ? '0 4px 14px rgba(239, 68, 68, 0.35)'
+                        : '0 4px 14px rgba(16, 185, 129, 0.35)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Mic size={16} strokeWidth={2.4} />
+                    <span>{isPitchListening ? 'Mikrofon aktiv' : 'Mikrofon starten'}</span>
+                  </button>
+                </div>
+
+                {/* 2027 Vocal Pitch Highway Visualizer */}
+                <div style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                }}>
+                  {livePitchResult && livePitchResult.isAudible && livePitchResult.pitch ? (
+                    (() => {
+                      const targetFreq = midiToFreq(currentPitchQuestion?.midi || 60);
+                      const evalScore = evaluatePitchMatch(livePitchResult.pitch, targetFreq, 28);
+                      const isMatched = evalScore.isMatched;
+                      const cents = evalScore.cents;
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
+                          {/* Gesungene Note vs. Zielton */}
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                            <span style={{
+                              fontSize: '2.2rem',
+                              fontWeight: 950,
+                              color: isMatched ? '#10b981' : '#0f172a',
+                              letterSpacing: '-0.02em',
+                              transition: 'color 0.15s ease'
+                            }}>
+                              {livePitchResult.noteName || '–'}
+                            </span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b' }}>
+                              ({Math.round(livePitchResult.pitch)} Hz)
+                            </span>
+                          </div>
+
+                          {/* Vocal Highway Pitch Track */}
+                          <div style={{
+                            width: '100%',
+                            maxWidth: '380px',
+                            height: '24px',
+                            background: '#f1f5f9',
+                            borderRadius: '100px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                            {/* Mittlerer Ziel-Korridor (Sweet Spot) */}
+                            <div style={{
+                              position: 'absolute',
+                              left: '42%',
+                              width: '16%',
+                              height: '100%',
+                              background: isMatched ? 'rgba(16, 185, 129, 0.25)' : '#e2e8f0',
+                              borderLeft: '1.5px dashed #cbd5e1',
+                              borderRight: '1.5px dashed #cbd5e1',
+                              transition: 'background 0.15s ease'
+                            }} />
+
+                            {/* Dynamischer Voice Orb / Stimm-Cursor */}
+                            <div style={{
+                              position: 'absolute',
+                              left: `${Math.max(5, Math.min(95, 50 + (cents)))}%`,
+                              top: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: isMatched
+                                ? '#10b981'
+                                : cents < -15
+                                ? '#3b82f6'
+                                : '#f97316',
+                              boxShadow: isMatched
+                                ? '0 0 14px rgba(16, 185, 129, 0.85)'
+                                : '0 2px 6px rgba(0,0,0,0.2)',
+                              transition: 'left 0.08s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease'
+                            }} />
+                          </div>
+
+                          {/* Didaktische Richtungs-Führung */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {isMatched ? (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#ecfdf5',
+                                border: '1px solid #10b981',
+                                color: '#065f46',
+                                padding: '4px 14px',
+                                borderRadius: '99px',
+                                fontSize: '0.78rem',
+                                fontWeight: 900,
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                              }}>
+                                <Check size={14} strokeWidth={3} />
+                                <span>{uiLevel === 'junior' ? 'Super getroffen! Halte den Ton...' : 'Perfekt getroffen! Ton halten...'}</span>
+                              </div>
+                            ) : cents < -15 ? (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: '#eff6ff',
+                                border: '1px solid #93c5fd',
+                                color: '#1e40af',
+                                padding: '4px 12px',
+                                borderRadius: '99px',
+                                fontSize: '0.76rem',
+                                fontWeight: 850
+                              }}>
+                                <ArrowUp size={13} strokeWidth={2.8} />
+                                <span>
+                                  {uiLevel === 'junior'
+                                    ? 'Höher singen'
+                                    : uiLevel === 'pro'
+                                    ? `Höher singen (Δ -${Math.abs(Math.round(cents))} ct)`
+                                    : `Höher singen (${Math.abs(Math.round(cents))}ct zu tief)`}
+                                </span>
+                              </div>
+                            ) : (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: '#fff7ed',
+                                border: '1px solid #fed7aa',
+                                color: '#c2410c',
+                                padding: '4px 12px',
+                                borderRadius: '99px',
+                                fontSize: '0.76rem',
+                                fontWeight: 850
+                              }}>
+                                <ArrowDown size={13} strokeWidth={2.8} />
+                                <span>
+                                  {uiLevel === 'junior'
+                                    ? 'Tiefer singen'
+                                    : uiLevel === 'pro'
+                                    ? `Tiefer singen (Δ +${Math.round(cents)} ct)`
+                                    : `Tiefer singen (${Math.round(cents)}ct zu hoch)`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 1,2s Lock-In Ladebalken */}
+                          {pitchMatchLockCountdown > 0 && (
+                            <div style={{
+                              width: '100%',
+                              maxWidth: '240px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '4px',
+                              marginTop: '2px'
+                            }}>
+                              <div style={{
+                                width: '100%',
+                                height: '8px',
+                                background: '#f1f5f9',
+                                borderRadius: '100px',
+                                overflow: 'hidden',
+                                border: '1px solid #e2e8f0'
+                              }}>
+                                <div style={{
+                                  width: `${pitchMatchLockCountdown}%`,
+                                  height: '100%',
+                                  background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                                  boxShadow: '0 0 10px rgba(16, 185, 129, 0.6)',
+                                  transition: 'width 0.08s linear'
+                                }} />
+                              </div>
+                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#059669' }}>
+                                Intonation einrasten: {pitchMatchLockCountdown}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div style={{ padding: '16px 0', textAlign: 'center', color: '#64748b', fontSize: '0.78rem' }}>
+                      <Activity size={24} strokeWidth={2.0} color="#8b5cf6" style={{ marginBottom: '6px' }} />
+                      <p style={{ margin: 0, fontWeight: 750, color: '#0f172a' }}>
+                        {isPitchListening ? 'Höre zu... Singe jetzt den Zielton!' : 'Mikrofon starten & Zielton nachsingen'}
+                      </p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.70rem', color: '#94a3b8' }}>
+                        Tipp: Du kannst den Ton in deiner bequemen Stimmlage singen (auch eine Oktave tiefer oder höher).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

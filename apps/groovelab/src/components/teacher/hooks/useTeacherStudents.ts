@@ -183,8 +183,23 @@ export function useTeacherStudents({
         queryCache.invalidatePrefix('teacher_students_');
         setAllStudents(prev => [...prev, data]);
         if (onRefresh) onRefresh();
-        const link = `${window.location.origin}/?invite=${qrToken}`;
-        setInviteLink(link);
+
+        // 🔒 Tier-1 Enterprise+ Single-Use Token Generation (Migration 393/394)
+        try {
+          const { data: tokenRes, error: tokenErr } = await supabase.rpc('generate_student_onboarding_token', {
+            p_student_user_id: data.id
+          });
+          if (tokenErr || !tokenRes?.success || !tokenRes?.token) {
+            console.error('[Onboarding] Error generating onboarding token:', tokenErr || tokenRes?.error);
+            alert('Das Schülerprofil wurde erstellt, aber der sichere Einladungslink konnte nicht generiert werden: ' + (tokenErr?.message || tokenRes?.error || 'Unbekannter Fehler'));
+          } else {
+            const link = `${window.location.origin}/onboarding/${tokenRes.token}?platform=campus`;
+            setInviteLink(link);
+          }
+        } catch (linkGenErr: any) {
+          console.error('[Onboarding] Exception generating onboarding token:', linkGenErr);
+          alert('Fehler beim Generieren des sicheren Einladungs-Links: ' + linkGenErr.message);
+        }
       }
     } finally {
       setInviteSaving(false);

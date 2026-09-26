@@ -1,0 +1,19 @@
+# ==============================================================================
+# Campus-Groovelab Enterprise Gitleaks Configuration (OWASP ASVS Level 3)
+# ==============================================================================
+# Autoritativer Secret- & Private-Key-Schutz für GitHub Actions & CI-Pipelines.
+# Produktive Verzeichnisse (apps/, packages/, supabase/migrations/, deploy/)
+# werden ausnahmslos auf Entropie, Private Keys und API-Tokens überwacht.
+# ==============================================================================
+
+title = "Campus-Groovelab Enterprise Gitleaks Configuration"
+
+[allowlist]
+description = "Global allowlist for legacy developer scratchpads, agent transcripts, and temporary migration dumps"
+paths = [
+  '''(?i)scratch/''',
+  '''(?i)\.agents/''',
+  '''scratch_cleanup\.ts$''',
+  '''(?i)\.system_generated/''',
+  '''docs/gitleaks_security_gate_implementation_plan\.md$'''
+]

@@ -28,8 +28,10 @@ import { safeDecodeAudioData, ensureWavBlob, ensureCenteredStereoAudioBuffer } f
 import { getAudioNotesCount, getAudioNotes, addAudioNote, updateAudioNote, deleteAudioNote, fetchAudioNotesFromServer } from '../../../utils/audioNotesStorage';
 import { getSecureAudioUrl, resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../../../utils/sharedAudioEngine';
-import { resampleWaveformPeaks, extractWaveformPeaks, detectAudioMimeType } from '../../../utils/waveformHelper';
+import { resampleWaveformPeaks, extractWaveformPeaks, detectAudioMimeType, INLINE_WAVEFORM_BARS, generateOrganicWaveform } from '../../../utils/waveformHelper';
 import { AudioLoopLocator, getLoopLocator } from '../../../utils/audioLoopLocatorStorage';
+import { getNextPlaybackRate, getPlaybackRateLabel, applyPitchPreservation, resolveAuthoritativeUiLevel } from '../../../utils/audioTempoHelper';
+import { stretchAudioBufferPitchNeutral } from '../../../services/audio/DidacticWsolaEngine';
 
 const AudioEditorModal = React.lazy(() => import('../../campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 const AudioNotesModal = React.lazy(() => import('../../campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
@@ -440,6 +442,7 @@ export interface InlineAudioPlayerProps {
   badgeTitle?: string;
   badgeBg?: string;
   badgeColor?: string;
+  badgeBorder?: string;
   onBadgeClick?: () => void;
   contextBadge?: string;
   onContextBadgeClick?: () => void;
@@ -463,6 +466,7 @@ export interface InlineAudioPlayerProps {
   uiLevel?: 'junior' | 'teen' | 'pro';
   initialLoopLocator?: AudioLoopLocator | null;
   layout?: 'single-line' | 'two-line' | 'auto';
+  trackIndex?: number;
 }
 
 export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({ 
@@ -478,6 +482,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   badgeTitle,
   badgeBg = '#f1f5f9',
   badgeColor = '#475569',
+  badgeBorder,
   onBadgeClick,
   contextBadge,
   onContextBadgeClick,
@@ -500,7 +505,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   waveformPeaks,
   uiLevel = 'junior',
   initialLoopLocator,
-  layout = 'auto'
+  layout = 'auto',
+  trackIndex
 }) => {
   const isTwoLine = layout === 'two-line';
   const [isPlaying, setIsPlaying] = useState(false);
@@ -521,7 +527,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       setPeaks(waveformPeaks);
     }
   }, [waveformPeaks]);
-  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = uiLevel || (typeof window !== 'undefined' ? (localStorage.getItem('campus_student_ui_level') as any) : null) || 'junior';
+  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = resolveAuthoritativeUiLevel(uiLevel);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState<boolean>(() => Boolean(initialLoopLocator?.enabled));
   const [countInActive, setCountInActive] = useState<boolean>(false);
@@ -993,9 +999,32 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         audioRef.current.pause();
       }
 
+      // 🎧 0,1% Goldstandard: Tonhöhen-Stabilisierung (Pitch Preservation)
+      if (playbackRate !== 1 && audioRef.current && isPlayableUrl(resolvedUrl)) {
+        const audio = audioRef.current;
+        audio.loop = Boolean(options.loop);
+        applyPitchPreservation(audio, playbackRate);
+        if (options.offsetSec !== undefined) {
+          try { audio.currentTime = options.offsetSec; } catch {}
+        }
+        audio.play().then(() => setIsPlaying(true)).catch((e) => {
+          console.warn('[InlineAudioPlayer] HTML5 pitch-preserved play fallback:', e);
+        });
+        return;
+      }
+
+      let activeBuffer = buffer;
+      if (playbackRate !== 1) {
+        try {
+          activeBuffer = stretchAudioBufferPitchNeutral(ctx, buffer, playbackRate);
+        } catch (stretchErr) {
+          console.warn('[InlineAudioPlayer] WSOLA buffer stretch note:', stretchErr);
+        }
+      }
+
       const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.playbackRate.value = playbackRate || 1;
+      source.buffer = activeBuffer;
+      source.playbackRate.value = (activeBuffer !== buffer) ? 1.0 : (playbackRate || 1);
       const hasLocatorLoop = Boolean(options.loop && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec);
       const loopStartBound = hasLocatorLoop ? loopLocator!.startSec : 0;
       const loopEndBound = hasLocatorLoop ? Math.min(buffer.duration, loopLocator!.endSec) : buffer.duration;
@@ -1239,27 +1268,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         setCountInStep(null);
         countInTimerRef.current = null;
 
-        // 1. Primär: Web Audio API Playback
-        if (audioBufferRef.current) {
-          startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
-          return;
-        }
-
-        // 2. Fallback: Versuche Puffer asynchron fertig zu laden
-        try {
-          const buf = await loadAudioBuffer();
-          if (buf) {
-            startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
-            return;
-          }
-        } catch {}
-
-        // 3. Fallback: Sauberes HTML5-Audio Playback direkt ab startOffset
+        // 1. Primär: Sauberes HTML5-Audio Playback mit nativer Tonhöhen-Stabilisierung
         if (audio && isPlayable) {
           try {
             audio.currentTime = startOffset;
             audio.loop = Boolean(isLooping);
-            audio.playbackRate = playbackRate || 1;
+            applyPitchPreservation(audio, playbackRate || 1);
             audio.muted = false;
             audio.volume = 1;
             const playPromise = audio.play();
@@ -1271,13 +1285,28 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             } else {
               setIsPlaying(true);
             }
+            return;
           } catch (err) {
             console.warn('[InlineAudioPlayer] HTML5 play exception, falling back to WebAudio:', err);
-            startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
           }
-        } else {
-          startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
         }
+
+        // 2. Fallback: Web Audio API Playback
+        if (audioBufferRef.current) {
+          startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+          return;
+        }
+
+        // 3. Fallback: Versuche Puffer asynchron fertig zu laden
+        try {
+          const buf = await loadAudioBuffer();
+          if (buf) {
+            startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+            return;
+          }
+        } catch {}
+
+        startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
       }, songStartDelayMs));
 
     } else {
@@ -1294,7 +1323,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           audio.muted = false;
           audio.volume = 1;
           audio.loop = Boolean(isLooping);
-          audio.playbackRate = playbackRate || 1;
+          applyPitchPreservation(audio, playbackRate || 1);
           const playPromise = audio.play();
           if (playPromise !== undefined) {
             playPromise
@@ -1380,16 +1409,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   }, [resolvedUrl, isLooping, loopLocator, duration]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
-      (audioRef.current as any).preservesPitch = true;
-      (audioRef.current as any).webkitPreservesPitch = true;
-      (audioRef.current as any).mozPreservesPitch = true;
-    }
-    if (loopSourceRef.current && isWebAudioPlayingRef.current && audioCtxRef.current) {
-      loopSourceRef.current.playbackRate.value = playbackRate;
-      loopOffsetSecRef.current = currentTime;
-      loopStartTimestampRef.current = audioCtxRef.current.currentTime;
+    applyPitchPreservation(audioRef.current, playbackRate);
+    if (isWebAudioPlayingRef.current) {
+      const cur = currentTime;
+      if (audioRef.current && isPlayableUrl(resolvedUrl)) {
+        stopWebAudio();
+        const audio = audioRef.current;
+        audio.currentTime = cur;
+        applyPitchPreservation(audio, playbackRate);
+        audio.loop = isLooping;
+        audio.play().then(() => setIsPlaying(true)).catch(() => {});
+      } else if (audioBufferRef.current && audioCtxRef.current) {
+        stopWebAudio();
+        startWebAudioPlayback({ loop: isLooping, offsetSec: cur });
+      }
     }
   }, [playbackRate]);
 
@@ -1880,18 +1913,21 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               <span 
                 onClick={onBadgeClick ? (e) => { e.stopPropagation(); onBadgeClick(); } : undefined}
                 style={{
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
+                  fontSize: '0.64rem',
+                  fontWeight: 850,
                   background: badgeBg || '#f1f5f9',
                   color: badgeColor || '#475569',
-                  padding: '2px 7px',
+                  border: badgeBorder || (isSharedWithTeacher ? '1px solid #86efac' : '1.5px solid #cbd5e1'),
+                  padding: '2.5px 8px',
                   borderRadius: '100px',
                   whiteSpace: 'nowrap',
                   display: 'inline-flex',
                   alignItems: 'center',
+                  gap: '4px',
                   cursor: onBadgeClick ? 'pointer' : 'default',
                   userSelect: 'none',
                   flexShrink: 0,
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
                   transition: 'all 0.15s ease'
                 }}
                 className={onBadgeClick ? 'hover-scale-mini' : ''}
@@ -1903,12 +1939,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     </div>
   );
 
-  const effective16Bars = useMemo(() => {
+  const effective36Bars = useMemo(() => {
     if (peaks && peaks.length > 0) {
-      return resampleWaveformPeaks(peaks, 16);
+      return resampleWaveformPeaks(peaks, INLINE_WAVEFORM_BARS, true);
     }
-    return [0.25, 0.40, 0.65, 0.35, 0.55, 0.85, 0.95, 0.70, 0.45, 0.65, 0.80, 0.95, 0.75, 0.55, 0.40, 0.25];
-  }, [peaks]);
+    return generateOrganicWaveform(resolvedUrl || url || label || id || 'default', INLINE_WAVEFORM_BARS);
+  }, [peaks, resolvedUrl, url, label, id]);
 
   const renderWaveform = (isDesktop: boolean) => {
     const hasLocator = Boolean(loopLocator && loopLocator.endSec > loopLocator.startSec && duration > 0);
@@ -1942,12 +1978,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           display: "flex",
           alignItems: "center",
           gap: "2px",
-          height: "18px",
+          height: isTwoLine ? "26px" : "24px",
           cursor: "pointer",
           width: "100%",
-          maxWidth: isDesktop ? "160px" : "160px",
-          minWidth: isDesktop ? "70px" : undefined,
-          flex: isDesktop ? 1 : undefined
+          maxWidth: isTwoLine ? "100%" : (isDesktop ? "220px" : "100%"),
+          minWidth: isDesktop ? "80px" : undefined,
+          flex: isDesktop ? 1 : undefined,
+          padding: "2px 0",
+          boxSizing: "border-box"
         }}
         title={hasLocator ? `A/B-Loop: ${formatTime(loopLocator!.startSec)} - ${formatTime(loopLocator!.endSec)} (Tippen zum Spulen)` : "Tippen zum Spulen"}
       >
@@ -2047,10 +2085,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           </>
         )}
 
-        {effective16Bars.map((val, i) => {
-          const barRatio = i / effective16Bars.length;
+        {effective36Bars.map((val, i) => {
+          const barRatio = i / effective36Bars.length;
           const isFilled = barRatio <= progressRatio;
-          const heightPct = Math.max(20, Math.round(val * 100));
+          const isHead = Math.abs(barRatio - progressRatio) < (1 / effective36Bars.length);
+          const heightPct = Math.max(18, Math.round(val * 100));
 
           // A/B Loop-Locator Visualisierung (32% Opacity außerhalb des Loop-Bereichs bei aktivem Looping)
           const isWithinLocator = !loopLocator?.enabled || !duration || duration <= 0 || (
@@ -2064,14 +2103,19 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               key={i}
               style={{
                 flex: 1,
-                minWidth: "2.5px",
+                minWidth: "2px",
                 height: `${heightPct}%`,
-                borderRadius: "1.5px",
+                borderRadius: "9999px",
                 opacity,
                 background: isFilled
                   ? (isIndigoPurple ? (isPlaying ? "#7c3aed" : "#6d28d9") : (isPlaying ? "#16a34a" : "#15803d"))
-                  : (isShared ? "#bbf7d0" : "#e2e8f0"),
-                transition: "background 0.1s ease, opacity 0.2s ease"
+                  : (isIndigoPurple 
+                      ? "rgba(124, 58, 237, 0.14)" 
+                      : (isShared ? "rgba(22, 163, 74, 0.16)" : "rgba(148, 163, 184, 0.22)")),
+                boxShadow: isHead && isPlaying 
+                  ? (isIndigoPurple ? '0 0 8px rgba(124, 58, 237, 0.75)' : '0 0 8px rgba(22, 163, 74, 0.75)') 
+                  : 'none',
+                transition: "background 0.1s ease, opacity 0.15s ease, height 0.15s ease"
               }}
             />
           );
@@ -2197,23 +2241,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           <Timer size={isMobile ? 14 : 15} strokeWidth={countInActive ? 2.6 : 2.2} />
         </button>
 
-        {/* 🎛️ Adaptiver Tempo Button (Junior: 🐢/🐰, Teen: 3 Stufen, Pro: Feinstufen) */}
+        {/* 🎛️ Adaptiver Tempo Button (1:1 Wochen-Fahrplan Parität) */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            if (effectiveUiLevel === 'junior') {
-              setPlaybackRate(prev => (prev === 1 ? 0.75 : 1));
-            } else if (effectiveUiLevel === 'teen') {
-              const rates = [1, 0.85, 0.75];
-              const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-              setPlaybackRate(nextRate);
-            } else {
-              const rates = [1, 0.85, 0.75, 0.6, 0.5];
-              const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-              setPlaybackRate(nextRate);
-            }
+            setPlaybackRate(prev => getNextPlaybackRate(prev, effectiveUiLevel));
           }}
+          aria-label={`Wiedergabegeschwindigkeit ${getPlaybackRateLabel(playbackRate, effectiveUiLevel)}`}
           style={{
             border: playbackRate !== 1 
               ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #16a34a') 
@@ -2224,32 +2259,31 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             color: playbackRate !== 1 
               ? (isIndigoPurple ? '#6d28d9' : '#15803d') 
               : '#64748b',
-            height: isMobile ? '30px' : '34px',
-            width: isMobile ? (effectiveUiLevel === 'junior' ? '44px' : '32px') : (effectiveUiLevel === 'junior' ? '48px' : '36px'),
-            minWidth: isMobile ? (effectiveUiLevel === 'junior' ? '44px' : '32px') : (effectiveUiLevel === 'junior' ? '48px' : '36px'),
-            padding: 0,
-            borderRadius: isMobile ? '8px' : '10px',
+            fontSize: isMobile ? '0.74rem' : '0.78rem',
+            fontWeight: 850,
+            height: isMobile ? '34px' : '36px',
+            minWidth: isMobile ? '48px' : '42px',
+            padding: '0 8px',
+            borderRadius: '10px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: playbackRate !== 1 
-              ? (isIndigoPurple ? '0 1px 3px rgba(109, 40, 217, 0.2)' : '0 1px 3px rgba(22, 163, 74, 0.2)') 
+              ? (isIndigoPurple ? '0 1px 3px rgba(109, 40, 217, 0.15)' : '0 1px 3px rgba(22, 163, 74, 0.15)') 
               : '0 1px 2px rgba(0, 0, 0, 0.02)',
-            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+            transition: 'all 0.15s ease',
+            touchAction: 'manipulation'
           }}
           className="hover-scale-mini"
           title={
-            effectiveUiLevel === 'junior'
-              ? (playbackRate < 1 ? '🐢 Langsam (75%) – Tippen für 🐰 Normal (100%)' : '🐰 Normal (100%) – Tippen für 🐢 Langsam (75%)')
-              : (playbackRate !== 1 ? `Tempo: ${Math.round(playbackRate * 100)}% (Tippen für nächstes Tempo)` : 'Tempo: 100% (Tippen zum Verlangsamen)')
+            playbackRate === 1
+              ? 'Originaltempo (100%)'
+              : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`
           }
         >
-          <span style={{ fontSize: isMobile ? (effectiveUiLevel === 'junior' ? '0.62rem' : '0.66rem') : (effectiveUiLevel === 'junior' ? '0.70rem' : '0.74rem'), fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
-            {effectiveUiLevel === 'junior'
-              ? (playbackRate < 1 ? '🐢 75' : '🐰 100')
-              : Math.round(playbackRate * 100)
-            }
+          <span style={{ fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 850, letterSpacing: '-0.02em', lineHeight: 1 }}>
+            {getPlaybackRateLabel(playbackRate, effectiveUiLevel)}
           </span>
         </button>
 
@@ -2437,6 +2471,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       {/* 1. Main Row: Responsive Desktop single-line vs two-line vs Mobile */}
       {isMobile ? (
         <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+          {trackIndex !== undefined && (
+            <span style={{
+              fontSize: '0.70rem',
+              fontWeight: 900,
+              color: isIndigoPurple ? '#7c3aed' : '#15803d',
+              fontVariantNumeric: 'tabular-nums',
+              minWidth: '18px',
+              textAlign: 'center',
+              lineHeight: 1,
+              flexShrink: 0
+            }}>
+              {String(trackIndex).padStart(2, '0')}
+            </span>
+          )}
           {playButtonElement}
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
@@ -2451,6 +2499,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           {/* Zeile 1: Play-Button + voller Titel & Badges + Zeit/Datum */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+              {trackIndex !== undefined && (
+                <span style={{
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  color: isIndigoPurple ? '#7c3aed' : '#15803d',
+                  fontVariantNumeric: 'tabular-nums',
+                  minWidth: '20px',
+                  textAlign: 'center',
+                  lineHeight: 1,
+                  flexShrink: 0
+                }}>
+                  {String(trackIndex).padStart(2, '0')}
+                </span>
+              )}
               {playButtonElement}
               {renderTitleAndBadges(false)}
             </div>
@@ -2465,7 +2527,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           </div>
           {/* Zeile 2: Waveform über volle Breite + kompakte Werkzeuge */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
-            <div style={{ flex: 1, minWidth: 0, paddingLeft: "42px" }}>
+            <div style={{ flex: 1, minWidth: 0, paddingLeft: trackIndex !== undefined ? "48px" : "42px" }}>
               {renderWaveform(true)}
             </div>
             <div style={{ flexShrink: 0 }}>
@@ -2939,8 +3001,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         document.body
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmModal && (
+      {/* Delete Confirmation Modal (Rendered via Portal to eliminate stacking context occlusions) */}
+      {showDeleteConfirmModal && typeof document !== 'undefined' && createPortal(
         <div
           onClick={(e) => {
             if (!isDeleting) {
@@ -2959,7 +3021,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 99999,
+            zIndex: 12000,
             padding: '20px'
           }}
         >
@@ -3113,7 +3175,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Studio Waveform & Pitch Editor Modal */}
@@ -3128,7 +3191,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             initialDuration={duration}
             initialOriginalDuration={originalDuration}
             editorMode="locator"
-            uiLevel={uiLevel || (typeof window !== 'undefined' ? (localStorage.getItem('campus_student_ui_level') as any) : null) || 'junior'}
+            uiLevel={effectiveUiLevel}
             recordingId={persistentAudioKey || audioId || id}
             initialLocator={loopLocator}
             userId={typeof window !== 'undefined' ? (localStorage.getItem('campus_auth_user_id') || localStorage.getItem('auth_user_id') || undefined) : undefined}

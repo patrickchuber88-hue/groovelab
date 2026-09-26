@@ -8147,9 +8147,21 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                 type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
-                                  navigator.clipboard.writeText(inviteLink);
-                                  await showAlert("Onboarding-Link kopiert! Du kannst diesen Link jetzt an die Eltern senden: " + inviteLink);
+                                  try {
+                                    const { data: tokenRes, error: tokenErr } = await supabase.rpc('generate_student_onboarding_token', {
+                                      p_student_user_id: s.id
+                                    });
+                                    let inviteLink = '';
+                                    if (!tokenErr && tokenRes?.success && tokenRes?.token) {
+                                      inviteLink = `${window.location.origin}/onboarding/${tokenRes.token}?platform=campus`;
+                                    } else {
+                                      inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
+                                    }
+                                    navigator.clipboard.writeText(inviteLink);
+                                    await showAlert("Sicherer Einladungs-Link kopiert (30 Tage gültig)! Du kannst diesen Link jetzt an die Eltern senden:\n" + inviteLink);
+                                  } catch (err: any) {
+                                    console.error('[Onboarding] Error generating invite link:', err);
+                                  }
                                 }}
                                 style={{
                                   flex: 1,

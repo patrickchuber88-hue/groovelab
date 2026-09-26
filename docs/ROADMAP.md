@@ -248,5 +248,74 @@ Das Ausweis-Set wird im Elternbereich als optionales Premium-Upgrade für **5,50
 4. **Das 90-Minuten Jour-Fixe Prinzip:** Monatliches Strategietreffen als feste Voraussetzung. Keine Stundenzettel. Ausfall ohne Entschuldigung = ersatzloser Wegfall der Monatsauszahlung.
 5. **Schutz des Geistigen Eigentums (IP):** Quellcode, Datenbanken, Systemrechte und Marken verbleiben dauerhaft zu 100 % bei Patrick Huber. Option auf gemeinsame Betriebsgesellschaft (UG/GmbH) ab 25 Schulen.
 
+---
 
+## 🚀 0,1% Goldstandard Meilensteine (Didaktik, Audio, Governance & Recht)
 
+### 1. 🎭 Bühnenmoment & Konzertsaal-Simulator (In *Meine Meisterwerke*)
+* **Status:** 🟡 **IN PLANUNG / READY FOR ARCHITECTURE (Track: High-End Audio & Meisterwerk)**
+* **Bereich:** `MeisterwerkRecordingsTab.tsx`, `useMeisterwerkAudioRecording.ts`, Web Audio ConvolverNode (Impulse Response)
+* **Zielgruppe:** Schüler (Campus & GrooveLab), Lehrkräfte, Familien
+* **Kernkonzept:**
+  * Sobald ein Song in *Meine Meisterwerke* den Status `Gemeistert` erreicht, schaltet sich der Button **`Bühnen-Simulator (Live im Konzertsaal)`** frei.
+  * **Immersion & Faltungshall:** Aktivierung eines Web-Audio-Faltungshalls (Impulse Response eines akustischen Kammermusiksaals), dezentem Saalgemurmel und knisternder Stille vor dem ersten Ton.
+  * **Intelligente Song-Erkennung (Zero-Takt-Eingabe):** RMS-Tail-Detection (ausklingender Schlussakkord unter $-42\text{ dBFS}$ + 3,5s Hall-Decay) oder finaler Taster *„Verneigen / Auftritt beenden“*. Fermaten und musikalische Pausen werden toleriert.
+  * **Finale & Würdigung:** Nach dem Schlussakkord brandet tosender Konzert-Applaus auf. Der Take erhält in der Monats-Chronik das **Goldene Bühnen-Emblem**.
+
+### 2. 🎸 Virtuelle Bandprobe & Anonyme Jam-Börse (Matching-Graph für reale Bands)
+* **Status:** 📋 **AUF DER ROADMAP (Track: Kollaboration & Ensemble)**
+* **Bereich:** *Meine Meisterwerke* (`MeisterwerkRecordingsTab.tsx`), Schulleiter-/Lehrer-Cockpit
+* **Zielgruppe:** Schüler (11–18 Jahre, insbes. `teen` & `pro`), Fachlehrkräfte für Ensemble/Band
+* **Kernkonzept:**
+  * Schüler können gemeisterte Takes über den Button **`In den Band-Pool stellen`** unter einem neutralen Musiker-Pseudonym (z. B. *„GrooveBass_089“*, Zero PII) asynchron bereitstellen.
+  * Andere Schüler entdecken die Spur im Übemodus und nehmen eigene Stimmen synchron dazu auf (z. B. Drums zu Bass, Keys zu Streichern).
+  * **Automatischer Matching-Graph für Lehrkräfte:** Das Lehrer-Cockpit erkennt musikalische Synergien und schlägt reale Bandproben im Überaum der Musikschule vor (*„Lukas, Mia und Jonas grooven asynchron perfekt zusammen – Raum 101 für Live-Probe empfohlen“*).
+
+### 3. 🎧 Apple Music & Pro-Audio Ästhetik für die `pro`-Altersgruppe (16+ & Erwachsene)
+* **Status:** 🟡 **IN PLANUNG (Track: Multi-Generations-UI)**
+* **Bereich:** Theme-Engine, Globales Layout, `campus_ui_level = 'pro'`
+* **Zielgruppe:** Jugendliche ab 16 Jahren, Musikstudenten, erwachsene Hobbymusiker & Senioren
+* **Kernkonzept:**
+  * **Zero Gamification:** Vollständiges Ausblenden von bunten XP-Balken, Tier-Avataren, Flammen-Streaks und Comic-Elementen.
+  * **Apple Music & Logic Pro Ästhetik:** Reines Schwarz (`#000000`), rahmenlose Album-Cover mit weichen Farbschatten, transluzente Milchglas-Karten (`backdrop-filter: blur(40px)`) und Schweizer Editorial-Typografie (Plus Jakarta Sans 800 / feine Slate-600 Metadaten).
+  * **Studio-Präzision:** Fokus auf unkomprimierte 24-bit/48kHz PCM WAV-Takes, Repertoire-Historie, BPM-Kurven und Dynamik-Präzision.
+
+### 4. ⏱️ 30-Sekunden-Unterrichts-Abschluss („Lesson Wrap-Up“ mit Auto-Metronom)
+* **Status:** 🟡 **IN PLANUNG (Track: Lehrkräfte-Entlastung & Übe-Brücke)**
+* **Bereich:** `TeacherStudentsView.tsx`, `TagesplanQuickAudioModal.tsx`, `StudentPracticeTab.tsx`
+* **Zielgruppe:** Musiklehrkräfte, Schüler, Erziehungsberechtigte
+* **Kernkonzept:**
+  * 3 Minuten vor Stundenende erscheint auf dem Pult-Tablet der Lehrkraft ein einzelner, grüner Button: **`Stunden-Memo aufnehmen`**.
+  * 15-Sekunden-Sprachmemo der Lehrkraft mit 3 Schnell-Pills (z. B. `[ 84 BPM ]`, `[ 4/4 ]`, `[ Takt 12–24 ]`). Zero Vorbereitungs- oder Nachbereitungszeit.
+  * **Magische Übe-Brücke:** Hört der Schüler die Sprachnotiz daheim ab, startet darunter **automatisch das integrierte Metronom auf exakt 84 BPM im 4/4-Takt**.
+  * Eltern erhalten nach Unterrichtsende eine diskrete Benachrichtigung über das neue Wochenziel.
+
+### 5. 🏛️ VdM-Strukturplan-Kompass & 1-Klick Gemeinderats-Kulturbericht
+* **Status:** 📋 **AUF DER ROADMAP (Track: B2B-Governance & Verbandspartnerschaft)**
+* **Bereich:** `SecretaryAuditView.tsx`, Repertoire-Datenbank, PDF-Export-Engine
+* **Zielgruppe:** Musikschulleitungen, Träger, Kulturämter, Verband deutscher Musikschulen (VdM)
+* **Kernkonzept:**
+  * Nativer Abgleich von Stücken mit den offiziellen VdM-Bildungsstufen (*Elementar-, Unterstufe U1/U2, Mittelstufe M1/M2, Oberstufe O1/O2*).
+  * Lehrkräfte taggen Songs mit 1 Klick beim Zuweisen.
+  * Schulleitungen generieren auf Knopfdruck ein behördliches, druckreifes PDF für Gemeinderat und Kulturamt zur unanfechtbaren Rechtfertigung kommunaler Zuschüsse (Nachweis von Ensemble-Quoten, Unterrichtsstunden und Breiten- vs. Spitzenförderung).
+
+### 6. 📚 Rechtssichere Lehrmaterial- & Notenempfehlungen (Zwei-Zonen-Architektur)
+* **Status:** 🟡 **IN PLANUNG / COMPLIANCE-APPROVED (Track: Legal & Parent Governance)**
+* **Bereich:** Chat & Hausaufgaben (`CampusDirectMessages.tsx`), Eltern-Bereich (`ParentCampusActivationModal.tsx`)
+* **Zielgruppe:** Lehrkräfte, Eltern, Minderjährige
+* **Kernkonzept:**
+  * **100 % rechtssicher nach UWG & BGB:** Kein E-Commerce in der App, keine In-App-Käufe im Schülerprofil (§ 104 ff. BGB). Striktes Verbot von Kaufappellen an Kinder (§ 3 Abs. 3 UWG i. V. m. Nr. 28 Anhang UWG).
+  * **Schüler-Ansicht:** Zeigt rein didaktische Metadaten (Titel, Verlag, ISBN/ISMN) als Unterrichtsinformation.
+  * **Eltern-Ansicht (im gesicherten Bereich):** Sachliche Notizen mit Optionen zur Reservierung beim lokalen Musikalienhändler vor Ort oder Suche im Buchhandel unter Wahrung des Buchpreisbindungsgesetzes (BuchPrG).
+
+### 7. 💿 Emotionales digitales „Jahres-Album“ & DSGVO-Tombstone-Löschkonzept
+* **Status:** 🟡 **IN PLANUNG (Track: Privacy by Design & Emotional Retention)**
+* **Bereich:** Backend Render-Cron, Supabase Storage, DIN 66398 Löschkonzept
+* **Zielgruppe:** Schülerinnen & Schüler, Eltern, Schulleitung (DSGVO-Verantwortliche)
+* **Kernkonzept:**
+  * **Automatischer Stichtag (31. Juli zum Schuljahresende):** Generierung des persönlichen Jahres-Pakets (*„Mein Schuljahr 2025/2026 – Meisterwerk LP“*):
+    * Alle gemeisterten Audio-Takes in Studio-Qualität (WAV/FLAC) mit ID3-Tags.
+    * Vektorbasiertes DIN A4 Pracht-Booklet (PDF) mit Jahres-Cover, persönlicher Widmung der Lehrkraft und Repertoire-Chronik.
+    * Autarke, offline-lauffähige HTML5-Vinyl-Station zur dauerhaften Wiedergabe auf privaten Familien-Rechnern.
+  * **Rechts- & Speichersicherheit:** Eltern erhalten einen kryptografisch signierten 60-Tage-Einmal-Downloadlink (Erfüllung von Art. 20 DSGVO Datenübertragbarkeit).
+  * **Stichtag 1. Oktober:** Atomare Bereinigung aller Roh-Audiodateien auf Hetzner-Servern (DIN 66398 / Art. 17 DSGVO). 0 Byte Restdaten = 0 Haftung = dauerhaft schlanke Server.

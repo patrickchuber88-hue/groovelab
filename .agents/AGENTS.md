@@ -59,7 +59,7 @@
   - **Inhaltliche Leitplanken**: Reine Software-Architektur, Bounded Contexts, System-Invarianten, deterministischer 4-Phasen-Ablauf (1. Exploration -> 2. Planung -> 3. Implementierung -> 4. Verifikation) und strukturiertes Status-Reporting. Keine domänenspezifischen Vorab-Festlegungen.
 
 ## ⚡ Hermetisches Vibe Coding & Enterprise Quality Gate
-- **Hermetischer Master-Prompt**: Bei KI-gestützten Feature-Erweiterungen und Refactorings ist zwingend der Prompt aus `.agents/prompts/VIBE_CODING_MASTER_PROMPT.md` zu verwenden. Der Prompt bindet die KI an strikte Bounded Contexts, verbietet unkontrollierte Dateimodifikationen außerhalb des Scopes und schützt alle OWASP ASVS Level 3 Axiome.
+- **Hermetischer Master-Prompt & Core Architect**: Bei KI-gestützten Feature-Erweiterungen und Refactorings ist zwingend der Prompt aus `.agents/prompts/CAMPUS_GROOVELAB_CORE_ARCHITECT.md` bzw. `.agents/prompts/VIBE_CODING_MASTER_PROMPT.md` zu verwenden. Der Prompt bindet die KI an strikte Bounded Contexts, verbietet unkontrollierte Dateimodifikationen außerhalb des Scopes und schützt alle OWASP ASVS Level 3 Axiome.
 - Der KI-Agent führt `npm run gate` oder Terminal-Prüfroutinen außerhalb des Codeworts „commit“ NIEMALS ungefragt aus. Keine automatischen Test-Schleifen am Ende von regulären Antworten.
 - Beim Codewort „commit“ (oder „commit and deploy“) führt der Agent `npm run gate` sowie alle Build- und Integritätsprüfungen eigenständig aus.
 - Die finale Sicherheitsprüfung beim Commit erfolgt zusätzlich über den Git-Pre-Commit-Hook.

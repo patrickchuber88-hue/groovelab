@@ -59,29 +59,26 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
     }
   };
 
-  // ── Duale Token-Architektur (DSGVO Art. 25 & 32 / Zero-Downtime) ──────────
+  // ── Fail-Closed Token-Architektur (OWASP ASVS Level 3 / DSGVO Art. 25 & 32) ──
   const handleCopyPwaLink = async () => {
     const targetPlatform = isGroove ? 'groovelab' : 'campus';
-    const effectiveToken = localQrToken || student.qr_token || student.id;
-    let finalLink = `${window.location.origin}/onboarding/${effectiveToken}?platform=${targetPlatform}`;
-
     setGeneratingLink(true);
     try {
       const { data, error } = await supabase.rpc('generate_student_onboarding_token', {
         p_student_user_id: student.id
       });
-      if (!error && data?.success && data?.token) {
-        finalLink = `${window.location.origin}/onboarding/${data.token}?platform=${targetPlatform}`;
-      } else if (error || (data && !data.success)) {
-        console.warn('[Onboarding] Einmaltoken RPC fiel auf Ausweis-Token zurück:', error?.message || data?.error);
+      if (error || !data?.success || !data?.token) {
+        throw new Error(error?.message || data?.error || 'Server-RPC konnte keinen sicheren Einmal-Token erzeugen.');
       }
-    } catch (err: any) {
-      console.warn('[Onboarding] Einmaltoken RPC-Aufruf nicht erfolgreich, nutze Fallback:', err);
-    } finally {
+      const finalLink = `${window.location.origin}/onboarding/${data.token}?platform=${targetPlatform}`;
       await copyToClipboardSafely(finalLink);
       setCopiedLink(true);
-      setGeneratingLink(false);
       setTimeout(() => setCopiedLink(false), 3000);
+    } catch (err: any) {
+      console.error('[Onboarding] Fail-Closed: Einladungs-Link konnte nicht sicher generiert werden:', err);
+      alert('Sicherheits-Hinweis: Der Einladungs-Link konnte nicht sicher vom Server bezogen werden: ' + (err.message || err));
+    } finally {
+      setGeneratingLink(false);
     }
   };
 

@@ -166,6 +166,40 @@ serve(async (req) => {
     });
     const billingDateStr = invoice.billing_date || new Date().toLocaleDateString("de-DE");
 
+    // 6a. GoBD § 147 AO WORM Storage Ingestion (Persistent Cold Archive)
+    const fiscalYear = invoice.billing_date ? invoice.billing_date.split("-")[0] : new Date().getFullYear().toString();
+    const cleanInvoiceNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const storagePath = `${fiscalYear}/${school.id}/${cleanInvoiceNumber}.pdf`;
+    let finalStoragePath: string | null = null;
+
+    try {
+      const binaryStr = atob(pdf_base64);
+      const pdfBytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        pdfBytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      const { error: uploadErr } = await supabase.storage
+        .from("invoices")
+        .upload(storagePath, pdfBytes, {
+          contentType: "application/pdf",
+          upsert: false,
+        });
+
+      if (uploadErr) {
+        if (uploadErr.message?.includes("already exists") || uploadErr.message?.includes("duplicate")) {
+          console.log(`[dispatch-school-invoice] WORM Blob ${storagePath} already exists. Preserving immutable copy.`);
+          finalStoragePath = storagePath;
+        } else {
+          console.warn("[dispatch-school-invoice] Storage bucket upload warning:", uploadErr.message);
+        }
+      } else {
+        finalStoragePath = storagePath;
+      }
+    } catch (storageEx: any) {
+      console.warn("[dispatch-school-invoice] Storage archiving exception:", storageEx);
+    }
+
     const emailSubject = `Rechnung ${invoiceNumber} für Campus-Groovelab Cloud-Infrastruktur – ${school.name}`;
     const emailBody = `Sehr geehrte Damen und Herren der ${school.name},
 
@@ -246,6 +280,7 @@ https://campus-groovelab.de`;
       p_pdf_sha256: pdfSha256,
       p_smtp_message_id: messageId,
       p_error_details: errorDetails,
+      p_storage_path: finalStoragePath,
     });
 
     if (recordErr) {
@@ -277,6 +312,7 @@ https://campus-groovelab.de`;
         invoice_number: invoiceNumber,
         recipient_email: recipientEmail,
         pdf_sha256: pdfSha256,
+        storage_path: finalStoragePath,
         dispatched_at: new Date().toISOString(),
         is_simulated: dispatchStatus === "simulated",
       }),

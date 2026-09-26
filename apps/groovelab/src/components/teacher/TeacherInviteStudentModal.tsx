@@ -93,7 +93,7 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
                 </div>
                 <div>
                   <div style={{ fontWeight: 900, color: '#34a853' }}>Profil angelegt!</div>
-                  <div style={{ fontSize: '0.78rem', color: '#34a853' }}>Teile den Link mit dem Schüler</div>
+                  <div style={{ fontSize: '0.78rem', color: '#34a853' }}>Sicherer Einladungslink für Eltern / Schüler (30 Tage gültig)</div>
                 </div>
               </div>
               <div style={{ background: 'white', border: '1px solid #e6f4ea', borderRadius: '12px', padding: '12px 16px', wordBreak: 'break-all', fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>
@@ -101,14 +101,14 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={() => { navigator.clipboard.writeText(inviteLink!).then(() => alert('✓ Link kopiert!')); }}
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink!).then(() => alert('✓ Einladungslink kopiert!')); }}
                 style={{ padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(139,92,246,0.2)' }}>
                 <Copy size={16} /> Link kopieren
               </button>
               {inviteEmail && (
-                <a href={`mailto:${inviteEmail}?subject=Deine%20Einladung&body=Hallo%20${encodeURIComponent(inviteFirstName)}%2C%0A%0AHier%20ist%20dein%20persönlicher%20Einladungslink%3A%0A${encodeURIComponent(inviteLink!)}`}
+                <a href={`mailto:${inviteEmail}?subject=Einladung%20zur%20Campus-Aktivierung&body=Hallo%20${encodeURIComponent(inviteFirstName)}%2C%0A%0Ahier%20ist%20der%20persönliche%20Einladungslink%20zur%20Aktivierung%20des%20Schülerprofils%20(30%20Tage%20gültig)%3A%0A${encodeURIComponent(inviteLink!)}`}
                   style={{ padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', fontSize: '0.9rem' }}>
-                  <Mail size={16} /> Per E-Mail senden
+                  <Mail size={16} /> Per E-Mail an Eltern senden
                 </a>
               )}
               <button onClick={() => { setShowInviteStudent(false); setInviteLink(null); setInviteFirstName(''); setInviteLastName(''); setInviteEmail(''); }}

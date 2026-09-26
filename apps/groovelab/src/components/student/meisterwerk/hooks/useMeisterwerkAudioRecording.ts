@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../../../lib/supabase';
-import { processPureRawBlob, processStudioMastering, audioBufferToWavBlob, ensureCenteredStereoAudioBuffer } from '../../../../utils/audioMasteringEngine';
+import { processPureRawBlob, processStudioMastering, audioBufferToWavBlob, ensureCenteredStereoAudioBuffer, alignAudioBufferToGrid } from '../../../../utils/audioMasteringEngine';
 import { storeBlob, deleteBlob } from '../../../../utils/blobStorage';
 import { validateMediaBlob } from '../../../../utils/mediaSecurityValidator';
 import { fixWebmDuration } from '../../../../utils/webmDurationPatcher';
@@ -9,6 +9,7 @@ import { acquireAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../../../servic
 import { playCountInBeep } from '../MeisterwerkAudioPlayers';
 import { SharedAudioEngine } from '../../../../utils/sharedAudioEngine';
 import { cleanSongOrBookTitle, formatHarmonizedAudioTitle } from '../../../../utils/audioNamingHelper';
+import { UniversalLatencyEngine } from '../../../../utils/universalLatencyEngine';
 import { getSimulatedNow } from '../../studentDateUtils';
 import { Student } from '../../meisterwerk.types';
 
@@ -324,6 +325,14 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
         let processedBlob: Blob | null = null;
         let dspDuration = 0;
 
+        // 🎯 Universal Latency Compensation (PDC):
+        // If recording with metronome, the instrument performance lags by the hardware output+input roundtrip.
+        // We trim the calibrated latency delay using alignAudioBufferToGrid (with 3ms anti-pop cosine fade).
+        const isMetronomeActive = Boolean(isRecordingMetronomeActiveRef.current);
+        const calibratedLatencyMs = UniversalLatencyEngine.getLatencyMs(audioCtx);
+        const effectiveLatencyMs = isMetronomeActive ? calibratedLatencyMs : 0;
+        const latencyCompensationSec = effectiveLatencyMs / 1000.0;
+
         // 1. Primary: High-fidelity uncompressed PCM WAV generation
         if (totalPcmSamples > 0 && pcmChunksL.length > 0) {
           try {
@@ -336,7 +345,10 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
               chanR.set(pcmChunksR[i], offset);
               offset += pcmChunksL[i].length;
             }
-            const capturedBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawBuffer);
+            let capturedBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawBuffer);
+            if (latencyCompensationSec > 0) {
+              capturedBuffer = alignAudioBufferToGrid(capturedBuffer, latencyCompensationSec, audioCtx);
+            }
             dspDuration = capturedBuffer.duration;
             processedBlob = audioBufferToWavBlob(capturedBuffer, {
               title: overrideLabel || audioLabelRef.current || 'Aufnahme',
@@ -357,7 +369,10 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
               processedBlob = res.masteredBlob;
               dspDuration = res.durationSec || 0;
             } else {
-              const res = await processPureRawBlob(patchedBlob, { padActive: isRecordingPadActiveRef.current });
+              const res = await processPureRawBlob(patchedBlob, {
+                padActive: isRecordingPadActiveRef.current,
+                latencyCompensationSec: latencyCompensationSec > 0 ? latencyCompensationSec : undefined
+              });
               processedBlob = res.processedBlob;
               dspDuration = res.durationSec || 0;
             }
@@ -450,6 +465,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
             visibility: 'private',
             metronomeBpm: metronomeBpmToSave,
             bpm: metronomeBpmToSave,
+            latencyOffsetMs: effectiveLatencyMs,
             cloudSyncStatus: 'local'
           };
 

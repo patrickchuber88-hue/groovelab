@@ -453,3 +453,86 @@ export function formatHarmonizedAudioTitle(
     ? `${baseTopic} • ${formattedDate} #${explicitTake}`
     : `${baseTopic} • ${formattedDate}`;
 }
+
+/**
+ * 0,1% DAW & Studio Goldstandard Canonical Take & Mixdown File Naming.
+ * Ensures cross-platform filename hygiene (Windows, macOS, iOS, Android, Linux DAWs)
+ * and embeds critical musical metadata (Song, Student, ISO Date, BPM, Take Number, Stem Role).
+ * 
+ * Example: `Duett_Stille-Nacht_Lukas_2026-09-26_100BPM_Take01_StereoMix.wav`
+ */
+export interface StudioTakeFileNameOptions {
+  prefix?: string;
+  songTitle?: string;
+  studentName?: string;
+  bpm?: number;
+  takeNumber?: number;
+  role?: 'StereoMix' | 'Spur1-Lehrkraft' | 'Spur2-Schueler' | 'Take';
+  extension?: string;
+  date?: string | Date;
+}
+
+export function buildCanonicalStudioTakeFileName(options: StudioTakeFileNameOptions): string {
+  const prefix = (options.prefix || 'Duett').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  // Clean and sanitize songTitle
+  let cleanSong = (options.songTitle || 'Aufnahme')
+    .replace(/^(?:Aufnahme|Duett):\s*/i, '')
+    .trim()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/Ä/g, 'Ae')
+    .replace(/Ö/g, 'Oe')
+    .replace(/Ü/g, 'Ue')
+    .replace(/[^\w\s-]/gi, '')
+    .replace(/\s+/g, '-');
+  if (!cleanSong) cleanSong = 'Take';
+
+  // Clean student name
+  let cleanStudent = (options.studentName || 'Schueler')
+    .trim()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/Ä/g, 'Ae')
+    .replace(/Ö/g, 'Oe')
+    .replace(/Ü/g, 'Ue')
+    .replace(/[^\w-]/gi, '') || 'Schueler';
+
+  // Format ISO date YYYY-MM-DD
+  let dateStr = '';
+  try {
+    const d = options.date ? (options.date instanceof Date ? options.date : new Date(options.date)) : new Date();
+    if (!isNaN(d.getTime())) {
+      dateStr = d.toISOString().split('T')[0];
+    } else {
+      dateStr = new Date().toISOString().split('T')[0];
+    }
+  } catch {
+    dateStr = new Date().toISOString().split('T')[0];
+  }
+
+  // Format BPM
+  const bpmStr = options.bpm && options.bpm > 0 ? `${Math.round(options.bpm)}BPM` : '';
+
+  // Format Take Number (2-digit padding: Take01, Take02...)
+  const takeStr = options.takeNumber && options.takeNumber > 0 
+    ? `Take${String(options.takeNumber).padStart(2, '0')}` 
+    : 'Take01';
+
+  // Stem / Mix Role
+  const role = options.role || 'StereoMix';
+
+  // File extension
+  const ext = (options.extension || 'wav').replace(/^\./, '').toLowerCase();
+
+  const parts = [prefix, cleanSong, cleanStudent, dateStr];
+  if (bpmStr) parts.push(bpmStr);
+  parts.push(takeStr);
+  if (role) parts.push(role);
+
+  return `${parts.filter(Boolean).join('_')}.${ext}`;
+}

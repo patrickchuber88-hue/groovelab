@@ -3061,6 +3061,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Stimmgerät...</div>}>
               <CampusTuner
                 uiLevel={uiLevel}
+                studentInstrument={(student as any)?.instrument || (student as any)?.instrument_name}
               />
             </Suspense>
           </div>
@@ -3085,8 +3086,56 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 embedded={true}
                 useNotebookLayout={true}
                 onClose={() => { setActiveViewMode('document'); setHubTab('modules'); }}
-                onRewardXp={async () => {}}
-                onSessionComplete={() => {}}
+                onRewardXp={async (xp, reason) => {
+                  if (!student?.id || student.id === 'teacher-self') return;
+                  try {
+                    const { data: avData } = await supabase
+                      .from('avatars')
+                      .select('xp')
+                      .or(`user_id.eq.${student.id},student_id.eq.${student.id}`)
+                      .maybeSingle();
+                    const nextAvXp = (avData?.xp || 0) + xp;
+                    await supabase
+                      .from('avatars')
+                      .update({ xp: nextAvXp, updated_at: new Date().toISOString() })
+                      .or(`user_id.eq.${student.id},student_id.eq.${student.id}`);
+
+                    const { data: statsRecord } = await supabase
+                      .from('student_stats')
+                      .select('current_xp')
+                      .eq('student_id', student.id)
+                      .maybeSingle();
+                    const nextStatsXp = (statsRecord?.current_xp || 0) + xp;
+                    await supabase
+                      .from('student_stats')
+                      .upsert({
+                        student_id: student.id,
+                        current_xp: nextStatsXp,
+                        updated_at: new Date().toISOString()
+                      }, { onConflict: 'student_id' });
+
+                    window.dispatchEvent(new CustomEvent('campus_xp_awarded', {
+                      detail: { studentId: student.id, xp, reason }
+                    }));
+                  } catch (err) {
+                    console.warn('[Meisterwerk] Could not persist ear training XP:', err);
+                  }
+                }}
+                onSessionComplete={async (summary) => {
+                  if (summary.accuracy >= 70) {
+                    handleImproveSkill('klang');
+                    const pillarLabel = summary.pillar === 'intervals' ? 'Intervalle' : summary.pillar === 'chords' ? 'Akkorde' : 'Sing-Back';
+                    const scoreTag = `EARLAB_SCORE:${summary.vdmLevel.toUpperCase()}|${pillarLabel}|${summary.accuracy}%|+${summary.xp}XP`;
+                    const currentList = Array.isArray(homeworkNotesList) ? [...homeworkNotesList] : [];
+                    const filtered = currentList.filter((n: any) => typeof n !== 'string' || !n.startsWith('EARLAB_SCORE:'));
+                    const updatedList = [...filtered, scoreTag];
+                    setHomeworkNotesList(updatedList);
+                    try {
+                      await syncHomeworkNotes(updatedList);
+                    } catch (_) {}
+                  }
+                  notifyHomeworkChange?.();
+                }}
               />
             </Suspense>
           </div>
@@ -3103,10 +3152,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             overflow: 'hidden'
           }}>
             <WorldTourMapSpread
+              studentId={student?.id}
               studentName={displayedStudentName}
               studentInstrument={(student as any)?.instrument || (student as any)?.resolved_instrument || 'Klavier'}
               uiLevel={uiLevel}
               isMobileView={isMobileOrSim}
+              onMasteryAchieved={async (stars, score, xp, countryCode) => {
+                if (stars >= 1) {
+                  handleImproveSkill('klang');
+                  const scoreTag = `WORLDTOUR_MASTERY:${countryCode}|${stars}STARS|${score}%|+${xp}XP`;
+                  const currentList = Array.isArray(homeworkNotesList) ? [...homeworkNotesList] : [];
+                  const filtered = currentList.filter((n: unknown) => typeof n !== 'string' || !n.startsWith(`WORLDTOUR_MASTERY:${countryCode}`));
+                  const updatedList = [...filtered, scoreTag];
+                  setHomeworkNotesList(updatedList);
+                  try {
+                    await syncHomeworkNotes(updatedList);
+                  } catch (_) {}
+                  notifyHomeworkChange?.();
+                }
+              }}
             />
           </div>
         ) : activeViewMode === 'recordings' ? (
@@ -3120,6 +3184,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
           }}>
             <MeisterwerkRecordingsTab
+              uiLevel={uiLevel}
               isTeacherTools={isTeacherTools}
               readOnly={readOnly}
               student={student}

@@ -52,6 +52,7 @@ import { AcousticOnsetEngine } from '../../services/audio/AcousticOnsetEngine';
 import { WebMidiEngine } from '../../services/audio/WebMidiEngine';
 import { AudioSettingsSheet } from '../student/meisterwerk/AudioSettingsSheet';
 import { StudioSoundEngine, SoundKitType } from '../../utils/StudioSoundEngine';
+import { linearToDawMeterPercent } from '../../utils/audioVuMeterHelper';
 
 export interface GrooveTrainerProps {
   student?: any;
@@ -2919,7 +2920,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               overflow: 'hidden'
             }}>
               <div style={{
-                width: `${Math.min(100, Math.round(micLevel * 100))}%`,
+                width: `${linearToDawMeterPercent(micLevel)}%`,
                 height: '100%',
                 background: '#ffffff',
                 transition: 'width 0.05s linear'

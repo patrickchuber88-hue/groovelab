@@ -52,6 +52,7 @@ export interface StudentBriefingModalsHubProps {
   getJuniorWeeklyHomeworkSummary?: () => any;
   handleOpenHomeworkBookWithView?: (tab: string, subView: string) => void;
   handleTabChangeLocal: (tab: string) => void;
+  studentUiLevel?: string;
 }
 
 export function StudentBriefingModalsHub({
@@ -85,7 +86,8 @@ export function StudentBriefingModalsHub({
   setActiveRecordingTrack,
   getJuniorWeeklyHomeworkSummary,
   handleOpenHomeworkBookWithView,
-  handleTabChangeLocal
+  handleTabChangeLocal,
+  studentUiLevel
 }: StudentBriefingModalsHubProps) {
   const formatQuickieDuration = (secs?: number | null) => {
     if (secs === null || secs === undefined || isNaN(secs)) return '0:00';
@@ -815,6 +817,7 @@ export function StudentBriefingModalsHub({
                   subjectText={subjectText}
                   isStudentAuthor={isStudentAuthor}
                   onOpenInHomeworkBook={openHomeworkBook}
+                  uiLevel={(studentUiLevel as any) || 'junior'}
                 />
               ) : (
                 <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '0.86rem' }}>

@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
+import { byteFrequencyToDawMeterPercent } from '../../utils/audioVuMeterHelper';
 
 interface AudioMemoRecorderProps {
   user: any;
@@ -147,13 +148,9 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
           const updateAudioLevel = () => {
             if (!analyserRef.current) return;
             analyserRef.current.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              sum += dataArray[i];
-            }
-            const avg = sum / (dataArray.length || 1);
-            const normalized = Math.min(1, avg / 120);
-            setAudioLevel(normalized);
+            // 🎚️ 2027 DAW Goldstandard: Quasialogarithmisches IEC 60268-10 / DIN PPM Metering
+            const dawPct = byteFrequencyToDawMeterPercent(dataArray);
+            setAudioLevel(dawPct / 100);
             animFrameRef.current = requestAnimationFrame(updateAudioLevel);
           };
           updateAudioLevel();

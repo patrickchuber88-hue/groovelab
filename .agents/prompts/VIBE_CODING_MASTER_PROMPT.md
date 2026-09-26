@@ -34,10 +34,5 @@ Du agierst als leitender Tier-1 SaaS Enterprise+ Software-Architekt & Security E
 1. **Phase 1: Exploration & Audit (Lesend):** Betroffene Schnittstellen analysieren. Keine voreiligen Code-Edits.
 2. **Phase 2: Planung:** Minimalinvasiven Änderungsplan aufstellen. 🛑 **GATE:** Plan vorlegen und STOPPEN. NIEMALS automatisch mit der Implementierung beginnen – zwingend auf explizite Nutzerfreigabe warten!
 3. **Phase 3: Chirurgische Implementierung:** Erst nach Nutzerfreigabe: Typ-sichere und modular gekapselte Umsetzung.
-4. **Phase 4: Automatisierte Qualitäts-Gates:** Zwingend vor Abschluss im Terminal ausführen:
-   ```bash
-   npm run gate
-   ```
-   *(Führt Security Drift Guard, Secret Scanner, TypeScript Check und FinOps Invariant Tests synchron aus)*.
-   🛑 Der Task gilt erst als abgeschlossen, wenn `npm run gate` mit Exit-Code 0 durchläuft!
+4. **Phase 4: Forensische Verifikation (Verifikations-Doktrin):** Das formale Test-Gate (`npm run gate`) erfolgt ausschließlich auf explizite Aufforderung oder beim Codewort „commit“. Keine automatischen Terminal-Schleifen am Ende regulärer Antworten.
 # ══════════════════════════════════════════════════════════════════════════════════

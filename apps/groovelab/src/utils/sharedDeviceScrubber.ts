@@ -158,6 +158,8 @@ export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
           k.startsWith('groovelab_secretary_subtab') ||
           k.startsWith('cg_events_swr_') ||
           k.startsWith('cg_schedule_swr_') ||
+          k.startsWith('cg_worldtour_progress_') ||
+          k === 'campus_worldtour_offline_progress' ||
           k === 'groovelab_storage_addon_gb' ||
           k === 'groovelab_storage_used_bytes' ||
           k === 'groovelab_cached_user'

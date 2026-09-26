@@ -8667,6 +8667,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
         getJuniorWeeklyHomeworkSummary={getJuniorWeeklyHomeworkSummary}
         handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
         handleTabChangeLocal={handleTabChangeLocal}
+        studentUiLevel={studentUiLevel}
       />
       </div>
   );

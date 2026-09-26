@@ -86,6 +86,30 @@ export async function resolvePlayableAudioSource(
     } catch {}
   }
 
+  const detectMimeFromBuffer = (buf: ArrayBuffer): string | null => {
+    if (!buf || buf.byteLength < 4) return null;
+    const view = new DataView(buf);
+    const b0 = view.getUint8(0);
+    const b1 = view.getUint8(1);
+    const b2 = view.getUint8(2);
+    const b3 = view.getUint8(3);
+    // EBML (WebM / Matroska): 1A 45 DF A3
+    if (b0 === 0x1A && b1 === 0x45 && b2 === 0xDF && b3 === 0xA3) return 'audio/webm';
+    // RIFF WAV: 52 49 46 46
+    if (b0 === 0x52 && b1 === 0x49 && b2 === 0x46 && b3 === 0x46) return 'audio/wav';
+    // MP3 ID3: 49 44 33
+    if (b0 === 0x49 && b1 === 0x44 && b2 === 0x33) return 'audio/mpeg';
+    // MP4 / M4A: ftyp box
+    if (buf.byteLength >= 8) {
+      const b4 = view.getUint8(4);
+      const b5 = view.getUint8(5);
+      const b6 = view.getUint8(6);
+      const b7 = view.getUint8(7);
+      if (b4 === 0x66 && b5 === 0x74 && b6 === 0x79 && b7 === 0x70) return 'audio/mp4';
+    }
+    return null;
+  };
+
   const inferMime = (k: string, fb = 'audio/wav') => {
     const l = k.toLowerCase();
     if (l.endsWith('.wav')) return 'audio/wav';
@@ -99,10 +123,25 @@ export async function resolvePlayableAudioSource(
   // 4. Binary blob storage keys ("campus_blob_...", "campus_audio_...")
   if (trimmed.startsWith('campus_blob_') || trimmed.startsWith('campus_audio_')) {
     try {
-      const raw = await getBlob(trimmed);
+      let raw = await getBlob(trimmed);
+      // Secondary check without or with extension if first key missed
+      if (!raw) {
+        const altKey = trimmed.replace(/\.(webm|wav|mp3|mp4|ogg)$/i, '');
+        if (altKey !== trimmed) {
+          raw = await getBlob(altKey);
+        }
+      }
       if (raw) {
-        const mime = raw instanceof Blob && raw.type ? raw.type : inferMime(trimmed);
-        const finalBlob = raw instanceof Blob ? (raw.type ? raw : new Blob([raw], { type: mime })) : new Blob([raw], { type: mime });
+        let mime = raw instanceof Blob && raw.type ? raw.type : '';
+        if (!mime && raw instanceof ArrayBuffer) {
+          mime = detectMimeFromBuffer(raw) || '';
+        }
+        if (!mime) {
+          mime = inferMime(trimmed, 'audio/webm');
+        }
+        const finalBlob = raw instanceof Blob 
+          ? (raw.type ? raw : new Blob([raw], { type: mime })) 
+          : new Blob([raw], { type: mime });
         const objectUrl = URL.createObjectURL(finalBlob);
         return {
           src: objectUrl,

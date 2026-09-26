@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Play, Pause, Repeat, Headphones, Timer } from 'lucide-react';
 import { getBlob } from '../../utils/blobStorage';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { AudioTrackItem } from '../AudioTrackCarousel';
 import { formatHarmonizedAudioTitle } from '../../utils/audioNamingHelper';
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
+import { generateOrganicWaveform, INLINE_WAVEFORM_BARS } from '../../utils/waveformHelper';
 
 export interface ZenPlayAlongDockProps {
   tracks: AudioTrackItem[];
@@ -363,6 +364,10 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
 
   const trackProgress = duration > 0 ? currentTime / duration : 0;
 
+  const waveformBars = useMemo(() => {
+    return generateOrganicWaveform(currentTrack?.url || currentTrack?.label || 'zen_track', INLINE_WAVEFORM_BARS);
+  }, [currentTrack?.url, currentTrack?.label]);
+
   return (
     <div
       style={{
@@ -622,7 +627,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           </span>
         </div>
 
-        {/* Apple Touch Scrubber Bar */}
+        {/* 0,1% Studio Waveform Scrubber */}
         <div
           onClick={e => {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -634,29 +639,45 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           }}
           style={{
             width: '100%',
-            height: '6px',
-            borderRadius: '100px',
-            background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.16)',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
             cursor: 'pointer',
-            position: 'relative',
-            overflow: 'hidden',
-            touchAction: 'none'
+            padding: '2px 0',
+            boxSizing: 'border-box'
           }}
           title="Tippen zum Vor- oder Zurückspulen der Spur"
         >
-          <div
-            style={{
-              width: `${Math.min(100, Math.max(0, trackProgress * 100))}%`,
-              height: '100%',
-              background: isLight
-                ? isPlaying ? 'linear-gradient(90deg, #0071e3 0%, #10b981 100%)' : '#0071e3'
-                : isAmber
-                ? isPlaying ? 'linear-gradient(90deg, #f59e0b 0%, #22c55e 100%)' : '#f59e0b'
-                : isPlaying ? 'linear-gradient(90deg, #6366f1 0%, #22c55e 100%)' : '#818cf8',
-              borderRadius: '100px',
-              transition: 'width 0.1s linear'
-            }}
-          />
+          {waveformBars.map((val, i) => {
+            const barRatio = i / waveformBars.length;
+            const isFilled = barRatio <= trackProgress;
+            const isHead = Math.abs(barRatio - trackProgress) < (1 / waveformBars.length);
+            const heightPct = Math.max(18, Math.round(val * 100));
+
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  minWidth: '2px',
+                  height: `${heightPct}%`,
+                  borderRadius: '9999px',
+                  background: isFilled
+                    ? (isLight
+                        ? (isPlaying ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)' : '#059669')
+                        : isAmber
+                        ? (isPlaying ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' : '#f59e0b')
+                        : (isPlaying ? 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)' : '#6366f1'))
+                    : (isLight ? 'rgba(5, 150, 105, 0.14)' : 'rgba(255, 255, 255, 0.18)'),
+                  boxShadow: isHead && isPlaying
+                    ? (isAmber ? '0 0 8px rgba(245, 158, 11, 0.8)' : '0 0 8px rgba(99, 102, 241, 0.8)')
+                    : 'none',
+                  transition: 'background 0.1s ease, height 0.15s ease'
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -1085,6 +1106,10 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
 
   const trackProgress = duration > 0 ? currentTime / duration : 0;
 
+  const waveformBars = useMemo(() => {
+    return generateOrganicWaveform(currentTrack?.url || currentTrack?.label || 'preflight_track', INLINE_WAVEFORM_BARS);
+  }, [currentTrack?.url, currentTrack?.label]);
+
   if (!tracks || tracks.length === 0) return null;
 
   return (
@@ -1263,30 +1288,42 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
           </span>
         </div>
 
-        {/* Interaktiver Scrubber-Balken zum Spulen */}
+        {/* 0,1% Studio Waveform Scrubber */}
         <div
           onClick={handleScrub}
           style={{
             width: '100%',
-            height: '8px',
-            borderRadius: '100px',
-            background: 'rgba(22, 163, 74, 0.16)',
-            border: '1px solid rgba(22, 163, 74, 0.22)',
+            height: '22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
             cursor: 'pointer',
-            position: 'relative',
-            overflow: 'hidden'
+            padding: '2px 0',
+            boxSizing: 'border-box'
           }}
           title="Tippen zum Vor- oder Zurückspulen der Aufnahme"
         >
-          <div
-            style={{
-              width: `${Math.min(100, Math.max(0, trackProgress * 100))}%`,
-              height: '100%',
-              background: isPlaying ? 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)' : '#4ade80',
-              borderRadius: '100px',
-              transition: 'width 0.1s linear'
-            }}
-          />
+          {waveformBars.map((val, i) => {
+            const barRatio = i / waveformBars.length;
+            const isFilled = barRatio <= trackProgress;
+            const isHead = Math.abs(barRatio - trackProgress) < (1 / waveformBars.length);
+            const heightPct = Math.max(18, Math.round(val * 100));
+
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  minWidth: '2px',
+                  height: `${heightPct}%`,
+                  borderRadius: '9999px',
+                  background: isFilled ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' : 'rgba(22, 163, 74, 0.14)',
+                  boxShadow: isHead && isPlaying ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
+                  transition: 'background 0.1s ease, height 0.15s ease'
+                }}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

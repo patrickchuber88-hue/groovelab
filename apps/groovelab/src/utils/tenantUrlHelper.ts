@@ -76,8 +76,11 @@ export function getSchoolOrigin(schoolName: string, explicitSubdomain?: string |
 }
 
 /**
- * Generates the official school-scoped Parent Onboarding URL.
+ * Generates the official school-scoped Student / Parent Onboarding URL.
  * Used in Elternbriefe, Infocenter, Messenger-Vorlagen, and PDFs.
+ * 
+ * - If token is provided: Produces canonical /onboarding/:token Tier-1 URL
+ * - If token is omitted: Points to the school origin / portal
  */
 export function getParentOnboardingUrl(
   schoolName: string,
@@ -85,23 +88,37 @@ export function getParentOnboardingUrl(
   token?: string | null
 ): string {
   const subdomain = getTenantSubdomain(schoolName, explicitSubdomain);
-  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+  const cleanToken = token ? token.trim() : null;
 
-  if (typeof window === 'undefined') {
-    return `https://${subdomain}.campus-groovelab.de/?onboarding=parent${tokenParam}`;
+  if (cleanToken) {
+    if (typeof window === 'undefined') {
+      return `https://${subdomain}.campus-groovelab.de/onboarding/${encodeURIComponent(cleanToken)}?platform=campus`;
+    }
+    const host = window.location.host;
+    const protocol = window.location.protocol;
+    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      const port = host.split(':')[1] || '5173';
+      return `${protocol}//localhost:${port}/onboarding/${encodeURIComponent(cleanToken)}?school=${subdomain}&platform=campus`;
+    }
+    const baseDomain = getBasePlatformDomain();
+    return `${protocol}//${subdomain}.${baseDomain}/onboarding/${encodeURIComponent(cleanToken)}?platform=campus`;
   }
 
-  const host = window.location.host;
-  const protocol = window.location.protocol;
+  return getSchoolOrigin(schoolName, explicitSubdomain);
+}
 
-  // Localhost & Dev Support
-  if (host.includes('localhost') || host.includes('127.0.0.1')) {
-    const port = host.split(':')[1] || '5173';
-    return `${protocol}//localhost:${port}/?school=${subdomain}&onboarding=parent${tokenParam}`;
-  }
-
-  const baseDomain = getBasePlatformDomain();
-  return `${protocol}//${subdomain}.${baseDomain}/?onboarding=parent${tokenParam}`;
+/**
+ * Generates the canonical, single-source-of-truth Student Onboarding URL.
+ * Guaranteed to route to StudentOnboardingPage (/onboarding/:token).
+ */
+export function getCanonicalStudentOnboardingUrl(
+  token: string,
+  platform: 'campus' | 'groovelab' = 'campus'
+): string {
+  const cleanToken = (token || '').trim();
+  if (!cleanToken) return '';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://campus-groovelab.de';
+  return `${origin}/onboarding/${cleanToken}?platform=${platform}`;
 }
 
 /**

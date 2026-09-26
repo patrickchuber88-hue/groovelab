@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Compass, ArrowLeft, Award, Sparkles, Volume2, Info, BookOpen, Star,
-  CheckCircle, Globe, ChevronRight, Share2, Printer, MapPin, Play, ZoomIn, ZoomOut, RotateCcw
+  CheckCircle, Globe, ChevronRight, ChevronDown, ChevronUp, Share2, Printer, MapPin, Play, ZoomIn, ZoomOut, RotateCcw
 } from 'lucide-react';
 import { CONTINENTS, WORLD_TOUR_COUNTRIES } from '../../../../domain/worldTourCatalog';
 import { WorldTourCountry, ContinentId, WorldTourStudentProgress } from '../../../../types/worldTour';
@@ -11,10 +11,12 @@ import { WorldTourDiplomaModal } from './WorldTourDiplomaModal';
 
 interface WorldTourMapSpreadProps {
   onBackToHub?: () => void;
+  studentId?: string;
   studentName?: string;
   studentInstrument?: string | null;
   uiLevel?: 'junior' | 'teen' | 'pro';
   isMobileView?: boolean;
+  onMasteryAchieved?: (stars: number, score: number, xp: number, countryCode: string) => void;
 }
 
 /**
@@ -70,7 +72,7 @@ function projectOrthographic(
 }
 
 /**
- * 📍 EXAKTE GEOGRAFISCHE LÄNDERKOORDINATEN DER 13 HYMNEN
+ * 📍 EXAKTE GEOGRAFISCHE LÄNDERKOORDINATEN DER 21 HYMNEN & KULTURSTATIONEN
  */
 interface GlobeCountryBeacon {
   code: string;
@@ -83,19 +85,36 @@ interface GlobeCountryBeacon {
 }
 
 const GLOBE_BEACONS: GlobeCountryBeacon[] = [
-  { code: 'DE', name: 'Deutschland', lat: 51.5, lon: 10.5, flag: '🇩🇪', continent: 'europe', chordFrequencies: [392.00, 493.88, 587.33] },
-  { code: 'FR', name: 'Frankreich', lat: 46.8, lon: 2.3, flag: '🇫🇷', continent: 'europe', chordFrequencies: [293.66, 369.99, 440.00, 587.33] },
-  { code: 'GB', name: 'Großbritannien', lat: 53.5, lon: -2.0, flag: '🇬🇧', continent: 'europe', chordFrequencies: [392.00, 493.88, 587.33] },
-  { code: 'IT', name: 'Italien', lat: 42.5, lon: 12.8, flag: '🇮🇹', continent: 'europe', chordFrequencies: [392.00, 493.88, 659.25] },
-  { code: 'ES', name: 'Spanien', lat: 40.2, lon: -3.7, flag: '🇪🇸', continent: 'europe', chordFrequencies: [261.63, 329.63, 392.00, 523.25] },
-  { code: 'AT', name: 'Österreich', lat: 47.6, lon: 14.2, flag: '🇦🇹', continent: 'europe', chordFrequencies: [349.23, 440.00, 523.25] },
-  { code: 'CH', name: 'Schweiz', lat: 46.8, lon: 8.2, flag: '🇨🇭', continent: 'europe', chordFrequencies: [466.16, 587.33, 698.46] },
-  { code: 'NL', name: 'Niederlande', lat: 52.2, lon: 5.3, flag: '🇳🇱', continent: 'europe', chordFrequencies: [349.23, 440.00, 523.25] },
-  { code: 'US', name: 'USA', lat: 39.5, lon: -98.3, flag: '🇺🇸', continent: 'americas', chordFrequencies: [233.08, 349.23, 466.16, 587.33] },
-  { code: 'CA', name: 'Kanada', lat: 56.0, lon: -106.0, flag: '🇨🇦', continent: 'americas', chordFrequencies: [349.23, 440.00, 523.25] },
-  { code: 'JP', name: 'Japan', lat: 36.2, lon: 138.2, flag: '🇯🇵', continent: 'asia', chordFrequencies: [293.66, 349.23, 440.00] },
-  { code: 'AU', name: 'Australien', lat: -25.2, lon: 133.7, flag: '🇦🇺', continent: 'oceania', chordFrequencies: [392.00, 493.88, 587.33] },
-  { code: 'EU', name: 'Europa-Union', lat: 50.8, lon: 4.3, flag: '🇪🇺', continent: 'europe', chordFrequencies: [293.66, 369.99, 440.00] }
+  // 1. Afrika (Polyrhythmik & Kora)
+  { code: 'WA_KUKU', name: 'Westafrika (Mali/Guinea)', lat: 10.5, lon: -11.0, flag: '🇬🇳', continent: 'africa', chordFrequencies: [196.00, 246.94, 293.66] },
+  { code: 'WA_JARABI', name: 'Senegal / Gambia', lat: 14.5, lon: -14.4, flag: '🇸🇳', continent: 'africa', chordFrequencies: [174.61, 220.00, 261.63] },
+  { code: 'ZA_SHOSHO', name: 'Südafrika (Zulu)', lat: -29.0, lon: 24.5, flag: '🇿🇦', continent: 'africa', chordFrequencies: [130.81, 164.81, 196.00] },
+
+  // 2. Lateinamerika & Nordamerika (Synkopen & Pentatonik)
+  { code: 'CU_SON', name: 'Kuba (Son Cubano)', lat: 21.5, lon: -79.5, flag: '🇨🇺', continent: 'americas', chordFrequencies: [196.00, 246.94, 293.66] },
+  { code: 'BR_CHORO', name: 'Brasilien (Tico-Tico no Fubá)', lat: -22.9, lon: -43.2, flag: '🇧🇷', continent: 'americas', chordFrequencies: [220.00, 261.63, 329.63] },
+  { code: 'PE_KASHWA', name: 'Anden / Peru (Inka)', lat: -13.5, lon: -71.9, flag: '🇵🇪', continent: 'americas', chordFrequencies: [220.00, 261.63, 329.63] },
+  { code: 'US', name: 'USA (Star-Spangled)', lat: 39.5, lon: -98.3, flag: '🇺🇸', continent: 'americas', chordFrequencies: [233.08, 349.23, 466.16] },
+
+  // 3. Asien & Orient (Koto, Raga & Maqam)
+  { code: 'JP', name: 'Japan (Edo Koto)', lat: 36.2, lon: 138.2, flag: '🇯🇵', continent: 'asia', chordFrequencies: [220.00, 246.94, 261.63] },
+  { code: 'IN_RAGA', name: 'Indien (Raga Bhupali)', lat: 20.6, lon: 78.9, flag: '🇮🇳', continent: 'asia', chordFrequencies: [261.63, 293.66, 329.63] },
+  { code: 'EG_MAQAM', name: 'Ägypten / Orient (Maqam)', lat: 26.8, lon: 30.8, flag: '🇪🇬', continent: 'asia', chordFrequencies: [146.83, 174.61, 220.00] },
+
+  // 4. Ozeanien (Songlines & Maori)
+  { code: 'AU', name: 'Australien (Songlines)', lat: -25.2, lon: 133.7, flag: '🇦🇺', continent: 'oceania', chordFrequencies: [146.83, 220.00, 293.66] },
+  { code: 'NZ_MAORI', name: 'Neuseeland (Maori Waiata)', lat: -40.9, lon: 174.8, flag: '🇳🇿', continent: 'oceania', chordFrequencies: [174.61, 220.00, 261.63] },
+  { code: 'US_HAWAII', name: 'Hawaii (Aloha \'Oe)', lat: 21.3, lon: -157.8, flag: '🌺', continent: 'oceania', chordFrequencies: [261.63, 329.63, 392.00] },
+
+  // 5. Europa (Balkan, Keltisch, Klassik & Flamenco)
+  { code: 'BG_HORO', name: 'Balkan / Bulgarien (7/8)', lat: 42.7, lon: 25.4, flag: '🇧🇬', continent: 'europe', chordFrequencies: [146.83, 220.00, 293.66] },
+  { code: 'IE_JIG', name: 'Irland (Slip Jig)', lat: 53.4, lon: -8.2, flag: '🇮🇪', continent: 'europe', chordFrequencies: [164.81, 196.00, 246.94] },
+  { code: 'DE', name: 'Deutschland (Klassik)', lat: 51.5, lon: 10.5, flag: '🇩🇪', continent: 'europe', chordFrequencies: [196.00, 246.94, 293.66] },
+  { code: 'FR', name: 'Frankreich (Marseillaise)', lat: 46.8, lon: 2.3, flag: '🇫🇷', continent: 'europe', chordFrequencies: [146.83, 185.00, 220.00] },
+  { code: 'EU', name: 'Europa-Union (Beethoven)', lat: 50.8, lon: 4.3, flag: '🇪🇺', continent: 'europe', chordFrequencies: [130.81, 164.81, 196.00] },
+  { code: 'ES_FLAMENCO', name: 'Spanien (Flamenco)', lat: 37.38, lon: -5.98, flag: '🇪🇸', continent: 'europe', chordFrequencies: [164.81, 220.00, 261.63] },
+  { code: 'IT', name: 'Italien (Fratelli d\'Italia)', lat: 41.9, lon: 12.5, flag: '🇮🇹', continent: 'europe', chordFrequencies: [130.81, 164.81, 196.00] },
+  { code: 'GB', name: 'Großbritannien (God Save the King)', lat: 51.5, lon: -0.12, flag: '🇬🇧', continent: 'europe', chordFrequencies: [196.00, 246.94, 293.66] }
 ];
 
 /**
@@ -218,18 +237,22 @@ const SPHERICAL_LANDMASSES: Array<{ id: string; points: Array<[number, number]>;
 
 export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   onBackToHub,
+  studentId,
   studentName = 'Musikschüler',
   studentInstrument = 'Klavier',
   uiLevel = 'teen',
-  isMobileView = false
+  isMobileView = false,
+  onMasteryAchieved
 }) => {
   const [activeView, setActiveView] = useState<'map' | 'score'>('map');
   const [selectedContinent, setSelectedContinent] = useState<ContinentId | 'all'>('all');
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('DE');
+  const [projectionMode, setProjectionMode] = useState<'3d' | '2d'>('3d');
   const [progressMap, setProgressMap] = useState<Record<string, WorldTourStudentProgress>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDiplomaOpen, setIsDiplomaOpen] = useState(false);
   const [isStoryPlaying, setIsStoryPlaying] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [hoveredCountryCode, setHoveredCountryCode] = useState<string | null>(null);
 
   // 🌍 GLOBUS DREH-ZUSTAND
@@ -246,14 +269,14 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   // Load student progress
   useEffect(() => {
     let isMounted = true;
-    WorldTourService.fetchStudentProgress().then(res => {
+    WorldTourService.fetchStudentProgress(studentId).then(res => {
       if (isMounted) {
         setProgressMap(res);
         setIsLoading(false);
       }
     });
     return () => { isMounted = false; };
-  }, []);
+  }, [studentId]);
 
   const activeCountry = useMemo(() => {
     return WORLD_TOUR_COUNTRIES.find(c => c.code === selectedCountryCode) || WORLD_TOUR_COUNTRIES[0];
@@ -263,12 +286,28 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
     return WorldTourService.calculateSchoolWorldMilestone(progressMap);
   }, [progressMap]);
 
-  // 🎵 Web Audio Kultur-Jingle (1.2 Sekunden warmer Akkord)
+  const jingleCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (jingleCtxRef.current && jingleCtxRef.current.state !== 'closed') {
+        jingleCtxRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
+
+  // 🎵 Web Audio Kultur-Jingle (Shared Context Pool gegen Hardware-Exhaustion)
   const playCultureJingle = useCallback((frequencies: number[]) => {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      if (!jingleCtxRef.current || jingleCtxRef.current.state === 'closed') {
+        const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        jingleCtxRef.current = new AudioCtx();
+      }
+      const ctx = jingleCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
       const now = ctx.currentTime;
 
       frequencies.forEach(freq => {
@@ -294,19 +333,26 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   }, []);
 
   const handleMasteryAchieved = useCallback((stars: number, score: number, xp: number) => {
-    setProgressMap(prev => ({
-      ...prev,
-      [activeCountry.code]: {
-        countryCode: activeCountry.code,
-        stars,
-        bestScorePercent: score,
-        bestTempoBpm: activeCountry.score.defaultBpm,
-        instrument: studentInstrument || undefined,
-        isUnlocked: true,
-        unlockedAt: new Date().toISOString()
-      }
-    }));
-  }, [activeCountry.code, activeCountry.score.defaultBpm, studentInstrument]);
+    setProgressMap(prev => {
+      const existing = prev[activeCountry.code];
+      const finalStars = Math.max(existing?.stars ?? 0, stars);
+      const finalScore = Math.max(existing?.bestScorePercent ?? 0, score);
+      const isUnlocked = finalStars >= 1 || Boolean(existing?.isUnlocked);
+      return {
+        ...prev,
+        [activeCountry.code]: {
+          countryCode: activeCountry.code,
+          stars: finalStars,
+          bestScorePercent: finalScore,
+          bestTempoBpm: Math.max(existing?.bestTempoBpm ?? 0, activeCountry.score.defaultBpm),
+          instrument: studentInstrument || existing?.instrument || undefined,
+          isUnlocked,
+          unlockedAt: existing?.unlockedAt || (isUnlocked ? new Date().toISOString() : undefined)
+        }
+      };
+    });
+    onMasteryAchieved?.(stars, score, xp, activeCountry.code);
+  }, [activeCountry.code, activeCountry.score.defaultBpm, studentInstrument, onMasteryAchieved]);
 
   // Butterweiche animierte Rotation zu Zielkoordinaten (SLERP-Kameraflug)
   const rotateToTarget = useCallback((targetLam: number, targetPhi: number) => {
@@ -460,13 +506,119 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
     });
   }, [rotation, globeRadius]);
 
+  // 📍 3D BEACONS MIT SMART RADIAL REPULSION (Anti-Kollision für Europa & Ballungsräume)
+  const projectedBeacons = useMemo(() => {
+    // 1. Orthografische Projektion aller 21 Stationen
+    const visible = GLOBE_BEACONS.map(beacon => {
+      const proj = projectOrthographic(
+        beacon.lat,
+        beacon.lon,
+        rotation.lambda,
+        rotation.phi,
+        globeRadius,
+        cx,
+        cy
+      );
+      return {
+        ...beacon,
+        proj,
+        adjustedX: proj.x,
+        adjustedY: proj.y,
+        repulsed: false
+      };
+    }).filter(b => b.proj.z >= -0.04);
+
+    // 2. Mehrstufige elastische Radial-Repulsion für benachbarte Stationen
+    const minDistance = 38;
+    for (let pass = 0; pass < 6; pass++) {
+      for (let i = 0; i < visible.length; i++) {
+        for (let j = i + 1; j < visible.length; j++) {
+          const dx = visible[j].adjustedX - visible[i].adjustedX;
+          const dy = visible[j].adjustedY - visible[i].adjustedY;
+          const dist = Math.hypot(dx, dy);
+          if (dist < minDistance && dist > 0.001) {
+            const overlap = (minDistance - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            visible[i].adjustedX -= nx * overlap * 0.65;
+            visible[i].adjustedY -= ny * overlap * 0.65;
+            visible[j].adjustedX += nx * overlap * 0.65;
+            visible[j].adjustedY += ny * overlap * 0.65;
+            visible[i].repulsed = true;
+            visible[j].repulsed = true;
+          }
+        }
+      }
+    }
+
+    return visible;
+  }, [rotation, globeRadius, cx, cy]);
+
+  // 🗺️ 2D KONTINENTE MIT FREUNDLICHEN PASTELL-FARBEN
+  const landmasses2D = useMemo(() => {
+    return SPHERICAL_LANDMASSES.map(land => {
+      const points = land.points.map(([lat, lon]) => {
+        const x = ((lon + 180) / 360) * 1140 + 30;
+        const y = ((90 - lat) / 180) * 480 + 40;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' L ');
+      const isEurope = land.id.includes('europe') || land.id.includes('british') || land.id.includes('ireland') || land.id.includes('scandinavia');
+      const isAfrica = land.id.includes('africa') || land.id.includes('madagascar');
+      const isAsia = land.id.includes('asia') || land.id.includes('japan');
+      const isNorthAmerica = land.id.includes('north-america') || land.id.includes('greenland');
+      const isSouthAmerica = land.id.includes('south-america');
+
+      return {
+        id: land.id,
+        fill: isEurope ? '#86efac' : isAfrica ? '#fde047' : isAsia ? '#6ee7b7' : isNorthAmerica ? '#fed7aa' : isSouthAmerica ? '#fbcfe8' : '#c7d2fe',
+        stroke: isEurope ? '#15803d' : isAfrica ? '#ca8a04' : isAsia ? '#059669' : isNorthAmerica ? '#ea580c' : isSouthAmerica ? '#db2777' : '#4f46e5',
+        d: `M ${points} Z`
+      };
+    });
+  }, []);
+
+  // 🗺️ 2D PINS MIT SMART ANTI-KOLLISION (Garantiert keine Überlappungen in Europa)
+  const pins2D = useMemo(() => {
+    const list = WORLD_TOUR_COUNTRIES.map(country => {
+      const baseX = (country.mapCoordinates.x / 100) * 1140 + 30;
+      const baseY = (country.mapCoordinates.y / 100) * 480 + 40;
+      return {
+        country,
+        x: baseX,
+        y: baseY
+      };
+    });
+
+    const minDistance = 36;
+    for (let pass = 0; pass < 5; pass++) {
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const dx = list[j].x - list[i].x;
+          const dy = list[j].y - list[i].y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < minDistance && dist > 0.001) {
+            const overlap = (minDistance - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            list[i].x -= nx * overlap * 0.7;
+            list[i].y -= ny * overlap * 0.7;
+            list[j].x += nx * overlap * 0.7;
+            list[j].y += ny * overlap * 0.7;
+          }
+        }
+      }
+    }
+
+    return list;
+  }, []);
+
   return (
     <div style={{
       width: '100%',
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: activeView === 'map' ? '#0f172a' : '#fcfaf7',
+      background: activeView === 'map' ? (projectionMode === '2d' ? '#f0fdf4' : '#0f172a') : '#fcfaf7',
       position: 'relative',
       overflow: 'hidden',
       color: '#f8fafc',
@@ -538,13 +690,13 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
           ) : null}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.5rem' }}>🌎</span>
+            <span style={{ fontSize: '1.5rem' }}>{projectionMode === '2d' ? '🗺️' : '🌎'}</span>
             <div>
               <h2 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
-                The Golden Globe of Sound • 3D Klang-Globus
+                {projectionMode === '2d' ? 'Expeditions-Atlas • Weltreise der Klänge' : 'The Golden Globe of Sound • 3D Klang-Globus'}
               </h2>
               <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 650 }}>
-                Drehe die Erdkugel und entdecke das Weltmusikerbe
+                {projectionMode === '2d' ? 'Entdecke alle 21 Kultur-Stationen im globalen Überblick' : 'Drehe die Erdkugel und entdecke das Weltmusikerbe'}
               </span>
             </div>
           </div>
@@ -552,23 +704,70 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
 
         {/* HUD Progress Badges & Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Zoom In / Out Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', padding: '3px', borderRadius: '100px' }}>
+          {/* 2D Karte / 3D Globus Toggle */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'rgba(255, 255, 255, 0.08)',
+            padding: '3px',
+            borderRadius: '100px',
+            border: '1px solid rgba(255, 255, 255, 0.15)'
+          }}>
             <button
-              onClick={() => setGlobeRadius(r => Math.min(340, r + 25))}
-              style={{ background: 'none', border: 'none', color: '#ffffff', padding: '6px 8px', cursor: 'pointer', borderRadius: '50%' }}
-              title="Globus vergrößern"
+              onClick={() => setProjectionMode('2d')}
+              style={{
+                background: projectionMode === '2d' ? '#38bdf8' : 'transparent',
+                color: projectionMode === '2d' ? '#0f172a' : '#cbd5e1',
+                border: 'none',
+                borderRadius: '100px',
+                padding: '5px 11px',
+                fontSize: '0.74rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="2D Entdeckerkarte anzeigen"
             >
-              <ZoomIn size={15} />
+              🗺️ 2D Karte
             </button>
             <button
-              onClick={() => setGlobeRadius(r => Math.max(180, r - 25))}
-              style={{ background: 'none', border: 'none', color: '#ffffff', padding: '6px 8px', cursor: 'pointer', borderRadius: '50%' }}
-              title="Globus verkleinern"
+              onClick={() => setProjectionMode('3d')}
+              style={{
+                background: projectionMode === '3d' ? '#38bdf8' : 'transparent',
+                color: projectionMode === '3d' ? '#0f172a' : '#cbd5e1',
+                border: 'none',
+                borderRadius: '100px',
+                padding: '5px 11px',
+                fontSize: '0.74rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="3D Klang-Globus anzeigen"
             >
-              <ZoomOut size={15} />
+              🌎 3D Globus
             </button>
           </div>
+
+          {/* Zoom In / Out Buttons (in 3D Mode) */}
+          {projectionMode === '3d' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', padding: '3px', borderRadius: '100px' }}>
+              <button
+                onClick={() => setGlobeRadius(r => Math.min(340, r + 25))}
+                style={{ background: 'none', border: 'none', color: '#ffffff', padding: '6px 8px', cursor: 'pointer', borderRadius: '50%' }}
+                title="Globus vergrößern"
+              >
+                <ZoomIn size={15} />
+              </button>
+              <button
+                onClick={() => setGlobeRadius(r => Math.max(180, r - 25))}
+                style={{ background: 'none', border: 'none', color: '#ffffff', padding: '6px 8px', cursor: 'pointer', borderRadius: '50%' }}
+                title="Globus verkleinern"
+              >
+                <ZoomOut size={15} />
+              </button>
+            </div>
+          )}
 
           <div style={{
             display: 'flex',
@@ -582,7 +781,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             fontWeight: 800,
             color: '#ffffff'
           }}>
-            <span>🌍 {totalMasteredCountries} / 13 Länder</span>
+            <span>🌍 {totalMasteredCountries} / {WORLD_TOUR_COUNTRIES.length} Länder</span>
             <span style={{ opacity: 0.35 }}>•</span>
             <span style={{ color: '#facc15' }}>✨ {schoolStats.totalXP} XP</span>
           </div>
@@ -676,16 +875,16 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
       {/* ========================================================================= */}
       {activeView === 'map' ? (
         <div
-          onMouseDown={e => handlePointerDown(e.clientX, e.clientY)}
-          onMouseMove={e => handlePointerMove(e.clientX, e.clientY)}
-          onMouseUp={handlePointerUp}
-          onTouchStart={e => {
+          onMouseDown={projectionMode === '3d' ? (e => handlePointerDown(e.clientX, e.clientY)) : undefined}
+          onMouseMove={projectionMode === '3d' ? (e => handlePointerMove(e.clientX, e.clientY)) : undefined}
+          onMouseUp={projectionMode === '3d' ? handlePointerUp : undefined}
+          onTouchStart={projectionMode === '3d' ? (e => {
             if (e.touches[0]) handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
-          }}
-          onTouchMove={e => {
+          }) : undefined}
+          onTouchMove={projectionMode === '3d' ? (e => {
             if (e.touches[0]) handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
-          }}
-          onTouchEnd={handlePointerUp}
+          }) : undefined}
+          onTouchEnd={projectionMode === '3d' ? handlePointerUp : undefined}
           style={{
             flex: 1,
             width: '100%',
@@ -694,29 +893,33 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             overflow: 'hidden',
-            cursor: isDraggingRef.current ? 'grabbing' : 'grab',
-            background: 'radial-gradient(ellipse at 50% 45%, #1e293b 0%, #0f172a 60%, #020617 100%)'
+            cursor: projectionMode === '2d' ? 'default' : (isDraggingRef.current ? 'grabbing' : 'grab'),
+            background: projectionMode === '2d'
+              ? 'radial-gradient(ellipse at 50% 45%, #f0fdf4 0%, #e0f2fe 65%, #dbeafe 100%)'
+              : 'radial-gradient(ellipse at 50% 45%, #1e293b 0%, #0f172a 60%, #020617 100%)'
           }}
         >
-          {/* Dezente Sternen-Partikel im Weltall */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `
-              radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(1px 1px at 150px 80px, #e2e8f0, rgba(0,0,0,0)),
-              radial-gradient(1.5px 1.5px at 320px 240px, #38bdf8, rgba(0,0,0,0)),
-              radial-gradient(1px 1px at 580px 140px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(1.5px 1.5px at 890px 70px, #facc15, rgba(0,0,0,0)),
-              radial-gradient(1px 1px at 1120px 210px, #e2e8f0, rgba(0,0,0,0)),
-              radial-gradient(1px 1px at 1340px 90px, #ffffff, rgba(0,0,0,0))
-            `,
-            backgroundSize: '400px 300px',
-            opacity: 0.6,
-            pointerEvents: 'none'
-          }} />
+          {/* Dezente Sternen-Partikel im Weltall (nur im 3D-Modus) */}
+          {projectionMode === '3d' && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `
+                radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 150px 80px, #e2e8f0, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 320px 240px, #38bdf8, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 580px 140px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 890px 70px, #facc15, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 1120px 210px, #e2e8f0, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 1340px 90px, #ffffff, rgba(0,0,0,0))
+              `,
+              backgroundSize: '400px 300px',
+              opacity: 0.6,
+              pointerEvents: 'none'
+            }} />
+          )}
 
-          {/* Hinweis-Overlay für Kinder: „Klicke & Ziehe zum Drehen“ */}
+          {/* Hinweis-Overlay für Kinder */}
           <div style={{
             position: 'absolute',
             top: '16px',
@@ -724,20 +927,212 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '6px 12px',
+            padding: '6px 14px',
             borderRadius: '100px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: projectionMode === '2d' ? 'rgba(255, 255, 255, 0.88)' : 'rgba(255, 255, 255, 0.08)',
+            border: projectionMode === '2d' ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: projectionMode === '2d' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
             fontSize: '0.74rem',
-            color: '#94a3b8',
+            fontWeight: 800,
+            color: projectionMode === '2d' ? '#334155' : '#94a3b8',
             pointerEvents: 'none',
             zIndex: 10
           }}>
-            <span>👆 Ziehe den Globus mit Maus oder Finger</span>
+            <span>{projectionMode === '2d' ? '🗺️ Wähle eine Station auf der Entdecker-Karte' : '👆 Ziehe den Globus mit Maus oder Finger'}</span>
           </div>
 
-          {/* HAUPT-SVG DES 3D-GLOBUS (1400 × 640) */}
-          <svg
+          {/* ========================================================================= */}
+          {/* ANSICHT A: 2D ILLUSTRIERTE ENTDECKERKARTE (1200 × 580)                    */}
+          {/* ========================================================================= */}
+          {projectionMode === '2d' ? (
+            <svg
+              viewBox="0 0 1200 580"
+              style={{
+                width: '100%',
+                height: '100%',
+                maxHeight: 'calc(100vh - 160px)',
+                overflow: 'visible',
+                pointerEvents: 'auto'
+              }}
+            >
+              <defs>
+                <filter id="medallionShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.18" floodColor="#0f172a" />
+                </filter>
+                <filter id="medallionGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="6" floodOpacity="0.85" floodColor="#facc15" />
+                </filter>
+              </defs>
+
+              {/* 1. Ozean-Hintergrund mit sanften Rändern */}
+              <rect x="15" y="15" width="1170" height="550" rx="28" fill="#e0f2fe" stroke="#bae6fd" strokeWidth="2" />
+
+              {/* 2. Nautisches Gradnetz (Äquator, Tropen, Meridiane) */}
+              {/* Äquator */}
+              <line x1="25" y1="280" x2="1175" y2="280" stroke="#93c5fd" strokeWidth="1.4" strokeDasharray="6 4" opacity="0.75" />
+              <text x="35" y="275" fontSize="10" fontWeight="800" fill="#0284c7" opacity="0.8">Äquator (0°)</text>
+
+              {/* Nördlicher Wendekreis */}
+              <line x1="25" y1="217" x2="1175" y2="217" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+              {/* Südlicher Wendekreis */}
+              <line x1="25" y1="343" x2="1175" y2="343" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+
+              {/* Nullmeridian (Greenwich) */}
+              <line x1="600" y1="25" x2="600" y2="555" stroke="#93c5fd" strokeWidth="1.4" strokeDasharray="6 4" opacity="0.75" />
+              <text x="606" y="550" fontSize="9" fontWeight="800" fill="#0284c7" opacity="0.8">Nullmeridian (0°)</text>
+
+              {/* Meridiane bei -120, -60, +60, +120 */}
+              <line x1="220" y1="25" x2="220" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+              <line x1="410" y1="25" x2="410" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+              <line x1="790" y1="25" x2="790" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+              <line x1="980" y1="25" x2="980" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+
+              {/* 3. Kontinente der Erde (Pastellfarben) */}
+              {landmasses2D.map(land => (
+                <path
+                  key={land.id}
+                  d={land.d}
+                  fill={land.fill}
+                  stroke={land.stroke}
+                  strokeWidth="1.5"
+                  opacity="0.9"
+                  style={{ transition: 'all 0.2s ease' }}
+                />
+              ))}
+
+              {/* 4. Nostalgische Kompassrose (Windrose) im Pazifik unten links */}
+              <g transform="translate(100, 480)" pointerEvents="none">
+                <circle cx="0" cy="0" r="28" fill="rgba(255,255,255,0.7)" stroke="#ca8a04" strokeWidth="1.5" />
+                <polygon points="0,-24 5,-6 24,0 6,5 0,24 -5,6 -24,0 -6,-5" fill="#eab308" stroke="#ca8a04" strokeWidth="1" />
+                <polygon points="0,-24 0,0 5,-6" fill="#ca8a04" />
+                <polygon points="24,0 0,0 6,5" fill="#ca8a04" />
+                <polygon points="0,24 0,0 -5,6" fill="#ca8a04" />
+                <polygon points="-24,0 0,0 -6,-5" fill="#ca8a04" />
+                <circle cx="0" cy="0" r="4" fill="#0f172a" />
+                <text x="0" y="-27" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">N</text>
+                <text x="0" y="35" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">S</text>
+                <text x="32" y="3" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">O</text>
+                <text x="-32" y="3" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">W</text>
+              </g>
+
+              {/* 5. Interaktive 36px Flaggen-Medaillons aller 21 Stationen */}
+              {pins2D.map(({ country, x, y }) => {
+                const isSelected = selectedCountryCode === country.code;
+                const isHovered = hoveredCountryCode === country.code;
+                const progress = progressMap[country.code];
+                const stars = progress?.stars ?? 0;
+                const isMastered = stars > 0;
+                const beacon = GLOBE_BEACONS.find(b => b.code === country.code) || {
+                  code: country.code,
+                  name: country.name,
+                  lat: country.geoCoordinates?.lat ?? 0,
+                  lon: country.geoCoordinates?.lon ?? 0,
+                  flag: country.flagEmoji,
+                  continent: country.continent,
+                  chordFrequencies: [261.63, 329.63, 392.00]
+                };
+
+                return (
+                  <g
+                    key={country.code}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Station ${country.name}, ${country.pieceTitle}. ${isMastered ? 'Gemeistert mit ' + stars + ' Sternen' : 'Station noch offen'}`}
+                    transform={`translate(${x}, ${y})`}
+                    onClick={e => {
+                      e.stopPropagation();
+                      handlePinClick(beacon);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handlePinClick(beacon);
+                      }
+                    }}
+                    onMouseEnter={() => setHoveredCountryCode(country.code)}
+                    onMouseLeave={() => setHoveredCountryCode(null)}
+                    onFocus={() => setHoveredCountryCode(country.code)}
+                    onBlur={() => setHoveredCountryCode(null)}
+                    style={{ cursor: 'pointer', outline: 'none' }}
+                  >
+                    {/* Radar-Impuls bei Auswahl */}
+                    {isSelected && (
+                      <circle cx="0" cy="0" r="22" fill="none" stroke="#facc15" strokeWidth="2.5">
+                        <animate attributeName="r" values="16;32" dur="1.8s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="1;0" dur="1.8s" repeatCount="indefinite" />
+                      </circle>
+                    )}
+
+                    {/* Touch-Target 44×44px für Barrierefreiheit */}
+                    <circle cx="0" cy="0" r="22" fill="transparent" pointerEvents="all" />
+
+                    {/* Medaillon-Körper (36px Kreis) */}
+                    <circle
+                      cx="0"
+                      cy="0"
+                      r="18"
+                      fill={isSelected ? '#0f172a' : '#ffffff'}
+                      stroke={isSelected ? '#facc15' : isMastered ? '#22c55e' : '#0284c7'}
+                      strokeWidth={isSelected ? 3 : isHovered ? 2.5 : 2}
+                      filter={isSelected ? 'url(#medallionGlow)' : 'url(#medallionShadow)'}
+                    />
+
+                    {/* Flaggen-Emoji zentriert */}
+                    <text
+                      x="0"
+                      y="1"
+                      fontSize="18"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {country.flagEmoji}
+                    </text>
+
+                    {/* Mini Meister-Stern Krone bei gemeisterten Ländern */}
+                    {isMastered && (
+                      <g transform="translate(12, -12)">
+                        <circle r="7.5" fill="#facc15" stroke="#0f172a" strokeWidth="1.2" />
+                        <text x="0" y="1" fontSize="8.5" textAnchor="middle" dominantBaseline="central" fill="#0f172a">
+                          ★
+                        </text>
+                      </g>
+                    )}
+
+                    {/* Länder-Kürzel Pill unter dem Medaillon */}
+                    <g transform="translate(0, 27)" pointerEvents="none">
+                      <rect
+                        x="-16"
+                        y="-7"
+                        width="32"
+                        height="14"
+                        rx="7"
+                        fill={isSelected ? '#0f172a' : 'rgba(255, 255, 255, 0.95)'}
+                        stroke={isSelected ? '#facc15' : '#cbd5e1'}
+                        strokeWidth="1"
+                        filter="drop-shadow(0 1px 3px rgba(0,0,0,0.15))"
+                      />
+                      <text
+                        x="0"
+                        y="3"
+                        fontSize="8.5"
+                        fontWeight="900"
+                        textAnchor="middle"
+                        fill={isSelected ? '#facc15' : '#1e293b'}
+                      >
+                        {country.code.startsWith('WA_') ? country.code.replace('WA_', '') : country.code.startsWith('ZA_') ? 'ZA' : country.code.startsWith('CU_') ? 'CU' : country.code.startsWith('BR_') ? 'BR' : country.code.startsWith('PE_') ? 'PE' : country.code.startsWith('IN_') ? 'IN' : country.code.startsWith('EG_') ? 'EG' : country.code.startsWith('NZ_') ? 'NZ' : country.code.startsWith('BG_') ? 'BG' : country.code.startsWith('IE_') ? 'IE' : country.code.startsWith('ES_') ? 'ES' : country.code}
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            /* ========================================================================= */
+            /* ANSICHT B: 3D DREHBARER KLANG-GLOBUS                                      */
+            /* ========================================================================= */
+            <svg
             viewBox="0 0 1400 640"
             style={{
               width: '100%',
@@ -905,126 +1300,142 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             </g>
 
             {/* ========================================================================= */}
-            {/* 7. INTERAKTIVE KULTUR-BEACONS DER 13 LÄNDER AUF DER 3D-KUGEL             */}
+            {/* 7. INTERAKTIVE 34px FLAGGEN-MEDAILLONS MIT ELASTISCHER RADIAL-REPULSION */}
             {/* ========================================================================= */}
-            {GLOBE_BEACONS.map(beacon => {
-              const proj = projectOrthographic(
-                beacon.lat,
-                beacon.lon,
-                rotation.lambda,
-                rotation.phi,
-                globeRadius,
-                cx,
-                cy
-              );
-
-              // Nur auf der sichtbaren Vorderseite der Erdkugel anzeigen
-              if (proj.z < -0.02) return null;
-
+            {projectedBeacons.map(beacon => {
               const isSelected = selectedCountryCode === beacon.code;
               const isHovered = hoveredCountryCode === beacon.code;
               const progress = progressMap[beacon.code];
               const stars = progress?.stars ?? 0;
               const isMastered = stars > 0;
 
-              // Perspektivische 3D-Tiefenskalierung: Im Zentrum groß, am Rand kleiner
-              const depthScale = Math.max(0.65, Math.min(1.2, 0.75 + proj.z * 0.45));
-              const depthOpacity = Math.max(0.35, Math.min(1, proj.z * 2.5 + 0.15));
-
-              const badgeW = (beacon.name.length > 9 ? 112 : 98) * depthScale;
-              const badgeH = 26 * depthScale;
+              const depthScale = Math.max(0.7, Math.min(1.2, 0.75 + beacon.proj.z * 0.45));
+              const depthOpacity = Math.max(0.35, Math.min(1, beacon.proj.z * 2.5 + 0.15));
+              const nameW = Math.max(76, beacon.name.length * 7 + 16);
 
               return (
                 <g
                   key={beacon.code}
-                  transform={`translate(${proj.x}, ${proj.y})`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Station ${beacon.name}, ${beacon.continent}. ${isMastered ? 'Gemeistert mit ' + stars + ' Sternen' : 'Station noch offen'}`}
+                  transform={`translate(${beacon.adjustedX}, ${beacon.adjustedY})`}
                   opacity={depthOpacity}
                   onClick={e => {
                     e.stopPropagation();
                     handlePinClick(beacon);
                   }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePinClick(beacon);
+                    }
+                  }}
                   onMouseEnter={() => setHoveredCountryCode(beacon.code)}
                   onMouseLeave={() => setHoveredCountryCode(null)}
-                  style={{ cursor: 'pointer' }}
+                  onFocus={() => setHoveredCountryCode(beacon.code)}
+                  onBlur={() => setHoveredCountryCode(null)}
+                  style={{ cursor: 'pointer', outline: 'none' }}
                 >
+                  {/* Dotted Leader Line bei Repulsion zum echten Bodenpunkt */}
+                  {beacon.repulsed && (
+                    <line
+                      x1={beacon.proj.x - beacon.adjustedX}
+                      y1={beacon.proj.y - beacon.adjustedY}
+                      x2={0}
+                      y2={0}
+                      stroke={isSelected ? '#facc15' : 'rgba(255,255,255,0.45)'}
+                      strokeWidth={1.2}
+                      strokeDasharray="3 3"
+                    />
+                  )}
+
+                  {/* Hotspot-Punkt auf der Erdoberfläche */}
+                  <circle
+                    cx={beacon.proj.x - beacon.adjustedX}
+                    cy={beacon.proj.y - beacon.adjustedY}
+                    r={(isSelected ? 5 : isHovered ? 4.5 : 3.5) * depthScale}
+                    fill={isMastered ? '#facc15' : isSelected ? '#ffffff' : '#38bdf8'}
+                    stroke={isSelected ? '#facc15' : '#0f172a'}
+                    strokeWidth={1.4 * depthScale}
+                  />
+
                   {/* Radar-Impuls bei Auswahl */}
                   {isSelected && (
-                    <circle cx="0" cy="0" r={16 * depthScale} fill="none" stroke="#facc15" strokeWidth="2">
-                      <animate attributeName="r" values={`${10 * depthScale};${28 * depthScale}`} dur="1.8s" repeatCount="indefinite" />
+                    <circle cx="0" cy="0" r={22 * depthScale} fill="none" stroke="#facc15" strokeWidth="2.4">
+                      <animate attributeName="r" values={`${14 * depthScale};${30 * depthScale}`} dur="1.8s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="1;0" dur="1.8s" repeatCount="indefinite" />
                     </circle>
                   )}
 
-                  {/* Hotspot Leuchtpunkt auf der Erde */}
+                  {/* Touch-Target 44×44px */}
+                  <circle cx="0" cy="0" r={22 * depthScale} fill="transparent" pointerEvents="all" />
+
+                  {/* 34px Kreisrundes Flaggen-Medaillon */}
                   <circle
                     cx="0"
                     cy="0"
-                    r={(isSelected ? 6 : isHovered ? 5 : 4) * depthScale}
-                    fill={isMastered ? '#facc15' : isSelected ? '#ffffff' : '#38bdf8'}
-                    stroke={isSelected ? '#facc15' : '#0f172a'}
-                    strokeWidth={1.8 * depthScale}
-                    filter="drop-shadow(0 2px 6px rgba(0,0,0,0.5))"
+                    r={17 * depthScale}
+                    fill={isSelected ? '#0f172a' : '#ffffff'}
+                    stroke={isSelected ? '#facc15' : isMastered ? '#22c55e' : '#38bdf8'}
+                    strokeWidth={(isSelected ? 2.8 : isHovered ? 2.2 : 1.6) * depthScale}
+                    filter={isSelected ? 'url(#goldGlow)' : 'drop-shadow(0 3px 8px rgba(0,0,0,0.45))'}
                   />
 
-                  {/* Verbindungs-Stift zur 3D-Pille */}
-                  <line
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2={-16 * depthScale}
-                    stroke={isSelected ? '#facc15' : 'rgba(255,255,255,0.7)'}
-                    strokeWidth={1.5 * depthScale}
-                  />
+                  {/* Flaggen-Emoji im Zentrum */}
+                  <text
+                    x="0"
+                    y="1"
+                    fontSize={16 * depthScale}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {beacon.flag}
+                  </text>
 
-                  {/* Volltext Flaggen-Pille schwebt über dem Land */}
-                  <g transform={`translate(${-badgeW / 2}, ${-16 * depthScale - badgeH})`}>
-                    <rect
-                      x="0"
-                      y="0"
-                      width={badgeW}
-                      height={badgeH}
-                      rx={badgeH / 2}
-                      fill={isSelected ? '#0f172a' : isHovered ? '#ffffff' : 'rgba(255, 255, 255, 0.94)'}
-                      stroke={isSelected ? '#facc15' : isMastered ? '#eab308' : '#38bdf8'}
-                      strokeWidth={(isSelected ? 2.2 : 1.4) * depthScale}
-                      filter={isSelected ? 'url(#goldGlow)' : 'drop-shadow(0 4px 10px rgba(0,0,0,0.35))'}
-                    />
-
-                    {/* Flagge */}
-                    <text
-                      x={8 * depthScale}
-                      y={badgeH - 8 * depthScale}
-                      fontSize={13 * depthScale}
-                    >
-                      {beacon.flag}
-                    </text>
-
-                    {/* Ausgeschriebener Name */}
-                    <text
-                      x={26 * depthScale}
-                      y={badgeH - 9 * depthScale}
-                      fontSize={9.5 * depthScale}
-                      fontWeight="900"
-                      fill={isSelected ? '#ffffff' : '#0f172a'}
-                    >
-                      {beacon.name}
-                    </text>
-
-                    {/* Meister-Stern */}
-                    {isMastered && (
-                      <text
-                        x={badgeW - 12 * depthScale}
-                        y={-2}
-                        fontSize={11 * depthScale}
-                      >
-                        ⭐
+                  {/* Mini Meister-Stern Krone */}
+                  {isMastered && (
+                    <g transform={`translate(${11 * depthScale}, ${-11 * depthScale})`}>
+                      <circle r={6.5 * depthScale} fill="#facc15" stroke="#0f172a" strokeWidth={1} />
+                      <text x="0" y="1" fontSize={7.5 * depthScale} textAnchor="middle" dominantBaseline="central" fill="#0f172a">
+                        ★
                       </text>
-                    )}
-                  </g>
+                    </g>
+                  )}
+
+                  {/* Schwebendes Namens-Pill (NUR bei Hover oder Fokus/Auswahl) */}
+                  {(isSelected || isHovered) && (
+                    <g transform={`translate(0, ${-26 * depthScale})`} pointerEvents="none">
+                      <rect
+                        x={-nameW / 2}
+                        y={-10}
+                        width={nameW}
+                        height={20}
+                        rx={10}
+                        fill="#0f172a"
+                        stroke="#facc15"
+                        strokeWidth={1.4}
+                        filter="drop-shadow(0 4px 12px rgba(0,0,0,0.6))"
+                      />
+                      <text
+                        x="0"
+                        y="4"
+                        textAnchor="middle"
+                        fontSize="9.5"
+                        fontWeight="900"
+                        fill="#ffffff"
+                      >
+                        {beacon.name}
+                      </text>
+                    </g>
+                  )}
                 </g>
               );
             })}
           </svg>
+        )}
 
           {/* ========================================================================= */}
           {/* 🗂️ SCHWEBENDE EXPEDITIONS-AKTE (Floating Glassmorphism Card am Boden)     */}
@@ -1033,7 +1444,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             onClick={e => e.stopPropagation()}
             style={{
               position: 'absolute',
-              bottom: '16px',
+              bottom: isMobileView ? 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 20px) + 16px)' : '20px',
               left: '20px',
               right: '20px',
               maxWidth: '920px',
@@ -1080,10 +1491,10 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                   )}
                 </div>
                 <div style={{ fontSize: '0.86rem', fontWeight: 750, color: '#38bdf8', marginTop: '2px' }}>
-                  „{activeCountry.anthemTitle}“
+                  „{activeCountry.pieceTitle || activeCountry.anthemTitle}“
                 </div>
                 <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                  Komponist: <strong style={{ color: '#ffffff' }}>{activeCountry.composer}</strong> ({activeCountry.composerDates})
+                  Kultur/Komponist: <strong style={{ color: '#ffffff' }}>{activeCountry.composer}</strong> ({activeCountry.composerDates})
                 </div>
               </div>
             </div>
@@ -1122,17 +1533,17 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                   gap: '8px',
                   padding: '10px 22px',
                   borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)',
-                  color: '#0f172a',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#ffffff',
                   border: 'none',
                   fontWeight: 900,
                   fontSize: '0.88rem',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(250, 204, 21, 0.4)',
+                  boxShadow: '0 4px 16px rgba(2, 132, 199, 0.45)',
                   touchAction: 'manipulation'
                 }}
                 className="hover-scale"
-                title="Notenpult öffnen und Hymne üben oder prüfen"
+                title="Notenpult öffnen und Kulturstück üben oder prüfen"
               >
                 <span>Notenpult öffnen</span>
                 <ChevronRight size={18} strokeWidth={2.8} />
@@ -1196,83 +1607,116 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
               </div>
             </div>
 
-            {/* 15s Story Audio Button */}
-            <button
-              onClick={handlePlayStory}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 18px',
-                borderRadius: '14px',
-                background: isStoryPlaying ? '#0284c7' : '#f0f9ff',
-                color: isStoryPlaying ? '#ffffff' : '#0369a1',
-                border: '1.5px solid #bae6fd',
-                fontWeight: 800,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                touchAction: 'manipulation'
-              }}
-              className="hover-scale"
-            >
-              <Volume2 size={18} />
-              <span>{isStoryPlaying ? 'Story pausieren' : 'Expeditions-Story (15s)'}</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {/* 15s Story Audio Button */}
+              <button
+                onClick={handlePlayStory}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 16px',
+                  borderRadius: '12px',
+                  background: isStoryPlaying ? '#0284c7' : '#f0f9ff',
+                  color: isStoryPlaying ? '#ffffff' : '#0369a1',
+                  border: '1.5px solid #bae6fd',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale"
+              >
+                <Volume2 size={16} />
+                <span>{isStoryPlaying ? 'Story pausieren' : 'Expeditions-Story (15s)'}</span>
+              </button>
+
+              {/* Faltbares Kultur-Dossier Button */}
+              <button
+                onClick={() => setIsDossierOpen(prev => !prev)}
+                aria-expanded={isDossierOpen}
+                aria-label="Kultur-Dossier und didaktischen Tipp ein- oder ausklappen"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 15px',
+                  borderRadius: '12px',
+                  background: isDossierOpen ? '#f1f5f9' : '#ffffff',
+                  color: isDossierOpen ? '#0f172a' : '#475569',
+                  border: '1.5px solid #e2e8f0',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale"
+              >
+                <BookOpen size={16} color={isDossierOpen ? '#0284c7' : '#64748b'} />
+                <span>{isDossierOpen ? 'Dossier einklappen' : 'Kultur-Dossier & Tipp'}</span>
+                {isDossierOpen ? <ChevronUp size={15} color="#64748b" /> : <ChevronDown size={15} color="#64748b" />}
+              </button>
+            </div>
           </div>
 
-          {/* Didactic & Fun Fact Info Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobileView ? '1fr' : '1fr 1fr',
-            gap: '14px',
-            color: '#0f172a'
-          }}>
+          {/* Didactic & Fun Fact Info Cards (Aufklappbares Expeditions-Dossier) */}
+          {isDossierOpen && (
             <div style={{
-              background: '#ffffff',
-              borderRadius: '16px',
-              padding: '16px 18px',
-              border: '1.5px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
+              display: 'grid',
+              gridTemplateColumns: isMobileView ? '1fr' : '1fr 1fr',
+              gap: '14px',
+              color: '#0f172a',
+              animation: 'fade-in 0.2s ease'
             }}>
-              <BookOpen size={20} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                  Wusstest du schon?
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                border: '1.5px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <BookOpen size={18} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                    Wusstest du schon?
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.45, marginTop: '4px' }}>
+                    {activeCountry.funFact}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.45, marginTop: '4px' }}>
-                  {activeCountry.funFact}
+              </div>
+
+              <div style={{
+                background: '#fefce8',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                border: '1.5px solid #fef08a',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <Sparkles size={18} color="#ca8a04" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e' }}>
+                    Didaktischer Tipp für dein Instrument
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#713f12', lineHeight: 1.45, marginTop: '4px' }}>
+                    {activeCountry.didacticTip}
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div style={{
-              background: '#fefce8',
-              borderRadius: '16px',
-              padding: '16px 18px',
-              border: '1.5px solid #fef08a',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
-            }}>
-              <Sparkles size={20} color="#ca8a04" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e' }}>
-                  Didaktischer Tipp für dein Instrument
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#713f12', lineHeight: 1.45, marginTop: '4px' }}>
-                  {activeCountry.didacticTip}
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* 🎼 MAIN SCORE PLAYER */}
           <WorldTourScorePlayer
             country={activeCountry}
             studentInstrument={studentInstrument}
+            studentId={studentId}
             onMasteryAchieved={handleMasteryAchieved}
             uiLevel={uiLevel}
           />
@@ -1287,7 +1731,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
           studentName={studentName}
           instrumentName={studentInstrument || 'Klavier'}
           unlockedCount={totalMasteredCountries}
-          totalCountries={13}
+          totalCountries={WORLD_TOUR_COUNTRIES.length}
         />
       )}
     </div>

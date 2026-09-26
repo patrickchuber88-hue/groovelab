@@ -169,7 +169,7 @@ export const WorldTourDiplomaModal: React.FC<WorldTourDiplomaModalProps> = ({
           </div>
 
           <p style={{ fontSize: '0.92rem', color: '#475569', maxWidth: '440px', lineHeight: 1.5, margin: '0 0 24px 0' }}>
-            am Instrument <strong>{instrumentName || 'Musikschul-Instrument'}</strong> die Nationalhymnen und das musikalische Kulturerbe von <strong>{continent?.label || 'der Welt'}</strong> erfolgreich erlernt und mit Bravour gemeistert hat!
+            am Instrument <strong>{instrumentName || 'Musikschul-Instrument'}</strong> die lebendigen Musiktraditionen und das musikalische Kulturerbe von <strong>{continent?.label || 'der Erde'}</strong> erfolgreich erlernt und mit Bravour gemeistert hat!
           </p>
 
           <div style={{

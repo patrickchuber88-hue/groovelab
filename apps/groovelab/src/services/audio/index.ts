@@ -8,3 +8,5 @@ export * from './InstrumentAudioWorkletProcessor';
 export * from './AudioCaptureEngine';
 export * from './SpotifyGradeStreamController';
 export * from './DidacticWsolaEngine';
+export * from './YinPitchDetectionEngine';
+export * from './EarSynthEngine';

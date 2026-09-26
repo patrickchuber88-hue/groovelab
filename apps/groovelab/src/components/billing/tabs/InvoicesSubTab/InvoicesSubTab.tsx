@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { School, CreditCard, TrendingUp, Users } from 'lucide-react';
 import { Invoice, PlatformSummary } from '../../types';
 import { SchoolListPane } from './SchoolListPane';
 import { SchoolDetailPane } from './SchoolDetailPane';
 import { InvoiceArchiveTable } from './InvoiceArchiveTable';
+import { exportGobdMonthPackage } from '../../../../services/gobdMonthCloseService';
 
 interface InvoicesSubTabProps {
   summary: PlatformSummary;
@@ -65,6 +66,27 @@ export const InvoicesSubTab: React.FC<InvoicesSubTabProps> = ({
   updateInvoiceStatus,
   toggleInvoicePaid
 }) => {
+  const [isExportingGobd, setIsExportingGobd] = useState(false);
+
+  const handleExportGobdMonth = async () => {
+    setIsExportingGobd(true);
+    try {
+      const today = new Date();
+      const targetYear = today.getFullYear();
+      const targetMonth = today.getMonth() + 1;
+
+      const result = await exportGobdMonthPackage(targetYear, targetMonth, {
+        company: 'Campus-Groovelab Plattformbetrieb',
+        contact: 'Patrick Huber'
+      });
+      alert(`✅ GoBD-Monatsabschluss für ${result.period} erfolgreich generiert!\n\nDatei: ${result.filename}\nRechnungen: ${result.invoiceCount}\nGesamtvolumen: ${result.totalRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}\nSHA-256 Manifest: ${result.manifestSha256.slice(0, 16)}...`);
+    } catch (err: any) {
+      alert(`Fehler beim GoBD-Monatsabschluss: ${err.message}`);
+    } finally {
+      setIsExportingGobd(false);
+    }
+  };
+
   const filteredInvoices = invoices.filter(inv => {
     const matchesSearch = inv.schoolName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
@@ -195,6 +217,8 @@ export const InvoicesSubTab: React.FC<InvoicesSubTabProps> = ({
           expandedSchoolId={expandedSchoolId}
           setExpandedSchoolId={setExpandedSchoolId}
           handleExportCSV={handleExportCSV}
+          handleExportGobdMonth={handleExportGobdMonth}
+          isExportingGobd={isExportingGobd}
         />
 
         {/* Right Pane: School Detail & Invoices */}

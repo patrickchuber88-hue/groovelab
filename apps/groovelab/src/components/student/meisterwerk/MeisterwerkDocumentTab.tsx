@@ -619,6 +619,174 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     setHasPracticedSectionToday(isDone);
   }, [selectedActiveSongId, student?.id, activeSectionId]);
 
+  // 🎵 Song Sections Handlers (Universal Architecture Builder)
+  const handleAddSongSection = (name: string) => {
+    const newSec: SongSection = {
+      id: `sec-${Date.now()}`,
+      name,
+      bars: '4 Takte',
+      chords: ['Em', 'C', 'G', 'D'],
+      drumFeel: '8tel Beat',
+      drumSurface: 'Geschlossene Hi-Hat'
+    };
+    const updated = [...songSections, newSec];
+    setSongSections(updated);
+    setActiveSectionId(newSec.id);
+    if (selectedActiveSongId && student?.id) {
+      try {
+        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
+      } catch {}
+    }
+    setHasChanges(true);
+  };
+
+  const handleUpdateSongSection = (updatedSec: SongSection) => {
+    const updated = songSections.map(s => s.id === updatedSec.id ? updatedSec : s);
+    setSongSections(updated);
+    if (selectedActiveSongId && student?.id) {
+      try {
+        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
+      } catch {}
+    }
+    setHasChanges(true);
+  };
+
+  const handleToggleSectionFocus = (id: string) => {
+    const updated = songSections.map(s => ({
+      ...s,
+      isHomeworkFocus: s.id === id ? !s.isHomeworkFocus : false
+    }));
+    setSongSections(updated);
+    if (selectedActiveSongId && student?.id) {
+      try {
+        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
+      } catch {}
+    }
+    setHasChanges(true);
+  };
+
+  const handleDeleteSongSection = (id: string) => {
+    if (songSections.length <= 1) return;
+    const updated = songSections.filter(s => s.id !== id);
+    setSongSections(updated);
+    if (activeSectionId === id) {
+      setActiveSectionId(updated[0]?.id || '');
+    }
+    if (selectedActiveSongId && student?.id) {
+      try {
+        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
+      } catch {}
+    }
+    setHasChanges(true);
+  };
+
+  // 🎵 Song Architecture & Play-Along State (2027 Goldstandard)
+  const [songRightTab, setSongRightTab] = useState<'homework' | 'architecture'>('homework');
+  const [songBpm, setSongBpm] = useState<number>(116);
+  const [songTimeSignature, setSongTimeSignature] = useState<string>('4/4');
+  const [isPlayingAlong, setIsPlayingAlong] = useState<boolean>(false);
+  const [playAlongBeat, setPlayAlongBeat] = useState<number>(1);
+  const [playAlongBar, setPlayAlongBar] = useState<number>(1);
+  const playAlongTimerRef = useRef<any>(null);
+  const tapTimesRef = useRef<number[]>([]);
+
+  // Load BPM from storage when selected song changes
+  useEffect(() => {
+    if (!selectedActiveSongId || !student?.id) return;
+    try {
+      const storedBpm = localStorage.getItem(`song_bpm_${student.id}_${selectedActiveSongId}`);
+      if (storedBpm) setSongBpm(parseInt(storedBpm, 10) || 116);
+      const storedSig = localStorage.getItem(`song_timesig_${student.id}_${selectedActiveSongId}`);
+      if (storedSig) setSongTimeSignature(storedSig);
+    } catch {}
+    setIsPlayingAlong(false);
+  }, [selectedActiveSongId, student?.id]);
+
+  // Tap-Tempo Handler
+  const handleTapTempo = () => {
+    const now = Date.now();
+    const taps = tapTimesRef.current.filter(t => now - t < 3000);
+    taps.push(now);
+    tapTimesRef.current = taps;
+    if (taps.length >= 2) {
+      const intervals: number[] = [];
+      for (let i = 1; i < taps.length; i++) {
+        intervals.push(taps[i] - taps[i - 1]);
+      }
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const calculatedBpm = Math.min(240, Math.max(40, Math.round(60000 / avgInterval)));
+      setSongBpm(calculatedBpm);
+      if (selectedActiveSongId && student?.id) {
+        try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(calculatedBpm)); } catch {}
+      }
+    }
+  };
+
+  // Fallback Audio Metronome Click helper
+  const triggerMetronomeTick = (isAccent: boolean) => {
+    if (typeof playMetronomeTick === 'function') {
+      try { playMetronomeTick(isAccent); return; } catch {}
+    }
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isAccent ? 1200 : 800, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    } catch {}
+  };
+
+  // Play-Along Timer Effect
+  useEffect(() => {
+    if (!isPlayingAlong) {
+      if (playAlongTimerRef.current) clearInterval(playAlongTimerRef.current);
+      return;
+    }
+
+    const beatsPerBar = songTimeSignature === '3/4' ? 3 : (songTimeSignature === '6/8' ? 6 : 4);
+    const msPerBeat = Math.round(60000 / songBpm);
+
+    let curBeat = 1;
+    let curBar = 1;
+    let secIdx = 0;
+
+    triggerMetronomeTick(true);
+    setPlayAlongBeat(1);
+    setPlayAlongBar(1);
+
+    playAlongTimerRef.current = setInterval(() => {
+      curBeat++;
+      if (curBeat > beatsPerBar) {
+        curBeat = 1;
+        curBar++;
+        const currentSec = songSections[secIdx];
+        const maxBars = currentSec?.bars ? parseInt(currentSec.bars, 10) || 4 : 4;
+        if (curBar > maxBars) {
+          curBar = 1;
+          secIdx = (secIdx + 1) % (songSections.length || 1);
+          if (songSections[secIdx]) {
+            setActiveSectionId(songSections[secIdx].id);
+          }
+        }
+      }
+      triggerMetronomeTick(curBeat === 1);
+      setPlayAlongBeat(curBeat);
+      setPlayAlongBar(curBar);
+    }, msPerBeat);
+
+    return () => {
+      if (playAlongTimerRef.current) clearInterval(playAlongTimerRef.current);
+    };
+  }, [isPlayingAlong, songBpm, songTimeSignature, songSections, playMetronomeTick]);
+
 
   // 📚 Lehrwerke Selection & Creation State (Self-Contained 1% Goldstandard)
   const [localShowAssignDropdown, setLocalShowAssignDropdown] = useState(false);
@@ -3008,94 +3176,127 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             von {skill.songs?.artist || 'Unbekannt'}
                           </p>
 
-                          {/* Segmented Status Selector (Simple, schlicht, kompakt) */}
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            background: '#f8fafc',
-                            padding: '3px',
-                            borderRadius: '12px',
-                            border: '1px solid #e2e8f0'
-                          }}>
-                            {[
-                              {
-                                mode: 'LOCKED',
-                                color: 'hsl(355, 75%, 84%)',
-                                text: '#991b1b',
-                                label: 'In Arbeit',
-                                getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework,
-                                action: () => {
-                                  setStatus('IN_PROGRESS');
-                                  setIsCurrentHomework(false);
-                                  setHasChanges(true);
-                                  if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', false);
+                          {/* Segmented Status Selector: Protected Read-Only Badge for Student, Interactive for Teacher */}
+                          {readOnly ? (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: status === 'MASTERED'
+                                ? '#dcfce7'
+                                : (isCurrentHomework ? '#fef3c7' : '#f1f5f9'),
+                              color: status === 'MASTERED'
+                                ? '#15803d'
+                                : (isCurrentHomework ? '#92400e' : '#475569'),
+                              border: `1.5px solid ${status === 'MASTERED' ? '#86efac' : (isCurrentHomework ? '#fde68a' : '#cbd5e1')}`,
+                              padding: '4px 12px',
+                              borderRadius: '99px',
+                              fontSize: '0.74rem',
+                              fontWeight: 900
+                            }}>
+                              <span style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                background: status === 'MASTERED'
+                                  ? '#16a34a'
+                                  : (isCurrentHomework ? '#d97706' : '#64748b')
+                              }} />
+                              <span>
+                                {status === 'MASTERED'
+                                  ? '🏆 Gemeistert'
+                                  : (isCurrentHomework ? '📌 Hausaufgabe der Woche' : '🟡 In Arbeit')}
+                              </span>
+                            </div>
+                          ) : (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#f8fafc',
+                              padding: '3px',
+                              borderRadius: '12px',
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              {[
+                                {
+                                  mode: 'LOCKED',
+                                  color: 'hsl(355, 75%, 84%)',
+                                  text: '#991b1b',
+                                  label: 'In Arbeit',
+                                  getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework,
+                                  action: () => {
+                                    setStatus('IN_PROGRESS');
+                                    setIsCurrentHomework(false);
+                                    setHasChanges(true);
+                                    if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', false);
+                                  }
+                                },
+                                {
+                                  mode: 'HOMEWORK',
+                                  color: 'hsl(47, 85%, 84%)',
+                                  text: '#854d0e',
+                                  label: 'Hausaufgabe',
+                                  getActive: () => status === 'IN_PROGRESS' && isCurrentHomework,
+                                  action: () => {
+                                    setStatus('IN_PROGRESS');
+                                    setIsCurrentHomework(true);
+                                    setHasChanges(true);
+                                    if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true);
+                                  }
+                                },
+                                {
+                                  mode: 'MASTERED',
+                                  color: 'hsl(130, 65%, 82%)',
+                                  text: '#166534',
+                                  label: 'Gemeistert',
+                                  getActive: () => status === 'MASTERED',
+                                  action: () => {
+                                    setStatus('MASTERED');
+                                    setIsCurrentHomework(false);
+                                    setHasChanges(true);
+                                    if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'MASTERED', false);
+                                  }
                                 }
-                              },
-                              {
-                                mode: 'HOMEWORK',
-                                color: 'hsl(47, 85%, 84%)',
-                                text: '#854d0e',
-                                label: 'Hausaufgabe',
-                                getActive: () => status === 'IN_PROGRESS' && isCurrentHomework,
-                                action: () => {
-                                  setStatus('IN_PROGRESS');
-                                  setIsCurrentHomework(true);
-                                  setHasChanges(true);
-                                  if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true);
-                                }
-                              },
-                              {
-                                mode: 'MASTERED',
-                                color: 'hsl(130, 65%, 82%)',
-                                text: '#166534',
-                                label: 'Gemeistert',
-                                getActive: () => status === 'MASTERED',
-                                action: () => {
-                                  setStatus('MASTERED');
-                                  setIsCurrentHomework(false);
-                                  setHasChanges(true);
-                                  if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'MASTERED', false);
-                                }
-                              }
-                            ].map(b => {
-                              const isActive = b.getActive();
-                              return (
-                                <button
-                                  key={b.mode}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    b.action();
-                                  }}
-                                  aria-label={b.label}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    padding: '4px 8px',
-                                    borderRadius: '8px',
-                                    border: isActive ? '1px solid rgba(0,0,0,0.1)' : '1px solid transparent',
-                                    background: isActive ? b.color : 'transparent',
-                                    color: isActive ? b.text : '#64748b',
-                                    fontWeight: isActive ? 800 : 600,
-                                    fontSize: '0.72rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  <span style={{
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    background: b.color,
-                                    border: '1px solid rgba(0,0,0,0.2)'
-                                  }} />
-                                  <span>{b.label}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
+                              ].map(b => {
+                                const isActive = b.getActive();
+                                return (
+                                  <button
+                                    key={b.mode}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      b.action();
+                                    }}
+                                    aria-label={b.label}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '4px 8px',
+                                      borderRadius: '8px',
+                                      border: isActive ? '1px solid rgba(0,0,0,0.1)' : '1px solid transparent',
+                                      background: isActive ? b.color : 'transparent',
+                                      color: isActive ? b.text : '#64748b',
+                                      fontWeight: isActive ? 800 : 600,
+                                      fontSize: '0.72rem',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    <span style={{
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: b.color,
+                                      border: '1px solid rgba(0,0,0,0.2)'
+                                    }} />
+                                    <span>{b.label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -7721,7 +7922,81 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       </div>
                     </div>
 
-                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
+                    {/* Apple Segmented Switcher for Song View: 1. Übungs-Fahrplan & Hausaufgabe | 2. Song-Architektur & Mitspielen */}
+                    <div
+                      role="tablist"
+                      aria-label="Song Ansicht"
+                      style={{
+                        display: 'inline-flex',
+                        background: '#f1f5f9',
+                        border: '1.5px solid #e2e8f0',
+                        padding: '4px',
+                        borderRadius: '16px',
+                        gap: '4px',
+                        alignSelf: 'flex-start',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={songRightTab === 'homework'}
+                        tabIndex={0}
+                        onClick={() => setSongRightTab('homework')}
+                        style={{
+                          border: 'none',
+                          background: songRightTab === 'homework' ? '#ffffff' : 'transparent',
+                          color: songRightTab === 'homework' ? '#0f172a' : '#64748b',
+                          fontWeight: songRightTab === 'homework' ? 900 : 700,
+                          fontSize: '0.84rem',
+                          padding: '7px 16px',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          boxShadow: songRightTab === 'homework' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <BookOpen size={15} color={songRightTab === 'homework' ? '#16a34a' : '#64748b'} />
+                        <span>1. Übungs-Fahrplan & Hausaufgabe</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={songRightTab === 'architecture'}
+                        tabIndex={0}
+                        onClick={() => setSongRightTab('architecture')}
+                        style={{
+                          border: 'none',
+                          background: songRightTab === 'architecture' ? '#ffffff' : 'transparent',
+                          color: songRightTab === 'architecture' ? '#0f172a' : '#64748b',
+                          fontWeight: songRightTab === 'architecture' ? 900 : 700,
+                          fontSize: '0.84rem',
+                          padding: '7px 16px',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          boxShadow: songRightTab === 'architecture' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Music size={15} color={songRightTab === 'architecture' ? '#2563eb' : '#64748b'} />
+                        <span>2. Song-Architektur & Mitspielen</span>
+                        {isPlayingAlong && (
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', animation: 'pulse 0.8s infinite' }} />
+                        )}
+                      </button>
+                    </div>
+
+                    {songRightTab === 'homework' ? (
+                      <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                           <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -7825,9 +8100,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             };
                           }}
                         />
-                        {/* Didactic Quick-Tag Chips */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
-                          {DIDACTIC_QUICK_TAGS.map((t) => {
+                        {/* Didactic Smart-Pills (Kompakter 4er-Goldstandard nach Swiss Design) */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                          {[
+                            { tag: '# 🎯 Fokus-Stelle', label: '🎯 Fokus-Stelle', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+                            { tag: '# ⚡ Tempo aufbauen', label: '⚡ Tempo', color: '#d97706', bg: '#fefce8', border: '#fde047' },
+                            { tag: '# 🎵 Rhythmus festigen', label: '🎵 Rhythmus', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                            { tag: '# 🧠 Auswendig', label: '🧠 Auswendig', color: '#7c3aed', bg: '#faf5ff', border: '#ddd6fe' }
+                          ].map((t) => {
                             const isActive = songHomeworkNotes.includes(t.tag);
                             return (
                               <button
@@ -7861,66 +8141,24 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 style={{
                                   background: isActive ? t.color : t.bg,
                                   color: isActive ? '#ffffff' : t.color,
-                                  border: `1px solid ${isActive ? t.color : t.border}`,
-                                  padding: '3px 8px',
+                                  border: `1.5px solid ${isActive ? t.color : t.border}`,
+                                  padding: '4px 10px',
                                   borderRadius: '100px',
-                                  fontSize: '0.68rem',
+                                  fontSize: '0.74rem',
                                   fontWeight: 800,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '3px',
-                                  transition: 'all 0.15s'
+                                  gap: '4px',
+                                  transition: 'all 0.15s ease'
                                 }}
-                                className="hover-scale-mini"
+                                className="hover-scale"
+                                aria-pressed={isActive}
                               >
-                                <Hash size={9} strokeWidth={2.5} />
-                                <span>{t.tag.replace(/^#/, '')}</span>
+                                <span>{t.label}</span>
                               </button>
                             );
                           })}
-                        </div>
-
-                        {/* Schnell-Textbausteine */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
-                          {[
-                            { label: '🐌 Schnecke', text: '• 🐌 Schnecken-Tempo: Schwierige Passage ganz langsam & präzise üben.' },
-                            { label: '🔂 Ritter-Drei', text: '• 🔂 Ritter-Drei: Kniffligen Übergang 3x hintereinander fehlerfrei spielen.' },
-                            { label: '🎵 Laut-Leise', text: '• 🎵 Dynamik: Auf deutliche Laut-Leise-Unterschiede achten.' },
-                            { label: '⏱️ 10-Min.', text: '• ⏱️ Fokus-Timer: 10 Minuten täglich konzentriert wiederholen.' }
-                          ].map((tpl, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => {
-                                const newNotes = songHomeworkNotes ? `${songHomeworkNotes}\n${tpl.text}` : tpl.text;
-                                setSongHomeworkNotes(newNotes);
-                                setStatus('IN_PROGRESS');
-                                setIsCurrentHomework(true);
-                                setHasChanges(true);
-                                if (selectedActiveSongId) {
-                                  try {
-                                    localStorage.setItem(`song_note_${student.id}_${selectedActiveSongId}`, newNotes);
-                                  } catch (err) {}
-                                  triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true, newNotes, teacherNotes);
-                                }
-                              }}
-                              style={{
-                                background: '#f8fafc',
-                                color: '#334155',
-                                border: '1.5px solid #e2e8f0',
-                                padding: '6px 12px',
-                                borderRadius: '99px',
-                                fontSize: '0.72rem',
-                                fontWeight: 750,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale"
-                            >
-                              {tpl.label}
-                            </button>
-                          ))}
                         </div>
                       </div>
 
@@ -8024,6 +8262,282 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </button>
                       </div>
                     </form>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px', animation: 'fadeIn 0.2s ease' }}>
+                        {/* 1. Header Card: Tempo (BPM), Tap-Tempo, Taktart, Tonart & Play-Along Engine */}
+                        <div style={{
+                          background: '#ffffff',
+                          borderRadius: '24px',
+                          padding: '20px 24px',
+                          border: '1px solid #cbd5e1',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '16px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+                              }}>
+                                <Music size={18} />
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                                  Song-Architektur & Play-Along Studio
+                                </h4>
+                                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>
+                                  Metadaten, Takt-Ablauf und interaktiver Mitspiel-Cursor
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Play-Along Master Button */}
+                            <button
+                              type="button"
+                              onClick={() => setIsPlayingAlong(!isPlayingAlong)}
+                              style={{
+                                border: 'none',
+                                background: isPlayingAlong
+                                  ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                                  : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                                color: '#ffffff',
+                                padding: '10px 22px',
+                                borderRadius: '100px',
+                                fontSize: '0.86rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                boxShadow: isPlayingAlong ? '0 4px 15px rgba(239, 68, 68, 0.35)' : '0 4px 15px rgba(37, 99, 235, 0.35)',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                            >
+                              {isPlayingAlong ? (
+                                <>
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', animation: 'pulse 0.8s infinite' }} />
+                                  <span>⏸ Pausieren</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play size={16} fill="#ffffff" />
+                                  <span>▶ Song-Ablauf abspielen</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Controls Row: BPM, Taktart, Tonart, Beat-Tracker */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            background: '#f8fafc',
+                            padding: '12px 16px',
+                            borderRadius: '16px',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                            {/* BPM Steuerung mit Tap-Tempo */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569' }}>Tempo:</span>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '10px', padding: '2px 4px', gap: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = Math.max(40, songBpm - 2);
+                                    setSongBpm(next);
+                                    if (selectedActiveSongId && student?.id) {
+                                      try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(next)); } catch {}
+                                    }
+                                  }}
+                                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 900, fontSize: '0.85rem', color: '#475569', padding: '2px 6px' }}
+                                >
+                                  −
+                                </button>
+                                <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#0f172a', minWidth: '46px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                                  {songBpm} BPM
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = Math.min(240, songBpm + 2);
+                                    setSongBpm(next);
+                                    if (selectedActiveSongId && student?.id) {
+                                      try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(next)); } catch {}
+                                    }
+                                  }}
+                                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 900, fontSize: '0.85rem', color: '#475569', padding: '2px 6px' }}
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleTapTempo}
+                                style={{
+                                  border: '1.5px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  padding: '5px 12px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 850,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.12s'
+                                }}
+                                className="hover-scale"
+                                title="Im Takt klicken, um Tempo automatisch zu berechnen"
+                              >
+                                🥁 Tap
+                              </button>
+                            </div>
+
+                            {/* Taktart */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569' }}>Taktart:</span>
+                              <select
+                                value={songTimeSignature}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSongTimeSignature(val);
+                                  if (selectedActiveSongId && student?.id) {
+                                    try { localStorage.setItem(`song_timesig_${student.id}_${selectedActiveSongId}`, val); } catch {}
+                                  }
+                                }}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #cbd5e1',
+                                  borderRadius: '10px',
+                                  padding: '5px 10px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 850,
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <option value="4/4">4/4 Takt</option>
+                                <option value="3/4">3/4 Walzer</option>
+                                <option value="6/8">6/8 Feel</option>
+                                <option value="12/8">12/8 Blues</option>
+                              </select>
+                            </div>
+
+                            {/* Live Beat-Indicator (when playing) */}
+                            {isPlayingAlong && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', padding: '4px 12px', borderRadius: '100px', border: '1.5px solid #bbf7d0' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                  Takt {playAlongBar}:
+                                </span>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                  {[1, 2, 3, 4].slice(0, songTimeSignature === '3/4' ? 3 : (songTimeSignature === '6/8' ? 6 : 4)).map(b => (
+                                    <div
+                                      key={b}
+                                      style={{
+                                        width: '9px',
+                                        height: '9px',
+                                        borderRadius: '50%',
+                                        background: playAlongBeat === b ? (b === 1 ? '#16a34a' : '#2563eb') : '#e2e8f0',
+                                        transform: playAlongBeat === b ? 'scale(1.3)' : 'scale(1)',
+                                        transition: 'all 0.08s ease'
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 2. Formteil-Timeline */}
+                        <div style={{
+                          background: '#ffffff',
+                          borderRadius: '24px',
+                          padding: '20px 24px',
+                          border: '1px solid #cbd5e1',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Song-Ablauf (Formteile):
+                            </span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a' }}>
+                              Klick auf Formteil zum Ansehen & Bearbeiten
+                            </span>
+                          </div>
+
+                          <SongStructureBar
+                            sections={songSections}
+                            activeSectionId={activeSectionId}
+                            onSelectSection={(id) => setActiveSectionId(id)}
+                            onAddSection={handleAddSongSection}
+                            onToggleFocus={handleToggleSectionFocus}
+                            onDeleteSection={handleDeleteSongSection}
+                            readOnly={readOnly}
+                          />
+                        </div>
+
+                        {/* 3. Ausführliche Formteil-Kachel */}
+                        {(() => {
+                          const currentSec = songSections.find(s => s.id === activeSectionId) || songSections[0];
+                          if (!currentSec) return null;
+                          return (
+                            <SongSectionCard
+                              section={currentSec}
+                              studentInstrument={student?.instrument || 'Gitarre'}
+                              readOnly={readOnly}
+                              onUpdateSection={handleUpdateSongSection}
+                              onToggleHomeworkFocus={() => handleToggleSectionFocus(currentSec.id)}
+                            />
+                          );
+                        })()}
+
+                        {/* 4. Fertig & Schließen Button */}
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleBackToHub()}
+                            style={{
+                              flex: 1,
+                              padding: '14px 20px',
+                              borderRadius: '16px',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: '#ffffff',
+                              fontWeight: 800,
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                              transition: 'all 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Check size={18} strokeWidth={2.5} />
+                            <span>Fertig & Schließen</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()

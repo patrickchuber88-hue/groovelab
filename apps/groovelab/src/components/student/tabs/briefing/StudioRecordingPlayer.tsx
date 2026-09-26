@@ -1,6 +1,13 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RefreshCw, Play, Pause, RotateCcw, BookOpen } from 'lucide-react';
 import { resolvePlayableAudioSource } from '../../../../utils/audioStorageHelper';
+import { resampleWaveformPeaks, generateOrganicWaveform, INLINE_WAVEFORM_BARS } from '../../../../utils/waveformHelper';
+import {
+  getAvailablePlaybackRates,
+  getPlaybackRateLabel,
+  applyPitchPreservation,
+  resolveAuthoritativeUiLevel
+} from '../../../../utils/audioTempoHelper';
 
 // 🎧 1% GOLDSTANDARD: STUDIO AUDIO RECORDING PLAYER (Zero-Crash, Fail-Safe Storage Resolver & WSOLA Pitch Shifter)
 export interface StudioRecordingPlayerProps {
@@ -9,6 +16,7 @@ export interface StudioRecordingPlayerProps {
   subjectText: string;
   isStudentAuthor?: boolean;
   onOpenInHomeworkBook?: () => void;
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 export function StudioRecordingPlayer({
@@ -16,8 +24,10 @@ export function StudioRecordingPlayer({
   effectiveAuthorName,
   subjectText,
   isStudentAuthor,
-  onOpenInHomeworkBook
+  onOpenInHomeworkBook,
+  uiLevel
 }: StudioRecordingPlayerProps) {
+  const effectiveUiLevel = resolveAuthoritativeUiLevel(uiLevel);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -120,10 +130,7 @@ export function StudioRecordingPlayer({
 
   const handleSpeedChange = (rate: number) => {
     setPlaybackRate(rate);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
-      (audioRef.current as any).preservesPitch = true;
-    }
+    applyPitchPreservation(audioRef.current, rate);
   };
 
   const handleRestart = () => {
@@ -143,6 +150,13 @@ export function StudioRecordingPlayer({
 
   const totalDuration = duration > 0 ? duration : (track.duration || 0);
   const progressPercent = totalDuration > 0 ? Math.min(100, (currentTime / totalDuration) * 100) : 0;
+
+  const waveformPeaks = useMemo(() => {
+    if (track.waveformPeaks && track.waveformPeaks.length > 0) {
+      return resampleWaveformPeaks(track.waveformPeaks, INLINE_WAVEFORM_BARS, true);
+    }
+    return generateOrganicWaveform(track.url || track.label || 'studio_rec', INLINE_WAVEFORM_BARS);
+  }, [track.waveformPeaks, track.url, track.label]);
 
   return (
     <div style={{
@@ -308,28 +322,77 @@ export function StudioRecordingPlayer({
               )}
             </button>
 
-            {/* Custom Interactive Scrubber Track */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ position: 'relative', width: '100%', height: '24px', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="range"
-                  min={0}
-                  max={totalDuration > 0 ? totalDuration : 1}
-                  step={0.05}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  disabled={isLoading || hasError}
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    borderRadius: '4px',
-                    accentColor: '#16a34a',
-                    cursor: 'pointer',
-                    background: `linear-gradient(to right, #16a34a 0%, #16a34a ${progressPercent}%, #cbd5e1 ${progressPercent}%, #cbd5e1 100%)`,
-                    outline: 'none'
-                  }}
-                  aria-label="Audio Abspielposition"
-                />
+            {/* 0,1% Studio Waveform Scrubber */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div
+                onClick={(e) => {
+                  if (isLoading || hasError) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const clickX = e.clientX - rect.left;
+                  const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                  const newTime = ratio * (totalDuration || 0);
+                  setCurrentTime(newTime);
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = newTime;
+                  }
+                }}
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  height: '26px',
+                  cursor: isLoading || hasError ? 'default' : 'pointer',
+                  width: '100%',
+                  padding: '2px 0',
+                  boxSizing: 'border-box'
+                }}
+                title="Tippen zum Spulen in der Aufnahme"
+                role="slider"
+                aria-label="Audio Abspielposition"
+                aria-valuemin={0}
+                aria-valuemax={totalDuration > 0 ? totalDuration : 1}
+                aria-valuenow={currentTime}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const newTime = Math.min(totalDuration, currentTime + 5);
+                    setCurrentTime(newTime);
+                    if (audioRef.current) audioRef.current.currentTime = newTime;
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const newTime = Math.max(0, currentTime - 5);
+                    setCurrentTime(newTime);
+                    if (audioRef.current) audioRef.current.currentTime = newTime;
+                  }
+                }}
+              >
+                {waveformPeaks.map((val, i) => {
+                  const barRatio = i / waveformPeaks.length;
+                  const isFilled = barRatio <= (totalDuration > 0 ? currentTime / totalDuration : 0);
+                  const isHead = Math.abs(barRatio - (totalDuration > 0 ? currentTime / totalDuration : 0)) < (1 / waveformPeaks.length);
+                  const heightPct = Math.max(18, Math.round(val * 100));
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1,
+                        minWidth: '2px',
+                        height: `${heightPct}%`,
+                        borderRadius: '9999px',
+                        background: isFilled
+                          ? (isStudentAuthor ? 'linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%)' : 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)')
+                          : (isStudentAuthor ? 'rgba(124, 58, 237, 0.14)' : 'rgba(22, 163, 74, 0.14)'),
+                        boxShadow: isHead && isPlaying
+                          ? (isStudentAuthor ? '0 0 8px rgba(124, 58, 237, 0.75)' : '0 0 8px rgba(34, 197, 94, 0.75)')
+                          : 'none',
+                        transition: 'background 0.1s ease, height 0.15s ease'
+                      }}
+                    />
+                  );
+                })}
               </div>
             </div>
 
@@ -370,32 +433,30 @@ export function StudioRecordingPlayer({
             <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Übe-Tempo:
             </span>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {[
-                { rate: 0.8, label: '0.8× Langsam' },
-                { rate: 1.0, label: '1.0× Normal' },
-                { rate: 1.2, label: '1.2× Schnell' }
-              ].map((s) => {
-                const isSelected = playbackRate === s.rate;
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {getAvailablePlaybackRates(effectiveUiLevel).map((rate) => {
+                const isSelected = Math.abs(playbackRate - rate) < 0.02;
+                const label = getPlaybackRateLabel(rate, effectiveUiLevel);
                 return (
                   <button
-                    key={s.rate}
+                    key={rate}
                     type="button"
-                    onClick={() => handleSpeedChange(s.rate)}
+                    onClick={() => handleSpeedChange(rate)}
                     style={{
                       padding: '4px 10px',
                       borderRadius: '8px',
-                      background: isSelected ? '#0f172a' : '#ffffff',
+                      background: isSelected ? '#15803d' : '#ffffff',
                       color: isSelected ? '#ffffff' : '#475569',
-                      border: isSelected ? '1px solid #0f172a' : '1px solid #cbd5e1',
+                      border: isSelected ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
                       fontSize: '0.72rem',
                       fontWeight: 900,
                       cursor: 'pointer',
-                      transition: 'all 0.12s ease'
+                      transition: 'all 0.12s ease',
+                      boxShadow: isSelected ? '0 1px 3px rgba(22, 163, 74, 0.2)' : 'none'
                     }}
-                    title={`Geschwindigkeit auf ${s.label} setzen`}
+                    title={`Geschwindigkeit auf ${label} setzen`}
                   >
-                    {s.label}
+                    {label}
                   </button>
                 );
               })}

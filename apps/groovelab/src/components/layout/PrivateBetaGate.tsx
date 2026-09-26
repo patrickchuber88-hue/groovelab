@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Sparkles, ArrowRight, AlertCircle, School } from 'lucide-react';
-import { CampusGroovelabBrand } from '../CampusGroovelabBrand';
+import { Lock, Sparkles, ArrowRight, AlertCircle, School, Music } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface PrivateBetaGateProps {
@@ -23,6 +22,15 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 🛡️ Defensiver Tab-Titel während geschlossener Vorschau
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'Campus • Vorschau für Musikschulen';
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
 
   // Auto-Unlock via URL query parameter (?code=... oder ?vip=...) via authoritative RPC
   useEffect(() => {
@@ -106,8 +114,29 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
         alignItems: 'center',
         padding: '12px 8px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <CampusGroovelabBrand size={22} withIcon={true} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '12px',
+            background: 'rgba(52, 168, 83, 0.16)',
+            border: '1px solid rgba(52, 168, 83, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#34a853',
+            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
+          }}>
+            <Music size={20} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.03em', color: '#ffffff', lineHeight: 1.1 }}>
+              Campus
+            </span>
+            <span style={{ fontSize: '0.64rem', fontWeight: 750, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Partnerschulen-Portal
+            </span>
+          </div>
         </div>
 
         <button
@@ -187,7 +216,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
           color: '#94a3b8',
           lineHeight: 1.6
         }}>
-          Campus-Groovelab befindet sich aktuell im geschlossenen Pilotbetrieb für ausgewählte Partnerschulen. Der Zugang zur vollständigen Plattformvorschau erfordert einen persönlichen Einladungscode.
+          Campus befindet sich aktuell im geschlossenen Pilotbetrieb für ausgewählte Partnerschulen. Der Zugang zur vollständigen Plattformvorschau erfordert einen persönlichen Einladungscode.
         </p>
 
         {/* Code Input Form */}
@@ -312,7 +341,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
           borderRadius: '12px',
           border: '1px solid rgba(255, 255, 255, 0.05)'
         }}>
-          <strong>Hinweis zur Projekt-Abgrenzung:</strong> Campus-Groovelab ist eine eigenständige Software- und Lernplattform für Musikschulen von Patrick Huber. Es besteht keinerlei gesellschaftsrechtliche oder organisatorische Verbindung zum GrooveLAB-Projekt der Städtischen Musikschule Lahr bzw. des Freundeskreises der Städtischen Musikschule Lahr e.V.
+          <strong>Hinweis zur Projekt-Abgrenzung:</strong> Die Bildungs- und Musikschulplattform „Campus“ ist ein eigenständiges Angebot von Patrick Huber. Es besteht keinerlei Verbindung oder Kooperation mit dem GrooveLAB-Projekt der Städtischen Musikschule Lahr bzw. des Freundeskreises der Städtischen Musikschule Lahr e.V.
         </div>
 
         {/* Legal Links */}

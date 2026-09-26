@@ -21,7 +21,7 @@ export type PlaybackStateListener = (state: WsolaPlaybackState) => void;
  * with a raised-cosine (Hann) window.
  * The grain length is kept constant at 60ms, ensuring pitch is preserved with 0 cent deviation.
  */
-function stretchAudioBufferPitchNeutral(
+export function stretchAudioBufferPitchNeutral(
   ctx: AudioContext,
   sourceBuffer: AudioBuffer,
   rate: number

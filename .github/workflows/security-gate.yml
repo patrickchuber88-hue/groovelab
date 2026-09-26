@@ -31,6 +31,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
 
       - name: "5. Software Supply Chain & Vulnerability Audit"
         run: npm run security:deps

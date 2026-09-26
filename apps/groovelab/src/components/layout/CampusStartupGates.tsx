@@ -275,8 +275,24 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
     );
   }
 
-  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder fixer QR-Token-Link
+  // 0.0a TIER-1 RESILIENT ONBOARDING INTERCEPTOR (?invite= & ?onboarding=parent&token=)
   const urlParams = new URLSearchParams(location.search);
+  const rawInviteParam = urlParams.get('invite');
+  const rawParentToken = urlParams.get('onboarding') === 'parent' ? urlParams.get('token') : null;
+  const legacyOnboardingToken = (rawInviteParam && rawInviteParam !== 'school_onboarding') ? rawInviteParam : rawParentToken;
+
+  if (legacyOnboardingToken && !urlParams.has('invite_school_id')) {
+    if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', `/onboarding/${encodeURIComponent(legacyOnboardingToken)}`);
+    }
+    return (
+      <Suspense fallback={<DashboardLoader />}>
+        <StudentOnboardingPage token={legacyOnboardingToken} />
+      </Suspense>
+    );
+  }
+
+  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder fixer QR-Token-Link
   const isInviteSchoolLink = urlParams.has('invite_school_id');
   const queryQrToken = !isInviteSchoolLink ? (urlParams.get('token') || urlParams.get('qr_token')) : null;
 

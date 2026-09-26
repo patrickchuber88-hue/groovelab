@@ -202,3 +202,20 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
    - Primärer Versandweg: Autoritatives deutsches SMTP-Relay über Hetzner Mailhost (`mail.your-server.de`, Port 587/465, TLS 1.3) via Supabase Edge Function `dispatch-school-invoice`.
    - Bei fehlenden Secrets oder im Dev-Modus: Automatischer, deterministischer Testlauf-Modus (`status: 'simulated'`).
    - Sekundärer Notfall-Rettungsschirm: Der manuelle Download inklusive Zwischenablage-Text und `mailto:`-Workflow bleibt zu 100 % erhalten.
+
+---
+
+## 10. GoBD-10-Jahre Kaltarchiv & Automatisierter DATEV-Monatsabschluss (§ 147 AO, DIN 66398)
+
+1. **Physische WORM-Kaltarchivierung bitgenauer PDF/A-3b Blobs:**
+   - Jede generierte B2B-Rechnung wird bei der Übermittlung atomar als Binärdatei im geschützten Storage-Bucket `invoices` unter `${year}/${school_id}/${invoice_number}.pdf` archiviert.
+   - Storage-RLS-Policies verhindern jedes `UPDATE` oder `DELETE` (Default-Deny / Write-Once-Read-Many).
+   - Die Referenz wird in `public.school_invoice_dispatches.storage_path` unlösbar mit dem Rechnungs- und Zustelldatensatz verknüpft.
+
+2. **Automatisierter 1-Klick DATEV- & GoBD-Monatsabschluss:**
+   - Zum Monatswechsel generiert die Plattform über den `gobdMonthCloseService` ein versiegeltes Gesamtpaket: `CG_Finanzen_{YYYY}_{MM}.zip`.
+   - **Inhalt des Monatsarchivs:**
+     - `/rechnungen_pdf/`: Alle bitgenauen PDF/A-3b Originalbelege des Abrechnungsmonats.
+     - `DATEV_Buchungsjournal_{YYYY}_{MM}.csv`: Vollständiges Buchungsjournal nach DATEV-Standard (Konto 1400 Forderungen LuL / Gegenkonto 8400 Erlöse steuerfrei gem. § 4 Nr. 21 / § 19 UStG, Festschreibungskennzeichen '1').
+     - `MANIFEST_SHA256.json`: Kryptografisches Prüfsummenregister aller Rechnungsnummern, Empfänger und SHA-256 Prüfsummen.
+   - **Rechtssicherheit für Betreiber & Steuerberater:** Garantiert 10 Jahre Revisionssicherheit gem. § 147 Abs. 2 AO ohne manuelle Download-Aufwände.

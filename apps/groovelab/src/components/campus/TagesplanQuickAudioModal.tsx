@@ -11,6 +11,7 @@ import { notifyOfflineListeners } from '../../services/offlineSyncService';
 import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../domain/stickersAndTresor';
 import { isUUID } from '../../utils/uuidValidator';
 import { useDictationInput } from '../../hooks/useVoiceToText';
+import { byteFrequencyToDawMeterPercent } from '../../utils/audioVuMeterHelper';
 
 interface RecordedClip {
   id: string;
@@ -464,13 +465,9 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       const updateLevel = () => {
         if (!analyserRef.current || !dataArrayRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
-        let sum = 0;
-        for (let i = 0; i < dataArrayRef.current.length; i++) {
-          sum += dataArrayRef.current[i];
-        }
-        const avg = sum / dataArrayRef.current.length;
-        const normalized = Math.min(1, avg / 128);
-        setAudioLevel(normalized);
+        // 🎚️ 2027 DAW Goldstandard: Quasialogarithmisches IEC 60268-10 / DIN PPM Metering
+        const dawPct = byteFrequencyToDawMeterPercent(dataArrayRef.current);
+        setAudioLevel(dawPct / 100);
         animFrameRef.current = requestAnimationFrame(updateLevel);
       };
 

@@ -11,6 +11,8 @@ interface SchoolListPaneProps {
   expandedSchoolId: string | null;
   setExpandedSchoolId: (id: string) => void;
   handleExportCSV: () => void;
+  handleExportGobdMonth?: () => void;
+  isExportingGobd?: boolean;
 }
 
 export const SchoolListPane: React.FC<SchoolListPaneProps> = ({
@@ -21,7 +23,9 @@ export const SchoolListPane: React.FC<SchoolListPaneProps> = ({
   filteredInvoices,
   expandedSchoolId,
   setExpandedSchoolId,
-  handleExportCSV
+  handleExportCSV,
+  handleExportGobdMonth,
+  isExportingGobd = false
 }) => {
   // Apple macOS HIG Keyboard Navigation (Arrow Up / Down) for School Selection
   useEffect(() => {
@@ -111,37 +115,77 @@ export const SchoolListPane: React.FC<SchoolListPaneProps> = ({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            style={{
-              background: '#ffffff',
-              border: '1px solid rgba(52, 168, 83, 0.25)',
-              borderRadius: '10px',
-              padding: '8px 14px',
-              fontSize: '0.80rem',
-              fontWeight: 800,
-              color: '#059669',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 6px rgba(5, 150, 105, 0.06)',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#ecfdf5';
-              e.currentTarget.style.borderColor = '#10b981';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-              e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.25)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            CSV Export
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {handleExportGobdMonth && (
+              <button
+                type="button"
+                onClick={handleExportGobdMonth}
+                disabled={isExportingGobd}
+                title="GoBD-10-Jahre Monatsabschluss: DATEV-Journal, PDF/A-3b Rechnungen & SHA-256 Manifest als ZIP herunterladen"
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(37, 99, 235, 0.25)',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  color: '#2563eb',
+                  cursor: isExportingGobd ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.06)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  opacity: isExportingGobd ? 0.7 : 1
+                }}
+                onMouseOver={(e) => {
+                  if (!isExportingGobd) {
+                    e.currentTarget.style.backgroundColor = '#eff6ff';
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                {isExportingGobd ? 'Archiviere...' : '📦 GoBD Monatsabschluss'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(52, 168, 83, 0.25)',
+                borderRadius: '10px',
+                padding: '8px 14px',
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                color: '#059669',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.06)',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#ecfdf5';
+                e.currentTarget.style.borderColor = '#10b981';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff';
+                e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.25)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              CSV Export
+            </button>
+          </div>
         </div>
       </div>
 

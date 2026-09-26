@@ -7,6 +7,7 @@ import { getSecureAudioUrl, resolvePlayableAudioSource } from '../utils/audioSto
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { getLoopLocator, saveLoopLocator, toggleLoopLocator, removeLoopLocator, AudioLoopLocator } from '../utils/audioLoopLocatorStorage';
 import { safeDecodeAudioData } from '../utils/audioMasteringEngine';
+import { getNextPlaybackRate, getPlaybackRateLabel, applyPitchPreservation, resolveAuthoritativeUiLevel } from '../utils/audioTempoHelper';
 
 const isPlayableUrl = (u?: string): boolean => {
   if (!u) return false;
@@ -77,12 +78,12 @@ const playCountInBeep = (isAccent: boolean) => {
   }
 };
 
-// 32 organic voice-memo waveform amplitude heights (0–100%)
+// 36 organic voice-memo waveform amplitude heights (0–100%) mit 0,1% perzeptiver Dynamik
 const ORGANIC_WAVEFORM = [
-  25, 45, 65, 35, 55, 85, 95, 70, 45, 65,
-  80, 100, 90, 65, 50, 75, 85, 60, 90, 75,
-  45, 65, 85, 95, 75, 55, 85, 65, 45, 70,
-  50, 30
+  28, 42, 58, 38, 62, 82, 94, 72, 48, 65,
+  78, 96, 88, 64, 52, 74, 86, 62, 90, 76,
+  48, 68, 84, 95, 74, 56, 82, 68, 46, 72,
+  54, 38, 52, 44, 32, 24
 ];
 
 export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
@@ -106,7 +107,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
 
-  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = uiLevel || (typeof window !== 'undefined' ? ((localStorage.getItem('campus_student_ui_level') as any) || 'junior') : 'junior');
+  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = resolveAuthoritativeUiLevel(uiLevel);
 
   const harmonizedTracks = React.useMemo(() => {
     return harmonizeAudioList(tracks || [], isTeacher, activeTopicContext);
@@ -866,12 +867,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   }, [resolvedUrl, isLooping, loopLocator, duration]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
-      (audioRef.current as any).preservesPitch = true;
-      (audioRef.current as any).webkitPreservesPitch = true;
-      (audioRef.current as any).mozPreservesPitch = true;
-    }
+    applyPitchPreservation(audioRef.current, playbackRate);
   }, [playbackRate]);
 
   const formatTime = (secs: number) => {
@@ -886,26 +882,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
   const handleCycleSpeed = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (uiLevel === 'junior') {
-      // 🐢 75% vs 🐰 100%
-      setPlaybackRate(prev => (prev === 1 ? 0.75 : 1));
-    } else if (uiLevel === 'teen') {
-      const rates = [1, 0.85, 0.75];
-      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-      setPlaybackRate(nextRate);
-    } else {
-      // pro
-      const rates = [1, 0.85, 0.75, 0.6, 0.5];
-      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-      setPlaybackRate(nextRate);
-    }
+    setPlaybackRate(prev => getNextPlaybackRate(prev, uiLevel));
   };
 
   const getSpeedLabel = () => {
-    if (uiLevel === 'junior') {
-      return playbackRate < 1 ? '🐢 75%' : '🐰 100%';
-    }
-    return `${Math.round(playbackRate * 100)}%`;
+    return getPlaybackRateLabel(playbackRate, uiLevel);
   };
 
   const hasActiveLocator = Boolean(loopLocator && loopLocator.enabled);
@@ -1295,10 +1276,12 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '2px',
-                  height: '18px',
+                  height: '24px',
                   cursor: 'pointer',
                   width: '100%',
-                  maxWidth: isMobile ? '100%' : '160px'
+                  maxWidth: isMobile ? '100%' : '200px',
+                  padding: '2px 0',
+                  boxSizing: 'border-box'
                 }}
                 title={hasLocator ? `A/B-Loop: ${formatTime(loopLocator!.startSec)} - ${formatTime(loopLocator!.endSec)} (Tippen zum Spulen)` : "Tippen zum Spulen"}
               >
@@ -1396,9 +1379,10 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
                   </>
                 )}
 
-                {ORGANIC_WAVEFORM.slice(0, 16).map((h, i) => {
-                  const barRatio = i / 16;
+                {ORGANIC_WAVEFORM.map((h, i) => {
+                  const barRatio = i / ORGANIC_WAVEFORM.length;
                   const isFilled = barRatio <= progressRatio;
+                  const isHead = Math.abs(barRatio - progressRatio) < (1 / ORGANIC_WAVEFORM.length);
                   const barSec = duration > 0 ? barRatio * duration : 0;
                   const isOutsideLocator = Boolean(
                     isLoopActive &&
@@ -1413,12 +1397,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
                       key={i}
                       style={{
                         flex: 1,
-                        minWidth: '2.5px',
-                        height: `${Math.max(25, h)}%`,
-                        borderRadius: '1.5px',
-                        background: isFilled ? '#16a34a' : '#e2e8f0',
+                        minWidth: '2px',
+                        height: `${Math.max(18, h)}%`,
+                        borderRadius: '9999px',
+                        background: isFilled 
+                          ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' 
+                          : 'rgba(22, 163, 74, 0.14)',
                         opacity: isOutsideLocator ? 0.32 : 1,
-                        transition: 'all 0.15s ease'
+                        boxShadow: isHead && isPlaying ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
+                        transition: 'background 0.1s ease, height 0.15s ease, opacity 0.15s ease'
                       }}
                     />
                   );
@@ -1983,12 +1970,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   }, [resolvedUrl, isLooping, loopLocator, duration]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
-      (audioRef.current as any).preservesPitch = true;
-      (audioRef.current as any).webkitPreservesPitch = true;
-      (audioRef.current as any).mozPreservesPitch = true;
-    }
+    applyPitchPreservation(audioRef.current, playbackRate);
   }, [playbackRate]);
 
   const formatTime = (secs: number) => {
@@ -2003,26 +1985,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
   const handleCycleSpeed = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (uiLevel === 'junior') {
-      // 🐢 75% vs 🐰 100%
-      setPlaybackRate(prev => (prev === 1 ? 0.75 : 1));
-    } else if (uiLevel === 'teen') {
-      const rates = [1, 0.85, 0.75];
-      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-      setPlaybackRate(nextRate);
-    } else {
-      // pro
-      const rates = [1, 0.85, 0.75, 0.6, 0.5];
-      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-      setPlaybackRate(nextRate);
-    }
+    setPlaybackRate(prev => getNextPlaybackRate(prev, uiLevel));
   };
 
   const getSpeedLabel = () => {
-    if (uiLevel === 'junior') {
-      return playbackRate < 1 ? '🐢 75%' : '🐰 100%';
-    }
-    return `${Math.round(playbackRate * 100)}%`;
+    return getPlaybackRateLabel(playbackRate, uiLevel);
   };
 
   const hasActiveLocator = Boolean(loopLocator && loopLocator.enabled);
@@ -2555,9 +2522,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '2px',
-              height: '16px',
+              height: '24px',
               cursor: 'pointer',
-              width: '100%'
+              width: '100%',
+              padding: '2px 0',
+              boxSizing: 'border-box'
             }}
             title="Tippen zum Vor- oder Zurückspulen"
           >
@@ -2580,13 +2549,13 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
                   style={{
                     flex: 1,
                     minWidth: '2px',
-                    height: `${Math.max(20, h)}%`,
-                    borderRadius: '2px',
+                    height: `${Math.max(18, h)}%`,
+                    borderRadius: '9999px',
                     background: isFilled 
                       ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' 
-                      : '#e2e8f0',
+                      : 'rgba(22, 163, 74, 0.14)',
                     opacity: isOutsideLocator ? 0.32 : 1,
-                    boxShadow: isHead && isPlaying ? '0 0 6px rgba(34, 197, 94, 0.8)' : 'none',
+                    boxShadow: isHead && isPlaying ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
                     transition: 'background 0.1s ease, height 0.15s ease, opacity 0.15s ease'
                   }}
                 />
