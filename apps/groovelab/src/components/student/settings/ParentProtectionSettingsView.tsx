@@ -594,9 +594,11 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             return (
               <button
                 key={lvl.id}
+                id={`age-tab-${lvl.id}`}
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-controls="age-tabpanel-settings"
                 tabIndex={active ? 0 : -1}
                 aria-label={`Altersstufe ${lvl.label} (${lvl.age}): ${lvl.desc}`}
                 onClick={() => {
@@ -676,7 +678,13 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       )}
 
       {/* Granular Board & Feature Toggles with Reset to Age Standard */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div
+        id="age-tabpanel-settings"
+        role="tabpanel"
+        aria-labelledby={`age-tab-${currentLvlKey}`}
+        tabIndex={0}
+        style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sliders size={16} color="#0284c7" />
@@ -848,16 +856,19 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         </label>
 
         {/* Toggle 5: Absences (Unterrichtsstunden selbstständig absagen) */}
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '14px 16px',
-          borderRadius: '16px',
-          opacity: currentLvlKey === 'junior' ? 0.75 : 1,
-          cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer',
-          ...hlAbsences.style
-        }}>
+        <label
+          aria-disabled={currentLvlKey === 'junior'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 16px',
+            borderRadius: '16px',
+            opacity: currentLvlKey === 'junior' ? 0.75 : 1,
+            cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer',
+            ...hlAbsences.style
+          }}
+        >
           <div style={{ paddingRight: '12px', textAlign: 'left' }}>
             <div style={{ fontSize: '0.86rem', fontWeight: 800, color: currentLvlKey === 'junior' ? '#64748b' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Calendar size={16} color={currentLvlKey === 'junior' ? '#94a3b8' : '#0284c7'} style={{ flexShrink: 0 }} />
@@ -880,6 +891,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           <input
             type="checkbox"
             disabled={currentLvlKey === 'junior'}
+            aria-disabled={currentLvlKey === 'junior'}
             checked={currentLvlKey === 'junior' ? false : curAbsences}
             onChange={(e) => {
               if (currentLvlKey !== 'junior') {
@@ -891,16 +903,19 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         </label>
 
         {/* Toggle 5b: Ausweich- & Verschiebungstermine selbstständig annehmen */}
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '14px 16px',
-          borderRadius: '16px',
-          opacity: currentLvlKey === 'junior' ? 0.75 : 1,
-          cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer',
-          ...hlReschedule.style
-        }}>
+        <label
+          aria-disabled={currentLvlKey === 'junior'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 16px',
+            borderRadius: '16px',
+            opacity: currentLvlKey === 'junior' ? 0.75 : 1,
+            cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer',
+            ...hlReschedule.style
+          }}
+        >
           <div style={{ paddingRight: '12px', textAlign: 'left' }}>
             <div style={{ fontSize: '0.86rem', fontWeight: 800, color: currentLvlKey === 'junior' ? '#64748b' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <RotateCcw size={16} color={currentLvlKey === 'junior' ? '#94a3b8' : '#0284c7'} style={{ flexShrink: 0 }} />
@@ -921,6 +936,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           <input
             type="checkbox"
             disabled={currentLvlKey === 'junior'}
+            aria-disabled={currentLvlKey === 'junior'}
             checked={currentLvlKey === 'junior' ? false : curReschedule}
             onChange={(e) => {
               if (currentLvlKey !== 'junior') {

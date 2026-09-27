@@ -6,14 +6,14 @@ import {
   RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School,
   Calendar, CalendarX, Check, CheckCircle, Target, Pencil, User, Mail, Phone, Users,
   Shield, Settings, Bell, FileText, AlertTriangle, ShieldCheck, CheckCheck, Mic, Download,
-  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft, Camera
+  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft, ChevronRight, Camera
 } from 'lucide-react';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { CampusGroovelabText } from '../../CampusGroovelabBrand';
 import { validateNewPin } from '../../../utils/pinValidation';
 import { secureVault } from '../../../utils/secureVault';
 import { AddSiblingModal } from '../../campus/AddSiblingModal';
-import { Avatar, getInstrumentAvatarUrl, STUDENT_AVATARS } from '../studentAvatars.constants';
+import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar, STUDENT_AVATARS } from '../studentAvatars.constants';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
 import { StudentBillingInvoicesSection } from '../StudentBillingInvoicesSection';
 import JSZip from 'jszip';
@@ -309,6 +309,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
   const [isRegisteringPasskey, setIsRegisteringPasskey] = React.useState<boolean>(false);
   const [passkeyActionMessage, setPasskeyActionMessage] = React.useState<string | null>(null);
   const [passkeyActionStatus, setPasskeyActionStatus] = React.useState<'success' | 'error'>('success');
+  const [activeHubSubTab, setActiveHubSubTab] = React.useState<string>('default');
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -317,6 +318,123 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
       setHasDevicePasskey(localStorage.getItem(`groovelab_parent_passkey_active_${targetId}`) === 'true');
     }
   }, [studentId, (studentUser as any)?.id]);
+
+  // 🌟 Direct Parent Cockpit: State & Authoritative Actions (0,1% Monolith Goldstandard)
+  const serverScreenMinutes = studentUser?.parent_permissions?.max_screen_minutes;
+  const [directMaxMinutes, setDirectMaxMinutes] = React.useState<number>(() => {
+    if (typeof serverScreenMinutes === 'number' && serverScreenMinutes > 0) return serverScreenMinutes;
+    return (studentUiLevel === 'junior' || draftUiLevel === 'junior') ? 30 : ((studentUiLevel === 'teen' || draftUiLevel === 'teen') ? 45 : 60);
+  });
+
+  React.useEffect(() => {
+    if (typeof serverScreenMinutes === 'number') {
+      setDirectMaxMinutes(serverScreenMinutes);
+    }
+  }, [serverScreenMinutes]);
+
+  const handleDirectSetMaxMinutes = async (mins: number) => {
+    setDirectMaxMinutes(mins);
+    const targetId = studentId || (studentUser as any)?.id;
+    if (targetId) {
+      try {
+        const nextPermissions = {
+          ...(studentUser?.parent_permissions || {}),
+          max_screen_minutes: mins,
+          updated_at: new Date().toISOString()
+        };
+        await supabase.rpc('save_parent_controls', {
+          p_student_id: targetId,
+          p_settings: {
+            parent_permissions: nextPermissions
+          }
+        });
+        if (studentUser) {
+          studentUser.parent_permissions = nextPermissions;
+        }
+      } catch (e) {
+        console.warn('Fehler beim Speichern der Pausen-Erinnerung:', e);
+      }
+    }
+  };
+
+  const [isDirectSwitchingLevel, setIsDirectSwitchingLevel] = React.useState<boolean>(false);
+
+  const handleDirectAgeLevelSwitch = async (targetLevelId: 'junior' | 'teen' | 'pro') => {
+    if (isDirectSwitchingLevel || targetLevelId === draftUiLevel) return;
+    setIsDirectSwitchingLevel(true);
+    try {
+      const targetStandard = CAMPUS_AGE_STANDARDS[targetLevelId] || CAMPUS_AGE_STANDARDS.junior;
+      await applyAndSaveParentControls({
+        uiLevel: targetLevelId,
+        allowAbsences: targetStandard.allowAbsences,
+        allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
+        allowChat: targetStandard.allowChat,
+        allowTimer: targetStandard.allowTimer,
+        allowLeaderboard: targetStandard.allowLeaderboard,
+        allowProposals: true,
+        allowAudio: targetStandard.allowAudio,
+        allowStudentAudio: targetStandard.allowStudentAudio,
+        allowTeacherAudio: targetStandard.allowTeacherAudio,
+        allowTts: targetStandard.allowTts,
+        boardOverrides: { ...targetStandard.boardOverrides, mediathek: true },
+        bedtimeEnabled: targetStandard.bedtimeEnabled,
+        bedtimeStart: targetStandard.bedtimeStart,
+        bedtimeEnd: targetStandard.bedtimeEnd,
+      });
+    } catch (e) {
+      console.warn('Fehler beim direkten Umschalten der Altersstufe:', e);
+    } finally {
+      setIsDirectSwitchingLevel(false);
+    }
+  };
+
+  const curChatAllowed = draftAllowChat !== null
+    ? draftAllowChat
+    : (studentUser?.parent_allow_chat !== undefined ? Boolean(studentUser?.parent_allow_chat) : (CAMPUS_AGE_STANDARDS[draftUiLevel as keyof typeof CAMPUS_AGE_STANDARDS]?.allowChat ?? false));
+
+  const handleDirectToggleChat = async () => {
+    await applyAndSaveParentControls({ allowChat: !curChatAllowed });
+  };
+
+  const curAudioAllowed = draftAllowAudio !== null
+    ? draftAllowAudio
+    : (studentUser?.parent_allow_audio !== undefined ? Boolean(studentUser?.parent_allow_audio) : (draftBoardOverrides?.recordings ?? false));
+
+  const handleDirectToggleAudio = async () => {
+    const nextVal = !curAudioAllowed;
+    await applyAndSaveParentControls({
+      allowAudio: nextVal,
+      allowStudentAudio: nextVal,
+      allowTeacherAudio: nextVal
+    });
+  };
+
+  const curAbsencesAllowed = draftAllowAbsences !== null
+    ? draftAllowAbsences
+    : (studentUser?.parent_allow_absences !== undefined ? Boolean(studentUser?.parent_allow_absences) : (CAMPUS_AGE_STANDARDS[draftUiLevel as keyof typeof CAMPUS_AGE_STANDARDS]?.allowAbsences ?? false));
+
+  const handleDirectToggleAbsences = async () => {
+    await applyAndSaveParentControls({ allowAbsences: !curAbsencesAllowed });
+  };
+
+  const curRescheduleAllowed = draftAllowReschedule !== null
+    ? draftAllowReschedule
+    : (studentUser?.parent_allow_reschedule !== undefined ? Boolean(studentUser?.parent_allow_reschedule) : (CAMPUS_AGE_STANDARDS[draftUiLevel as keyof typeof CAMPUS_AGE_STANDARDS]?.allowRescheduleConfirm ?? false));
+
+  const handleDirectToggleReschedule = async () => {
+    await applyAndSaveParentControls({ allowRescheduleConfirm: !curRescheduleAllowed });
+  };
+
+  const skillLevelsPreview = React.useMemo(() => {
+    try {
+      if (studentUser?.skill_radar_levels && typeof studentUser.skill_radar_levels === 'object') {
+        return studentUser.skill_radar_levels;
+      }
+      const saved = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_skill_overrides_${studentId || studentUser?.id || 'default'}`) : null;
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { timing: 3, rhythm: 3, technique: 3, repertoire: 2, creativity: 3 };
+  }, [studentUser?.skill_radar_levels, studentId, studentUser?.id]);
 
   const downloadBlobAsFile = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
@@ -597,12 +715,53 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
       <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
         {activeTab === 'settings' && studentUser && (() => {
           const isJuniorOrTeen = (studentUiLevel === 'junior' || studentUiLevel === 'teen');
+          const isMinorStudent = !isAdultStudent;
           const isParentSessionActive = checkIsParentSessionActive();
+          const isParentGateLocked = isMinorStudent && !isParentSessionActive;
           const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
+
+          const isProtectionHub = activeStudentSettingsModal === 'protection_and_safety' || activeStudentSettingsModal === 'parent_controls' || activeStudentSettingsModal === 'screentime' || activeStudentSettingsModal === 'security';
+          const isLearningHub = activeStudentSettingsModal === 'learning_and_insights' || activeStudentSettingsModal === 'practice_report' || activeStudentSettingsModal === 'skills_radar' || activeStudentSettingsModal === 'cancellations';
+          const isFamilyHub = activeStudentSettingsModal === 'family_and_devices' || activeStudentSettingsModal === 'family_profiles';
+          const isBillingHub = activeStudentSettingsModal === 'billing_and_legal' || activeStudentSettingsModal === 'billing' || activeStudentSettingsModal === 'notifications' || activeStudentSettingsModal === 'consents' || activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'legal' || activeStudentSettingsModal === 'modules';
+
+          const effectiveProtectionSubTab = (isProtectionHub && activeHubSubTab !== 'default')
+            ? activeHubSubTab
+            : (activeStudentSettingsModal === 'screentime' ? 'screentime' : (activeStudentSettingsModal === 'security' ? 'security' : 'parent_controls'));
+
+          const effectiveLearningSubTab = (isLearningHub && activeHubSubTab !== 'default')
+            ? activeHubSubTab
+            : (activeStudentSettingsModal === 'skills_radar' ? 'skills_radar' : (activeStudentSettingsModal === 'cancellations' ? 'cancellations' : 'practice_report'));
+
+          const effectiveBillingSubTab = (isBillingHub && activeHubSubTab !== 'default')
+            ? activeHubSubTab
+            : (activeStudentSettingsModal === 'notifications' ? 'notifications' : (activeStudentSettingsModal === 'consents' ? 'consents' : (activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'legal' ? 'downloads' : 'billing')));
+
+          const handleCardClick = (id: string) => {
+            if (id === 'parent_controls' || id === 'screentime' || id === 'security') {
+              setActiveHubSubTab(id);
+              handleOpenSettingsModule('protection_and_safety');
+            } else if (id === 'practice_report' || id === 'cancellations' || id === 'skills_radar') {
+              setActiveHubSubTab(id);
+              handleOpenSettingsModule('learning_and_insights');
+            } else if (id === 'family_profiles') {
+              setActiveHubSubTab('family_profiles');
+              handleOpenSettingsModule('family_and_devices');
+            } else if (id === 'modules') {
+              setActiveHubSubTab('default');
+              handleOpenSettingsModule('modules');
+            } else if (id === 'billing' || id === 'notifications' || id === 'consents' || id === 'downloads' || id === 'legal') {
+              setActiveHubSubTab(id === 'legal' ? 'downloads' : id);
+              handleOpenSettingsModule('billing_and_legal');
+            } else {
+              setActiveHubSubTab(id);
+              handleOpenSettingsModule(id);
+            }
+          };
 
           return (
             <>
-              {isJuniorOrTeen && !isParentSessionActive ? (
+              {isParentGateLocked ? (
                 <div style={{
                 width: '100%',
                 maxWidth: '440px',
@@ -934,25 +1093,23 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 </div>
               ) : (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h2 style={{ fontSize: '1.65rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: currentPlatform === 'groovelab' ? '#fefce8' : '#e6f4ea', border: currentPlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #ceebd6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPlatform === 'groovelab' ? '#ca8a04' : '#34a853' }}>
                       <Sliders size={22} strokeWidth={2.4} />
                     </div>
-                    <span>{isAdultStudent ? 'Mein Account & Einstellungen' : (isJuniorOrTeen ? 'Elternbereich & Schutz' : 'Einstellungen & Eltern-Zone')}</span>
+                    <span>{isAdultStudent ? 'Mein Account & Einstellungen' : 'Elternbereich & Schutz'}</span>
                   </h2>
-                  <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
                     {isAdultStudent 
                       ? 'Verwalte deine App-Designs, Push-Benachrichtigungen, persönliche PIN, Belege und Datenschutz-Einstellungen eigenständig.' 
-                      : (isJuniorOrTeen 
-                        ? 'Schutz- & Freigabefunktionen, Benachrichtigungen und Sicherheit für Eltern.' 
-                        : 'Verwalte deine Push-Benachrichtigungen, persönliche PIN, Belege und Erziehungsberechtigten-Freigaben.')}
+                      : 'Schutz- & Freigabefunktionen, Benachrichtigungen und Sicherheit für Eltern.'}
                   </p>
                 </div>
 
                 {/* 🛡️ 1-Tap Parent Area Lock Button */}
-                {isJuniorOrTeen && (
+                {isMinorStudent && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1081,8 +1238,178 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 </div>
               )}
 
-              {/* 🌟 3 ERGONOMISCHE SINNABSCHNITTE: ELTERNZONE & EINSTELLUNGEN */}
+              {/* 🌟 3 ERGONOMISCHE SINNABSCHNITTE: ELTERNZONE & EINSTELLUNGEN (0,1% GOLDSTANDARD) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
+
+                {/* 1. Geschwister-Switcher Chips (wenn mehrere Profile vorhanden) */}
+                {familyProfiles && familyProfiles.length > 1 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    padding: '4px 2px 8px 2px',
+                    WebkitOverflowScrolling: 'touch'
+                  }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', whiteSpace: 'nowrap', paddingRight: '4px' }}>
+                      Kind wechseln:
+                    </span>
+                    {familyProfiles.map((member: any) => {
+                      const isCurrent = member.id === studentId;
+                      const targetMember = isCurrent && !member.instrument ? { ...member, instrument: studentUser?.instrument } : member;
+                      const memberAvatarUrl = resolveCampusStudentAvatar(targetMember);
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() => {
+                            if (!isCurrent) handleSwitchFamilyStudent(member.id, true);
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 14px 6px 8px',
+                            borderRadius: '100px',
+                            border: isCurrent ? '2px solid #0f172a' : '1.5px solid #e2e8f0',
+                            background: isCurrent ? '#0f172a' : '#ffffff',
+                            color: isCurrent ? '#ffffff' : '#334155',
+                            cursor: isCurrent ? 'default' : 'pointer',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
+                            boxShadow: isCurrent ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
+                            transition: 'all 0.15s ease',
+                            whiteSpace: 'nowrap',
+                            minHeight: '40px',
+                            touchAction: 'manipulation'
+                          }}
+                          className={!isCurrent ? "hover-scale" : ""}
+                          title={isCurrent ? `${member.first_name || 'Kind'} (Aktuell ausgewählt)` : `Zu ${member.first_name || 'Kind'} wechseln`}
+                        >
+                          <div style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            background: '#f1f5f9',
+                            border: `1.5px solid ${isCurrent ? '#ffffff' : '#cbd5e1'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <img src={memberAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                          <span>{member.first_name || member.name || 'Kind'}</span>
+                          {isCurrent && (
+                            <span style={{ fontSize: '0.68rem', background: '#22c55e', color: '#ffffff', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                              Aktiv
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSiblingModalOpen(true)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '100px',
+                        border: '1.5px dashed #cbd5e1',
+                        background: '#f8fafc',
+                        color: '#64748b',
+                        fontSize: '0.78rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        minHeight: '40px',
+                        touchAction: 'manipulation'
+                      }}
+                      className="hover-scale"
+                      title="Weiteres Kind per QR/PIN verknüpfen"
+                    >
+                      <Users size={14} />
+                      <span>+ Kind koppeln</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* 2. 1-Tap Sofortpause Banner (nur wenn aktiv als unaufdringlicher Schnellzugriff) */}
+                {isCurrentlyInInstantLock && (
+                  <div style={{
+                    background: '#fffbeb',
+                    border: '2px solid #fde68a',
+                    borderRadius: '20px',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '14px',
+                    flexWrap: 'wrap',
+                    boxShadow: '0 6px 20px rgba(217, 119, 6, 0.12)',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: '#fef3c7',
+                        border: '1px solid #fde68a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#d97706',
+                        flexShrink: 0
+                      }}>
+                        <Coffee size={22} strokeWidth={2.4} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
+                            1-Tap Sofortpause („Familienzeit“)
+                          </h3>
+                          {instantLockUntil && (
+                            <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.72rem', fontWeight: 850, padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                              Aktiv bis {new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 550, lineHeight: 1.35 }}>
+                          Die App ist aktuell für Familienzeit pausiert. Dein Kind kann den Übe-Modus währenddessen nicht starten.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSetInstantLock(null)}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: '12px',
+                        background: '#d97706',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.82rem',
+                        fontWeight: 850,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)',
+                        minHeight: '44px',
+                        touchAction: 'manipulation'
+                      }}
+                      className="hover-scale"
+                    >
+                      <RotateCcw size={15} />
+                      <span>Pause jetzt aufheben</span>
+                    </button>
+                  </div>
+                )}
 
                 {/* ABSCHNITT 1: Schutz & Wohlbefinden */}
                 <div>
@@ -1096,23 +1423,26 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         {isAdultStudent ? 'Altersstufe, Benutzeroberfläche und Login-Sicherheit' : 'Altersstufen, Bildschirmzeit-Ruhefenster und Eltern-PIN'}
                       </p>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bae6fd' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bae6fd' }}>
                       Sicherheitszone
                     </span>
                   </div>
 
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
                     gap: '16px',
                     width: '100%'
                   }}>
                     {[
                       {
                         id: 'parent_controls',
-                        title: isAdultStudent ? 'App- & Design-Stufe' : 'Kinderschutz & Freigaben',
-                        subtitle: isAdultStudent ? 'Benutzeroberfläche & Boards' : 'Altersstufen & 8 didaktische Toggles',
+                        title: isAdultStudent ? 'App-Design & Modus' : 'Kinderschutz & Freigaben',
+                        subtitle: isAdultStudent ? 'Didaktisches UI-Level & Funktionen' : 'Altersstufen & 8 didaktische Toggles',
                         badge: isAdultStudent ? 'Self-Management' : 'Altersstufe',
+                        badgeBg: '#dcfce7',
+                        badgeColor: '#15803d',
+                        badgeBorder: '#86efac',
                         gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                         shadowColor: currentPlatform === 'groovelab' ? 'rgba(250, 204, 21, 0.40)' : 'rgba(2, 132, 199, 0.40)',
                         icon: isAdultStudent ? Compass : ShieldCheck
@@ -1122,6 +1452,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Bildschirmzeit & Ruhe',
                         subtitle: bedtimeModeEnabled ? `Ruhezeit ab ${bedtimeStart} Uhr aktiv` : 'Nachtruhe, Schul-Fokus & Sofortpause',
                         badge: bedtimeModeEnabled ? 'Geschützt' : 'Ruhefenster',
+                        badgeBg: bedtimeModeEnabled ? '#dcfce7' : '#f8fafc',
+                        badgeColor: bedtimeModeEnabled ? '#15803d' : '#475569',
+                        badgeBorder: bedtimeModeEnabled ? '#86efac' : '#e2e8f0',
                         gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
                         shadowColor: 'rgba(99, 102, 241, 0.40)',
                         icon: Moon
@@ -1133,8 +1466,11 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           ? ((studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen')
                           : '6-stellige Eltern-PIN & 4-stellige Schüler-PIN',
                         badge: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'PIN vergeben',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)' : 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(202, 138, 4, 0.40)' : 'rgba(52, 168, 83, 0.40)',
+                        badgeBg: '#dcfce7',
+                        badgeColor: '#15803d',
+                        badgeBorder: '#86efac',
+                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(202, 138, 4, 0.40)' : 'rgba(22, 163, 74, 0.40)',
                         icon: Lock
                       },
                       {
@@ -1142,6 +1478,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Mitteilungen & Push',
                         subtitle: pushEnabled ? 'Push-Mitteilungen auf diesem Gerät aktiv' : 'Hausaufgaben, Chat & Stundenplan-Meldungen',
                         badge: pushEnabled ? 'Aktiv' : 'Inaktiv',
+                        badgeBg: pushEnabled ? '#dcfce7' : '#f1f5f9',
+                        badgeColor: pushEnabled ? '#15803d' : '#64748b',
+                        badgeBorder: pushEnabled ? '#86efac' : '#e2e8f0',
                         gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                         shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.40)' : 'rgba(59, 130, 246, 0.40)',
                         icon: Bell
@@ -1151,11 +1490,20 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       return (
                         <div
                           key={module.id}
-                          onClick={() => handleOpenSettingsModule(module.id as any)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${module.title}: ${module.subtitle}`}
+                          onClick={() => handleCardClick(module.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleCardClick(module.id);
+                            }
+                          }}
                           style={{
                             background: '#ffffff',
                             border: '1.5px solid #e2e8f0',
-                            borderRadius: '20px',
+                            borderRadius: '24px',
                             padding: '24px 16px 20px 16px',
                             display: 'flex',
                             flexDirection: 'column',
@@ -1164,7 +1512,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             cursor: 'pointer',
                             boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                            position: 'relative'
+                            position: 'relative',
+                            touchAction: 'manipulation',
+                            outline: 'none'
                           }}
                           className="hover-scale"
                         >
@@ -1186,9 +1536,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             fontWeight: 800,
                             padding: '3px 9px',
                             borderRadius: '100px',
-                            background: currentPlatform === 'groovelab' ? '#fefce8' : '#e6f4ea',
-                            color: currentPlatform === 'groovelab' ? '#ca8a04' : '#15803d',
-                            border: currentPlatform === 'groovelab' ? '1px solid #fef08a' : 'none',
+                            background: module.badgeBg,
+                            color: module.badgeColor,
+                            border: `1px solid ${module.badgeBorder}`,
                             marginBottom: '10px',
                             letterSpacing: '0.02em',
                             textTransform: 'uppercase'
@@ -1239,7 +1589,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
                     gap: '16px',
                     width: '100%'
                   }}>
@@ -1248,7 +1598,10 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         id: 'practice_report',
                         title: 'Übe-Report & Insights',
                         subtitle: `${weeklyPracticeMinutes !== undefined ? weeklyPracticeMinutes : totalPracticeMinutes} Min. Übezeit diese Woche`,
-                        badge: `${avatar?.streak_flame || 0} Tage Streak`,
+                        badge: `${(studentUser?.current_streak || avatar?.streak_flame || 0) > 0 ? `${studentUser?.current_streak || avatar?.streak_flame || 0} Tage Streak` : '1 Tage Streak'}`,
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
                         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         shadowColor: 'rgba(16, 185, 129, 0.40)',
                         icon: Clock
@@ -1256,8 +1609,13 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       {
                         id: 'cancellations',
                         title: 'Gemeldete Abwesenheiten',
-                        subtitle: studentCancellationsCount > 0 ? `${studentCancellationsCount} gemeldete Abwesenheiten` : 'Keine Abwesenheiten gemeldet',
-                        badge: studentCancellationsCount > 0 ? `${studentCancellationsCount} Abwesenheiten` : 'Alles regulär',
+                        subtitle: cancelledSchoolYearOccurrences.length > 0
+                          ? `${cancelledSchoolYearOccurrences.length} Abwesenheiten gemeldet`
+                          : 'Keine Abwesenheiten gemeldet',
+                        badge: cancelledSchoolYearOccurrences.length > 0 ? `${cancelledSchoolYearOccurrences.length} Termine` : 'Alles regulär',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
                         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                         shadowColor: 'rgba(245, 158, 11, 0.40)',
                         icon: CalendarX
@@ -1267,6 +1625,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Familie & Geschwister',
                         subtitle: familyProfiles.length > 1 ? `${familyProfiles.length} Profile verknüpft (1-Tap Wechsel)` : 'Geschwisterkinder & Geräteverwaltung',
                         badge: familyProfiles.length > 1 ? `${familyProfiles.length} Kinder` : 'Multi-Profil',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
                         gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                         shadowColor: 'rgba(59, 130, 246, 0.40)',
                         icon: Users
@@ -1279,6 +1640,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         })(),
                         subtitle: 'Didaktisches Entwicklungsraster (5 Säulen)',
                         badge: '5 Dimensionen',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
                         gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
                         shadowColor: 'rgba(236, 72, 153, 0.40)',
                         icon: Sparkles
@@ -1288,11 +1652,20 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       return (
                         <div
                           key={module.id}
-                          onClick={() => handleOpenSettingsModule(module.id as any)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${module.title}: ${module.subtitle}`}
+                          onClick={() => handleCardClick(module.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleCardClick(module.id);
+                            }
+                          }}
                           style={{
                             background: '#ffffff',
                             border: '1.5px solid #e2e8f0',
-                            borderRadius: '20px',
+                            borderRadius: '24px',
                             padding: '24px 16px 20px 16px',
                             display: 'flex',
                             flexDirection: 'column',
@@ -1301,7 +1674,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             cursor: 'pointer',
                             boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                            position: 'relative'
+                            position: 'relative',
+                            touchAction: 'manipulation',
+                            outline: 'none'
                           }}
                           className="hover-scale"
                         >
@@ -1323,9 +1698,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             fontWeight: 800,
                             padding: '3px 9px',
                             borderRadius: '100px',
-                            background: '#f8fafc',
-                            color: '#334155',
-                            border: '1px solid #e2e8f0',
+                            background: module.badgeBg,
+                            color: module.badgeColor,
+                            border: `1px solid ${module.badgeBorder}`,
                             marginBottom: '10px',
                             letterSpacing: '0.02em',
                             textTransform: 'uppercase'
@@ -1376,7 +1751,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
                     gap: '16px',
                     width: '100%'
                   }}>
@@ -1386,8 +1761,11 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Module & Freischaltung',
                         subtitle: studentUser?.is_campus_active ? 'Campus & GrooveLab aktiv' : (currentPlatform === 'groovelab' ? 'GrooveLab aktiv' : '1 Monat gratis schnuppern'),
                         badge: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? 'Aktiv' : '1 Mo. gratis',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(16, 185, 129, 0.40)',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
+                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(5, 150, 105, 0.40)',
                         icon: Zap
                       },
                       {
@@ -1395,47 +1773,56 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung',
                         subtitle: (studentUser as any)?.is_direct_billed ? 'Jahresbeitrag & Zahlungsbelege' : 'Von Musikschule übernommen (0,00 €)',
                         badge: (studentUser as any)?.is_direct_billed ? 'Direktabrechnung' : '0,00 € Inklusive',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(139, 92, 246, 0.40)',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
+                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(124, 58, 237, 0.40)',
                         icon: FileText
                       },
                       {
-                        id: 'legal',
-                        title: 'Datenschutz & Rechtliches',
-                        subtitle: 'DSGVO-Grundsätze, Art. 15 Auskunft & Impressum',
-                        badge: 'DSGVO & Recht',
-                        gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
-                        shadowColor: 'rgba(100, 116, 139, 0.40)',
+                        id: 'downloads',
+                        title: 'Datenschutz & Datentresor',
+                        subtitle: 'Art. 15 Auskunft & 4 Archiv-Downloads',
+                        badge: 'DSGVO konform',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
+                        gradient: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+                        shadowColor: 'rgba(71, 85, 105, 0.40)',
                         icon: ShieldCheck
                       },
                       {
                         id: 'consents',
-                        title: 'Medien & Einwilligungen',
-                        subtitle: 'Foto-Freigaben, Programmheft & Push',
-                        badge: 'Art. 7 & 8 DSGVO',
-                        gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        shadowColor: 'rgba(16, 185, 129, 0.40)',
+                        title: 'Einwilligungen & Medien',
+                        subtitle: 'Foto-, Audio- & Video-Zustimmungen',
+                        badge: 'KUG Bildnisschutz',
+                        badgeBg: '#f8fafc',
+                        badgeColor: '#334155',
+                        badgeBorder: '#e2e8f0',
+                        gradient: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                        shadowColor: 'rgba(13, 148, 136, 0.40)',
                         icon: Camera
-                      },
-                      {
-                        id: 'downloads',
-                        title: 'Downloads & Datentresor',
-                        subtitle: 'Art. 20 Datensouveränität & 4 Archiv-Pakete',
-                        badge: '4 Archive',
-                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                        shadowColor: 'rgba(2, 132, 199, 0.40)',
-                        icon: Download
                       }
                     ].map((module) => {
                       const IconComp = module.icon;
                       return (
                         <div
                           key={module.id}
-                          onClick={() => handleOpenSettingsModule(module.id as any)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${module.title}: ${module.subtitle}`}
+                          onClick={() => handleCardClick(module.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleCardClick(module.id);
+                            }
+                          }}
                           style={{
                             background: '#ffffff',
                             border: '1.5px solid #e2e8f0',
-                            borderRadius: '20px',
+                            borderRadius: '24px',
                             padding: '24px 16px 20px 16px',
                             display: 'flex',
                             flexDirection: 'column',
@@ -1444,7 +1831,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             cursor: 'pointer',
                             boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                            position: 'relative'
+                            position: 'relative',
+                            touchAction: 'manipulation',
+                            outline: 'none'
                           }}
                           className="hover-scale"
                         >
@@ -1466,9 +1855,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             fontWeight: 800,
                             padding: '3px 9px',
                             borderRadius: '100px',
-                            background: currentPlatform === 'groovelab' ? '#fefce8' : '#e6f4ea',
-                            color: currentPlatform === 'groovelab' ? '#ca8a04' : '#15803d',
-                            border: currentPlatform === 'groovelab' ? '1px solid #fef08a' : 'none',
+                            background: module.badgeBg,
+                            color: module.badgeColor,
+                            border: `1px solid ${module.badgeBorder}`,
                             marginBottom: '10px',
                             letterSpacing: '0.02em',
                             textTransform: 'uppercase'
@@ -1500,7 +1889,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
                 </div>
 
-                {/* KOMPAKTE WERKZEUGBANK: Mitteilungen & Ideenschmiede */}
+                {/* KOMPAKTE SERVICE-LEISTE: Mitteilungen & Direkter Feedback-Kanal */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1531,7 +1920,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         Service &amp; Mitteilungen
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
-                        Push-Kanäle anpassen oder Wünsche direkt an unser Entwicklerteam senden.
+                        Push-Kanäle anpassen oder Ideen direkt an unser Team senden.
                       </div>
                     </div>
                   </div>
@@ -1539,7 +1928,10 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      onClick={() => handleOpenSettingsModule('notifications')}
+                      onClick={() => {
+                        setActiveHubSubTab('notifications');
+                        handleOpenSettingsModule('billing_and_legal');
+                      }}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1559,9 +1951,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       <span>Mitteilungen {pushEnabled ? '(Aktiv)' : ''}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenSettingsModule('feedback')}
+                    <a
+                      href="mailto:kontakt@campus-groovelab.de?subject=Feedback%20Elternbereich"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1573,13 +1964,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         color: '#334155',
                         fontSize: '0.80rem',
                         fontWeight: 800,
+                        textDecoration: 'none',
                         cursor: 'pointer'
                       }}
                       className="hover-scale"
                     >
                       <Lightbulb size={15} color="#ca8a04" />
-                      <span>Ideenschmiede</span>
-                    </button>
+                      <span>Feedback &amp; Ideen</span>
+                    </a>
                   </div>
                 </div>
 
@@ -1691,7 +2083,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     background: '#ffffff',
                     borderRadius: isMobile ? 0 : '24px',
                     width: '100%',
-                    maxWidth: isMobile ? '100vw' : (activeStudentSettingsModal === 'billing' ? '920px' : ((activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'consents') ? '760px' : '680px')),
+                    maxWidth: isMobile ? '100vw' : (isBillingHub ? '920px' : '760px'),
                     height: isMobile ? '100dvh' : 'auto',
                     maxHeight: isMobile ? '100dvh' : '88vh',
                     display: 'flex',
@@ -1755,22 +2147,13 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             overflow: 'hidden',
                             textOverflow: 'ellipsis'
                           }}>
-                            {activeStudentSettingsModal === 'modules' && 'Module & Freischaltung'}
-                            {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'App-Einstellungen' : 'Kinderschutz & Freigaben')}
-                            {activeStudentSettingsModal === 'screentime' && 'Bildschirmzeit & Ruhe'}
-                            {activeStudentSettingsModal === 'practice_report' && 'Übe-Report & Insights'}
-                            {activeStudentSettingsModal === 'cancellations' && 'Gemeldete Abwesenheiten'}
-                            {activeStudentSettingsModal === 'family_profiles' && 'Familien-Profile'}
-                            {activeStudentSettingsModal === 'skills_radar' && (() => {
-                              const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
-                              return lvl === 'junior' ? 'Musik-Stern & Raster' : (lvl === 'pro' ? 'Kompetenzen-Radar' : 'Skill-Radar & Raster');
-                            })()}
-                            {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Push'}
-                            {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Sicherheit' : 'PIN & Eltern-Schutz')}
-                            {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
-                            {activeStudentSettingsModal === 'legal' && 'Datenschutz & Rechtliches'}
-                            {activeStudentSettingsModal === 'consents' && 'Medien & Einwilligungen'}
-                            {activeStudentSettingsModal === 'downloads' && 'Downloads & Datentresor'}
+                            {isProtectionHub && (isAdultStudent ? 'App & Sicherheit' : 'Kinderschutz & Sicherheit')}
+                            {isLearningHub && 'Lernalltag & Einblick'}
+                            {isFamilyHub && 'Familie & Geräte'}
+                            {isBillingHub && (isAdultStudent ? 'Vertrag & Datenschutz' : 'Bereitstellung & Datenschutz')}
+                            {!isProtectionHub && !isLearningHub && !isFamilyHub && !isBillingHub && (
+                              activeStudentSettingsModal === 'modules' ? 'Module' : 'Einstellungen'
+                            )}
                           </h3>
                         </div>
 
@@ -1803,83 +2186,35 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             width: '42px',
                             height: '42px',
                             borderRadius: '12px',
-                            background: activeStudentSettingsModal === 'modules'
+                            background: isProtectionHub
+                              ? (currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)')
+                              : isLearningHub
                               ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                              : activeStudentSettingsModal === 'parent_controls'
-                              ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
-                              : activeStudentSettingsModal === 'screentime'
-                              ? 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)'
-                              : activeStudentSettingsModal === 'practice_report'
-                              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                              : activeStudentSettingsModal === 'cancellations'
-                              ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                              : activeStudentSettingsModal === 'family_profiles'
-                              ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                              : activeStudentSettingsModal === 'skills_radar'
-                              ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
-                              : activeStudentSettingsModal === 'notifications'
+                              : isFamilyHub
                               ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-                              : activeStudentSettingsModal === 'security'
-                              ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)'
-                              : activeStudentSettingsModal === 'billing'
-                              ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
-                              : activeStudentSettingsModal === 'consents'
-                              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                              : activeStudentSettingsModal === 'downloads'
-                              ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
-                              : 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                              : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
                           }}>
-                            {activeStudentSettingsModal === 'modules' && <Zap size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? <Compass size={20} color="#ffffff" /> : <ShieldCheck size={20} color="#ffffff" />)}
-                            {activeStudentSettingsModal === 'screentime' && <Moon size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'practice_report' && <Clock size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'cancellations' && <CalendarX size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'family_profiles' && <Users size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'skills_radar' && <Sparkles size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'legal' && <ShieldCheck size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'consents' && <Camera size={20} color="#ffffff" />}
-                            {activeStudentSettingsModal === 'downloads' && <Download size={20} color="#ffffff" />}
+                            {isProtectionHub && (isAdultStudent ? <Compass size={20} color="#ffffff" /> : <ShieldCheck size={20} color="#ffffff" />)}
+                            {isLearningHub && <BookOpen size={20} color="#ffffff" />}
+                            {isFamilyHub && <Users size={20} color="#ffffff" />}
+                            {isBillingHub && <FileText size={20} color="#ffffff" />}
                           </div>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              {activeStudentSettingsModal === 'modules' && 'Module & Freischaltung'}
-                              {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'App- & Design-Einstellungen' : 'Kinderschutz & Freigaben')}
-                              {activeStudentSettingsModal === 'screentime' && 'Bildschirmzeit & Ruhezeiten'}
-                              {activeStudentSettingsModal === 'practice_report' && 'Wöchentlicher Übe-Report & Fortschritt'}
-                              {activeStudentSettingsModal === 'cancellations' && 'Gemeldete Abwesenheiten'}
-                              {activeStudentSettingsModal === 'family_profiles' && 'Familien-Profile & Geschwister'}
-                              {activeStudentSettingsModal === 'skills_radar' && (() => {
-                                const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
-                                return lvl === 'junior' ? 'Mein Musik-Stern · Entwicklungsraster' : (lvl === 'pro' ? 'Kompetenzen-Radar · Entwicklungsraster' : 'Skill-Radar & Entwicklungsraster');
-                              })()}
-                              {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Benachrichtigungen'}
-                              {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit')}
-                              {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
-                              {activeStudentSettingsModal === 'legal' && 'Datenschutz, DSGVO & Transparenz'}
-                              {activeStudentSettingsModal === 'consents' && 'Medien-Einwilligungen & Foto-Freigaben'}
-                              {activeStudentSettingsModal === 'downloads' && 'Downloads & Didaktik-Datentresor'}
+                              {isProtectionHub && (isAdultStudent ? 'App-Design & Sicherheit' : 'Kinderschutz & Sicherheit')}
+                              {isLearningHub && 'Lernalltag & Einblick'}
+                              {isFamilyHub && 'Familie & Geräte'}
+                              {isBillingHub && (isAdultStudent ? 'Vertrag, Belege & Datenschutz' : 'Bereitstellung, Belege & Datenschutz')}
                             </h3>
                             <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              {activeStudentSettingsModal === 'modules' && 'Verwalte Campus- & GrooveLab-Module und schalte Zusatzfunktionen frei.'}
-                              {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'Passe Benutzeroberfläche und Funktionen nach deinen Wünschen an.' : 'Altersstufen-Standards, Audio-Berechtigungen & didaktische Toggles.')}
-                              {activeStudentSettingsModal === 'screentime' && 'Nachtruhe-Schutz, Schulzeit-Fokus & 1-Tap Familienzeit.'}
-                              {activeStudentSettingsModal === 'practice_report' && '100% datenschutzkonforme Zusammenfassung der Übe-Einheiten zu Hause.'}
-                              {activeStudentSettingsModal === 'cancellations' && 'Übersicht aller Unterrichtsstunden, die durch dein Kind oder die Familie abgesagt wurden.'}
-                              {activeStudentSettingsModal === 'family_profiles' && 'Mehrere Kinder auf einem Gerät verwalten und per Fingertipp wechseln.'}
-                              {activeStudentSettingsModal === 'skills_radar' && 'Persönliche, behutsame Förderung durch die Musiklehrkraft (ohne Noten, ohne Leistungsdruck).'}
-                              {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
-                              {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
-                              {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Übersicht über deine gebuchten Module und Zahlungsnachweise.' : 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.')}
-                              {activeStudentSettingsModal === 'legal' && '100% datensparsam in deutschen Rechenzentren, Auskunftsrechte nach Art. 15 DSGVO & Impressum.'}
-                              {activeStudentSettingsModal === 'consents' && 'DSGVO-Einwilligungen nach Art. 7 & 8: Fotos, Konzert-Programmheft und Push-Mitteilungen.'}
-                              {activeStudentSettingsModal === 'downloads' && 'Volle Datensouveränität nach Art. 20 DSGVO: Sichere alle Übedaten, Audioaufnahmen und Sammel-Sticker.'}
+                              {isProtectionHub && (isAdultStudent ? 'Altersstufe, didaktische Freigaben und persönliche PIN.' : 'Altersstufen-Standards, Bildschirmzeit, Ruhefenster & Eltern-PIN.')}
+                              {isLearningHub && 'Wöchentliche Übezeit, didaktisches 5-Säulen Entwicklungsraster & Abwesenheiten.'}
+                              {isFamilyHub && 'Geschwisterkinder per 1-Tap wechseln, neues Kind hinzufügen und Geräte verwalten.'}
+                              {isBillingHub && (isAdultStudent ? 'Vertragsübersicht, amtliche Belege, Push-Kanäle und DSGVO-Datentresor.' : '0,00 € Bereitstellung, amtliche Bestätigung, Push-Kanäle und DSGVO-Datentresor.')}
                             </p>
                           </div>
                         </div>
@@ -1950,6 +2285,200 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     )}
                   </div>
 
+                  {/* WAI-ARIA SUBTAB-LEISTE FÜR MULTI-TAB HUBS */}
+                  {isProtectionHub && (
+                    <div
+                      role="tablist"
+                      aria-label="Kinderschutz-Untermenü"
+                      style={{
+                        padding: isMobile ? '8px 14px 10px 14px' : '10px 24px 12px 24px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        gap: '8px',
+                        overflowX: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        flexShrink: 0
+                      }}
+                    >
+                      {[
+                        { id: 'parent_controls', label: isAdultStudent ? 'Altersstufe & Design' : 'Didaktik & Freigaben', icon: ShieldCheck },
+                        { id: 'screentime', label: 'Bildschirmzeit & Ruhe', icon: Moon },
+                        { id: 'security', label: isAdultStudent ? 'Persönliche PIN' : 'PIN & Passkey', icon: Lock }
+                      ].map(tab => {
+                        const isSelected = effectiveProtectionSubTab === tab.id;
+                        const TabIcon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={isSelected}
+                            tabIndex={0}
+                            onClick={() => setActiveHubSubTab(tab.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setActiveHubSubTab(tab.id);
+                              }
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '7px 14px',
+                              borderRadius: '12px',
+                              border: isSelected ? '1px solid #cbd5e1' : '1px solid transparent',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? '#0f172a' : '#64748b',
+                              fontWeight: isSelected ? 850 : 650,
+                              fontSize: '0.80rem',
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                              whiteSpace: 'nowrap',
+                              minHeight: '38px',
+                              touchAction: 'manipulation',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale"
+                          >
+                            <TabIcon size={14} color={isSelected ? (currentPlatform === 'groovelab' ? '#ca8a04' : '#0284c7') : '#64748b'} />
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {isLearningHub && (
+                    <div
+                      role="tablist"
+                      aria-label="Lernalltag-Untermenü"
+                      style={{
+                        padding: isMobile ? '8px 14px 10px 14px' : '10px 24px 12px 24px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        gap: '8px',
+                        overflowX: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        flexShrink: 0
+                      }}
+                    >
+                      {[
+                        { id: 'practice_report', label: 'Übe-Report & Streak', icon: Clock },
+                        { id: 'skills_radar', label: draftUiLevel === 'junior' ? 'Musik-Stern (5 Säulen)' : 'Entwicklungsraster', icon: Sparkles },
+                        { id: 'cancellations', label: 'Abwesenheiten', icon: CalendarX }
+                      ].map(tab => {
+                        const isSelected = effectiveLearningSubTab === tab.id;
+                        const TabIcon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={isSelected}
+                            tabIndex={0}
+                            onClick={() => setActiveHubSubTab(tab.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setActiveHubSubTab(tab.id);
+                              }
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '7px 14px',
+                              borderRadius: '12px',
+                              border: isSelected ? '1px solid #cbd5e1' : '1px solid transparent',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? '#0f172a' : '#64748b',
+                              fontWeight: isSelected ? 850 : 650,
+                              fontSize: '0.80rem',
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                              whiteSpace: 'nowrap',
+                              minHeight: '38px',
+                              touchAction: 'manipulation',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale"
+                          >
+                            <TabIcon size={14} color={isSelected ? '#15803d' : '#64748b'} />
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {isBillingHub && (
+                    <div
+                      role="tablist"
+                      aria-label="Vertrag-Untermenü"
+                      style={{
+                        padding: isMobile ? '8px 14px 10px 14px' : '10px 24px 12px 24px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        gap: '8px',
+                        overflowX: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        flexShrink: 0
+                      }}
+                    >
+                      {[
+                        { id: 'billing', label: isAdultStudent ? 'Vertrag & Belege' : 'Bereitstellung & Belege', icon: FileText },
+                        { id: 'notifications', label: 'Mitteilungen & Push', icon: Bell },
+                        { id: 'consents', label: 'Einwilligungen', icon: Camera },
+                        { id: 'downloads', label: 'DSGVO & Datentresor', icon: Download }
+                      ].map(tab => {
+                        const isSelected = effectiveBillingSubTab === tab.id;
+                        const TabIcon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={isSelected}
+                            tabIndex={0}
+                            onClick={() => setActiveHubSubTab(tab.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setActiveHubSubTab(tab.id);
+                              }
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '7px 14px',
+                              borderRadius: '12px',
+                              border: isSelected ? '1px solid #cbd5e1' : '1px solid transparent',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? '#0f172a' : '#64748b',
+                              fontWeight: isSelected ? 850 : 650,
+                              fontSize: '0.80rem',
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                              whiteSpace: 'nowrap',
+                              minHeight: '38px',
+                              touchAction: 'manipulation',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale"
+                          >
+                            <TabIcon size={14} color={isSelected ? '#6d28d9' : '#64748b'} />
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {/* Modal Body */}
                   <div
                     style={{
@@ -1965,7 +2494,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     }}
                     className={isMobile ? "mobile-scroll-container" : ""}
                   >
-                    {activeStudentSettingsModal === 'parent_controls' && (
+                    {(activeStudentSettingsModal === 'parent_controls' || (isProtectionHub && effectiveProtectionSubTab === 'parent_controls')) && (
                       <ParentProtectionSettingsView
                         studentUser={studentUser}
                         studentId={studentId}
@@ -1990,7 +2519,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       />
                     )}
 
-                    {activeStudentSettingsModal === 'screentime' && (() => {
+                    {(activeStudentSettingsModal === 'screentime' || (isProtectionHub && effectiveProtectionSubTab === 'screentime')) && (() => {
                       const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
                       return (
                         <ParentScreenTimeSettingsView
@@ -2011,7 +2540,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       );
                     })()}
 
-                    {activeStudentSettingsModal === 'practice_report' && (() => {
+                    {(activeStudentSettingsModal === 'practice_report' || (isLearningHub && effectiveLearningSubTab === 'practice_report')) && (() => {
                       const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
                       return (
                         <ParentPracticeReportSettingsView
@@ -2026,14 +2555,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       );
                     })()}
 
-                    {activeStudentSettingsModal === 'cancellations' && (
+                    {(activeStudentSettingsModal === 'cancellations' || (isLearningHub && effectiveLearningSubTab === 'cancellations')) && (
                       <ParentCancellationLogSettingsView
                         cancelledSchoolYearOccurrences={cancelledSchoolYearOccurrences}
                         handleUndoCancelOccurrence={handleUndoCancelOccurrence}
                       />
                     )}
 
-                    {activeStudentSettingsModal === 'family_profiles' && (
+                    {(activeStudentSettingsModal === 'family_profiles' || isFamilyHub) && (
                       <ParentFamilyProfilesSettingsView
                         familyProfiles={familyProfiles}
                         studentId={studentId}
@@ -2044,7 +2573,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       />
                     )}
 
-                    {activeStudentSettingsModal === 'skills_radar' && (() => {
+                    {(activeStudentSettingsModal === 'skills_radar' || (isLearningHub && effectiveLearningSubTab === 'skills_radar')) && (() => {
                       const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
                       return (
                         <ParentDevelopmentGridSettingsView
@@ -2056,7 +2585,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       );
                     })()}
 
-                    {activeStudentSettingsModal === 'notifications' && (
+                    {(activeStudentSettingsModal === 'notifications' || (isBillingHub && effectiveBillingSubTab === 'notifications')) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {/* Push-Benachrichtigungen Haupt-Toggle */}
@@ -2238,7 +2767,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       </div>
                     )}
 
-                    {activeStudentSettingsModal === 'security' && (() => {
+                    {(activeStudentSettingsModal === 'security' || (isProtectionHub && effectiveProtectionSubTab === 'security')) && (() => {
                       const isParentTarget = securityPinTarget === 'parent' && !isAdultStudent;
                       const targetPinLength = isParentTarget ? 6 : 4;
                       const isFilledComplete = pinFormNew.length === targetPinLength && pinFormConfirm.length === targetPinLength;
@@ -3119,7 +3648,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       </div>
                     )}
 
-                    {activeStudentSettingsModal === 'billing' && (
+                    {(activeStudentSettingsModal === 'billing' || (isBillingHub && effectiveBillingSubTab === 'billing')) && (
                       <div>
                         {studentUser?.role?.toLowerCase() === 'student' && (
                           <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
@@ -3256,14 +3785,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       </div>
                     )}
 
-                    {activeStudentSettingsModal === 'consents' && (
+                    {(activeStudentSettingsModal === 'consents' || (isBillingHub && effectiveBillingSubTab === 'consents')) && (
                       <ParentConsentSettingsView
                         studentUser={studentUser}
                         studentId={studentId}
                       />
                     )}
 
-                    {activeStudentSettingsModal === 'downloads' && (
+                    {(activeStudentSettingsModal === 'downloads' || (isBillingHub && (effectiveBillingSubTab === 'downloads' || effectiveBillingSubTab === 'legal'))) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {/* DSGVO Art. 20 Datenübertragbarkeit / Voll-Archiv Export */}
                         {handleExportFullDataArchive && (

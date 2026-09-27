@@ -2,6 +2,7 @@ import React from "react";
 import { Play, Volume2, X } from "lucide-react";
 import { getSongColor } from "../studentDateUtils";
 import { renderSongVinylCover } from "../CampusVinylCoverArt";
+import { cleanCanonicalSongTitle, cleanCanonicalArtistName } from "../tabs/StudentSongsTab";
 
 export interface StudentSongDetailModalProps {
   song: any | null;
@@ -22,15 +23,17 @@ export const StudentSongDetailModal: React.FC<StudentSongDetailModalProps> = ({
 }) => {
   if (!song) return null;
 
+  const displayTitle = cleanCanonicalSongTitle(song.title);
+  const displayArtist = cleanCanonicalArtistName(song.artist);
 
-        const lwColor = getSongColor(song.title || '');
-        const progressItem = progressItems.find(item => 
-          item.topic_name.toLowerCase() === song.title.toLowerCase() ||
-          item.topic_name.toLowerCase().includes(song.title.toLowerCase())
-        );
-        const isMastered = song.status === 'MASTERED' || progressItem?.status === 'MASTERED' || (song.progress_percent || 0) === 100;
-        const isCurrentMission = Boolean(song.is_current_homework || progressItem?.is_current_homework);
-        const progressPercent = isMastered ? 100 : (song.progress_percent || progressItem?.progress_percent || 0);
+  const lwColor = getSongColor(displayTitle);
+  const progressItem = progressItems.find(item => 
+    item.topic_name.toLowerCase() === displayTitle.toLowerCase() ||
+    item.topic_name.toLowerCase().includes(displayTitle.toLowerCase())
+  );
+  const isMastered = song.status === 'MASTERED' || progressItem?.status === 'MASTERED' || (song.progress_percent || 0) === 100;
+  const isCurrentMission = Boolean(song.is_current_homework || progressItem?.is_current_homework);
+  const progressPercent = isMastered ? 100 : (song.progress_percent || progressItem?.progress_percent || 0);
 
         // Extract verified teacher homework notes / roadmap
         const rawNotes = song.homework_notes || progressItem?.homework_notes || localStorage.getItem(`song_note_${studentId}_${song.id}`) || '';
@@ -117,10 +120,10 @@ return (
                       )}
                     </div>
                     <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                      {song.title}
+                      {displayTitle}
                     </h2>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 700 }}>
-                      von {song.artist}
+                      von {displayArtist}
                     </p>
                   </div>
                 </div>
@@ -253,7 +256,7 @@ return (
                 {/* Action CTA Button */}
                 <button
                   onClick={() => {
-                    setSelectedTopic(song.title);
+                    setSelectedTopic(displayTitle);
                     onClose();
                     handleTabChangeLocal('practice');
                   }}

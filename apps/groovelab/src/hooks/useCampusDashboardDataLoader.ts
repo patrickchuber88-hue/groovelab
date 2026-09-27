@@ -797,6 +797,16 @@ export function useCampusDashboardDataLoader({
           }
         });
       });
+      const dismissedPracticeSongIds = new Set<string>(
+        (() => {
+          try {
+            return JSON.parse(localStorage.getItem(`groovelab_dismissed_practice_${userId}`) || '[]');
+          } catch {
+            return [];
+          }
+        })()
+      );
+
       const instrumentalSongs = safeSkills.map((p: any) => {
           const song = Array.isArray(p.songs) ? p.songs[0] : p.songs;
           if (!song || song.is_groovelab_active === false) return null;
@@ -809,6 +819,7 @@ export function useCampusDashboardDataLoader({
             instrument: p.instrument, difficulty_level: p.difficulty_level || 'original',
             part_number: p.part_number || 1,
             is_stage_ready: !!p.is_stage_ready, is_favorite: !!p.is_favorite, locked: !p.is_stage_ready,
+            is_practice_dismissed: !!p.is_practice_dismissed || dismissedPracticeSongIds.has(song.id),
             is_pending_approval: !!p.is_pending_approval, media_link: song.media_link, tomplay_url: song.tomplay_url, instrumentation: song.instrumentation,
             playalong_url: song.playalong_url
           };
@@ -1299,7 +1310,7 @@ export function useCampusDashboardDataLoader({
             formationsList.push({ id: `first_slot_${song.id}_${level}`, members: [], memberMap: {}, isInitial: true, level });
           }
           
-          const levelFormations = formationsList.map(form => {
+          const levelFormations = formationsList.map((form, idx) => {
             const isComplete = Object.keys(requiredInsts).every(inst => {
               const lower = inst.toLowerCase();
               if (lower.includes('vocals') || lower.includes('gesang')) return true;
@@ -1313,7 +1324,7 @@ export function useCampusDashboardDataLoader({
               
               return matchingCount >= needed;
             });
-            return { ...form, isComplete };
+            return { ...form, formation_index: idx + 1, isComplete };
           });
 
           if (levelFormations.length > 0) {

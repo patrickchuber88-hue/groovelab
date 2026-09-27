@@ -14,7 +14,7 @@
  * - Hysteresis finalized note transitions (no zombie 'pending' notes)
  */
 
-import { WorldTourNote } from '../types/worldTour';
+import { WorldTourNote, WorldTourRepeatSection } from '../types/worldTour';
 
 export interface AudioNoteEvent {
   noteIndex: number;
@@ -30,7 +30,127 @@ export interface WorldTourPlaybackOptions {
   studentInstrument?: string | null;
   timeSignature?: string;
   anacrusisBeats?: number;
+  repeatSections?: WorldTourRepeatSection[];
+  metronomeEnabled?: boolean;
+  metronomeVolume?: number;
   onMicError?: (err: unknown) => void;
+}
+
+export interface ExpandedPlaybackScore {
+  notes: WorldTourNote[];
+  noteIndexMap: number[];
+}
+
+/**
+ * 🎼 Expands linear score notes for synchronized repeat playback.
+ * Maintains an exact 1-to-1 index mapping (`noteIndexMap`) back to visual notation positions.
+ */
+export function expandNotesForPlayback(
+  notes: WorldTourNote[],
+  timeSignature: string = '4/4',
+  anacrusisBeats: number = 0,
+  repeatSections?: WorldTourRepeatSection[]
+): ExpandedPlaybackScore {
+  if (!repeatSections || repeatSections.length === 0) {
+    return {
+      notes: [...notes],
+      noteIndexMap: notes.map((_, i) => i)
+    };
+  }
+
+  let beatsPerMeasure = 4;
+  if (timeSignature === '3/4') beatsPerMeasure = 3;
+  else if (timeSignature === '2/4') beatsPerMeasure = 2;
+  else if (timeSignature === '6/8') beatsPerMeasure = 3;
+  else if (timeSignature === '7/8') beatsPerMeasure = 3.5;
+  else if (timeSignature === '9/8') beatsPerMeasure = 4.5;
+  else if (timeSignature === '12/8') beatsPerMeasure = 6;
+
+  interface NoteWithIndex {
+    note: WorldTourNote;
+    originalIndex: number;
+  }
+  interface MeasureGroup {
+    measureNum: number;
+    notes: NoteWithIndex[];
+  }
+
+  const measures: MeasureGroup[] = [];
+  let isBuildingAnacrusis = anacrusisBeats > 0;
+  let currentMeasureNum = isBuildingAnacrusis ? 0 : 1;
+  let currentBeatInMeasure = 0;
+  let currentMeasureNotes: NoteWithIndex[] = [];
+
+  notes.forEach((note, idx) => {
+    const targetMeasureBeats = isBuildingAnacrusis ? anacrusisBeats : beatsPerMeasure;
+
+    if (currentBeatInMeasure >= targetMeasureBeats - 0.01) {
+      measures.push({
+        measureNum: currentMeasureNum,
+        notes: currentMeasureNotes
+      });
+      if (isBuildingAnacrusis) {
+        isBuildingAnacrusis = false;
+        currentMeasureNum = 1;
+      } else {
+        currentMeasureNum++;
+      }
+      currentBeatInMeasure = 0;
+      currentMeasureNotes = [];
+    }
+
+    currentMeasureNotes.push({
+      note,
+      originalIndex: idx
+    });
+
+    currentBeatInMeasure += note.durationBeats || 1;
+  });
+
+  if (currentMeasureNotes.length > 0) {
+    measures.push({
+      measureNum: currentMeasureNum,
+      notes: currentMeasureNotes
+    });
+  }
+
+  const expandedNotes: WorldTourNote[] = [];
+  const noteIndexMap: number[] = [];
+
+  let mIdx = 0;
+  while (mIdx < measures.length) {
+    const m = measures[mIdx];
+    const section = repeatSections.find(s => s.startBar === m.measureNum);
+    if (section) {
+      const sectionMeasures: MeasureGroup[] = [];
+      let sIdx = mIdx;
+      while (sIdx < measures.length && measures[sIdx].measureNum <= section.endBar) {
+        sectionMeasures.push(measures[sIdx]);
+        sIdx++;
+      }
+      const count = section.repeatCount ?? 2;
+      for (let rep = 0; rep < count; rep++) {
+        for (const sm of sectionMeasures) {
+          for (const item of sm.notes) {
+            expandedNotes.push(item.note);
+            noteIndexMap.push(item.originalIndex);
+          }
+        }
+      }
+      mIdx = sIdx;
+    } else {
+      for (const item of m.notes) {
+        expandedNotes.push(item.note);
+        noteIndexMap.push(item.originalIndex);
+      }
+      mIdx++;
+    }
+  }
+
+  return {
+    notes: expandedNotes,
+    noteIndexMap
+  };
 }
 
 const SEMITONE_INDEX: Record<string, number> = {
@@ -70,6 +190,11 @@ export class WorldTourAudioEngine {
   private totalCountInBeats: number = 4;
   private isCountingIn: boolean = true;
   private timeSignature: string = '4/4';
+  private anacrusisBeats: number = 0;
+  private isMetronomeActive: boolean = true;
+  private metronomeVolume: number = 1.0;
+  private nextBeatTime: number = 0;
+  private currentBeatInMeasure: number = 0;
   private uiLevel: 'junior' | 'teen' | 'pro' = 'teen';
   private studentInstrument?: string | null = null;
   private currentNoteScheduledTime: number = 0;
@@ -104,6 +229,8 @@ export class WorldTourAudioEngine {
   private onNoteResult?: (event: AudioNoteEvent) => void;
   private onComplete?: () => void;
   private notes: WorldTourNote[] = [];
+  private noteIndexMap: number[] = [];
+  private originalNotesLength: number = 0;
   private mode: 'listen' | 'practice' | 'challenge' = 'listen';
 
   // Hysteresis & Scoring
@@ -337,7 +464,8 @@ export class WorldTourAudioEngine {
   }
 
   /**
-   * Schedules a woodblock transient metronome click at an exact AudioContext time.
+   * Schedules a high-contrast, crystal-clear woodblock metronome click at an exact AudioContext time.
+   * High-energy transients (accent 0.98, regular 0.82) ensure it punches cleanly through any melody/chords.
    */
   private scheduleWoodblockAtTime(time: number, isAccent: boolean = false): void {
     const ctx = this.initContext();
@@ -345,16 +473,22 @@ export class WorldTourAudioEngine {
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
-    osc.frequency.exponentialRampToValueAtTime(isAccent ? 300 : 200, time + 0.03);
+    // Triangle wave provides crisp wooden presence and bright odd harmonics
+    osc.type = 'triangle';
+    const startFreq = isAccent ? 2400 : 1600;
+    const endFreq = isAccent ? 1500 : 1000;
+    osc.frequency.setValueAtTime(startFreq, time);
+    osc.frequency.exponentialRampToValueAtTime(endFreq, time + 0.012);
 
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(isAccent ? 1800 : 1200, time);
-    filter.Q.setValueAtTime(4.0, time);
+    // Highpass filter at 450 Hz lets the full transient & harmonics punch through without muddy low-end
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(450, time);
+    filter.Q.setValueAtTime(1.0, time);
 
-    gain.gain.setValueAtTime(isAccent ? 0.42 : 0.28, time);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+    // Dynamic studio volume: loud, punchy, and distinct
+    const targetGain = (isAccent ? 0.98 : 0.82) * this.metronomeVolume;
+    gain.gain.setValueAtTime(targetGain, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + (isAccent ? 0.065 : 0.052));
 
     osc.connect(filter);
     filter.connect(gain);
@@ -369,13 +503,14 @@ export class WorldTourAudioEngine {
     };
 
     osc.start(time);
-    osc.stop(time + 0.05);
+    osc.stop(time + (isAccent ? 0.075 : 0.060));
   }
 
   /**
    * Starts high-precision playback using the Web Audio Lookahead-Scheduler.
+   * INVARIANT: In Challenge mode, microphone permission MUST be granted before any audio or count-in begins!
    */
-  public startPlayback(
+  public async startPlayback(
     notes: WorldTourNote[],
     bpm: number,
     mode: 'listen' | 'practice' | 'challenge',
@@ -383,11 +518,33 @@ export class WorldTourAudioEngine {
     onNoteResult?: (event: AudioNoteEvent) => void,
     onComplete?: () => void,
     options?: WorldTourPlaybackOptions
-  ): void {
+  ): Promise<boolean> {
     this.stop();
     const ctx = this.initContext();
 
-    this.notes = notes;
+    if (options) {
+      if (options.uiLevel) this.uiLevel = options.uiLevel;
+      if (options.studentInstrument !== undefined) this.studentInstrument = options.studentInstrument;
+      if (options.timeSignature) this.timeSignature = options.timeSignature;
+      if (options.onMicError) this.onMicError = options.onMicError;
+      if (options.metronomeEnabled !== undefined) this.isMetronomeActive = options.metronomeEnabled;
+      if (options.metronomeVolume !== undefined) this.metronomeVolume = options.metronomeVolume;
+    }
+
+    const timeSig = options?.timeSignature || this.timeSignature;
+    const anacrusis = options?.anacrusisBeats || 0;
+    this.anacrusisBeats = anacrusis;
+    this.nextBeatTime = 0;
+    this.currentBeatInMeasure = 0;
+    const expanded = expandNotesForPlayback(
+      notes,
+      timeSig,
+      anacrusis,
+      options?.repeatSections
+    );
+    this.notes = expanded.notes;
+    this.noteIndexMap = expanded.noteIndexMap;
+    this.originalNotesLength = notes.length;
     this.tempoBpm = Math.max(40, Math.min(220, bpm));
     this.mode = mode;
     this.onBeatUpdate = onBeatUpdate;
@@ -401,16 +558,8 @@ export class WorldTourAudioEngine {
     this.prevRms = 0;
     this.isCurrentNoteDrum = false;
 
-    if (options) {
-      if (options.uiLevel) this.uiLevel = options.uiLevel;
-      if (options.studentInstrument !== undefined) this.studentInstrument = options.studentInstrument;
-      if (options.timeSignature) this.timeSignature = options.timeSignature;
-      if (options.onMicError) this.onMicError = options.onMicError;
-    }
-
     // Dynamic count-in adapted to meter and anacrusis
     const fullBarBeats = WorldTourAudioEngine.parseBeatsPerMeasure(this.timeSignature);
-    const anacrusis = options?.anacrusisBeats || 0;
     const beatsCount = (anacrusis > 0 && anacrusis < fullBarBeats)
       ? Math.round(fullBarBeats - anacrusis)
       : fullBarBeats;
@@ -422,26 +571,29 @@ export class WorldTourAudioEngine {
     // In Challenge mode, stop any loudspeaker drone audio bleed before count-in
     if (mode === 'challenge') {
       this.toggleDrone('C3', false);
+      const micGranted = await this.startMicrophoneListening();
+      if (!micGranted || !this.isRunning) {
+        this.stop();
+        return false;
+      }
     }
 
-    // Schedule begins 80ms in future
+    // Audio schedule begins 80ms in future ONLY after microphone is verified live
     this.nextNoteTime = ctx.currentTime + 0.08;
-
-    if (mode === 'challenge') {
-      this.startMicrophoneListening();
-    }
 
     // Precision Lookahead Loop (25ms interval)
     this.schedulerIntervalId = window.setInterval(() => {
       if (!this.isRunning) return;
       this.scheduleLoop();
     }, 25);
+
+    return true;
   }
 
   /**
    * Universal adapter for WorldTourScorePlayer compatibility.
    */
-  public startScore(
+  public async startScore(
     notes: WorldTourNote[],
     bpm: number,
     mode: 'listen' | 'practice' | 'challenge',
@@ -449,11 +601,11 @@ export class WorldTourAudioEngine {
     onNoteResult?: (event: AudioNoteEvent) => void,
     onComplete?: () => void,
     options?: WorldTourPlaybackOptions
-  ): void {
+  ): Promise<boolean> {
     if (mode === 'challenge') {
       this.toggleDrone('C3', false);
     }
-    this.startPlayback(
+    return this.startPlayback(
       notes,
       bpm,
       mode,
@@ -495,6 +647,13 @@ export class WorldTourAudioEngine {
 
         if (this.countInRemaining <= 0) {
           this.isCountingIn = false;
+          this.nextBeatTime = this.nextNoteTime;
+          const fullBarBeats = WorldTourAudioEngine.parseBeatsPerMeasure(this.timeSignature);
+          if (this.anacrusisBeats > 0 && this.anacrusisBeats < fullBarBeats) {
+            this.currentBeatInMeasure = Math.round(fullBarBeats - this.anacrusisBeats);
+          } else {
+            this.currentBeatInMeasure = 0;
+          }
         }
       } else {
         // Song note playback
@@ -505,18 +664,19 @@ export class WorldTourAudioEngine {
             window.clearInterval(this.schedulerIntervalId);
             this.schedulerIntervalId = null;
           }
-          // Song ended
-          const finishDelayMs = Math.max(0, (this.nextNoteTime - this.ctx.currentTime) * 1000) + 400;
+          // Song ended - natural acoustic ring-out without artificial multi-second freeze
+          const finishDelayMs = Math.min(1500, Math.max(80, (this.nextNoteTime - this.ctx.currentTime) * 1000 + 200));
           this.scheduleTimeout(() => {
             if (this.isRunning) {
               // Finalize last note if pending
               if (this.activeNoteIndex >= 0 && this.activeNoteIndex < this.notes.length) {
                 const lastNote = this.notes[this.activeNoteIndex];
-                if (lastNote.pitch !== 'REST' && this.noteBestStatus === 'pending' && !this.manualHits.has(this.activeNoteIndex)) {
+                const origLastIdx = this.noteIndexMap[this.activeNoteIndex] ?? this.activeNoteIndex;
+                if (lastNote.pitch !== 'REST' && this.noteBestStatus === 'pending' && !this.manualHits.has(origLastIdx)) {
                   this.noteBestStatus = 'miss';
                   if (this.onNoteResult) {
                     this.onNoteResult({
-                      noteIndex: this.activeNoteIndex,
+                      noteIndex: origLastIdx,
                       pitch: lastNote.pitch,
                       expectedHz: getPitchFrequency(lastNote.pitch),
                       status: 'miss'
@@ -539,9 +699,6 @@ export class WorldTourAudioEngine {
 
         if (this.mode === 'listen' || this.mode === 'practice') {
           this.scheduleToneAtTime(note.pitch, scheduledTime, noteDurationSec, 0.48);
-          this.scheduleWoodblockAtTime(scheduledTime, noteIdx === 0);
-        } else if (this.mode === 'challenge') {
-          this.scheduleWoodblockAtTime(scheduledTime, noteIdx === 0);
         }
 
         // Synchronize UI highlight with exact note strike
@@ -552,11 +709,12 @@ export class WorldTourAudioEngine {
           // Hysteresis Fix: Finalize previous note as 'miss' if it wasn't played/hit
           if (this.activeNoteIndex >= 0 && this.activeNoteIndex < this.notes.length) {
             const prevNote = this.notes[this.activeNoteIndex];
-            if (prevNote.pitch !== 'REST' && this.noteBestStatus === 'pending' && !this.manualHits.has(this.activeNoteIndex)) {
+            const origPrevIdx = this.noteIndexMap[this.activeNoteIndex] ?? this.activeNoteIndex;
+            if (prevNote.pitch !== 'REST' && this.noteBestStatus === 'pending' && !this.manualHits.has(origPrevIdx)) {
               this.noteBestStatus = 'miss';
               if (this.onNoteResult) {
                 this.onNoteResult({
-                  noteIndex: this.activeNoteIndex,
+                  noteIndex: origPrevIdx,
                   pitch: prevNote.pitch,
                   expectedHz: getPitchFrequency(prevNote.pitch),
                   status: 'miss'
@@ -569,8 +727,9 @@ export class WorldTourAudioEngine {
           this.currentNoteScheduledTime = scheduledTime;
           this.isCurrentNoteDrum = Boolean(note.drumType && note.drumType !== 'rest') || this.isPercussionInstrument(this.studentInstrument);
           this.resetNoteHysteresis();
+          const origNoteIdx = this.noteIndexMap[noteIdx] ?? noteIdx;
           if (this.onBeatUpdate) {
-            this.onBeatUpdate(noteIdx, noteIdx + 1, this.notes.length);
+            this.onBeatUpdate(origNoteIdx, origNoteIdx + 1, this.originalNotesLength || this.notes.length);
           }
         }, delayMs);
 
@@ -578,13 +737,27 @@ export class WorldTourAudioEngine {
         this.currentNoteIdx++;
       }
     }
+
+    // Parallel Metronome Beat Scheduler (Independent of melodic note durations)
+    if (!this.isCountingIn && !this.isFinishing && this.nextBeatTime > 0) {
+      const fullBarBeats = WorldTourAudioEngine.parseBeatsPerMeasure(this.timeSignature);
+      while (this.nextBeatTime < this.ctx.currentTime + this.scheduleAheadTime) {
+        if (this.isMetronomeActive) {
+          const isDownbeat = (this.currentBeatInMeasure === 0);
+          this.scheduleWoodblockAtTime(this.nextBeatTime, isDownbeat);
+        }
+        this.nextBeatTime += beatDurationSec;
+        this.currentBeatInMeasure = (this.currentBeatInMeasure + 1) % fullBarBeats;
+      }
+    }
   }
 
   /**
    * Initializes microphone stream and pitch analyzer.
    * Guarded with session tokens to eliminate media stream leaks.
+   * Returns true if microphone was granted and is actively streaming.
    */
-  private async startMicrophoneListening(): Promise<void> {
+  private async startMicrophoneListening(): Promise<boolean> {
     const sessionId = ++this.playbackSessionId;
     this.micDenied = false;
 
@@ -593,7 +766,7 @@ export class WorldTourAudioEngine {
         this.isListeningMic = false;
         this.micDenied = true;
         this.onMicError?.(new Error('navigator.mediaDevices.getUserMedia is unavailable.'));
-        return;
+        return false;
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -607,7 +780,7 @@ export class WorldTourAudioEngine {
       // Session fence: If playback was stopped or restarted while prompt was active, release track immediately
       if (!this.isRunning || this.playbackSessionId !== sessionId) {
         stream.getTracks().forEach(t => t.stop());
-        return;
+        return false;
       }
 
       this.micStream = stream;
@@ -619,12 +792,14 @@ export class WorldTourAudioEngine {
       this.analyser = analyser;
       this.isListeningMic = true;
       this.pollPitch();
+      return true;
     } catch (err) {
       this.isListeningMic = false;
       this.micDenied = true;
       if (this.onMicError) {
         this.onMicError(err);
       }
+      return false;
     }
   }
 
@@ -633,15 +808,17 @@ export class WorldTourAudioEngine {
    * ensuring mic noise cannot downgrade or overwrite it.
    */
   public registerManualHit(noteIndex: number): void {
-    if (!this.isRunning || noteIndex < 0 || noteIndex >= this.notes.length) return;
+    if (!this.isRunning) return;
     this.manualHits.add(noteIndex);
     this.noteBestStatus = 'hit';
-    const note = this.notes[noteIndex];
-    if (this.onNoteResult) {
+    const activeNote = (this.activeNoteIndex >= 0 && this.activeNoteIndex < this.notes.length)
+      ? this.notes[this.activeNoteIndex]
+      : (this.notes[noteIndex] || this.notes[0]);
+    if (this.onNoteResult && activeNote) {
       this.onNoteResult({
         noteIndex,
-        pitch: note.pitch,
-        expectedHz: getPitchFrequency(note.pitch),
+        pitch: activeNote.pitch,
+        expectedHz: getPitchFrequency(activeNote.pitch),
         status: 'hit'
       });
     }
@@ -742,11 +919,11 @@ export class WorldTourAudioEngine {
 
                 const absCents = Math.abs(foldedCents);
 
-                // UI-level adaptive cent tolerances
+                // UI-level adaptive cent tolerances (calibrated for real acoustic instruments & inharmonicity)
                 const tolerances = {
                   junior: { hit: 50, near: 75 },
-                  teen: { hit: 30, near: 45 },
-                  pro: { hit: 18, near: 28 }
+                  teen: { hit: 32, near: 48 },
+                  pro: { hit: 24, near: 38 }
                 };
                 const tol = tolerances[this.uiLevel] || tolerances.teen;
 
@@ -776,8 +953,9 @@ export class WorldTourAudioEngine {
           }
 
           if (this.onNoteResult) {
+            const origActiveIdx = this.noteIndexMap[activeIdx] ?? activeIdx;
             this.onNoteResult({
-              noteIndex: activeIdx,
+              noteIndex: origActiveIdx,
               pitch: activeNote.pitch,
               expectedHz: getPitchFrequency(activeNote.pitch),
               detectedHz: this.lastDetectedHz,
@@ -809,7 +987,7 @@ export class WorldTourAudioEngine {
       rms += buf[i] * buf[i];
     }
     rms = Math.sqrt(rms / SIZE);
-    if (rms < 0.012) return -1; // Squelch ambient silence
+    if (rms < 0.008) return -1; // Squelch ambient silence (calibrated for quiet piano / acoustic attacks)
 
     // W = 2048 integration window (matching requirement: Quadratic difference function d_t(tau) over 2048 samples)
     const W = 2048;
@@ -939,6 +1117,37 @@ export class WorldTourAudioEngine {
     this.analyser = null;
     this.activeNoteIndex = -1;
     this.currentNoteScheduledTime = 0;
+    this.nextBeatTime = 0;
+    this.currentBeatInMeasure = 0;
+  }
+
+  /**
+   * Toggles metronome clicks on/off during playback.
+   */
+  public toggleMetronome(forceState?: boolean): boolean {
+    this.isMetronomeActive = forceState !== undefined ? forceState : !this.isMetronomeActive;
+    return this.isMetronomeActive;
+  }
+
+  /**
+   * Returns whether the metronome is currently enabled.
+   */
+  public getMetronomeActive(): boolean {
+    return this.isMetronomeActive;
+  }
+
+  /**
+   * Sets the metronome volume level (0.1 to 2.0). Default is 1.0.
+   */
+  public setMetronomeVolume(vol: number): void {
+    this.metronomeVolume = Math.max(0.1, Math.min(2.0, vol));
+  }
+
+  /**
+   * Returns the current metronome volume level.
+   */
+  public getMetronomeVolume(): number {
+    return this.metronomeVolume;
   }
 }
 

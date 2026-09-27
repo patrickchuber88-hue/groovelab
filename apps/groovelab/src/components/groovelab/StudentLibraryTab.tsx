@@ -5,7 +5,9 @@ import {
   Music, 
   ExternalLink, 
   Check, 
-  Plus 
+  Plus,
+  Award,
+  Sparkles
 } from 'lucide-react';
 import { brandColor as defaultBrandColor } from '../../constants/instruments';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
@@ -13,6 +15,9 @@ import { ErrorBoundary } from '../ui/ErrorBoundary';
 export interface StudentLibraryTabProps {
   globalSongs: any[];
   userSongs: any[];
+  groupedPracticeSongs?: any[];
+  repertoireSongs?: any[];
+  setActiveStudentTab?: (tab: string) => void;
   brandColor?: string;
   onAddSongToRepertoire: (song: any) => Promise<void> | void;
   isMobile: boolean;
@@ -36,6 +41,9 @@ const LEVEL_COLORS: Record<string | number, string> = {
 export function StudentLibraryTab({
   globalSongs = [],
   userSongs = [],
+  groupedPracticeSongs = [],
+  repertoireSongs = [],
+  setActiveStudentTab,
   brandColor = defaultBrandColor,
   onAddSongToRepertoire,
   isMobile
@@ -271,7 +279,43 @@ export function StudentLibraryTab({
                 const iconBg = `hsl(${songHue}, 90%, 96%)`;
                 const iconBorder = `hsl(${songHue}, 45%, 88%)`;
                 const iconColor = `hsl(${songHue}, 65%, 45%)`;
-                const isAdded = userSongs.some(us => us.song_id === song.id);
+                const songSkills = (userSongs || []).filter((us: any) => us.song_id === song.id);
+                const masteredSkills = songSkills.filter((us: any) => 
+                  (us.progress === 100 || us.is_stage_ready) && !us.is_pending_approval
+                );
+                const isMasteredInRepertoire = masteredSkills.length > 0;
+                
+                // Is this song currently active in the practice board?
+                const isInPractice = (groupedPracticeSongs || []).some((ps: any) => ps.song_id === song.id);
+
+                // Determine required instruments
+                const rawInst = song.instrumentation || {};
+                const normalizedInst: Record<string, number> = {};
+                Object.entries(rawInst).forEach(([inst, count]) => {
+                  let key = inst;
+                  const lower = inst.toLowerCase();
+                  if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
+                  else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
+                  else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
+                  else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
+                  else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
+                  normalizedInst[key] = Math.max(normalizedInst[key] || 0, Number(count) || 0);
+                });
+                const activeInstruments = Object.keys(normalizedInst).filter(k => !k.toLowerCase().includes('vocal') && normalizedInst[k] > 0);
+                const availableInstruments = activeInstruments.length > 0 ? activeInstruments : ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+
+                const masteredInstNames = new Set(
+                  masteredSkills.map((s: any) => {
+                    const l = (s.instrument || '').toLowerCase();
+                    if (l.includes('guitar') || l.includes('gitarre')) return 'E-Gitarre';
+                    if (l.includes('drum') || l.includes('schlagzeug')) return 'E-Drums';
+                    if (l.includes('bass')) return 'E-Bass';
+                    if (l.includes('piano') || l.includes('keys') || l.includes('tasten')) return 'E-Piano';
+                    return s.instrument;
+                  })
+                );
+                const isAllMastered = availableInstruments.length > 0 && availableInstruments.every(inst => masteredInstNames.has(inst));
+                const masteredSummary = Array.from(masteredInstNames).join(', ');
 
                 return (
                   <div 
@@ -355,6 +399,22 @@ export function StudentLibraryTab({
                               {song.bpm} BPM
                             </span>
                           )}
+                          {isMasteredInRepertoire && (
+                            <span style={{ 
+                              background: isAllMastered ? '#fef9c3' : '#e6f4ea', 
+                              color: isAllMastered ? '#854d0e' : '#137333', 
+                              border: isAllMastered ? '1px solid #fde047' : '1px solid #ceead6', 
+                              padding: '4px 10px', 
+                              borderRadius: '8px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 900,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              {isAllMastered ? '👑 Repertoire (Alle Tracks)' : `⭐ Repertoire (${masteredSummary})`}
+                            </span>
+                          )}
                           {song.instrumentation && typeof song.instrumentation === 'object' && !Array.isArray(song.instrumentation) && (
                             Object.entries(song.instrumentation)
                               .filter(([_, count]) => Number(count) > 0)
@@ -401,26 +461,84 @@ export function StudentLibraryTab({
 
                     {/* Actions */}
                     <div style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto' }}>
-                      {isAdded ? (
-                        <div style={{ 
-                          background: '#e6f4ea', 
-                          border: '1px solid #e6f4ea', 
-                          padding: '12px 24px', 
-                          borderRadius: '16px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: isMobile ? 'center' : 'flex-start', 
-                          gap: '8px', 
-                          color: '#34a853', 
-                          fontWeight: 900, 
-                          fontSize: '0.85rem', 
-                          width: isMobile ? '100%' : 'auto',
-                          minHeight: '44px'
-                        }}>
-                          <Check size={18} strokeWidth={3} /> Hinzugefügt
-                        </div>
+                      {isInPractice ? (
+                        <button 
+                          type="button"
+                          onClick={() => setActiveStudentTab?.('practice')}
+                          style={{ 
+                            background: '#e6f4ea', 
+                            border: '1px solid #ceead6', 
+                            padding: '12px 24px', 
+                            borderRadius: '16px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: isMobile ? 'center' : 'flex-start', 
+                            gap: '8px', 
+                            color: '#137333', 
+                            fontWeight: 900, 
+                            fontSize: '0.85rem', 
+                            width: isMobile ? '100%' : 'auto',
+                            minHeight: '44px',
+                            cursor: 'pointer',
+                            touchAction: 'manipulation'
+                          }}
+                          aria-label={`Song ${song.title} ist im Übe-Bereich. Klicke, um zum Üben zu wechseln.`}
+                        >
+                          <Check size={18} strokeWidth={3} /> Im Übe-Bereich
+                        </button>
+                      ) : isAllMastered ? (
+                        <button 
+                          type="button"
+                          onClick={() => setActiveStudentTab?.('repertoire')}
+                          style={{ 
+                            background: '#fef9c3', 
+                            border: '1px solid #fde047', 
+                            padding: '12px 24px', 
+                            borderRadius: '16px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: isMobile ? 'center' : 'flex-start', 
+                            gap: '8px', 
+                            color: '#854d0e', 
+                            fontWeight: 900, 
+                            fontSize: '0.85rem', 
+                            width: isMobile ? '100%' : 'auto',
+                            minHeight: '44px',
+                            cursor: 'pointer',
+                            touchAction: 'manipulation'
+                          }}
+                          aria-label={`Song ${song.title} ist komplett gemeistert. Klicke, um zum Repertoire zu wechseln.`}
+                        >
+                          <Award size={18} /> Im Repertoire
+                        </button>
+                      ) : isMasteredInRepertoire ? (
+                        <button 
+                          type="button"
+                          onClick={() => onAddSongToRepertoire(song)}
+                          style={{ 
+                            background: '#ffffff', 
+                            border: '1.5px solid #f59e0b', 
+                            padding: '12px 24px', 
+                            borderRadius: '16px', 
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: isMobile ? 'center' : 'flex-start', 
+                            gap: '8px', 
+                            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.12)', 
+                            transition: 'all 0.2s ease',
+                            width: isMobile ? '100%' : 'auto',
+                            minHeight: '44px',
+                            touchAction: 'manipulation'
+                          }}
+                          aria-label={`Weiteres Instrument für ${song.title} üben`}
+                        >
+                          <Plus size={18} color="#f59e0b" strokeWidth={3} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#b45309' }}>Weiteres Instrument üben</span>
+                        </button>
                       ) : (
                         <button 
+                          type="button"
                           onClick={() => onAddSongToRepertoire(song)}
                           style={{ 
                             background: '#ffffff', 

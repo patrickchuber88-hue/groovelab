@@ -41,7 +41,7 @@ export async function fetchRoomsBySchool(schoolId: string, force = false, active
 
   if (!force && inMemoryRooms.has(memoryKey)) {
     const cached = inMemoryRooms.get(memoryKey)!;
-    if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    if (Date.now() - cached.timestamp < CACHE_TTL_MS && cached.data.length > 0) {
       return cached.data;
     }
   }
@@ -70,13 +70,21 @@ export async function fetchRoomsBySchool(schoolId: string, force = false, active
       const allRooms = data || [];
       let result = allRooms;
       if (activePlatform === 'groovelab') {
-        result = allRooms.filter(r => Boolean(r.is_groovelab_active));
+        // Tolerant filtering: only exclude explicitly deactivated rooms (true or null/undefined remain active)
+        result = allRooms.filter(r => r.is_groovelab_active !== false);
       } else if (activePlatform === 'campus') {
         result = allRooms.filter(r => r.is_campus_active !== false);
       }
 
-      inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: result });
-      setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
+      // Fail-open protection: If platform-specific filtering returned 0 rooms but school has rooms, keep all rooms
+      if (result.length === 0 && allRooms.length > 0) {
+        result = allRooms;
+      }
+
+      if (result.length > 0) {
+        inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: result });
+        setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
+      }
       return result;
     } catch (err) {
       console.error('[RoomRepository] Unexpected error in fetchRoomsBySchool:', err);
@@ -90,7 +98,7 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
 
   if (!force && inMemoryStations.has(schoolId)) {
     const cached = inMemoryStations.get(schoolId)!;
-    if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    if (Date.now() - cached.timestamp < CACHE_TTL_MS && cached.data.length > 0) {
       return cached.data;
     }
   }
@@ -106,11 +114,43 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
 
   return dedupeQuery(`stations_${schoolId}`, async () => {
     try {
-      const { data, error } = await supabase
+      // ⚡ 0,1% Goldstandard 3-Tier Resilient Station Query:
+      // Tier 1: Direct query by school_id (standard in modern tenant schema)
+      let { data, error } = await supabase
         .from('stations')
-        .select('*, rooms!stations_room_id_fkey!inner(school_id, is_groovelab_active, is_campus_active)')
-        .eq('rooms.school_id', schoolId)
+        .select('*')
+        .eq('school_id', schoolId)
         .order('name');
+
+      // Tier 2: Relational join via rooms if direct school_id query returned 0 rows or errored
+      if (error || !data || data.length === 0) {
+        const joinRes = await supabase
+          .from('stations')
+          .select('*, rooms!inner(school_id, is_groovelab_active, is_campus_active)')
+          .eq('rooms.school_id', schoolId)
+          .order('name');
+        if (!joinRes.error && joinRes.data && joinRes.data.length > 0) {
+          data = joinRes.data;
+          error = null;
+        }
+      }
+
+      // Tier 3: Query stations matching known room IDs of the school
+      if (error || !data || data.length === 0) {
+        const roomsRes = await supabase.from('rooms').select('id').eq('school_id', schoolId);
+        const roomIds = (roomsRes.data || []).map((r: any) => r.id);
+        if (roomIds.length > 0) {
+          const byRoomsRes = await supabase
+            .from('stations')
+            .select('*')
+            .in('room_id', roomIds)
+            .order('name');
+          if (!byRoomsRes.error && byRoomsRes.data && byRoomsRes.data.length > 0) {
+            data = byRoomsRes.data;
+            error = null;
+          }
+        }
+      }
 
       if (error) {
         console.warn('[RoomRepository] Error fetching stations:', error);
@@ -118,8 +158,10 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
       }
 
       const result = data || [];
-      inMemoryStations.set(schoolId, { timestamp: Date.now(), data: result });
-      setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
+      if (result.length > 0) {
+        inMemoryStations.set(schoolId, { timestamp: Date.now(), data: result });
+        setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
+      }
       return result;
     } catch (err) {
       console.error('[RoomRepository] Unexpected error in fetchStationsBySchool:', err);

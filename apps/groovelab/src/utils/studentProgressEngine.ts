@@ -168,7 +168,7 @@ export const getMasteredSongsSet = (songSkills?: any[], progressMatrix?: any[]):
   const masteredSongs = new Set<string>();
 
   (songSkills || []).forEach(skill => {
-    if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
+    if (skill.progress_percent === 100 || skill.status === 'MASTERED') {
       const rawTitle = skill.songs?.title || skill.title || skill.song_title;
       if (rawTitle) {
         const cleanTitle = String(rawTitle).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();

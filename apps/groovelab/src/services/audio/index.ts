@@ -10,3 +10,4 @@ export * from './SpotifyGradeStreamController';
 export * from './DidacticWsolaEngine';
 export * from './YinPitchDetectionEngine';
 export * from './EarSynthEngine';
+export * from './RelationalHarmonicEngine';

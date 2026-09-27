@@ -23,8 +23,9 @@ import { TeacherBriefingTab } from './teacher/tabs/TeacherBriefingTab';
 import { TeacherCoachesTab } from './teacher/tabs/TeacherCoachesTab';
 import { TeacherModalsHub } from './teacher/modals/TeacherModalsHub';
 
-// Lazy Loaded Tabs
-const TeacherLiveView = lazy(() => import('./teacher/TeacherLiveView').then(m => ({ default: m.TeacherLiveView })));
+// Lazy Loaded Tabs (⚡ 0ms Instant Chunk Preload)
+const teacherLiveViewChunk = import('./teacher/TeacherLiveView');
+const TeacherLiveView = lazy(() => teacherLiveViewChunk.then(m => ({ default: m.TeacherLiveView })));
 const TeacherBandWorkspace = lazy(() => import('./teacher/TeacherBandWorkspace').then(m => ({ default: m.TeacherBandWorkspace })));
 const TeacherStudioBoardView = lazy(() => import('./teacher/TeacherStudioBoardView').then(m => ({ default: m.TeacherStudioBoardView })));
 const TeacherStudentsView = lazy(() => import('./teacher/TeacherStudentsView').then(m => ({ default: m.TeacherStudentsView })));
@@ -189,6 +190,9 @@ export function TeacherDashboard({
     teacher: data.teacher,
     schoolData: data.schoolData,
     activePlatform,
+    viewMode,
+    activeTab,
+    hideHeader,
     onRefresh: data.fetchData
   });
 
@@ -199,6 +203,9 @@ export function TeacherDashboard({
     schoolData: data.schoolData,
     rooms: data.rooms,
     allStudents: students.allStudents,
+    viewMode,
+    activeTab,
+    hideHeader,
     onRefresh: data.fetchData,
     onToast: showToast
   });
@@ -229,6 +236,9 @@ export function TeacherDashboard({
     briefingData: tagesplan.briefingData,
     crisisNotifications: data.crisisNotifications,
     showRealNames: students.showRealNames,
+    viewMode,
+    activeTab,
+    hideHeader,
     onRefresh: handleTeacherRefresh
   });
 
@@ -272,10 +282,13 @@ export function TeacherDashboard({
     activePlanningEvents: [],
     mySubmittedProgramPoints: [],
     isTeacherBriefingSidebarCollapsed: data.isTeacherBriefingSidebarCollapsed,
+    viewMode,
+    activeTab,
+    hideHeader,
     onTabChange
   });
 
-  const unreadHelpCount = Math.max(0, (data.helpRequests || []).length - localLastSeenCounts.help);
+  const unreadHelpCount = viewMode === 'student' ? 0 : Math.max(0, (data.helpRequests || []).length - localLastSeenCounts.help);
   const effectiveRehearsal = propsRehearsalSuggestions !== undefined ? propsRehearsalSuggestions : (livelab.rehearsalSuggestions || []);
   const effectiveWallSongs = propsWallSongs !== undefined ? propsWallSongs : (livelab.wallSongs || []);
   const unreadRehearsalCount = Math.max(0, effectiveRehearsal.length - localLastSeenCounts.rehearsal);
@@ -285,7 +298,7 @@ export function TeacherDashboard({
   useEffect(() => {
     if (!isSidebarCollapsed) {
       const currentCounts = {
-        help: (data.helpRequests || []).length,
+        help: viewMode === 'student' ? 0 : (data.helpRequests || []).length,
         rehearsal: effectiveRehearsal.length,
         matching: effectiveWallSongs.length
       };
@@ -294,7 +307,7 @@ export function TeacherDashboard({
         localStorage.setItem('groovelab_last_seen_sidebar', JSON.stringify(currentCounts));
       }
     }
-  }, [isSidebarCollapsed, (data.helpRequests || []).length, effectiveRehearsal.length, effectiveWallSongs.length]);
+  }, [isSidebarCollapsed, viewMode, (data.helpRequests || []).length, effectiveRehearsal.length, effectiveWallSongs.length]);
 
   useEffect(() => {
     if (onSidebarNotificationsChange) {
@@ -432,7 +445,7 @@ export function TeacherDashboard({
         maxWidth: '1600px',
         width: '100%',
         margin: '0 auto',
-        padding: '24px 24px 80px 24px',
+        padding: hideHeader ? '8px 16px 24px 16px' : '24px 24px 80px 24px',
         boxSizing: 'border-box'
       }}>
         {activeTab === 'briefing' ? (
@@ -608,6 +621,7 @@ export function TeacherDashboard({
               handleTeacherSelfCheckout={livelab.handleTeacherSelfCheckout}
               handleTeacherCheckout={livelab.handleTeacherCheckout}
               handleLogoutStudent={livelab.handleLogoutStudent}
+              onLogout={onLogout}
               handleResolveHelp={livelab.handleResolveHelp}
               handleMarkAsRead={livelab.handleMarkAsRead}
               handleMarkAllAsRead={livelab.handleMarkAllAsRead}

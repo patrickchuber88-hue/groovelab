@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { normalizeInstrument } from '../utils/instruments';
 import type { ToastMessage } from './useCampusPracticeSearchAndPdfSuite';
 
@@ -402,23 +402,43 @@ export function useBandRepertoireActions({
 
       // Send Realtime Broadcast notification that a band has been founded
       try {
+        const memberUserIds = uniqueMembers.map((m: any) => m.user_id);
+        const broadcastPayload = {
+          bandId: newBand.id,
+          bandName: newBand.name,
+          songTitle: target.title || target.songs?.title || 'einem Song',
+          founderId: user.id,
+          memberIds: memberUserIds
+        };
+
         const liveLabChannel = supabase.channel(`realtime_live_lab_${user.school_id}`);
         liveLabChannel.subscribe((status: any) => {
           if (status === 'SUBSCRIBED') {
             liveLabChannel.send({
               type: 'broadcast',
               event: 'band-founded',
-              payload: {
-                bandName: newBand.name,
-                songTitle: target.title || target.songs?.title || 'einem Song'
-              }
+              payload: broadcastPayload
             });
-            console.log('[Founding] Sent band-founded broadcast for', newBand.name);
             setTimeout(() => {
               supabase.removeChannel(liveLabChannel);
             }, 1500);
           }
         });
+
+        const bandsChannel = supabase.channel(`realtime_bands_${user.school_id}`);
+        bandsChannel.subscribe((status: any) => {
+          if (status === 'SUBSCRIBED') {
+            bandsChannel.send({
+              type: 'broadcast',
+              event: 'band-founded',
+              payload: broadcastPayload
+            });
+            setTimeout(() => {
+              supabase.removeChannel(bandsChannel);
+            }, 1500);
+          }
+        });
+        console.log('[Founding] Sent band-founded broadcast for', newBand.name, 'with memberIds:', memberUserIds);
       } catch (bcErr) {
         console.error('Failed to send band-founded broadcast:', bcErr);
       }
@@ -678,25 +698,102 @@ export function useBandRepertoireActions({
     if (!window.confirm('Möchtest du diesen Song aus deinem Übe-Board entfernen?')) return;
     try {
       setLoading(true);
-      const { error } = await supabase.from('user_song_skills').delete().eq('song_id', songId).eq('user_id', loggedInUserId);
-      if (error) {
-        console.error('Delete error:', error);
-        throw error;
+
+      // Check if user has mastered skills for this song (100% or is_stage_ready)
+      const currentSkills = (userSongs || []).filter((s: any) => s.song_id === songId);
+      const masteredSkills = currentSkills.filter((s: any) => 
+        (s.progress === 100 || s.is_stage_ready) && !s.is_pending_approval
+      );
+
+      if (masteredSkills.length > 0) {
+        // 0,1% Goldstandard Repertoire-Schutz (GRV-39):
+        // Keep 100% mastered repertoire skills safe! Mark them as dismissed from practice board.
+        // Delete only unmastered practice skills.
+        const unmasteredIds = currentSkills
+          .filter((s: any) => s.progress < 100 && !s.is_stage_ready && !s.isMock)
+          .map((s: any) => s.id)
+          .filter((id: string) => id && !id.startsWith('mock::'));
+
+        if (unmasteredIds.length > 0) {
+          await supabase.from('user_song_skills').delete().in('id', unmasteredIds);
+        }
+
+        // Persist dismissal to localStorage (fail-safe and resilient against schema drift)
+        const dismissedKey = `groovelab_dismissed_practice_${loggedInUserId}`;
+        try {
+          const dismissed: string[] = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+          if (!dismissed.includes(songId)) {
+            dismissed.push(songId);
+            localStorage.setItem(dismissedKey, JSON.stringify(dismissed));
+          }
+        } catch {}
+
+        // Set is_practice_dismissed = true on the remaining mastered skills (fail-safe)
+        try {
+          await supabase
+            .from('user_song_skills')
+            .update({ is_practice_dismissed: true })
+            .eq('song_id', songId)
+            .eq('user_id', loggedInUserId);
+        } catch {}
+
+        // Optimistic local update: mark dismissed
+        setUserSongs(prev => prev.map(s => s.song_id === songId ? { ...s, is_practice_dismissed: true } : s));
+        notify('Song aus Üben entfernt. Dein Repertoire-Erfolg bleibt sicher erhalten! ⭐', 'info');
+      } else {
+        // Complete delete if no skill was mastered
+        const { error } = await supabase.from('user_song_skills').delete().eq('song_id', songId).eq('user_id', loggedInUserId);
+        if (error) {
+          console.error('Delete error:', error);
+          throw error;
+        }
+        setUserSongs(prev => prev.filter(s => s.song_id !== songId));
+        notify('Song aus deinem Übe-Board entfernt.', 'info');
       }
-      console.log('Delete successful');
+
+      console.log('Delete / Dismiss successful');
       if (loggedInUserId) await fetchDashboardData(loggedInUserId);
     } catch (e: any) {
-      notify('Fehler beim Löschen: ' + e.message, 'error');
+      notify('Fehler beim Entfernen: ' + e.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [loggedInUserId, supabase, fetchDashboardData, setLoading]);
+  }, [loggedInUserId, userSongs, setUserSongs, supabase, fetchDashboardData, setLoading, notify]);
 
   const handleAddSongToRepertoire = useCallback(async (song: any) => {
     if (!loggedInUserId) return;
     try {
       setLoading(true);
-      
+
+      const songId = song.id || song.song_id;
+      const currentSkills = (userSongs || []).filter((s: any) => s.song_id === songId);
+      const isDismissed = currentSkills.some((s: any) => s.is_practice_dismissed);
+
+      // Persist reactivation to localStorage
+      const dismissedKey = `groovelab_dismissed_practice_${loggedInUserId}`;
+      try {
+        const dismissed: string[] = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+        const updated = dismissed.filter(id => id !== songId);
+        localStorage.setItem(dismissedKey, JSON.stringify(updated));
+      } catch {}
+
+      // If song already exists and was dismissed from practice, reactivate it!
+      if (isDismissed) {
+        try {
+          await supabase
+            .from('user_song_skills')
+            .update({ is_practice_dismissed: false })
+            .eq('song_id', songId)
+            .eq('user_id', loggedInUserId);
+        } catch {}
+
+        setUserSongs(prev => prev.map(s => s.song_id === songId ? { ...s, is_practice_dismissed: false } : s));
+        notify('Song wieder zum Übe-Board hinzugefügt! 🎸', 'info');
+        await fetchDashboardData(loggedInUserId);
+        setActiveStudentTab('practice');
+        return;
+      }
+
       const req = song.instrumentation || { Guitar: 1, Bass: 1, Drums: 1, Keys: 0 };
       const instrumentsToAdd = Object.keys(req).filter(inst => req[inst] > 0);
       
@@ -706,44 +803,60 @@ export function useBandRepertoireActions({
         return;
       }
       
+      // Filter out instruments that already exist in user_song_skills to prevent duplicate key errors (23505)
+      const existingKeySet = new Set(
+        currentSkills.map((s: any) => `${(s.instrument || '').toLowerCase()}::${s.difficulty_level || 'starter'}`)
+      );
+
       const insertData: any[] = [];
       instrumentsToAdd.forEach(inst => {
-        insertData.push({
-          user_id: loggedInUserId,
-          song_id: song.id,
-          instrument: inst,
-          difficulty_level: 'starter',
-          progress_percent: 0,
-          is_stage_ready: false
-        });
-        insertData.push({
-          user_id: loggedInUserId,
-          song_id: song.id,
-          instrument: inst,
-          difficulty_level: 'original',
-          progress_percent: 0,
-          is_stage_ready: false
-        });
+        if (!existingKeySet.has(`${inst.toLowerCase()}::starter`)) {
+          insertData.push({
+            user_id: loggedInUserId,
+            song_id: songId,
+            instrument: inst,
+            difficulty_level: 'starter',
+            progress_percent: 0,
+            is_stage_ready: false
+          });
+        }
+        if (!existingKeySet.has(`${inst.toLowerCase()}::original`)) {
+          insertData.push({
+            user_id: loggedInUserId,
+            song_id: songId,
+            instrument: inst,
+            difficulty_level: 'original',
+            progress_percent: 0,
+            is_stage_ready: false
+          });
+        }
       });
 
-      const { error } = await supabase.from('user_song_skills').insert(insertData);
-      
-      if (error) {
-        if (error.code === '23505') {
-          notify('Dieser Song ist bereits in deinem Repertoire!', 'info');
-        } else {
+      if (insertData.length > 0) {
+        const { error } = await supabase.from('user_song_skills').insert(insertData);
+        if (error && error.code !== '23505') {
           throw error;
         }
-      } else {
-        await fetchDashboardData(loggedInUserId);
-        setActiveStudentTab('practice');
       }
+
+      // Also ensure any existing rows for this song are marked not dismissed (fail-safe)
+      try {
+        await supabase
+          .from('user_song_skills')
+          .update({ is_practice_dismissed: false })
+          .eq('song_id', songId)
+          .eq('user_id', loggedInUserId);
+      } catch {}
+
+      await fetchDashboardData(loggedInUserId);
+      setActiveStudentTab('practice');
+      notify('Song zum Üben hinzugefügt! 🎶', 'info');
     } catch (err: any) {
       notify('Fehler: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [loggedInUserId, supabase, fetchDashboardData, setActiveStudentTab, setLoading, notify]);
+  }, [loggedInUserId, userSongs, setUserSongs, supabase, fetchDashboardData, setActiveStudentTab, setLoading, notify]);
 
   const handleSubmitForApproval = useCallback(async (skill: any) => {
     if (!loggedInUserId || !user) return;
@@ -899,14 +1012,39 @@ export function useBandRepertoireActions({
     }
   }, [user, exclusiveProposal, globalSongs, dismissSuggestion, supabase, fetchDashboardData, notify]);
 
+  // Realtime listener for band-founded events: Celebrates in real-time if a bandmate is online
+  useEffect(() => {
+    if (!user?.school_id || !user?.id) return;
+
+    const channelName = `realtime_bands_listener_${user.school_id}_${user.id}`;
+    const channel = supabase.channel(channelName)
+      .on('broadcast', { event: 'band-founded' }, (message: any) => {
+        const data = message?.payload;
+        if (!data) return;
+
+        if (data.memberIds && Array.isArray(data.memberIds) && data.memberIds.includes(user.id) && data.founderId !== user.id) {
+          console.log('[Realtime] Band founded for current user:', data.bandName);
+          notify(`🎸 Deine neue Band "${data.bandName}" wurde gegründet!`, 'success');
+          if (fetchDashboardData) {
+            fetchDashboardData(user.id);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.school_id, user?.id, supabase, fetchDashboardData, notify]);
+
   const clearConfetti = useCallback(async () => {
     if (!showConfetti) return;
     const bandToOpen = showConfetti.bands;
     await supabase.from('band_members').update({ confetti_seen: true }).eq('id', showConfetti.id);
     if (setShowConfetti) setShowConfetti(null);
     
-    // Now trigger the Artist Gateway debut once
-    if (bandToOpen && bandToOpen.status === 'forming') {
+    // Now trigger the Artist Gateway debut once (supporting both forming and active bands)
+    if (bandToOpen && (bandToOpen.status === 'forming' || bandToOpen.status === 'active')) {
       setSelectedBandForGateway(bandToOpen);
     }
   }, [showConfetti, supabase, setShowConfetti, setSelectedBandForGateway]);

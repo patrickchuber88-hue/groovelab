@@ -193,7 +193,6 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         await supabase
           .from('user_song_skills')
           .update({
-            is_stage_ready: targetStatus === 'MASTERED',
             progress_percent: skillPercent,
             is_current_homework: targetHomework,
             homework_notes: noteToSave,

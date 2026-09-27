@@ -197,16 +197,21 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
     if (isExplicitTeacher) {
       displaySrc = resolveGrooveLabTeacherAvatar(targetUser, src);
     } else {
-      const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
-      const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;
-      const userAvatar = (targetUser?.avatar_url === '/campus_login_hero.png') ? null : targetUser?.avatar_url;
+      // Student in GrooveLab: Single Source of Truth
+      const isGhost = (s: string | null | undefined) => !s || s === '/avatar_ghost.jpg' || s === '/avatar_ghost.png';
+      const isHero = (s: string | null | undefined) => !s || s.includes('campus_login_hero');
       
-      const candidate = effectiveSrc || userPhoto || userAvatar;
-      const isCustomMusician = candidate && !candidate.includes('campus_login_hero');
-      if (isCustomMusician) {
+      const effectiveSrc = (isHero(src) || isGhost(src)) ? null : src;
+      const userAvatar = (isHero(targetUser?.avatar_url) || isGhost(targetUser?.avatar_url)) ? null : targetUser?.avatar_url;
+      const userPhoto = (isHero(targetUser?.photo_url) || isGhost(targetUser?.photo_url)) ? null : targetUser?.photo_url;
+      
+      // Custom musician avatar selection wins if present and not a ghost
+      const candidate = userAvatar || userPhoto || effectiveSrc;
+      if (candidate) {
         displaySrc = candidate;
       } else {
-        displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser), role);
+        const effInst = resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument || 'Gitarre';
+        displaySrc = getDefaultMusicianAvatarUrl(effInst, role);
       }
     }
   } else if (activePlat === 'campus') {
@@ -257,7 +262,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
     >
       <img 
-        src={displaySrc || '/avatar_ghost.jpg'} 
+        src={displaySrc || (role === 'student' ? getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, 'student') : '/avatar_ghost.jpg')} 
         onLoad={() => setIsLoaded(true)}
         loading="lazy"
         decoding="async"
@@ -274,7 +279,11 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         }} 
         onError={(e) => {
           const img = e.target as HTMLImageElement;
-          img.src = (activePlat === 'campus' && (role === 'student' || role === 'teacher')) ? '/avatars/gitarre_avatar_new.png' : '/avatar_ghost.jpg';
+          if (role === 'student') {
+            img.src = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, 'student');
+          } else {
+            img.src = (activePlat === 'campus' && (role === 'student' || role === 'teacher')) ? '/avatars/gitarre_avatar_new.png' : '/avatar_ghost.jpg';
+          }
         }}
       />
     </div>

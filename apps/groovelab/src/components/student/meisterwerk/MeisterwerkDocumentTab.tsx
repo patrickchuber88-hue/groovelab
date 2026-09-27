@@ -1,11 +1,11 @@
 import React, { Suspense, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import {
-  Activity, ArrowRightLeft, Award, BookOpen, Calendar, Check, CheckCircle, ChevronDown, ChevronLeft,
+  Activity, ArrowRight, ArrowRightLeft, Award, BookOpen, Calendar, Check, CheckCircle, ChevronDown, ChevronLeft,
   ChevronRight, Clock, Compass, Copy, Disc, Edit3, FileText, Globe, Hash, Headphones, HelpCircle, History, Lightbulb,
   Lock, Mail, Mic, Moon, Music, Pin, Play, Plus, Radio, RotateCcw, Search, Settings, Share2, Sliders,
   Sparkles, Square, Star, Target, Timer, Trash2, User, Volume2, VolumeX, AlertCircle,
-  Eye, EyeOff, Hand, Info, MessageSquare, Pencil, Printer, RefreshCw, RotateCw, Unlock, Users, Wrench, Zap, X, Send
+  Eye, EyeOff, Hand, Info, MessageSquare, Pencil, Printer, RefreshCw, RotateCw, Unlock, Users, Wrench, Zap, X, Send, Wand2, Repeat
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { AudioTrackCarousel } from '../../AudioTrackCarousel';
@@ -55,8 +55,8 @@ import {
   areSongsIdentical,
   formatDisplayTitle
 } from './utils/meisterwerkSongHelpers';
-import { SongStructureBar, type SongSection } from './components/SongStructureBar';
-import { SongSectionCard } from './components/SongSectionCard';
+import type { SongSection, SongMeasure } from './components/SongStructureBar';
+import { playAlongAudioEngine, DEFAULT_MIXER_STATE, type AudioMixerState } from './utils/songPlayAlongAudioEngine';
 import { getInstrumentAvatarUrl } from '../studentAvatars.constants';
 import { getSimulatedNow, getWeekDateRange } from '../studentDateUtils';
 import { useDictationInput } from '../../../hooks/useVoiceToText';
@@ -570,17 +570,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [localNewSongTitle, setLocalNewSongTitle] = useState('');
   const [localNewSongArtist, setLocalNewSongArtist] = useState('');
 
-  // 🎵 0.1% Goldstandard 2027 Song Sections Architecture
-  const [songSections, setSongSections] = useState<SongSection[]>(() => {
-    return [
-      { id: 'sec-intro', name: 'Intro', bars: '4 Takte', chords: ['Em', 'C', 'G', 'D'], drumFeel: '8tel Beat', drumSurface: 'Geschlossene Hi-Hat' },
-      { id: 'sec-verse', name: 'Strophe', bars: '8 Takte', chords: ['Em', 'C', 'G', 'D'], drumFeel: '8tel Rock', drumSurface: 'Geschlossene Hi-Hat' },
-      { id: 'sec-chorus', name: 'Refrain', bars: '8 Takte', isHomeworkFocus: true, chords: ['Em', 'C', 'G', 'D'], drumFeel: 'Druckvoller 8tel Rock', drumSurface: 'Offene Hi-Hat', drumDynamics: 'Laut (f)', drumFill: '⚡ Snare Roll in Takt 8' },
-      { id: 'sec-bridge', name: 'Bridge', bars: '8 Takte', chords: ['C', 'D', 'Em', 'Em'], drumFeel: 'Halftime Beat', drumSurface: 'Ride-Becken' },
-      { id: 'sec-outro', name: 'Outro', bars: '4 Takte', chords: ['Em', 'C', 'G', 'D'], drumSurface: 'Crash on 1' }
-    ];
-  });
-  const [activeSectionId, setActiveSectionId] = useState<string>('sec-chorus');
+  // 🎵 0.1% Goldstandard 2027 Song Sections Architecture (Zero-Dummy-Data Doktrin)
+  const [songSections, setSongSections] = useState<SongSection[]>(() => []);
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
   const [hasPracticedSectionToday, setHasPracticedSectionToday] = useState<boolean>(false);
   const [textbookPageFilter, setTextbookPageFilter] = useState<'all' | 'homework' | 'focus'>('all');
 
@@ -600,15 +592,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
       }
     } catch {}
 
-    const defaultSecs: SongSection[] = [
-      { id: 'sec-intro', name: 'Intro', bars: '4 Takte', chords: ['Em', 'C', 'G', 'D'], drumFeel: '8tel Beat', drumSurface: 'Geschlossene Hi-Hat' },
-      { id: 'sec-verse', name: 'Strophe', bars: '8 Takte', chords: ['Em', 'C', 'G', 'D'], drumFeel: '8tel Rock', drumSurface: 'Geschlossene Hi-Hat' },
-      { id: 'sec-chorus', name: 'Refrain', bars: '8 Takte', isHomeworkFocus: true, chords: ['Em', 'C', 'G', 'D'], drumFeel: 'Druckvoller 8tel Rock', drumSurface: 'Offene Hi-Hat', drumDynamics: 'Laut (f)', drumFill: '⚡ Snare Roll in Takt 8' },
-      { id: 'sec-bridge', name: 'Bridge', bars: '8 Takte', chords: ['C', 'D', 'Em', 'Em'], drumFeel: 'Halftime Beat', drumSurface: 'Ride-Becken' },
-      { id: 'sec-outro', name: 'Outro', bars: '4 Takte', chords: ['Em', 'C', 'G', 'D'], drumSurface: 'Crash on 1' }
-    ];
-    setSongSections(defaultSecs);
-    setActiveSectionId('sec-chorus');
+    // Zero-Dummy-Data: Starts completely empty until created by student or teacher
+    setSongSections([]);
+    setActiveSectionId('');
   }, [selectedActiveSongId, student?.id]);
 
   // Sync practiced state for active section
@@ -624,7 +610,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     const newSec: SongSection = {
       id: `sec-${Date.now()}`,
       name,
-      bars: '4 Takte',
+      bars: '8 Takte',
+      barsCount: 8,
+      repetitions: 1,
       chords: ['Em', 'C', 'G', 'D'],
       drumFeel: '8tel Beat',
       drumSurface: 'Geschlossene Hi-Hat'
@@ -680,15 +668,62 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     setHasChanges(true);
   };
 
+  const handleDuplicateSongSection = (id: string) => {
+    const idx = songSections.findIndex(s => s.id === id);
+    if (idx === -1) return;
+    const target = songSections[idx];
+    const dupl: SongSection = {
+      ...target,
+      id: `sec-${Date.now()}`,
+      name: `${target.name} (Kopie)`
+    };
+    const updated = [...songSections];
+    updated.splice(idx + 1, 0, dupl);
+    setSongSections(updated);
+    if (selectedActiveSongId && student?.id) {
+      try {
+        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
+      } catch {}
+    }
+    setHasChanges(true);
+  };
+
+  const handleMoveSongSection = (id: string, direction: 'left' | 'right') => {
+    const idx = songSections.findIndex(s => s.id === id);
+    if (idx === -1) return;
+    if ((direction === 'left' && idx === 0) || (direction === 'right' && idx === songSections.length - 1)) return;
+    const updated = [...songSections];
+    const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+    const temp = updated[idx];
+    updated[idx] = updated[targetIdx];
+    updated[targetIdx] = temp;
+    setSongSections(updated);
+    if (selectedActiveSongId && student?.id) {
+      try {
+        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
+      } catch {}
+    }
+    setHasChanges(true);
+  };
+
   // 🎵 Song Architecture & Play-Along State (2027 Goldstandard)
-  const [songRightTab, setSongRightTab] = useState<'homework' | 'architecture'>('homework');
   const [songBpm, setSongBpm] = useState<number>(116);
   const [songTimeSignature, setSongTimeSignature] = useState<string>('4/4');
   const [isPlayingAlong, setIsPlayingAlong] = useState<boolean>(false);
   const [playAlongBeat, setPlayAlongBeat] = useState<number>(1);
   const [playAlongBar, setPlayAlongBar] = useState<number>(1);
+  const [playAlongRepetition, setPlayAlongRepetition] = useState<number>(1);
+  const [mixerState, setMixerState] = useState<AudioMixerState>(DEFAULT_MIXER_STATE);
+  const [isLoopingActiveSection, setIsLoopingActiveSection] = useState<boolean>(false);
+  const [isSpeedTrainerActive, setIsSpeedTrainerActive] = useState<boolean>(false);
+
   const playAlongTimerRef = useRef<any>(null);
   const tapTimesRef = useRef<number[]>([]);
+
+  // Unique list of all chords across all sections
+  const allSongChords = useMemo(() => {
+    return Array.from(new Set(songSections.flatMap(s => s.chords)));
+  }, [songSections]);
 
   // Load BPM from storage when selected song changes
   useEffect(() => {
@@ -722,45 +757,47 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     }
   };
 
-  // Fallback Audio Metronome Click helper
-  const triggerMetronomeTick = (isAccent: boolean) => {
-    if (typeof playMetronomeTick === 'function') {
-      try { playMetronomeTick(isAccent); return; } catch {}
-    }
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(isAccent ? 1200 : 800, ctx.currentTime);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.05);
-    } catch {}
+  const handleUpdateMixer = (patch: Partial<AudioMixerState>) => {
+    setMixerState(prev => {
+      const updated = { ...prev, ...patch };
+      playAlongAudioEngine.updateMixer(updated);
+      return updated;
+    });
   };
 
-  // Play-Along Timer Effect
+  // Play-Along Timer Effect using Web Audio Engine
   useEffect(() => {
     if (!isPlayingAlong) {
       if (playAlongTimerRef.current) clearInterval(playAlongTimerRef.current);
+      playAlongAudioEngine.suspend();
       return;
     }
 
-    const beatsPerBar = songTimeSignature === '3/4' ? 3 : (songTimeSignature === '6/8' ? 6 : 4);
+    const beatsPerBar = songTimeSignature === '3/4' ? 3 : (songTimeSignature === '6/8' ? 6 : (songTimeSignature === '12/8' ? 12 : 4));
     const msPerBeat = Math.round(60000 / songBpm);
 
     let curBeat = 1;
     let curBar = 1;
-    let secIdx = 0;
+    let curRep = 1;
+    let secIdx = songSections.findIndex(s => s.id === activeSectionId);
+    if (secIdx === -1) secIdx = 0;
 
-    triggerMetronomeTick(true);
+    const initialSec = songSections[secIdx];
+    const initialMeasure = initialSec?.measures?.[0];
+    const initialChord = initialMeasure?.chords?.[0] || initialSec?.chords?.[0] || 'C';
+
+    playAlongAudioEngine.triggerBeat({
+      beat: 1,
+      totalBeats: beatsPerBar,
+      chord: initialChord,
+      drumFeel: initialSec?.drumFeel,
+      isFirstBeatOfMeasure: true,
+      shouldPlayChord: true
+    });
+
     setPlayAlongBeat(1);
     setPlayAlongBar(1);
+    setPlayAlongRepetition(1);
 
     playAlongTimerRef.current = setInterval(() => {
       curBeat++;
@@ -768,24 +805,107 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         curBeat = 1;
         curBar++;
         const currentSec = songSections[secIdx];
-        const maxBars = currentSec?.bars ? parseInt(currentSec.bars, 10) || 4 : 4;
+        const maxBars = currentSec?.barsCount || (currentSec?.bars ? parseInt(currentSec.bars, 10) || 4 : 4);
+        const maxReps = Math.max(1, currentSec?.repetitions || 1);
+
         if (curBar > maxBars) {
           curBar = 1;
-          secIdx = (secIdx + 1) % (songSections.length || 1);
-          if (songSections[secIdx]) {
-            setActiveSectionId(songSections[secIdx].id);
+          if (isLoopingActiveSection) {
+            // Stay on current section in loop mode
+            curRep++;
+            setPlayAlongRepetition(curRep);
+            if (isSpeedTrainerActive) {
+              setSongBpm(prev => {
+                const nextBpm = Math.min(240, prev + 5);
+                if (selectedActiveSongId && student?.id) {
+                  try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(nextBpm)); } catch {}
+                }
+                return nextBpm;
+              });
+            }
+          } else {
+            if (curRep < maxReps) {
+              curRep++;
+              setPlayAlongRepetition(curRep);
+            } else {
+              curRep = 1;
+              setPlayAlongRepetition(1);
+              const nextIdx = (secIdx + 1) % (songSections.length || 1);
+              if (nextIdx === 0 && isSpeedTrainerActive) {
+                // Full song completed, speed up +5 BPM!
+                setSongBpm(prev => {
+                  const nextBpm = Math.min(240, prev + 5);
+                  if (selectedActiveSongId && student?.id) {
+                    try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(nextBpm)); } catch {}
+                  }
+                  return nextBpm;
+                });
+              }
+              secIdx = nextIdx;
+              if (songSections[secIdx]) {
+                setActiveSectionId(songSections[secIdx].id);
+              }
+            }
           }
         }
       }
-      triggerMetronomeTick(curBeat === 1);
+
+      const activeSec = songSections[secIdx];
+      const activeMeasure = activeSec?.measures?.[curBar - 1];
+      const measureChords = (activeMeasure?.chords && activeMeasure.chords.length > 0)
+        ? activeMeasure.chords
+        : (activeSec?.chords && activeSec.chords.length > 0 ? [activeSec.chords[(curBar - 1) % activeSec.chords.length]] : ['C']);
+
+      let activeChord = measureChords[0] || 'C';
+      let shouldPlayChord = false;
+
+      if (measureChords.length === 1) {
+        shouldPlayChord = curBeat === 1;
+        activeChord = measureChords[0];
+      } else if (measureChords.length === 2) {
+        if (curBeat === 1) {
+          shouldPlayChord = true;
+          activeChord = measureChords[0];
+        } else if (beatsPerBar === 4 && curBeat === 3) {
+          shouldPlayChord = true;
+          activeChord = measureChords[1];
+        } else if (beatsPerBar === 6 && curBeat === 4) {
+          shouldPlayChord = true;
+          activeChord = measureChords[1];
+        } else if (beatsPerBar === 12 && curBeat === 7) {
+          shouldPlayChord = true;
+          activeChord = measureChords[1];
+        } else if (beatsPerBar === 3 && curBeat === 2) {
+          shouldPlayChord = true;
+          activeChord = measureChords[1];
+        }
+      } else {
+        const chordSpacing = Math.max(1, Math.floor(beatsPerBar / measureChords.length));
+        const chordIdx = Math.floor((curBeat - 1) / chordSpacing);
+        if (chordIdx < measureChords.length) {
+          activeChord = measureChords[chordIdx];
+          shouldPlayChord = (curBeat - 1) % chordSpacing === 0;
+        }
+      }
+
+      playAlongAudioEngine.triggerBeat({
+        beat: curBeat,
+        totalBeats: beatsPerBar,
+        chord: activeChord,
+        drumFeel: activeSec?.drumFeel,
+        isFirstBeatOfMeasure: curBeat === 1,
+        shouldPlayChord
+      });
+
       setPlayAlongBeat(curBeat);
       setPlayAlongBar(curBar);
     }, msPerBeat);
 
     return () => {
       if (playAlongTimerRef.current) clearInterval(playAlongTimerRef.current);
+      playAlongAudioEngine.suspend();
     };
-  }, [isPlayingAlong, songBpm, songTimeSignature, songSections, playMetronomeTick]);
+  }, [isPlayingAlong, songBpm, songTimeSignature, songSections, activeSectionId, isLoopingActiveSection, isSpeedTrainerActive, selectedActiveSongId, student?.id]);
 
 
   // 📚 Lehrwerke Selection & Creation State (Self-Contained 1% Goldstandard)
@@ -1609,14 +1729,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   }, [viewingWeekOffset, generalHomeworkNotes, progressItems, getISOWeek]);
 
   // 🏆 0.1% Goldstandard: Live Mastered Pieces Count (Gemeisterte Songs + Lehrwerk-Abschlüsse)
+  // 🛡️ Bounded Context Isolation (Axiom 1):
+  // Campus-Meisterwerke speisen sich ausschließlich aus didaktischen progressItems (progress_matrix) und Lehrwerk-Seiten.
   const masteredPiecesCount = useMemo(() => {
     const masteredSongsSet = new Set<string>();
-    (activeSongSkills || []).forEach((skill: any) => {
-      if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
-        const title = skill.songs?.title || skill.title || skill.song_title;
-        if (title) masteredSongsSet.add(title.toLowerCase().trim());
-      }
-    });
     (progressItems || []).forEach((item: any) => {
       const rawTopic = (item.topic_name || item.title || '').trim();
       if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase() === 'test') return;
@@ -1632,7 +1748,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
       });
     });
     return masteredSongsSet.size + (masteredPagesCount > 0 ? 1 : 0);
-  }, [activeSongSkills, progressItems, assignedLehrwerke]);
+  }, [progressItems, assignedLehrwerke]);
 
   // 🎯 Cursor-Preservation für Hausaufgaben-Bemerkung: Verhindert Cursor-Sprünge beim Tippen & Zeilenumbrüchen
   React.useLayoutEffect(() => {
@@ -1861,12 +1977,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   }, [student, effectiveTeacherFullName, studentFirstName]);
 
   return (
-            <>
-          
-          {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
-
-
-
+    <>
+      {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
           <div style={{
             flex: isMobileView ? 'none' : '0 0 45%',
             width: isMobileView ? '100%' : '45%',
@@ -3402,7 +3514,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   setStatus('IN_PROGRESS');
                                 }
                                 setHasChanges(true);
-                                setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: val, is_stage_ready: val === 100 } : s));
+                                setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: val, status: val === 100 ? 'MASTERED' : (val < 100 && s.status === 'MASTERED' ? 'IN_PROGRESS' : s.status) } : s));
                                 localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
                                   rhythm: val,
                                   finger: val,
@@ -3970,7 +4082,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     setStatus('MASTERED');
                                     setIsCurrentHomework(false);
                                   }
-                                  setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: avg, is_stage_ready: avg === 100 } : s));
+                                  setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: avg, status: avg === 100 ? 'MASTERED' : (avg < 100 && s.status === 'MASTERED' ? 'IN_PROGRESS' : s.status) } : s));
                                   localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
                                     rhythm: r,
                                     finger: f,
@@ -4003,7 +4115,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               setExpressionVal(100);
                               setIsSubSlidersExpanded(false);
                               setHasChanges(true);
-                              setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: 100, is_stage_ready: true } : s));
+                              setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: 100, status: 'MASTERED' } : s));
                               localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
                                 rhythm: 100,
                                 finger: 100,
@@ -5410,7 +5522,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                   {(() => {
                       const activeSongsRaw = (activeSongSkills || []).filter(skill =>
-                        !skill.is_stage_ready && (skill.progress_percent || 0) < 100 && skill.status !== 'MASTERED'
+                        (skill.progress_percent || 0) < 100 && skill.status !== 'MASTERED'
                       );
 
                       // Deduplicate active songs so each unique song is only listed once
@@ -5425,8 +5537,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                       // Sortierung: Höchster prozentualer Fortschritt oben, niedrigster unten
                       const activeSongs = Array.from(uniqueActiveMap.values()).sort((a, b) => {
-                        const pA = a.is_stage_ready ? 100 : (a.progress_percent || 0);
-                        const pB = b.is_stage_ready ? 100 : (b.progress_percent || 0);
+                        const pA = a.status === 'MASTERED' ? 100 : (a.progress_percent || 0);
+                        const pB = b.status === 'MASTERED' ? 100 : (b.progress_percent || 0);
                         if (pB !== pA) return pB - pA;
                         const titleA = (a.songs?.title || a.title || a.song_title || '').toLowerCase();
                         const titleB = (b.songs?.title || b.title || b.song_title || '').toLowerCase();
@@ -5500,7 +5612,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           paddingRight: '2px'
                         }}>
                           {activeSongs.map(skill => {
-                            const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
+                            const progress = skill.status === 'MASTERED' ? 100 : (skill.progress_percent || 0);
                             const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Unbenannter Song';
                             const songArtist = skill.songs?.artist || skill.artist || 'Song-Projekt';
                             const songColor = getSongColor(songTitle);
@@ -7922,81 +8034,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       </div>
                     </div>
 
-                    {/* Apple Segmented Switcher for Song View: 1. Übungs-Fahrplan & Hausaufgabe | 2. Song-Architektur & Mitspielen */}
-                    <div
-                      role="tablist"
-                      aria-label="Song Ansicht"
-                      style={{
-                        display: 'inline-flex',
-                        background: '#f1f5f9',
-                        border: '1.5px solid #e2e8f0',
-                        padding: '4px',
-                        borderRadius: '16px',
-                        gap: '4px',
-                        alignSelf: 'flex-start',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-                      }}
+                    <form
+                      onSubmit={handleSave}
+                      style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px', outline: 'none' }}
                     >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={songRightTab === 'homework'}
-                        tabIndex={0}
-                        onClick={() => setSongRightTab('homework')}
-                        style={{
-                          border: 'none',
-                          background: songRightTab === 'homework' ? '#ffffff' : 'transparent',
-                          color: songRightTab === 'homework' ? '#0f172a' : '#64748b',
-                          fontWeight: songRightTab === 'homework' ? 900 : 700,
-                          fontSize: '0.84rem',
-                          padding: '7px 16px',
-                          borderRadius: '12px',
-                          cursor: 'pointer',
-                          boxShadow: songRightTab === 'homework' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <BookOpen size={15} color={songRightTab === 'homework' ? '#16a34a' : '#64748b'} />
-                        <span>1. Übungs-Fahrplan & Hausaufgabe</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={songRightTab === 'architecture'}
-                        tabIndex={0}
-                        onClick={() => setSongRightTab('architecture')}
-                        style={{
-                          border: 'none',
-                          background: songRightTab === 'architecture' ? '#ffffff' : 'transparent',
-                          color: songRightTab === 'architecture' ? '#0f172a' : '#64748b',
-                          fontWeight: songRightTab === 'architecture' ? 900 : 700,
-                          fontSize: '0.84rem',
-                          padding: '7px 16px',
-                          borderRadius: '12px',
-                          cursor: 'pointer',
-                          boxShadow: songRightTab === 'architecture' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Music size={15} color={songRightTab === 'architecture' ? '#2563eb' : '#64748b'} />
-                        <span>2. Song-Architektur & Mitspielen</span>
-                        {isPlayingAlong && (
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', animation: 'pulse 0.8s infinite' }} />
-                        )}
-                      </button>
-                    </div>
-
-                    {songRightTab === 'homework' ? (
-                      <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                           <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -8262,282 +8303,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </button>
                       </div>
                     </form>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px', animation: 'fadeIn 0.2s ease' }}>
-                        {/* 1. Header Card: Tempo (BPM), Tap-Tempo, Taktart, Tonart & Play-Along Engine */}
-                        <div style={{
-                          background: '#ffffff',
-                          borderRadius: '24px',
-                          padding: '20px 24px',
-                          border: '1px solid #cbd5e1',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '16px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '12px',
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#ffffff',
-                                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
-                              }}>
-                                <Music size={18} />
-                              </div>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                                  Song-Architektur & Play-Along Studio
-                                </h4>
-                                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>
-                                  Metadaten, Takt-Ablauf und interaktiver Mitspiel-Cursor
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Play-Along Master Button */}
-                            <button
-                              type="button"
-                              onClick={() => setIsPlayingAlong(!isPlayingAlong)}
-                              style={{
-                                border: 'none',
-                                background: isPlayingAlong
-                                  ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                                  : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                                color: '#ffffff',
-                                padding: '10px 22px',
-                                borderRadius: '100px',
-                                fontSize: '0.86rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                boxShadow: isPlayingAlong ? '0 4px 15px rgba(239, 68, 68, 0.35)' : '0 4px 15px rgba(37, 99, 235, 0.35)',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale"
-                            >
-                              {isPlayingAlong ? (
-                                <>
-                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', animation: 'pulse 0.8s infinite' }} />
-                                  <span>⏸ Pausieren</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Play size={16} fill="#ffffff" />
-                                  <span>▶ Song-Ablauf abspielen</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Controls Row: BPM, Taktart, Tonart, Beat-Tracker */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '12px',
-                            background: '#f8fafc',
-                            padding: '12px 16px',
-                            borderRadius: '16px',
-                            border: '1px solid #e2e8f0'
-                          }}>
-                            {/* BPM Steuerung mit Tap-Tempo */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569' }}>Tempo:</span>
-                              <div style={{ display: 'inline-flex', alignItems: 'center', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '10px', padding: '2px 4px', gap: '4px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = Math.max(40, songBpm - 2);
-                                    setSongBpm(next);
-                                    if (selectedActiveSongId && student?.id) {
-                                      try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(next)); } catch {}
-                                    }
-                                  }}
-                                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 900, fontSize: '0.85rem', color: '#475569', padding: '2px 6px' }}
-                                >
-                                  −
-                                </button>
-                                <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#0f172a', minWidth: '46px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                                  {songBpm} BPM
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = Math.min(240, songBpm + 2);
-                                    setSongBpm(next);
-                                    if (selectedActiveSongId && student?.id) {
-                                      try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(next)); } catch {}
-                                    }
-                                  }}
-                                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 900, fontSize: '0.85rem', color: '#475569', padding: '2px 6px' }}
-                                >
-                                  +
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={handleTapTempo}
-                                style={{
-                                  border: '1.5px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  color: '#0f172a',
-                                  padding: '5px 12px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 850,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.12s'
-                                }}
-                                className="hover-scale"
-                                title="Im Takt klicken, um Tempo automatisch zu berechnen"
-                              >
-                                🥁 Tap
-                              </button>
-                            </div>
-
-                            {/* Taktart */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#475569' }}>Taktart:</span>
-                              <select
-                                value={songTimeSignature}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setSongTimeSignature(val);
-                                  if (selectedActiveSongId && student?.id) {
-                                    try { localStorage.setItem(`song_timesig_${student.id}_${selectedActiveSongId}`, val); } catch {}
-                                  }
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #cbd5e1',
-                                  borderRadius: '10px',
-                                  padding: '5px 10px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 850,
-                                  color: '#0f172a',
-                                  outline: 'none',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                <option value="4/4">4/4 Takt</option>
-                                <option value="3/4">3/4 Walzer</option>
-                                <option value="6/8">6/8 Feel</option>
-                                <option value="12/8">12/8 Blues</option>
-                              </select>
-                            </div>
-
-                            {/* Live Beat-Indicator (when playing) */}
-                            {isPlayingAlong && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ffffff', padding: '4px 12px', borderRadius: '100px', border: '1.5px solid #bbf7d0' }}>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
-                                  Takt {playAlongBar}:
-                                </span>
-                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                  {[1, 2, 3, 4].slice(0, songTimeSignature === '3/4' ? 3 : (songTimeSignature === '6/8' ? 6 : 4)).map(b => (
-                                    <div
-                                      key={b}
-                                      style={{
-                                        width: '9px',
-                                        height: '9px',
-                                        borderRadius: '50%',
-                                        background: playAlongBeat === b ? (b === 1 ? '#16a34a' : '#2563eb') : '#e2e8f0',
-                                        transform: playAlongBeat === b ? 'scale(1.3)' : 'scale(1)',
-                                        transition: 'all 0.08s ease'
-                                      }}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 2. Formteil-Timeline */}
-                        <div style={{
-                          background: '#ffffff',
-                          borderRadius: '24px',
-                          padding: '20px 24px',
-                          border: '1px solid #cbd5e1',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              Song-Ablauf (Formteile):
-                            </span>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a' }}>
-                              Klick auf Formteil zum Ansehen & Bearbeiten
-                            </span>
-                          </div>
-
-                          <SongStructureBar
-                            sections={songSections}
-                            activeSectionId={activeSectionId}
-                            onSelectSection={(id) => setActiveSectionId(id)}
-                            onAddSection={handleAddSongSection}
-                            onToggleFocus={handleToggleSectionFocus}
-                            onDeleteSection={handleDeleteSongSection}
-                            readOnly={readOnly}
-                          />
-                        </div>
-
-                        {/* 3. Ausführliche Formteil-Kachel */}
-                        {(() => {
-                          const currentSec = songSections.find(s => s.id === activeSectionId) || songSections[0];
-                          if (!currentSec) return null;
-                          return (
-                            <SongSectionCard
-                              section={currentSec}
-                              studentInstrument={student?.instrument || 'Gitarre'}
-                              readOnly={readOnly}
-                              onUpdateSection={handleUpdateSongSection}
-                              onToggleHomeworkFocus={() => handleToggleSectionFocus(currentSec.id)}
-                            />
-                          );
-                        })()}
-
-                        {/* 4. Fertig & Schließen Button */}
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleBackToHub()}
-                            style={{
-                              flex: 1,
-                              padding: '14px 20px',
-                              borderRadius: '16px',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                              color: '#ffffff',
-                              fontWeight: 800,
-                              fontSize: '0.88rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
-                              transition: 'all 0.2s ease',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Check size={18} strokeWidth={2.5} />
-                            <span>Fertig & Schließen</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })()

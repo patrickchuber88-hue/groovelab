@@ -60,6 +60,58 @@ Das Datenmodell und die Komponenten bleiben im Codebase-Fundament erhalten und k
 
 ---
 
+## 🎵 Modul: Song-Architektur & 2-Spalten Play-Along Studio 2027 (6-Schritte Apple Micro-Flow, Rhodes VST & Musiktheorie)
+
+* **Status:** 🟡 **GEPARKT AUF DER ROADMAP (Vollständig implementiert & einsatzbereit, temporär aus aktiver UI entfernt)**
+* **Bereich:** Hausaufgabenheft & Meisterwerk-Studio (`MeisterwerkDocumentTab.tsx`, `components/songArchitecture/`)
+* **Zielgruppe:** Schülerinnen & Schüler (Campus & GrooveLab), Lehrkräfte und Ensembles
+
+### 1. Pädagogische & Didaktische Motivation
+Das **Song-Architektur & Play-Along Studio** verwandelt passive Notenblätter in ein interaktives, klingendes Arrangement:
+1. **6-Schritte Apple Micro-Flow Baukasten (`SongArchitectureWizardModal.tsx`):**
+   - *1. Tempo & Puls:* Intuitives BPM-Rad mit Metronom-Tick, Tap-Tempo und 3 kuratierten Geschwindigkeits-Pills (*Gemütlich 80*, *Pop 116*, *Schnell 135*).
+   - *2. Taktart:* 3 symmetrische Apple-Karten in einer Zeile (*4/4*, *3/4 Walzer*, *6/8 Slow Feel*) mit pulsierenden Live-Beat-Dots.
+   - *3. Songteile (Form-Dramaturgie):* 1-Tap Vorlagen (*Pop-Hit*, *Strophe & Refrain*, *12-Bar Blues*, *Leer*) + proportionale Bausteinkette mit `◀`, `▶`, `📑` Duplizieren und `🗑` Löschen sowie 1-Tap Baustein-Palette. **Zero Zahlen, keine Taktüberlastung.**
+   - *4. Taktlängen & Phrasierung:* Aufgeräumte Liste aller Teile mit 1-Tap Touch-Pills für Takte (`4`, `8`, `12`, `16`) und Wiederholungen (`1×`, `2×`, `3×`), Hausaufgaben-Fokus-Pin (`📌 Fokus`) sowie Live-Gesamtdauer-Kalkulation (*z. B. „64 Takte • ca. 2:12 Min.“*).
+   - *5. Sound-Driven Akkord-Stile mit Sofort-Audio:* 5 Apple-Stilkarten (`🌟 Pop-Hit`, `🌙 Emotional & Deep`, `🎹 Klassiker`, `🎸 Rock & Drive`, `🎺 Blues & Funk`) mit sofortiger polyphoner Rhodes-Audio-Vorschau bei Klick. Intelligente Auto-Vererbung (`↳ Wie Strophe 1`). Eingeklappter Umschalter für Lehrkräfte (`[ ⚙️ Akkorde manuell anpassen ]`).
+   - *6. Starten & Mitspielen:* Übersichtliche Launch-Karte mit erkannter Tonart, klingenden Solo-Pentatonik-Pills (mit Rhodes-Notenprobe) und Launch ins 2-Spalten-Studio.
+2. **2-Spalten Aufgabenheft-Studio (`SongArchitectureStudioView.tsx`):**
+   - Öffnet sich in der exakten Größe des Aufgabenhefts ohne Seiten-Reload.
+   - Linke Spalte (380px): Transport (Play/Pause, Tempo BPM mit Stepper/Slider/Tap, Taktart, Tonart, Loop, Speed-Trainer, Mixer), Live-Beat-Tracker und Formteil-Timeline.
+   - Rechte Spalte: Großes 4-Takt-Phrasierungs-Grid (`SongChordGridEditor.tsx`), Harmonielehre-Analyse mit interaktiven Sounding-Solo-Noten und Instrumenten-Griffbilder (`SongInstrumentPedagogyView.tsx`).
+3. **Polyphone VST E-Piano / Rhodes Begleitung (`songPlayAlongAudioEngine.ts`):**
+   - Web Audio Synthese mit Dual-Oszillatoren pro Stimme (Triangle-Body + Tine-Glockenschlag), Tiefpassfilter-Sweep (2400Hz ➔ 850Hz) und 1.6s Ausklang; Sub-Bass und taktsynchrone Drums.
+4. **Mathematische Musiktheorie-Engine 2027 (`musicTheoryEngine.ts`):**
+   - Krumhansl-Schmuckler Profil-Algorithmus (Pearson-Kreuzkorrelation über 12 Dur- und 12 Moll-Profile), Stufenanalyse (römische Ziffern), Riemann-Funktionstheorie und Pentatonik-Extraktion.
+
+### 2. Grund für das Parken auf der Roadmap
+Im aktuellen Entwicklungsschritt steht die **reibungslose, absolut minimalistische Kern-Ergonomie** im Vordergrund:
+- **Zero Cognitive Overload:** Schüler und Lehrkräfte sollen das Aufgabenheft ohne jegliche Ablenkung für Notizen, Hausaufgaben-Fahrplan und Audio-Takes nutzen können.
+- **Entlastung der linken Song-Karte:** Die linke Song-Karte bleibt schlank und übersichtlich, ohne zusätzliche Funktionsknöpfe.
+- Das gesamte Feature steht vollständig fertig entwickelt im Komponenten-Inventar bereit und kann zu einem späteren Zeitpunkt als dedizierter Spezialmodus, separates Lernmodul oder zuschaltbares Add-on mit wenigen Zeilen reaktiviert werden.
+
+### 3. Technische Schnittstellen & Wiederaufnahme-Inventar
+Sämtliche Komponenten und Engines sind im Codebase-Fundament 100 % einsatzbereit und typ-sicher gesichert:
+- **Komponenten-Verzeichnis (`apps/groovelab/src/components/student/meisterwerk/components/songArchitecture/`):**
+  - `SongArchitectureWizardModal.tsx` (Vollständiger 6-Schritte Apple Micro-Flow)
+  - `SongArchitectureStudioView.tsx` (2-Spalten Aufgabenheft-Studio)
+  - `SongChordGridEditor.tsx` (Interaktives 4-Takt Phrasierungs-Grid)
+  - `SongInstrumentPedagogyView.tsx` (Klingendes Griffbrett & Klaviertastatur)
+  - `SongAudioMixerModal.tsx` (Spuren-Mixer für E-Piano, Bass, Drums, Klick)
+- **Audio- & Theorie-Engines (`apps/groovelab/src/components/student/meisterwerk/utils/`):**
+  - `songPlayAlongAudioEngine.ts` (Polyphones Rhodes VST, Drums & Bass)
+  - `musicTheoryEngine.ts` (Krumhansl-Schmuckler Key-Detection & Skalen-Extraktion)
+- **Reaktivierungs-Anleitung (1-Schritt):**
+  - In `MeisterwerkDocumentTab.tsx`: Den Button auf der linken Song-Karte wieder einbinden:
+    ```tsx
+    <button type="button" onClick={() => setIsSongStudioOpen(true)}>
+      Song-Architektur & Play-Along Studio
+    </button>
+    ```
+    und den Studio-Container `<SongArchitectureStudioView ... />` oberhalb der Spalten einbinden.
+
+---
+
 ## 🎪 Modul: Event-Planung & Konzert-Koordination (Bühnen, Acts, Packliste & Programmheft)
 
 * **Status:** 🟡 **IN IMPLEMENTIERUNG / AKTIV** (Frontend-Shell & Modals integriert, Server-RPC Migration 454 in Bereitstellung)

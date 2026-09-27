@@ -1,245 +1,565 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  Compass, ArrowLeft, Award, Sparkles, Volume2, Info, BookOpen, Star,
-  CheckCircle, Globe, ChevronRight, ChevronDown, ChevronUp, Share2, Printer, MapPin, Play, ZoomIn, ZoomOut, RotateCcw
+  ArrowLeft, Sparkles, Volume2, BookOpen,
+  ChevronRight, ChevronDown, ChevronUp, Printer,
+  Globe, Compass, Trophy, Star,
+  Plane, Lock, CheckCircle2, MapPin, Navigation
 } from 'lucide-react';
 import { CONTINENTS, WORLD_TOUR_COUNTRIES } from '../../../../domain/worldTourCatalog';
 import { WorldTourCountry, ContinentId, WorldTourStudentProgress } from '../../../../types/worldTour';
 import { WorldTourService } from '../../../../services/worldTourService';
+import { WorldTourFlightEngine, FLIGHT_CONNECTIONS_GRAPH } from '../../../../domain/worldTourFlightGraph';
 import { WorldTourScorePlayer } from './WorldTourScorePlayer';
 import { WorldTourDiplomaModal } from './WorldTourDiplomaModal';
+import { WorldTourPassportModal } from './WorldTourPassportModal';
+import { WorldTourCountryFlag, renderCountryFlagPaths } from './WorldTourCountryFlags';
 
 interface WorldTourMapSpreadProps {
   onBackToHub?: () => void;
   studentId?: string;
   studentName?: string;
   studentInstrument?: string | null;
+  studentAvatarUrl?: string | null;
   uiLevel?: 'junior' | 'teen' | 'pro';
   isMobileView?: boolean;
   onMasteryAchieved?: (stars: number, score: number, xp: number, countryCode: string) => void;
 }
 
 /**
- * 🌍 3D SPHERICAL PROJECTION MATH (Pure TypeScript / Zero Dependencies)
- * Mathematisch exakte orthografische Rotation einer dreidimensionalen Erdkugel.
+ * 👑 KA HAE HAWAIʻI (Offizielle Flagge des Königreichs & Staates Hawaii)
+ * 8 horizontale Streifen (Weiß, Rot, Blau x2) + Union Jack im Kanton.
+ * Ersetzt das unpassende Blumen-Emoji durch ein heraldisch exaktes Vektor-Badge.
  */
-interface GeoPoint {
-  lat: number;
-  lon: number;
-}
+export const HawaiiFlagSvg: React.FC<{ width?: number; height?: number; style?: React.CSSProperties }> = ({
+  width = 36,
+  height = 24,
+  style
+}) => {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 60 40"
+      style={{ borderRadius: '4px', overflow: 'hidden', flexShrink: 0, ...style }}
+      aria-label="Ka Hae Hawaiʻi (Offizielle Flagge von Hawaii)"
+    >
+      {/* 8 Streifen: Weiß, Rot, Blau, Weiß, Rot, Blau, Weiß, Rot */}
+      <rect x="0" y="0" width="60" height="5" fill="#ffffff" />
+      <rect x="0" y="5" width="60" height="5" fill="#dc2626" />
+      <rect x="0" y="10" width="60" height="5" fill="#1e3a8a" />
+      <rect x="0" y="15" width="60" height="5" fill="#ffffff" />
+      <rect x="0" y="20" width="60" height="5" fill="#dc2626" />
+      <rect x="0" y="25" width="60" height="5" fill="#1e3a8a" />
+      <rect x="0" y="30" width="60" height="5" fill="#ffffff" />
+      <rect x="0" y="35" width="60" height="5" fill="#dc2626" />
 
-interface ProjectedPoint {
-  x: number;
-  y: number;
-  z: number; // z > 0: sichtbare Vorderseite; z < 0: Rückseite
-  visible: boolean;
-}
-
-function projectOrthographic(
-  lat: number,
-  lon: number,
-  lambda0: number, // Längendrehung in Grad (-180..180)
-  phi0: number,    // Breitendrehung / Neigung in Grad (-90..90)
-  radius: number,
-  cx: number,
-  cy: number
-): ProjectedPoint {
-  const radLat = (lat * Math.PI) / 180;
-  const radLon = (lon * Math.PI) / 180;
-  const radLam0 = (lambda0 * Math.PI) / 180;
-  const radPhi0 = (phi0 * Math.PI) / 180;
-
-  const dLon = radLon - radLam0;
-
-  const cosLat = Math.cos(radLat);
-  const sinLat = Math.sin(radLat);
-  const cosPhi0 = Math.cos(radPhi0);
-  const sinPhi0 = Math.sin(radPhi0);
-  const cosDLon = Math.cos(dLon);
-  const sinDLon = Math.sin(dLon);
-
-  // 3D-Kugelkoordinaten rotiert
-  const x = cosLat * sinDLon;
-  const y = cosPhi0 * sinLat - sinPhi0 * cosLat * cosDLon;
-  const z = sinPhi0 * sinLat + cosPhi0 * cosLat * cosDLon;
-
-  return {
-    x: cx + radius * x,
-    y: cy - radius * y,
-    z,
-    visible: z >= -0.08
-  };
-}
+      {/* Kanton: Union Jack (30 × 20) */}
+      <g>
+        <rect x="0" y="0" width="30" height="20" fill="#1e3a8a" />
+        {/* Weißes Andreaskreuz */}
+        <line x1="0" y1="0" x2="30" y2="20" stroke="#ffffff" strokeWidth="4.5" />
+        <line x1="0" y1="20" x2="30" y2="0" stroke="#ffffff" strokeWidth="4.5" />
+        {/* Rotes Andreaskreuz */}
+        <line x1="0" y1="0" x2="30" y2="20" stroke="#dc2626" strokeWidth="2.2" />
+        <line x1="0" y1="20" x2="30" y2="0" stroke="#dc2626" strokeWidth="2.2" />
+        {/* Weißes Georgskreuz */}
+        <line x1="15" y1="0" x2="15" y2="20" stroke="#ffffff" strokeWidth="6" />
+        <line x1="0" y1="10" x2="30" y2="10" stroke="#ffffff" strokeWidth="6" />
+        {/* Rotes Georgskreuz */}
+        <line x1="15" y1="0" x2="15" y2="20" stroke="#dc2626" strokeWidth="3.2" />
+        <line x1="0" y1="10" x2="30" y2="10" stroke="#dc2626" strokeWidth="3.2" />
+      </g>
+      <rect x="0" y="0" width="60" height="40" fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth="1" />
+    </svg>
+  );
+};
 
 /**
- * 📍 EXAKTE GEOGRAFISCHE LÄNDERKOORDINATEN DER 21 HYMNEN & KULTURSTATIONEN
+ * ✈️ EXPEDITIONS-DOPPELDECKER / JET-SPRITE (0,1% Vektor-Goldstandard)
+ * Ultraschlanker SVG-Flugzeugkörper für 60 FPS Bézier-Fluganimationen.
+ * Nase zeigt nach Norden (0° = nach oben, 90° Drehung bei atan2).
  */
-interface GlobeCountryBeacon {
-  code: string;
-  name: string;
-  lat: number;
-  lon: number;
-  flag: string;
-  continent: ContinentId;
-  chordFrequencies: number[];
-}
+export const AirplaneSprite: React.FC<{ size?: number; fill?: string; stroke?: string }> = ({
+  size = 28,
+  fill = '#ffffff',
+  stroke = '#0284c7'
+}) => {
+  return (
+    <g transform={`scale(${size / 24}) translate(-12, -12)`} aria-label="Expeditions-Flugzeug">
+      {/* Sanfter Flugzeugschatten auf Meereshöhe */}
+      <ellipse cx="12" cy="19.5" rx="8.5" ry="3.2" fill="rgba(15, 23, 42, 0.26)" />
 
-const GLOBE_BEACONS: GlobeCountryBeacon[] = [
-  // 1. Afrika (Polyrhythmik & Kora)
-  { code: 'WA_KUKU', name: 'Westafrika (Mali/Guinea)', lat: 10.5, lon: -11.0, flag: '🇬🇳', continent: 'africa', chordFrequencies: [196.00, 246.94, 293.66] },
-  { code: 'WA_JARABI', name: 'Senegal / Gambia', lat: 14.5, lon: -14.4, flag: '🇸🇳', continent: 'africa', chordFrequencies: [174.61, 220.00, 261.63] },
-  { code: 'ZA_SHOSHO', name: 'Südafrika (Zulu)', lat: -29.0, lon: 24.5, flag: '🇿🇦', continent: 'africa', chordFrequencies: [130.81, 164.81, 196.00] },
+      {/* Triebwerksgondeln unter den Tragflächen mit goldenen Austrittsdüsen */}
+      <rect x="7" y="10.8" width="2.2" height="4.6" rx="1.1" fill="#f8fafc" stroke={stroke} strokeWidth="0.8" />
+      <circle cx="8.1" cy="15.4" r="0.75" fill="#f59e0b" />
+      <rect x="14.8" y="10.8" width="2.2" height="4.6" rx="1.1" fill="#f8fafc" stroke={stroke} strokeWidth="0.8" />
+      <circle cx="15.9" cy="15.4" r="0.75" fill="#f59e0b" />
 
-  // 2. Lateinamerika & Nordamerika (Synkopen & Pentatonik)
-  { code: 'CU_SON', name: 'Kuba (Son Cubano)', lat: 21.5, lon: -79.5, flag: '🇨🇺', continent: 'americas', chordFrequencies: [196.00, 246.94, 293.66] },
-  { code: 'BR_CHORO', name: 'Brasilien (Tico-Tico no Fubá)', lat: -22.9, lon: -43.2, flag: '🇧🇷', continent: 'americas', chordFrequencies: [220.00, 261.63, 329.63] },
-  { code: 'PE_KASHWA', name: 'Anden / Peru (Inka)', lat: -13.5, lon: -71.9, flag: '🇵🇪', continent: 'americas', chordFrequencies: [220.00, 261.63, 329.63] },
-  { code: 'US', name: 'USA (Star-Spangled)', lat: 39.5, lon: -98.3, flag: '🇺🇸', continent: 'americas', chordFrequencies: [233.08, 349.23, 466.16] },
+      {/* Aerodynamischer Rumpf und pfeilförmige Tragflächen */}
+      <path
+        d="M12 1.5 C13 1.5 14 2.8 14 5.5 L14 10.5 L22.5 14.8 L22.5 16.8 L14 14.5 L14 19.8 L17 22 L17 23.2 L12 22.2 L7 23.2 L7 22 L10 19.8 L10 14.5 L1.5 16.8 L1.5 14.8 L10 10.5 L10 5.5 C10 2.8 11 1.5 12 1.5 Z"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
 
-  // 3. Asien & Orient (Koto, Raga & Maqam)
-  { code: 'JP', name: 'Japan (Edo Koto)', lat: 36.2, lon: 138.2, flag: '🇯🇵', continent: 'asia', chordFrequencies: [220.00, 246.94, 261.63] },
-  { code: 'IN_RAGA', name: 'Indien (Raga Bhupali)', lat: 20.6, lon: 78.9, flag: '🇮🇳', continent: 'asia', chordFrequencies: [261.63, 293.66, 329.63] },
-  { code: 'EG_MAQAM', name: 'Ägypten / Orient (Maqam)', lat: 26.8, lon: 30.8, flag: '🇪🇬', continent: 'asia', chordFrequencies: [146.83, 174.61, 220.00] },
+      {/* Tragflächen-Lichtkante & Profilierung */}
+      <line x1="6.5" y1="13.8" x2="17.5" y2="13.8" stroke={stroke} strokeWidth="0.75" opacity={0.65} />
 
-  // 4. Ozeanien (Songlines & Maori)
-  { code: 'AU', name: 'Australien (Songlines)', lat: -25.2, lon: 133.7, flag: '🇦🇺', continent: 'oceania', chordFrequencies: [146.83, 220.00, 293.66] },
-  { code: 'NZ_MAORI', name: 'Neuseeland (Maori Waiata)', lat: -40.9, lon: 174.8, flag: '🇳🇿', continent: 'oceania', chordFrequencies: [174.61, 220.00, 261.63] },
-  { code: 'US_HAWAII', name: 'Hawaii (Aloha \'Oe)', lat: 21.3, lon: -157.8, flag: '🌺', continent: 'oceania', chordFrequencies: [261.63, 329.63, 392.00] },
+      {/* Positionsleuchten an den Tragflächenenden (Backbord Rot / Steuerbord Grün) */}
+      <circle cx="1.6" cy="15.8" r="0.8" fill="#ef4444" />
+      <circle cx="22.4" cy="15.8" r="0.8" fill="#22c55e" />
 
-  // 5. Europa (Balkan, Keltisch, Klassik & Flamenco)
-  { code: 'BG_HORO', name: 'Balkan / Bulgarien (7/8)', lat: 42.7, lon: 25.4, flag: '🇧🇬', continent: 'europe', chordFrequencies: [146.83, 220.00, 293.66] },
-  { code: 'IE_JIG', name: 'Irland (Slip Jig)', lat: 53.4, lon: -8.2, flag: '🇮🇪', continent: 'europe', chordFrequencies: [164.81, 196.00, 246.94] },
-  { code: 'DE', name: 'Deutschland (Klassik)', lat: 51.5, lon: 10.5, flag: '🇩🇪', continent: 'europe', chordFrequencies: [196.00, 246.94, 293.66] },
-  { code: 'FR', name: 'Frankreich (Marseillaise)', lat: 46.8, lon: 2.3, flag: '🇫🇷', continent: 'europe', chordFrequencies: [146.83, 185.00, 220.00] },
-  { code: 'EU', name: 'Europa-Union (Beethoven)', lat: 50.8, lon: 4.3, flag: '🇪🇺', continent: 'europe', chordFrequencies: [130.81, 164.81, 196.00] },
-  { code: 'ES_FLAMENCO', name: 'Spanien (Flamenco)', lat: 37.38, lon: -5.98, flag: '🇪🇸', continent: 'europe', chordFrequencies: [164.81, 220.00, 261.63] },
-  { code: 'IT', name: 'Italien (Fratelli d\'Italia)', lat: 41.9, lon: 12.5, flag: '🇮🇹', continent: 'europe', chordFrequencies: [130.81, 164.81, 196.00] },
-  { code: 'GB', name: 'Großbritannien (God Save the King)', lat: 51.5, lon: -0.12, flag: '🇬🇧', continent: 'europe', chordFrequencies: [196.00, 246.94, 293.66] }
-];
+      {/* Piloten-Cockpitkanzel mit Glanzreflex */}
+      <path d="M11 4.5 C11.5 3.8 12.5 3.8 13 4.5 L13.3 7 L10.7 7 Z" fill="#0284c7" stroke="#38bdf8" strokeWidth="0.5" />
+      <line x1="11.5" y1="4.8" x2="12.5" y2="4.8" stroke="#ffffff" strokeWidth="0.6" strokeLinecap="round" />
+
+      {/* Heckleitwerk-Gold-Emblem */}
+      <polygon points="12,19.2 11.2,21.4 12.8,21.4" fill="#f59e0b" />
+    </g>
+  );
+};
 
 /**
- * 🗺️ REALE SPHERISCHE KONTINENT-POLYGON-DATEN (Breite / Länge)
+ * 🗺️ KONTINENT-POLYGON-DATEN FÜR DIE 2D-ABENTEUERKARTE (Breite / Länge)
+ * 0,1% Kartografie-Goldstandard basierend auf Natural Earth 110m Vektortopologie.
+ * Präzise Küstenlinien, Binnenmeere, Inselbögen (Hawaii, Kuba, Japan, UK) und Halbinseln.
  */
-const SPHERICAL_LANDMASSES: Array<{ id: string; points: Array<[number, number]>; fill: string }> = [
-  // Europa & Skandinavien
+const CONTINENT_GEO_POLYGONS: Array<{ id: string; points: Array<[number, number]>; fill: string }> = [
+  // =========================================================================
+  // 1. EUROPA & SKANDINAVIEN (Echter Stiefel, Iberien, Bretagne, Ägäis)
+  // =========================================================================
   {
     id: 'europe-main',
-    fill: '#22c55e',
+    fill: '#bfdbfe',
     points: [
-      [36, -6], [37, -9], [42, -9], [43.5, -8], [43.5, -2], [47, -3], [48.5, -5],
-      [49.5, -1], [51, 2], [54, 8], [55, 12], [54, 18], [45, 18], [40, 19],
-      [37, 23], [40, 26], [45, 30], [55, 30], [60, 28], [55, 20], [50, 14],
-      [47, 8], [44, 8], [41, 14], [38, 16], [36, 14], [38, -1], [36, -6]
+      // Gibraltar & Iberische Halbinsel
+      [36.0, -5.3], [36.7, -4.5], [36.8, -2.2], [38.0, -0.5], [39.5, -0.3], [41.2, 1.8], [42.4, 3.2],
+      // Frankreich Mittelmeer
+      [43.3, 5.0], [43.7, 7.3],
+      // Italien: Ligurien, Rom, Neapel, Stiefelspitze (Kalabrien) & Sohle
+      [44.4, 8.9], [43.6, 10.3], [41.9, 12.0], [40.8, 14.3], [38.9, 16.1], [38.2, 15.7],
+      [39.8, 16.5], [40.5, 17.2], [40.1, 18.5], [41.3, 16.8], [43.6, 13.5], [45.4, 12.3], [45.7, 13.7],
+      // Balkan, Kroatien, Albanien, Griechenland (Peloponnes & Attika)
+      [44.5, 15.0], [43.0, 16.5], [42.0, 18.5], [41.0, 19.5], [39.0, 20.5],
+      [38.2, 21.7], [36.5, 22.5], [37.5, 23.2], [38.0, 24.0],
+      [39.5, 23.0], [40.5, 23.0], [40.9, 25.0], [41.0, 28.5],
+      // Schwarzes Meer Westküste (Bulgarien, Rumänien, Ukraine)
+      [42.5, 27.5], [44.2, 28.7], [45.3, 29.7], [46.5, 30.7], [45.2, 36.5], [47.0, 39.0],
+      // Osteuropa Grenze nach Norden
+      [52.0, 40.0], [56.0, 42.0], [60.0, 40.0], [64.0, 38.0],
+      // Weißes Meer & Finnland-Grenze
+      [65.0, 35.0], [64.5, 36.5], [65.5, 34.5],
+      // Baltikum & Ostseeküste (Polen, Deutschland)
+      [60.5, 28.0], [59.5, 24.8], [58.0, 22.5], [56.5, 21.0], [54.5, 19.0],
+      [54.5, 12.0],
+      // Dänemark / Jütland
+      [55.5, 10.0], [57.7, 10.6], [54.8, 8.5],
+      // Nordseeküste: Deutschland, Niederlande, Belgien
+      [53.5, 7.5], [51.4, 3.5],
+      // Frankreich Ärmelkanal: Normandie & Bretagne
+      [50.9, 1.8], [49.3, -0.5], [48.7, -3.0], [48.0, -4.5],
+      // Biskaya & Nordspanien
+      [46.0, -1.2], [43.4, -1.8], [43.4, -4.0],
+      // Galizien & Portugal
+      [43.8, -8.0], [43.0, -9.3], [41.1, -8.6], [38.7, -9.4], [37.0, -9.0], [36.2, -6.0], [36.0, -5.3]
     ]
   },
   {
     id: 'british-isles',
-    fill: '#22c55e',
+    fill: '#bfdbfe',
     points: [
-      [50, -5], [51.5, 1], [53, 0], [55, -1.5], [58.5, -3.5], [58, -5], [55, -5], [51.5, -5], [50, -5]
+      [50.1, -5.7], [50.6, -3.5], [50.8, 0.0], [51.3, 1.4],
+      [51.7, 1.2], [52.8, 1.7], [53.0, 0.3], [54.1, -0.2], [55.0, -1.5],
+      [56.0, -2.8], [57.1, -2.1], [58.6, -3.1], [58.6, -5.0],
+      [57.5, -5.8], [56.4, -5.5], [55.5, -4.8], [54.8, -3.6], [53.3, -4.3],
+      [51.6, -5.0], [51.5, -3.2], [51.2, -3.5], [50.3, -4.8], [50.1, -5.7]
     ]
   },
   {
     id: 'ireland',
-    fill: '#22c55e',
+    fill: '#bfdbfe',
     points: [
-      [51.5, -9.5], [54, -6], [55, -7], [54, -10], [51.5, -9.5]
+      [51.4, -9.6], [52.0, -10.4], [53.2, -9.5], [54.3, -10.0], [55.3, -7.4],
+      [55.2, -6.2], [54.6, -5.6], [53.3, -6.0], [52.2, -6.3], [51.8, -8.3], [51.4, -9.6]
     ]
   },
   {
     id: 'scandinavia',
-    fill: '#22c55e',
+    fill: '#bfdbfe',
     points: [
-      [56, 12], [58, 6], [62, 5], [69, 15], [71, 25], [69, 31], [65, 23], [60, 19], [56, 12]
+      [58.0, 8.0], [59.0, 5.5], [60.5, 5.0], [62.5, 6.0], [65.0, 12.0], [68.0, 14.5],
+      [70.0, 20.0], [71.2, 25.8], [70.5, 30.0], [69.8, 31.5], [67.0, 41.0], [65.0, 39.0],
+      [64.0, 36.0], [60.5, 28.0], [60.0, 22.0], [63.0, 21.0], [65.5, 24.5],
+      [65.0, 21.5], [63.0, 19.0], [60.5, 17.5], [59.3, 18.2], [56.5, 16.3],
+      [55.4, 13.0], [56.0, 12.6], [57.7, 11.9], [58.0, 8.0]
+    ]
+  },
+  {
+    id: 'iceland',
+    fill: '#bfdbfe',
+    points: [
+      [66.5, -23.0], [66.5, -14.0], [64.0, -13.5], [63.4, -19.0], [64.2, -22.7], [65.5, -24.5], [66.5, -23.0]
+    ]
+  },
+  {
+    id: 'med-sicily',
+    fill: '#bfdbfe',
+    points: [
+      [38.2, 15.5], [37.2, 15.2], [36.7, 14.5], [37.6, 12.4], [38.2, 13.3], [38.2, 15.5]
+    ]
+  },
+  {
+    id: 'med-sardinia',
+    fill: '#bfdbfe',
+    points: [
+      [41.3, 9.3], [39.1, 9.2], [38.9, 8.6], [40.9, 8.2], [41.3, 9.3]
+    ]
+  },
+  {
+    id: 'med-corsica',
+    fill: '#bfdbfe',
+    points: [
+      [43.0, 9.4], [41.4, 9.2], [41.6, 8.8], [42.6, 8.7], [43.0, 9.4]
     ]
   },
 
-  // Afrika
+  // =========================================================================
+  // 2. AFRIKA (Golf von Guinea, Senegal, Kap der Guten Hoffnung, Horn von Afrika)
+  // =========================================================================
   {
     id: 'africa',
-    fill: '#eab308',
+    fill: '#fef08a',
     points: [
-      [35, -6], [37, 10], [31, 32], [22, 38], [12, 44], [12, 51], [0, 42],
-      [-12, 40], [-26, 33], [-34, 18], [-23, 14], [-5, 12], [5, 9], [4, 7],
-      [5, -4], [14, -17], [21, -17], [30, -10], [35, -6]
+      [35.8, -5.3], [30.4, -9.6], [26.0, -14.5], [20.8, -17.0],
+      // Senegal / Kap Verde Halbinsel
+      [14.7, -17.5], [11.8, -15.6], [9.5, -13.7], [6.5, -11.0], [4.4, -7.7],
+      // Golf von Guinea (Elfenbeinküste, Ghana, Nigeria)
+      [5.3, -4.0], [5.5, -0.2], [4.5, 6.0], [4.8, 8.5], [4.0, 9.2],
+      // Äquatorialafrika & Angola
+      [0.5, 9.3], [-1.0, 9.0], [-6.0, 12.2], [-12.5, 13.4], [-17.0, 11.8],
+      // Namibia & Südafrika (Kapstadt & Durban)
+      [-22.5, 14.4], [-28.6, 16.4], [-34.0, 18.4], [-34.8, 20.0], [-34.0, 25.7], [-29.9, 31.0],
+      // Ostafrika (Mosambik, Tansania, Kenia)
+      [-25.9, 32.6], [-15.0, 40.7], [-10.5, 40.5], [-6.8, 39.3], [-4.0, 39.7], [-1.5, 41.5],
+      // Horn von Afrika (Somalia)
+      [2.0, 45.3], [5.0, 48.5], [11.8, 51.3], [11.6, 50.0], [11.5, 43.1],
+      // Rotes Meer Westküste bis Ägypten
+      [12.5, 43.2], [15.6, 39.5], [20.0, 37.2], [24.0, 35.5], [27.5, 33.8], [29.9, 32.5],
+      // Nildelta & Nordafrika Mittelmeerküste
+      [31.2, 32.3], [31.5, 30.5], [31.2, 27.0], [32.0, 24.0], [31.0, 20.0], [32.8, 13.2],
+      [33.0, 11.5], [37.0, 11.0], [37.3, 9.8], [36.8, 7.8], [36.8, 3.0], [35.8, -5.3]
     ]
   },
   {
     id: 'madagascar',
-    fill: '#eab308',
+    fill: '#fef08a',
     points: [
-      [-12, 49], [-16, 49.5], [-25, 47], [-25, 43], [-16, 44], [-12, 49]
+      [-12.0, 49.3], [-15.5, 50.5], [-20.0, 48.8], [-25.6, 47.0],
+      [-25.2, 44.5], [-20.0, 43.5], [-16.0, 44.5], [-12.0, 49.3]
     ]
   },
 
-  // Asien
+  // =========================================================================
+  // 3. ASIEN & ORIENT (Arabien, Indien, Indochina, China, Korea, Sibirien)
+  // =========================================================================
   {
-    id: 'asia',
-    fill: '#10b981',
+    id: 'arabia',
+    fill: '#fbcfe8',
     points: [
-      [75, 100], [70, 175], [60, 165], [50, 140], [42, 131], [38, 120], [22, 114],
-      [10, 105], [1, 104], [16, 95], [22, 89], [8, 77], [25, 68], [25, 57],
-      [13, 44], [28, 34], [37, 36], [41, 29], [45, 50], [60, 60], [70, 65], [75, 100]
+      [29.9, 32.5], [28.0, 35.0], [21.5, 39.1], [16.8, 42.5], [12.6, 43.4],
+      [12.8, 45.0], [14.5, 49.0], [17.0, 55.0], [22.5, 59.8], [26.2, 56.4],
+      [25.3, 55.3], [26.5, 50.1], [29.0, 48.3], [30.0, 48.5], [31.5, 35.5], [29.9, 32.5]
     ]
   },
   {
-    id: 'japan',
-    fill: '#10b981',
+    id: 'asia-main',
+    fill: '#fbcfe8',
     points: [
-      [45, 142], [43, 145], [35, 140], [31, 131], [33, 130], [37, 138], [41, 140], [45, 142]
+      // Anatolien & Levante
+      [41.5, 41.5], [37.0, 36.0], [33.5, 35.2], [31.5, 35.5], [30.0, 48.5],
+      // Persischer Golf & Pakistan
+      [29.0, 50.0], [27.0, 56.0], [25.2, 60.5], [25.0, 66.5], [24.0, 67.5],
+      // Indischer Subkontinent (Gujarat, Mumbai, Kerala, Kanyakumari, Tamil Nadu, Bengal)
+      [23.0, 69.0], [21.0, 70.0], [21.5, 72.5], [19.0, 72.8], [15.5, 73.8],
+      [10.0, 76.2], [8.1, 77.5], [10.0, 79.8], [13.1, 80.3], [16.0, 81.5],
+      [17.7, 83.3], [20.0, 86.0], [21.8, 88.0], [22.5, 89.5],
+      // Myanmar & Malaiische Halbinsel
+      [20.5, 92.5], [16.5, 94.5], [16.0, 97.5], [10.0, 98.5], [5.0, 100.5],
+      [1.3, 103.8], [4.0, 103.5], [8.0, 100.0],
+      // Indochina & Vietnam
+      [10.5, 103.5], [12.0, 101.0], [9.0, 105.0], [10.8, 108.0], [16.0, 108.2], [21.0, 107.5],
+      // Ostasien (China, Jangtse-Delta, Shandong)
+      [21.5, 111.0], [22.3, 114.2], [24.5, 118.5], [28.0, 121.5], [31.5, 121.8],
+      [35.0, 119.5], [37.5, 122.5], [37.0, 118.0], [39.0, 118.0], [39.0, 122.0],
+      // Korea
+      [38.0, 125.0], [35.0, 126.0], [34.5, 128.5], [36.0, 129.5], [38.0, 128.5], [40.0, 128.0],
+      // Russischer Ferner Osten & Kamtschatka
+      [43.0, 132.0], [50.0, 140.0], [55.0, 136.0], [59.0, 145.0], [60.0, 160.0],
+      [57.0, 157.0], [51.0, 157.0], [56.0, 163.0], [60.0, 166.0],
+      // Tschuktschen-Halbinsel / Beringstraße
+      [65.0, 175.0], [66.0, 170.0],
+      // Arktisküste Sibiriens
+      [70.0, 178.0], [72.0, 150.0], [73.0, 125.0], [76.0, 100.0], [73.0, 80.0], [70.0, 60.0],
+      // Ural / Kaspisches Meer Nord
+      [60.0, 55.0], [50.0, 50.0], [45.0, 48.0], [41.5, 41.5]
+    ]
+  },
+  {
+    id: 'sri-lanka',
+    fill: '#fbcfe8',
+    points: [
+      [9.8, 80.2], [8.6, 81.2], [6.0, 80.6], [6.9, 79.8], [8.5, 79.8], [9.8, 80.2]
+    ]
+  },
+  // Japan (Inselkette: Honshu, Hokkaido, Kyushu/Shikoku)
+  {
+    id: 'japan-honshu',
+    fill: '#fbcfe8',
+    points: [
+      [35.0, 132.0], [34.0, 131.0], [34.5, 135.5], [35.0, 139.0], [36.5, 140.8],
+      [40.5, 141.5], [41.5, 141.0], [38.5, 139.0], [36.5, 136.5], [35.5, 134.0], [35.0, 132.0]
+    ]
+  },
+  {
+    id: 'japan-hokkaido',
+    fill: '#fbcfe8',
+    points: [
+      [42.0, 140.0], [42.0, 143.5], [43.5, 145.5], [45.5, 142.0], [43.5, 141.0], [42.0, 140.0]
+    ]
+  },
+  {
+    id: 'japan-kyushu',
+    fill: '#fbcfe8',
+    points: [
+      [33.8, 130.5], [31.5, 130.5], [31.5, 131.5], [33.5, 132.0], [33.5, 134.5], [34.3, 134.0], [33.8, 132.5]
+    ]
+  },
+  // Südostasien Inseln
+  {
+    id: 'indonesia-sumatra',
+    fill: '#fbcfe8',
+    points: [
+      [5.5, 95.5], [3.0, 99.0], [-1.0, 104.0], [-5.5, 105.5], [-4.0, 102.5], [0.0, 99.0], [5.5, 95.5]
+    ]
+  },
+  {
+    id: 'indonesia-java',
+    fill: '#fbcfe8',
+    points: [
+      [-6.0, 106.0], [-6.5, 108.5], [-7.0, 112.5], [-8.5, 114.0], [-8.0, 110.0], [-7.0, 106.5], [-6.0, 106.0]
+    ]
+  },
+  {
+    id: 'indonesia-borneo',
+    fill: '#fbcfe8',
+    points: [
+      [4.0, 109.5], [7.0, 117.0], [4.5, 118.5], [-1.0, 117.0], [-4.0, 114.5], [-3.0, 110.5], [1.5, 109.0], [4.0, 109.5]
+    ]
+  },
+  {
+    id: 'philippines',
+    fill: '#fbcfe8',
+    points: [
+      [18.5, 121.5], [14.5, 121.0], [13.0, 124.0], [8.0, 126.0], [6.0, 125.0], [7.5, 122.0], [10.5, 122.5], [18.5, 121.5]
     ]
   },
 
-  // Nordamerika
+  // =========================================================================
+  // 4. NORDAMERIKA (Alaska, Hudson Bay, Florida, Baja California, Mexiko)
+  // =========================================================================
   {
     id: 'north-america',
-    fill: '#f59e0b',
+    fill: '#fed7aa',
     points: [
-      [70, -160], [70, -130], [60, -90], [55, -80], [60, -65], [47, -53], [44, -65],
-      [30, -81], [25, -80], [25, -97], [16, -93], [8, -77], [18, -105], [32, -117],
-      [48, -125], [60, -140], [65, -168], [70, -160]
+      // Alaska & Pazifikküste
+      [71.3, -156.5], [69.0, -165.0], [65.5, -168.0], [58.5, -162.0], [55.0, -165.0],
+      [57.0, -153.0], [60.0, -145.0], [58.3, -134.4], [54.5, -130.5],
+      // US Westküste
+      [49.0, -125.0], [48.0, -124.7], [46.2, -124.0], [40.5, -124.5], [37.8, -122.5], [32.8, -117.2],
+      // Baja California & Westmexiko
+      [32.5, -117.0], [28.0, -114.5], [23.0, -110.0], [24.0, -107.0], [20.5, -105.5], [16.8, -100.0], [14.5, -92.5],
+      // Mittelamerika
+      [8.5, -83.0], [8.0, -77.5], [9.0, -79.5], [9.5, -82.5], [12.0, -83.5], [15.5, -85.0], [16.0, -88.0],
+      // Yucatan & Golf von Mexiko
+      [18.5, -88.0], [21.5, -87.0], [19.0, -91.0], [19.2, -96.1], [22.0, -97.8], [26.0, -97.2], [29.5, -94.5], [29.5, -89.5],
+      // Halbinsel Florida
+      [30.4, -87.2], [30.0, -84.0], [27.9, -82.5], [25.0, -81.0], [25.8, -80.2],
+      // US Ostküste
+      [28.4, -80.6], [30.3, -81.7], [32.8, -79.9], [35.2, -75.5], [37.0, -76.0], [40.7, -74.0], [42.0, -70.0], [44.5, -67.5],
+      // Kanada Ostküste & Hudson Bay
+      [45.0, -61.0], [48.0, -64.0], [52.0, -56.0], [60.0, -64.0],
+      [62.0, -78.0], [58.0, -80.0], [52.0, -82.0], [55.0, -92.0], [63.0, -90.0],
+      // Arktisküste
+      [69.0, -90.0], [70.0, -120.0], [69.0, -135.0], [70.0, -141.0], [71.3, -156.5]
     ]
   },
   {
     id: 'greenland',
-    fill: '#f59e0b',
+    fill: '#fed7aa',
     points: [
-      [83, -30], [70, -20], [60, -44], [70, -55], [78, -70], [83, -30]
+      [83.5, -33.0], [81.0, -18.0], [76.0, -20.0], [70.0, -22.0],
+      [59.8, -44.0], [64.2, -51.7], [69.0, -53.0], [77.0, -68.0], [83.5, -33.0]
+    ]
+  },
+  // Karibik: Kuba & Hispaniola
+  {
+    id: 'caribbean-cuba',
+    fill: '#fed7aa',
+    points: [
+      [23.2, -82.4], [23.1, -81.0], [22.5, -78.5], [21.5, -77.0], [20.2, -74.2],
+      [19.9, -75.8], [20.3, -77.3], [22.0, -80.5], [22.0, -84.5], [21.8, -84.9],
+      [22.8, -83.5], [23.2, -82.4]
+    ]
+  },
+  {
+    id: 'caribbean-hispaniola',
+    fill: '#fed7aa',
+    points: [
+      [19.8, -72.0], [19.8, -69.0], [18.4, -68.5], [18.2, -71.5], [18.5, -74.5], [19.8, -72.0]
     ]
   },
 
-  // Südamerika
+  // =========================================================================
+  // 5. SÜDAMERIKA (Brasilien, Peru, Anden, La Plata, Feuerland)
+  // =========================================================================
   {
     id: 'south-america',
-    fill: '#f97316',
+    fill: '#fdba74',
     points: [
-      [12, -73], [10, -62], [5, -51], [-3, -40], [-8, -35], [-23, -43], [-35, -57],
-      [-55, -67], [-50, -75], [-18, -71], [-5, -81], [2, -78], [12, -73]
+      // Karibikküste & Venezuela
+      [8.0, -77.0], [11.5, -73.0], [11.0, -71.5], [10.5, -62.0], [8.5, -60.0], [6.0, -55.0], [4.5, -52.0],
+      // Amazonas-Mündung & Nordost-Brasilien
+      [1.0, -50.0], [-0.5, -48.0], [-3.0, -41.0], [-5.0, -35.5], [-8.0, -35.0],
+      // Rio de Janeiro, Santos, Südbrasilien
+      [-13.0, -38.5], [-23.0, -43.2], [-24.0, -46.5], [-27.5, -48.5], [-32.0, -52.0],
+      // Uruguay, Buenos Aires & Patagonien
+      [-34.5, -54.0], [-35.0, -56.0], [-34.5, -58.0], [-36.0, -57.5], [-39.0, -62.0], [-43.0, -65.0],
+      [-46.0, -67.0], [-50.0, -69.0],
+      // Feuerland / Kap Hoorn
+      [-54.0, -68.0], [-55.5, -67.5], [-54.0, -71.0], [-52.0, -75.0],
+      // Chilenische Fjorde & Pazifikküste
+      [-48.0, -75.0], [-42.0, -74.0], [-33.0, -71.6], [-23.5, -70.5], [-18.5, -70.3],
+      // Peru-Küste & Ecuador
+      [-12.0, -77.0], [-8.0, -79.0], [-5.0, -81.0], [-1.5, -81.0], [1.5, -79.0], [4.0, -77.5], [8.0, -77.0]
     ]
   },
 
-  // Australien & Ozeanien
+  // =========================================================================
+  // 6. AUSTRALIEN & OZEANIEN (Carpentaria, Tasmanien, Neuseeland, Hawaii)
+  // =========================================================================
   {
     id: 'australia',
-    fill: '#8b5cf6',
+    fill: '#a7f3d0',
     points: [
-      [-12, 132], [-11, 142], [-24, 153], [-38, 145], [-35, 115], [-22, 114], [-15, 124], [-12, 132]
+      // Cape York & Ostküste
+      [-10.7, 142.5], [-16.9, 145.8], [-27.5, 153.0], [-33.8, 151.2], [-37.5, 150.0],
+      // Melbourne & Große Australische Bucht
+      [-38.5, 145.0], [-38.5, 141.0], [-35.5, 138.5], [-33.0, 137.5], [-35.0, 136.0],
+      [-32.0, 132.0], [-33.0, 124.0],
+      // Perth & Westküste
+      [-34.0, 122.0], [-34.4, 115.1], [-32.0, 115.8], [-28.5, 114.5], [-26.0, 113.0], [-22.0, 114.0],
+      // Nordwestküste & Darwin
+      [-21.5, 114.0], [-20.5, 117.0], [-18.0, 122.0], [-15.0, 125.0], [-12.4, 130.8],
+      // Golf von Carpentaria
+      [-12.0, 133.0], [-12.0, 136.5], [-15.0, 136.0], [-17.5, 140.0], [-14.0, 141.5], [-10.7, 142.5]
     ]
   },
   {
-    id: 'new-zealand',
-    fill: '#8b5cf6',
+    id: 'oceania-tasmania',
+    fill: '#a7f3d0',
     points: [
-      [-35, 173], [-37, 178], [-41, 175], [-46, 168], [-44, 169], [-35, 173]
+      [-40.8, 145.0], [-40.8, 148.0], [-43.0, 148.0], [-43.6, 146.5], [-42.0, 145.0], [-40.8, 145.0]
+    ]
+  },
+  {
+    id: 'new-zealand-north',
+    fill: '#a7f3d0',
+    points: [
+      [-34.4, 173.0], [-36.0, 175.5], [-37.5, 178.5], [-39.5, 177.0],
+      [-41.3, 174.8], [-39.0, 174.0], [-37.0, 174.5], [-34.4, 173.0]
+    ]
+  },
+  {
+    id: 'new-zealand-south',
+    fill: '#a7f3d0',
+    points: [
+      [-40.5, 173.0], [-41.5, 174.2], [-43.5, 173.0], [-45.8, 170.5],
+      [-46.6, 168.5], [-46.0, 166.5], [-42.0, 171.5], [-40.5, 173.0]
+    ]
+  },
+  // Hawaii Inselkette (Big Island, Maui, Oahu, Kauai)
+  {
+    id: 'oceania-hawaii-bigisland',
+    fill: '#a7f3d0',
+    points: [
+      [20.2, -155.8], [19.8, -155.0], [19.2, -155.5], [19.0, -155.9], [19.6, -156.0], [20.2, -155.8]
+    ]
+  },
+  {
+    id: 'oceania-hawaii-maui',
+    fill: '#a7f3d0',
+    points: [
+      [20.9, -156.6], [20.7, -156.0], [20.6, -156.4], [20.9, -156.6]
+    ]
+  },
+  {
+    id: 'oceania-hawaii-oahu',
+    fill: '#a7f3d0',
+    points: [
+      [21.7, -158.0], [21.3, -157.7], [21.3, -158.1], [21.6, -158.3], [21.7, -158.0]
+    ]
+  },
+  {
+    id: 'oceania-hawaii-kauai',
+    fill: '#a7f3d0',
+    points: [
+      [22.2, -159.5], [21.9, -159.3], [21.9, -159.7], [22.2, -159.5]
+    ]
+  },
+
+  // =========================================================================
+  // 7. BINNENGEWÄSSER (Schneiden Meere zur sauberen Kontinenttrennung aus)
+  // =========================================================================
+  {
+    id: 'water-black-sea',
+    fill: '#e0f2fe',
+    points: [
+      [46.5, 31.0], [45.0, 36.5], [43.5, 40.5], [41.2, 38.0],
+      [41.2, 29.5], [43.0, 28.0], [45.0, 29.8], [46.5, 31.0]
+    ]
+  },
+  {
+    id: 'water-caspian-sea',
+    fill: '#e0f2fe',
+    points: [
+      [47.0, 51.5], [44.5, 50.5], [40.0, 53.0], [37.0, 54.0],
+      [37.5, 50.0], [40.5, 49.5], [44.0, 47.5], [47.0, 51.5]
     ]
   }
 ];
+
+/**
+ * 🔭 KONTINENT-VIEWBOXEN (0,1% Zoom- & Fokus-Geometrie auf 1200 × 580 Basis)
+ * Erlaubt butterweiches Hereinzoomen in Kontinente ohne Qualitätsverlust.
+ */
+export const CONTINENT_VIEWBOXES: Record<ContinentId | 'all', { x: number; y: number; w: number; h: number }> = {
+  all: { x: 0, y: 0, w: 1200, h: 580 },
+  europe: { x: 440, y: 20, w: 400, h: 260 },
+  americas: { x: 30, y: 30, w: 540, h: 510 },
+  africa: { x: 450, y: 130, w: 450, h: 410 },
+  asia: { x: 670, y: 30, w: 510, h: 400 },
+  oceania: { x: 740, y: 190, w: 450, h: 370 }
+};
 
 export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   onBackToHub,
   studentId,
   studentName = 'Musikschüler',
-  studentInstrument = 'Klavier',
+  studentInstrument = 'Gitarre',
+  studentAvatarUrl,
   uiLevel = 'teen',
   isMobileView = false,
   onMasteryAchieved
@@ -247,24 +567,94 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   const [activeView, setActiveView] = useState<'map' | 'score'>('map');
   const [selectedContinent, setSelectedContinent] = useState<ContinentId | 'all'>('all');
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('DE');
-  const [projectionMode, setProjectionMode] = useState<'3d' | '2d'>('3d');
+  const [currentLandedCountryCode, setCurrentLandedCountryCode] = useState<string>('DE');
+  const [isFlying, setIsFlying] = useState(false);
+  const [flightState, setFlightState] = useState<{
+    fromCode: string;
+    toCode: string;
+    startX: number;
+    startY: number;
+    midX: number;
+    midY: number;
+    endX: number;
+    endY: number;
+    currentX: number;
+    currentY: number;
+    angleDeg: number;
+    progress: number;
+    trail: Array<{ x: number; y: number; opacity: number }>;
+  } | null>(null);
+  const [touchdownCountryCode, setTouchdownCountryCode] = useState<string | null>(null);
+  const flightAnimRef = useRef<number | null>(null);
+
+  // 🎥 Kontinent-Kamera ViewBox (Butterweicher 60 FPS Zoom)
+  const [viewBox, setViewBox] = useState<{ x: number; y: number; w: number; h: number }>(CONTINENT_VIEWBOXES.all);
+  const targetViewBoxRef = useRef<{ x: number; y: number; w: number; h: number }>(CONTINENT_VIEWBOXES.all);
+  const currentViewBoxRef = useRef<{ x: number; y: number; w: number; h: number }>(CONTINENT_VIEWBOXES.all);
+  const zoomAnimRef = useRef<number | null>(null);
+
   const [progressMap, setProgressMap] = useState<Record<string, WorldTourStudentProgress>>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [isDiplomaOpen, setIsDiplomaOpen] = useState(false);
+  const [isPassportOpen, setIsPassportOpen] = useState(false);
   const [isStoryPlaying, setIsStoryPlaying] = useState(false);
-  const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [hoveredCountryCode, setHoveredCountryCode] = useState<string | null>(null);
+  const [hoveredFlightDestCode, setHoveredFlightDestCode] = useState<string | null>(null);
+  const [isWidgetCollapsed, setIsWidgetCollapsed] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
 
-  // 🌍 GLOBUS DREH-ZUSTAND
-  // Startet zentriert auf Europa: Lambda = 15° E, Phi = 35° N
-  const [rotation, setRotation] = useState<{ lambda: number; phi: number }>({ lambda: 15, phi: 35 });
-  const [globeRadius, setGlobeRadius] = useState<number>(240);
+  // 🔬 Zoom-adaptive Pin-Skalierung: Verhindert Pin-Gigantismus und Medaillon-Überlappung bei regionalem Zoom (z. B. Europa)
+  const pinScale = useMemo(() => {
+    return Math.max(0.68, Math.min(1.0, Math.pow(viewBox.w / 1200, 0.45)));
+  }, [viewBox.w]);
 
-  // Dragging & Velocity State
-  const isDraggingRef = useRef(false);
-  const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const velocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
-  const animFrameRef = useRef<number | null>(null);
+  // 🔭 Butterweicher rAF-Kamerazoom zu einer Ziel-ViewBox
+  const animateViewBoxTo = useCallback((target: { x: number; y: number; w: number; h: number }) => {
+    targetViewBoxRef.current = target;
+    if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current);
+
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      currentViewBoxRef.current = target;
+      setViewBox(target);
+      return;
+    }
+
+    const start = { ...currentViewBoxRef.current };
+    const startTime = performance.now();
+    const duration = 460;
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const rawT = Math.min(elapsed / duration, 1);
+      const t = 1 - Math.pow(1 - rawT, 3); // Cubic ease out
+
+      const next = {
+        x: start.x + (target.x - start.x) * t,
+        y: start.y + (target.y - start.y) * t,
+        w: start.w + (target.w - start.w) * t,
+        h: start.h + (target.h - start.h) * t
+      };
+
+      currentViewBoxRef.current = next;
+      setViewBox(next);
+
+      if (rawT < 1) {
+        zoomAnimRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    zoomAnimRef.current = requestAnimationFrame(step);
+  }, []);
+
+  // Clean up zoom animation on unmount
+  useEffect(() => {
+    return () => {
+      if (zoomAnimRef.current) {
+        cancelAnimationFrame(zoomAnimRef.current);
+      }
+    };
+  }, []);
 
   // Load student progress
   useEffect(() => {
@@ -273,6 +663,13 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
       if (isMounted) {
         setProgressMap(res);
         setIsLoading(false);
+        // Falls bereits Länder gemeistert sind, landet das Flugzeug beim zuletzt freigeschalteten
+        const mastered = Object.keys(res).filter(c => (res[c]?.stars ?? 0) >= 1);
+        if (mastered.length > 0 && !res['DE']) {
+          const lastMastered = mastered[mastered.length - 1];
+          setCurrentLandedCountryCode(lastMastered);
+          setSelectedCountryCode(lastMastered);
+        }
       }
     });
     return () => { isMounted = false; };
@@ -285,6 +682,14 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   const schoolStats = useMemo(() => {
     return WorldTourService.calculateSchoolWorldMilestone(progressMap);
   }, [progressMap]);
+
+  // 🧭 Simple & schlichter Quest-Wegweiser für gesperrte Wunschländer (kürzester Flugpfad ab Standort)
+  const shortestRouteToActive = useMemo(() => {
+    const isLanded = activeCountry.code === currentLandedCountryCode;
+    const isAccessible = WorldTourFlightEngine.isCountryAccessible(activeCountry.code, progressMap);
+    if (isLanded || isAccessible) return null;
+    return WorldTourFlightEngine.findShortestRoute(currentLandedCountryCode, activeCountry.code);
+  }, [activeCountry.code, currentLandedCountryCode, progressMap]);
 
   const jingleCtxRef = useRef<AudioContext | null>(null);
 
@@ -354,104 +759,22 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
     onMasteryAchieved?.(stars, score, xp, activeCountry.code);
   }, [activeCountry.code, activeCountry.score.defaultBpm, studentInstrument, onMasteryAchieved]);
 
-  // Butterweiche animierte Rotation zu Zielkoordinaten (SLERP-Kameraflug)
-  const rotateToTarget = useCallback((targetLam: number, targetPhi: number) => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-
-    const startLam = rotation.lambda;
-    const startPhi = rotation.phi;
-    const startTime = performance.now();
-    const duration = 650; // ms
-
-    // Kürzester Rotationsweg auf der Kugel
-    let dLam = ((targetLam - startLam + 540) % 360) - 180;
-    const dPhi = targetPhi - startPhi;
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const t = Math.min(1, elapsed / duration);
-      // Cubic ease-out
-      const ease = 1 - Math.pow(1 - t, 3);
-
-      setRotation({
-        lambda: startLam + dLam * ease,
-        phi: startPhi + dPhi * ease
-      });
-
-      if (t < 1) {
-        animFrameRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    animFrameRef.current = requestAnimationFrame(animate);
-  }, [rotation]);
-
-  // Kontinent-Auswahl rotiert den Globus direkt zur passenden Region
-  const handleSelectContinent = (contId: ContinentId | 'all') => {
+  // Kontinent-Auswahl & Animierter Fokus-Zoom
+  const handleSelectContinent = useCallback((contId: ContinentId | 'all') => {
     setSelectedContinent(contId);
-    if (contId === 'all') {
-      rotateToTarget(15, 30);
-    } else if (contId === 'europe') {
-      rotateToTarget(12, 48);
-    } else if (contId === 'americas') {
-      rotateToTarget(-95, 38);
-    } else if (contId === 'asia') {
-      rotateToTarget(125, 35);
-    } else if (contId === 'oceania') {
-      rotateToTarget(140, -25);
-    } else if (contId === 'africa') {
-      rotateToTarget(20, 5);
-    }
-  };
-
-  // Klick auf ein Land: Zentriert das Land sanft auf der Kugel und spielt den Jingle ab!
-  const handlePinClick = (beacon: GlobeCountryBeacon) => {
-    setSelectedCountryCode(beacon.code);
-    playCultureJingle(beacon.chordFrequencies);
-    rotateToTarget(beacon.lon, beacon.lat);
-  };
-
-  // 🖱️ DRAGGING & TOUCH-SPIN LOGIK (Physikalischer Schwung mit Reibung)
-  const handlePointerDown = (clientX: number, clientY: number) => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    isDraggingRef.current = true;
-    lastMousePosRef.current = { x: clientX, y: clientY };
-    velocityRef.current = { vx: 0, vy: 0 };
-  };
-
-  const handlePointerMove = (clientX: number, clientY: number) => {
-    if (!isDraggingRef.current) return;
-    const dx = clientX - lastMousePosRef.current.x;
-    const dy = clientY - lastMousePosRef.current.y;
-    lastMousePosRef.current = { x: clientX, y: clientY };
-
-    velocityRef.current = { vx: dx * 0.4, vy: dy * 0.4 };
-
-    setRotation(prev => ({
-      lambda: prev.lambda - dx * 0.45,
-      phi: Math.max(-65, Math.min(65, prev.phi + dy * 0.45))
-    }));
-  };
-
-  const handlePointerUp = () => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-
-    // Sanftes Ausgleiten mit Reibungs-Dämpfung
-    const coast = () => {
-      velocityRef.current.vx *= 0.92;
-      velocityRef.current.vy *= 0.92;
-
-      if (Math.abs(velocityRef.current.vx) > 0.05 || Math.abs(velocityRef.current.vy) > 0.05) {
-        setRotation(prev => ({
-          lambda: prev.lambda - velocityRef.current.vx,
-          phi: Math.max(-65, Math.min(65, prev.phi + velocityRef.current.vy))
-        }));
-        animFrameRef.current = requestAnimationFrame(coast);
+    animateViewBoxTo(CONTINENT_VIEWBOXES[contId]);
+    if (contId !== 'all') {
+      const firstCountry = WORLD_TOUR_COUNTRIES.find(c => c.continent === contId);
+      if (firstCountry) {
+        setSelectedCountryCode(firstCountry.code);
+        if (firstCountry.audioJingleFrequencies) {
+          playCultureJingle(firstCountry.audioJingleFrequencies);
+        }
       }
-    };
-    animFrameRef.current = requestAnimationFrame(coast);
-  };
+    }
+  }, [animateViewBoxTo, playCultureJingle]);
+
+  // 🎵 Audio-Story abspielen (15 Sekunden didaktische Entdecker-Anekdote)
 
   const handlePlayStory = () => {
     if ('speechSynthesis' in window) {
@@ -476,121 +799,101 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
     return Object.values(progressMap).filter(p => (p.stars ?? 0) > 0).length;
   }, [progressMap]);
 
-  // Globus-Mittelpunkt im 1400 × 640 Canvas
-  const cx = 700;
-  const cy = 290;
+  // ✈️ Piloten-Meilen & Didaktischer Expeditions-Rang
+  const pilotStats = useMemo(() => {
+    return WorldTourFlightEngine.calculatePilotStats(progressMap);
+  }, [progressMap]);
 
-  // 3D-Gradnetz: Parallelen (Äquator, Wendekreise, Polarkreise)
-  const graticuleParallels = useMemo(() => {
-    const latitudes = [-66.5, -30, -23.5, 0, 23.5, 30, 66.5];
-    return latitudes.map(lat => {
-      const points: Array<{ x: number; y: number; visible: boolean }> = [];
-      for (let lon = -180; lon <= 180; lon += 6) {
-        const pt = projectOrthographic(lat, lon, rotation.lambda, rotation.phi, globeRadius, cx, cy);
-        points.push(pt);
-      }
-      return { lat, points };
-    });
-  }, [rotation, globeRadius]);
-
-  // 3D-Gradnetz: Meridiane
-  const graticuleMeridians = useMemo(() => {
-    const longitudes = [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180];
-    return longitudes.map(lon => {
-      const points: Array<{ x: number; y: number; visible: boolean }> = [];
-      for (let lat = -80; lat <= 80; lat += 5) {
-        const pt = projectOrthographic(lat, lon, rotation.lambda, rotation.phi, globeRadius, cx, cy);
-        points.push(pt);
-      }
-      return { lon, points };
-    });
-  }, [rotation, globeRadius]);
-
-  // 📍 3D BEACONS MIT SMART RADIAL REPULSION (Anti-Kollision für Europa & Ballungsräume)
-  const projectedBeacons = useMemo(() => {
-    // 1. Orthografische Projektion aller 21 Stationen
-    const visible = GLOBE_BEACONS.map(beacon => {
-      const proj = projectOrthographic(
-        beacon.lat,
-        beacon.lon,
-        rotation.lambda,
-        rotation.phi,
-        globeRadius,
-        cx,
-        cy
-      );
-      return {
-        ...beacon,
-        proj,
-        adjustedX: proj.x,
-        adjustedY: proj.y,
-        repulsed: false
-      };
-    }).filter(b => b.proj.z >= -0.04);
-
-    // 2. Mehrstufige elastische Radial-Repulsion für benachbarte Stationen
-    const minDistance = 38;
-    for (let pass = 0; pass < 6; pass++) {
-      for (let i = 0; i < visible.length; i++) {
-        for (let j = i + 1; j < visible.length; j++) {
-          const dx = visible[j].adjustedX - visible[i].adjustedX;
-          const dy = visible[j].adjustedY - visible[i].adjustedY;
-          const dist = Math.hypot(dx, dy);
-          if (dist < minDistance && dist > 0.001) {
-            const overlap = (minDistance - dist) / 2;
-            const nx = dx / dist;
-            const ny = dy / dist;
-            visible[i].adjustedX -= nx * overlap * 0.65;
-            visible[i].adjustedY -= ny * overlap * 0.65;
-            visible[j].adjustedX += nx * overlap * 0.65;
-            visible[j].adjustedY += ny * overlap * 0.65;
-            visible[i].repulsed = true;
-            visible[j].repulsed = true;
-          }
-        }
-      }
-    }
-
-    return visible;
-  }, [rotation, globeRadius, cx, cy]);
-
-  // 🗺️ 2D KONTINENTE MIT FREUNDLICHEN PASTELL-FARBEN
+  // 🗺️ 2D KONTINENTE NACH DEM 0,1% SCHWEIZER KARTOGRAFIE-GOLDSTANDARD
   const landmasses2D = useMemo(() => {
-    return SPHERICAL_LANDMASSES.map(land => {
+    return CONTINENT_GEO_POLYGONS.map(land => {
       const points = land.points.map(([lat, lon]) => {
         const x = ((lon + 180) / 360) * 1140 + 30;
         const y = ((90 - lat) / 180) * 480 + 40;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(' L ');
-      const isEurope = land.id.includes('europe') || land.id.includes('british') || land.id.includes('ireland') || land.id.includes('scandinavia');
+
+      const isWater = land.id.includes('water') || land.id.includes('sea');
+      const isEurope = land.id.includes('europe') || land.id.includes('british') || land.id.includes('ireland') || land.id.includes('scandinavia') || land.id.includes('sicily') || land.id.includes('sardinia') || land.id.includes('corsica') || land.id.includes('iceland');
       const isAfrica = land.id.includes('africa') || land.id.includes('madagascar');
-      const isAsia = land.id.includes('asia') || land.id.includes('japan');
-      const isNorthAmerica = land.id.includes('north-america') || land.id.includes('greenland');
+      const isAsia = land.id.includes('asia') || land.id.includes('japan') || land.id.includes('arabia') || land.id.includes('sri-lanka') || land.id.includes('indonesia') || land.id.includes('philippines');
+      const isNorthAmerica = land.id.includes('north-america') || land.id.includes('greenland') || land.id.includes('cuba') || land.id.includes('caribbean');
       const isSouthAmerica = land.id.includes('south-america');
+      const isOceania = land.id.includes('australia') || land.id.includes('tasmania') || land.id.includes('new-zealand') || land.id.includes('hawaii');
+
+      let fill = '#c7d2fe';
+      let stroke = '#4f46e5';
+
+      if (isWater) {
+        fill = '#e0f2fe';
+        stroke = '#bae6fd';
+      } else if (isEurope) {
+        // EUROPA: Klassik- & EU-Blau (Match zum blauen Button #3b82f6 & EU-Flagge)
+        fill = '#bfdbfe';
+        stroke = '#2563eb';
+      } else if (isAfrica) {
+        // AFRIKA: Savannengold (Match zum goldgelben Button #eab308)
+        fill = '#fef08a';
+        stroke = '#ca8a04';
+      } else if (isAsia) {
+        // ASIEN & ORIENT: Seidenstraßen-Lotus-Pink (Match zum pinken Button #ec4899)
+        fill = '#fbcfe8';
+        stroke = '#db2777';
+      } else if (isNorthAmerica) {
+        // AMERIKA (Nord): Warmes Bernstein (Match zum orangen Button #f59e0b)
+        fill = '#fed7aa';
+        stroke = '#ea580c';
+      } else if (isSouthAmerica) {
+        // AMERIKA (Süd): Sanftes Terracotta-Pfirsich (Harmonische Familie mit Nordamerika & Kante #ea580c)
+        fill = '#fdba74';
+        stroke = '#ea580c';
+      } else if (isOceania) {
+        // OZEANIEN: Südsee-Smaragdgrün (Match zum grünen Button #10b981)
+        fill = '#a7f3d0';
+        stroke = '#059669';
+      }
+
+      const isContinentSelected =
+        selectedContinent === 'all' ||
+        (selectedContinent === 'europe' && isEurope) ||
+        (selectedContinent === 'africa' && isAfrica) ||
+        (selectedContinent === 'asia' && isAsia) ||
+        (selectedContinent === 'americas' && (isNorthAmerica || isSouthAmerica)) ||
+        (selectedContinent === 'oceania' && isOceania);
 
       return {
         id: land.id,
-        fill: isEurope ? '#86efac' : isAfrica ? '#fde047' : isAsia ? '#6ee7b7' : isNorthAmerica ? '#fed7aa' : isSouthAmerica ? '#fbcfe8' : '#c7d2fe',
-        stroke: isEurope ? '#15803d' : isAfrica ? '#ca8a04' : isAsia ? '#059669' : isNorthAmerica ? '#ea580c' : isSouthAmerica ? '#db2777' : '#4f46e5',
+        isWater,
+        fill,
+        stroke,
+        opacity: isWater ? 1 : isContinentSelected ? 0.95 : 0.35,
         d: `M ${points} Z`
       };
     });
-  }, []);
+  }, [selectedContinent]);
 
-  // 🗺️ 2D PINS MIT SMART ANTI-KOLLISION (Garantiert keine Überlappungen in Europa)
+  // 🗺️ 2D PINS MIT WGS84 GPS-PROJEKTION & ELASTISCHER ANTI-KOLLISION (42px Mindestabstand mit 8 Durchläufen)
   const pins2D = useMemo(() => {
-    const list = WORLD_TOUR_COUNTRIES.map(country => {
-      const baseX = (country.mapCoordinates.x / 100) * 1140 + 30;
-      const baseY = (country.mapCoordinates.y / 100) * 480 + 40;
+    const validCountries = (WORLD_TOUR_COUNTRIES || []).filter(c => 
+      Boolean(c && c.geoCoordinates && typeof c.geoCoordinates.lat === 'number' && typeof c.geoCoordinates.lon === 'number')
+    );
+    const list = validCountries.map(country => {
+      // Kanonische WGS84 Equirectangular-Projektion (1200 × 580 SVG)
+      const coords = country.geoCoordinates || { lat: 0, lon: 0 };
+      const baseX = ((coords.lon + 180) / 360) * 1140 + 30;
+      const baseY = ((90 - coords.lat) / 180) * 480 + 40;
       return {
         country,
+        baseX,
+        baseY,
         x: baseX,
-        y: baseY
+        y: baseY,
+        isMoved: false
       };
     });
 
-    const minDistance = 36;
-    for (let pass = 0; pass < 5; pass++) {
+    const minDistance = 42; // Barrierefreie 42px Mindestdistanz
+    for (let pass = 0; pass < 8; pass++) {
       for (let i = 0; i < list.length; i++) {
         for (let j = i + 1; j < list.length; j++) {
           const dx = list[j].x - list[i].x;
@@ -609,8 +912,298 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
       }
     }
 
+    list.forEach(item => {
+      const displacement = Math.hypot(item.x - item.baseX, item.y - item.baseY);
+      item.isMoved = displacement > 4;
+    });
+
     return list;
   }, []);
+
+  // 🎥 Aviation Cinema Auto-Framing: Richtet Kamera sanft auf den gesamten Flugkorridor aus (Anti-Occlusion)
+  const frameFlightCorridor = useCallback((fromCountryCode: string, toCountryCode: string) => {
+    const p1 = pins2D.find(p => p.country.code === fromCountryCode);
+    const p2 = pins2D.find(p => p.country.code === toCountryCode);
+    if (!p1 || !p2) return;
+
+    const minX = Math.min(p1.x, p2.x);
+    const maxX = Math.max(p1.x, p2.x);
+    const minY = Math.min(p1.y, p2.y);
+    const maxY = Math.max(p1.y, p2.y);
+
+    const padX = 130;
+    const padTop = 60;
+    const padBottom = 160; // 160px unterer Puffer garantiert, dass der Ziel-Pin immer frei über dem Dock liegt
+
+    const neededW = (maxX - minX) + padX * 2;
+    const neededH = (maxY - minY) + padTop + padBottom;
+
+    // Großzügige Mindestbreite 680px verhindert übermäßig engen Nahbereichs-Zoom
+    const targetW = Math.max(neededW, neededH * 2.069, 680);
+    const targetH = targetW / 2.069;
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2 - (padBottom - padTop) * 0.35;
+
+    const x = Math.max(0, Math.min(1200 - targetW, centerX - targetW / 2));
+    const y = Math.max(0, Math.min(580 - targetH, centerY - targetH / 2));
+
+    animateViewBoxTo({ x, y, w: targetW, h: targetH });
+  }, [pins2D, animateViewBoxTo]);
+
+  // 🔍 Sanfter Regionen-Fokus auf ein gewähltes Land
+  const focusCountry = useCallback((countryCode: string) => {
+    const pin = pins2D.find(p => p.country.code === countryCode);
+    if (!pin) return;
+    const targetW = 720;
+    const targetH = targetW / 2.069; // ~348
+    const x = Math.max(0, Math.min(1200 - targetW, pin.x - targetW / 2));
+    const y = Math.max(0, Math.min(580 - targetH, pin.y - targetH / 2 - 25));
+    animateViewBoxTo({ x, y, w: targetW, h: targetH });
+  }, [pins2D, animateViewBoxTo]);
+
+  // Klick auf ein Land: Wählt das Land aus, fokussiert die Region und spielt den Jingle ab!
+  const handleCountryPinClick = useCallback((country: WorldTourCountry) => {
+    setSelectedCountryCode(country.code);
+    focusCountry(country.code);
+    const frequencies = country.audioJingleFrequencies || [261.63, 329.63, 392.00];
+    playCultureJingle(frequencies);
+  }, [focusCountry, playCultureJingle]);
+
+  // 🛫 Web Audio Flugzeug-Sound (Zero-Server, synthetisierter Turbine-/Wind-Effekt)
+  const playTakeoffSound = useCallback(() => {
+    try {
+      if (!jingleCtxRef.current || jingleCtxRef.current.state === 'closed') {
+        const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        jingleCtxRef.current = new AudioCtx();
+      }
+      const ctx = jingleCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(540, now + 0.6);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 1.2);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.07, now + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 1.25);
+    } catch {
+      // Graceful degradation
+    }
+  }, []);
+
+  // ✈️ 60 FPS BÉZIER-FLUGANIMATION (GPU-beschleunigt mit Aviation Cinema Begleitfahrt)
+  const startFlight = useCallback((targetCountryCode: string) => {
+    if (isFlying || targetCountryCode === currentLandedCountryCode) return;
+
+    const fromPin = pins2D.find(p => p.country.code === currentLandedCountryCode);
+    const toPin = pins2D.find(p => p.country.code === targetCountryCode);
+    if (!fromPin || !toPin) {
+      setSelectedCountryCode(targetCountryCode);
+      setCurrentLandedCountryCode(targetCountryCode);
+      return;
+    }
+
+    // 🎥 Aviation Cinema Flight Tracking: Kamera richtet sich sofort auf den Flugkorridor aus
+    frameFlightCorridor(currentLandedCountryCode, targetCountryCode);
+
+    // BFSG 2025 / WCAG 2.2: Barrierefreier Reduced-Motion Bypass
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      setCurrentLandedCountryCode(targetCountryCode);
+      setSelectedCountryCode(targetCountryCode);
+      setTouchdownCountryCode(targetCountryCode);
+      focusCountry(targetCountryCode);
+      playTakeoffSound();
+      const targetCountry = WORLD_TOUR_COUNTRIES.find(c => c.code === targetCountryCode);
+      if (targetCountry?.audioJingleFrequencies) {
+        playCultureJingle(targetCountry.audioJingleFrequencies);
+      }
+      setTimeout(() => setTouchdownCountryCode(null), 1200);
+      return;
+    }
+
+    const arc = WorldTourFlightEngine.calculateFlightArc(fromPin.x, fromPin.y, toPin.x, toPin.y);
+    const durationMs = Math.min(Math.max(arc.distance * 2.8, 900), 1600);
+    const startTime = performance.now();
+
+    setIsFlying(true);
+    playTakeoffSound();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const rawT = Math.min(elapsed / durationMs, 1);
+      // Easing: Smooth Cubic In-Out
+      const t = rawT < 0.5 ? 4 * rawT * rawT * rawT : 1 - Math.pow(-2 * rawT + 2, 3) / 2;
+
+      // Quadratische Bézier-Punktberechnung: B(t) = (1-t)^2 P0 + 2(1-t)t Pmid + t^2 P1
+      const invT = 1 - t;
+      const curX = invT * invT * fromPin.x + 2 * invT * t * arc.midX + t * t * toPin.x;
+      const curY = invT * invT * fromPin.y + 2 * invT * t * arc.midY + t * t * toPin.y;
+
+      // Ableitung für Ausrichtungswinkel
+      const tangentX = 2 * invT * (arc.midX - fromPin.x) + 2 * t * (toPin.x - arc.midX);
+      const tangentY = 2 * invT * (arc.midY - fromPin.y) + 2 * t * (toPin.y - arc.midY);
+      const angleDeg = (Math.atan2(tangentY, tangentX) * 180) / Math.PI + 90;
+
+      setFlightState(prev => {
+        const newTrail = prev ? [{ x: curX, y: curY, opacity: 0.8 }, ...prev.trail.slice(0, 7)] : [{ x: curX, y: curY, opacity: 0.8 }];
+        return {
+          fromCode: currentLandedCountryCode,
+          toCode: targetCountryCode,
+          startX: fromPin.x,
+          startY: fromPin.y,
+          midX: arc.midX,
+          midY: arc.midY,
+          endX: toPin.x,
+          endY: toPin.y,
+          currentX: curX,
+          currentY: curY,
+          angleDeg,
+          progress: t,
+          trail: newTrail.map((p, i) => ({ ...p, opacity: Math.max(0, 0.8 - i * 0.1) }))
+        };
+      });
+
+      if (rawT < 1) {
+        flightAnimRef.current = requestAnimationFrame(animate);
+      } else {
+        // 🛬 TOUCHDOWN & ERFOLGREICHE LANDUNG
+        setIsFlying(false);
+        setFlightState(null);
+        setCurrentLandedCountryCode(targetCountryCode);
+        setSelectedCountryCode(targetCountryCode);
+        setTouchdownCountryCode(targetCountryCode);
+        focusCountry(targetCountryCode);
+
+        // Kultureller Lande-Jingle
+        const targetCountry = WORLD_TOUR_COUNTRIES.find(c => c.code === targetCountryCode);
+        if (targetCountry?.audioJingleFrequencies) {
+          playCultureJingle(targetCountry.audioJingleFrequencies);
+        }
+
+        setTimeout(() => {
+          setTouchdownCountryCode(null);
+        }, 1200);
+      }
+    };
+
+    flightAnimRef.current = requestAnimationFrame(animate);
+  }, [isFlying, currentLandedCountryCode, pins2D, frameFlightCorridor, focusCountry, playTakeoffSound, playCultureJingle]);
+
+  // Clean up animation on unmount
+  useEffect(() => {
+    return () => {
+      if (flightAnimRef.current) {
+        cancelAnimationFrame(flightAnimRef.current);
+      }
+    };
+  }, []);
+
+  // ✈️ 2D FLUGNETZWERK-KANTEN (Deduplizierte Bézier-Bögen aller 21 Stationen)
+  const flightRoutes2D = useMemo(() => {
+    const routeMap = new Map<string, { fromCode: string; toCode: string; key: string }>();
+
+    Object.entries(FLIGHT_CONNECTIONS_GRAPH).forEach(([fromCode, neighbors]) => {
+      neighbors.forEach(toCode => {
+        const sortedKey = [fromCode, toCode].sort().join('-');
+        if (!routeMap.has(sortedKey)) {
+          routeMap.set(sortedKey, { fromCode, toCode, key: sortedKey });
+        }
+      });
+    });
+
+    const pinCoords: Record<string, { x: number; y: number }> = {};
+    pins2D.forEach(p => {
+      pinCoords[p.country.code] = { x: p.x, y: p.y };
+    });
+
+    const routes: Array<{
+      key: string;
+      fromCode: string;
+      toCode: string;
+      d: string;
+      isHighlighted: boolean;
+      isHovered: boolean;
+      isActiveFlight: boolean;
+      isAccessible: boolean;
+      isMastered: boolean;
+      distanceKm: number;
+    }> = [];
+
+    routeMap.forEach(({ fromCode, toCode, key }) => {
+      const p1 = pinCoords[fromCode];
+      const p2 = pinCoords[toCode];
+      if (!p1 || !p2) return;
+
+      const arc = WorldTourFlightEngine.calculateFlightArc(p1.x, p1.y, p2.x, p2.y);
+      const routeInfo = WorldTourFlightEngine.getRouteInfo(fromCode, toCode);
+
+      const fromAccessible = WorldTourFlightEngine.isCountryAccessible(fromCode, progressMap);
+      const toAccessible = WorldTourFlightEngine.isCountryAccessible(toCode, progressMap);
+      const isAccessible = fromAccessible && toAccessible;
+
+      const fromMastered = Boolean(progressMap[fromCode] && (progressMap[fromCode].stars ?? 0) >= 1);
+      const toMastered = Boolean(progressMap[toCode] && (progressMap[toCode].stars ?? 0) >= 1);
+      const isMastered = fromMastered && toMastered;
+
+      // Ist diese Route aktiv zwischen dem aktuellen Standort und dem ausgewählten Ziel?
+      const isHighlighted =
+        (fromCode === currentLandedCountryCode && toCode === selectedCountryCode) ||
+        (toCode === currentLandedCountryCode && fromCode === selectedCountryCode);
+
+      // Hovert der Schüler im Widget über diese Route (Radar-Coupling)?
+      const isHovered = Boolean(
+        hoveredFlightDestCode &&
+        ((fromCode === currentLandedCountryCode && toCode === hoveredFlightDestCode) ||
+         (toCode === currentLandedCountryCode && fromCode === hoveredFlightDestCode))
+      );
+
+      // Fliegt das Flugzeug gerade auf dieser Route?
+      const isActiveFlight = Boolean(
+        flightState &&
+        ((flightState.fromCode === fromCode && flightState.toCode === toCode) ||
+         (flightState.fromCode === toCode && flightState.toCode === fromCode))
+      );
+
+      routes.push({
+        key,
+        fromCode,
+        toCode,
+        d: arc.d,
+        isHighlighted,
+        isHovered,
+        isActiveFlight,
+        isAccessible,
+        isMastered,
+        distanceKm: routeInfo.distanceKm
+      });
+    });
+
+    return routes;
+  }, [pins2D, progressMap, currentLandedCountryCode, selectedCountryCode, flightState, hoveredFlightDestCode]);
+
+  const landedPin = useMemo(() => {
+    return pins2D.find(p => p.country.code === currentLandedCountryCode);
+  }, [pins2D, currentLandedCountryCode]);
+
+  const touchdownPin = useMemo(() => {
+    if (!touchdownCountryCode) return null;
+    return pins2D.find(p => p.country.code === touchdownCountryCode) || null;
+  }, [pins2D, touchdownCountryCode]);
 
   return (
     <div style={{
@@ -618,938 +1211,1388 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: activeView === 'map' ? (projectionMode === '2d' ? '#f0fdf4' : '#0f172a') : '#fcfaf7',
+      background: activeView === 'map' ? 'radial-gradient(ellipse at 50% 45%, #f0fdf4 0%, #e0f2fe 65%, #dbeafe 100%)' : '#fcfaf7',
       position: 'relative',
       overflow: 'hidden',
-      color: '#f8fafc',
+      color: '#0f172a',
       userSelect: 'none'
     }}>
-      {/* 🧭 Top Expeditions-HUD Header (Dark Space Gold Edition) */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-        padding: isMobileView ? '10px 14px' : '12px 24px',
-        background: 'rgba(15, 23, 42, 0.85)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-        zIndex: 20
-      }}>
-        {/* Navigation & Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {activeView === 'score' ? (
-            <button
-              onClick={() => setActiveView('map')}
-              aria-label="Zurück zum Klang-Globus"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                borderRadius: '12px',
-                background: '#38bdf8',
-                border: 'none',
-                color: '#0f172a',
-                fontWeight: 900,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(56, 189, 248, 0.3)',
-                touchAction: 'manipulation'
-              }}
-              className="hover-scale"
-            >
-              <ArrowLeft size={16} />
-              <span>Zum Klang-Globus 🌍</span>
-            </button>
-          ) : onBackToHub ? (
-            <button
-              onClick={onBackToHub}
-              aria-label="Zurück zum Studio"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#ffffff',
-                fontWeight: 750,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                touchAction: 'manipulation'
-              }}
-              className="hover-scale"
-            >
-              <ArrowLeft size={16} />
-              <span>Studio</span>
-            </button>
-          ) : null}
+      {/* 🧭 Top Expeditions-HUD Header (nur in der Weltkarten-Übersicht) */}
+      {activeView === 'map' && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          padding: isMobileView ? '10px 14px' : '12px 24px',
+          background: 'rgba(255, 255, 255, 0.94)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1.5px solid #cbd5e1',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
+          zIndex: 20
+        }}>
+          {/* Navigation & Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {onBackToHub && (
+              <button
+                onClick={onBackToHub}
+                aria-label="Zurück zum Studio"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '12px',
+                  background: '#f1f5f9',
+                  border: '1.5px solid #cbd5e1',
+                  color: '#0f172a',
+                  fontWeight: 750,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale"
+              >
+                <ArrowLeft size={16} />
+                <span>Studio</span>
+              </button>
+            )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.5rem' }}>{projectionMode === '2d' ? '🗺️' : '🌎'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: '#e0f2fe',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0284c7'
+            }}>
+              <Compass size={19} strokeWidth={2.4} />
+            </div>
             <div>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
-                {projectionMode === '2d' ? 'Expeditions-Atlas • Weltreise der Klänge' : 'The Golden Globe of Sound • 3D Klang-Globus'}
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+                Expeditions-Atlas • Weltreise der Klänge
               </h2>
-              <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 650 }}>
-                {projectionMode === '2d' ? 'Entdecke alle 21 Kultur-Stationen im globalen Überblick' : 'Drehe die Erdkugel und entdecke das Weltmusikerbe'}
+              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>
+                Entdecke alle 21 Kultur-Stationen im globalen 2D-Überblick
               </span>
             </div>
           </div>
         </div>
 
         {/* HUD Progress Badges & Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* 2D Karte / 3D Globus Toggle */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: 'rgba(255, 255, 255, 0.08)',
-            padding: '3px',
-            borderRadius: '100px',
-            border: '1px solid rgba(255, 255, 255, 0.15)'
-          }}>
-            <button
-              onClick={() => setProjectionMode('2d')}
-              style={{
-                background: projectionMode === '2d' ? '#38bdf8' : 'transparent',
-                color: projectionMode === '2d' ? '#0f172a' : '#cbd5e1',
-                border: 'none',
-                borderRadius: '100px',
-                padding: '5px 11px',
-                fontSize: '0.74rem',
-                fontWeight: 850,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              title="2D Entdeckerkarte anzeigen"
-            >
-              🗺️ 2D Karte
-            </button>
-            <button
-              onClick={() => setProjectionMode('3d')}
-              style={{
-                background: projectionMode === '3d' ? '#38bdf8' : 'transparent',
-                color: projectionMode === '3d' ? '#0f172a' : '#cbd5e1',
-                border: 'none',
-                borderRadius: '100px',
-                padding: '5px 11px',
-                fontSize: '0.74rem',
-                fontWeight: 850,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              title="3D Klang-Globus anzeigen"
-            >
-              🌎 3D Globus
-            </button>
-          </div>
-
-          {/* Zoom In / Out Buttons (in 3D Mode) */}
-          {projectionMode === '3d' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', padding: '3px', borderRadius: '100px' }}>
-              <button
-                onClick={() => setGlobeRadius(r => Math.min(340, r + 25))}
-                style={{ background: 'none', border: 'none', color: '#ffffff', padding: '6px 8px', cursor: 'pointer', borderRadius: '50%' }}
-                title="Globus vergrößern"
-              >
-                <ZoomIn size={15} />
-              </button>
-              <button
-                onClick={() => setGlobeRadius(r => Math.max(180, r - 25))}
-                style={{ background: 'none', border: 'none', color: '#ffffff', padding: '6px 8px', cursor: 'pointer', borderRadius: '50%' }}
-                title="Globus verkleinern"
-              >
-                <ZoomOut size={15} />
-              </button>
-            </div>
-          )}
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             padding: '6px 14px',
             borderRadius: '100px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
+            background: '#ffffff',
+            border: '1.5px solid #cbd5e1',
             fontSize: '0.80rem',
             fontWeight: 800,
-            color: '#ffffff'
+            color: '#0f172a'
           }}>
-            <span>🌍 {totalMasteredCountries} / {WORLD_TOUR_COUNTRIES.length} Länder</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Trophy size={14} color="#0284c7" strokeWidth={2.4} />
+              <span>{totalMasteredCountries} / {WORLD_TOUR_COUNTRIES.length} Meisterwerke</span>
+            </span>
             <span style={{ opacity: 0.35 }}>•</span>
-            <span style={{ color: '#facc15' }}>✨ {schoolStats.totalXP} XP</span>
+            <span style={{ color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={14} color="#b45309" strokeWidth={2.4} />
+              <span>{schoolStats.totalXP} XP</span>
+            </span>
           </div>
 
-          <button
-            onClick={() => setIsDiplomaOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 14px',
-              borderRadius: '100px',
-              background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-              border: 'none',
-              color: '#0f172a',
-              fontWeight: 850,
-              fontSize: '0.78rem',
-              cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(234, 179, 8, 0.35)',
-              touchAction: 'manipulation'
-            }}
-            className="hover-scale"
-            title="Drucke dein offizielles A4-Expeditions-Diplom"
-          >
-            <Printer size={14} strokeWidth={2.6} />
-            <span>Diplom</span>
-          </button>
-        </div>
-
-        {/* Kontinent-Schnellreise Buttons */}
-        {activeView === 'map' && (
+          {/* ✈️ Piloten-Meilen & Expeditions-Rang */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            overflowX: 'auto',
-            width: '100%',
-            paddingTop: '6px'
-          }} className="custom-scrollbar">
-            <button
-              onClick={() => handleSelectContinent('all')}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '100px',
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                border: selectedContinent === 'all' ? '1.5px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
-                background: selectedContinent === 'all' ? '#38bdf8' : 'rgba(255,255,255,0.06)',
-                color: selectedContinent === 'all' ? '#0f172a' : '#cbd5e1',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              🌐 Weltübersicht
-            </button>
-            {CONTINENTS.map(cont => {
-              const isSelected = selectedContinent === cont.id;
-              return (
-                <button
-                  key={cont.id}
-                  onClick={() => handleSelectContinent(cont.id)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '100px',
-                    fontSize: '0.76rem',
-                    fontWeight: 800,
-                    border: isSelected ? `2px solid ${cont.color}` : '1px solid rgba(255,255,255,0.15)',
-                    background: isSelected ? cont.color : 'rgba(255,255,255,0.06)',
-                    color: isSelected ? '#ffffff' : '#cbd5e1',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: isSelected ? `0 2px 10px ${cont.color}50` : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <span>{cont.emoji}</span>
-                  <span>{cont.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ========================================================================= */}
-      {/* ANSICHT 1: DER INTERAKTIVE 3D-GLOBUS (DREHBAR & TOUCH-INTERAKTIV)         */}
-      {/* ========================================================================= */}
-      {activeView === 'map' ? (
-        <div
-          onMouseDown={projectionMode === '3d' ? (e => handlePointerDown(e.clientX, e.clientY)) : undefined}
-          onMouseMove={projectionMode === '3d' ? (e => handlePointerMove(e.clientX, e.clientY)) : undefined}
-          onMouseUp={projectionMode === '3d' ? handlePointerUp : undefined}
-          onTouchStart={projectionMode === '3d' ? (e => {
-            if (e.touches[0]) handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
-          }) : undefined}
-          onTouchMove={projectionMode === '3d' ? (e => {
-            if (e.touches[0]) handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
-          }) : undefined}
-          onTouchEnd={projectionMode === '3d' ? handlePointerUp : undefined}
-          style={{
-            flex: 1,
-            width: '100%',
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            cursor: projectionMode === '2d' ? 'default' : (isDraggingRef.current ? 'grabbing' : 'grab'),
-            background: projectionMode === '2d'
-              ? 'radial-gradient(ellipse at 50% 45%, #f0fdf4 0%, #e0f2fe 65%, #dbeafe 100%)'
-              : 'radial-gradient(ellipse at 50% 45%, #1e293b 0%, #0f172a 60%, #020617 100%)'
-          }}
-        >
-          {/* Dezente Sternen-Partikel im Weltall (nur im 3D-Modus) */}
-          {projectionMode === '3d' && (
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: `
-                radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 150px 80px, #e2e8f0, rgba(0,0,0,0)),
-                radial-gradient(1.5px 1.5px at 320px 240px, #38bdf8, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 580px 140px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(1.5px 1.5px at 890px 70px, #facc15, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 1120px 210px, #e2e8f0, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 1340px 90px, #ffffff, rgba(0,0,0,0))
-              `,
-              backgroundSize: '400px 300px',
-              opacity: 0.6,
-              pointerEvents: 'none'
-            }} />
-          )}
-
-          {/* Hinweis-Overlay für Kinder */}
-          <div style={{
-            position: 'absolute',
-            top: '16px',
-            left: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
             padding: '6px 14px',
             borderRadius: '100px',
-            background: projectionMode === '2d' ? 'rgba(255, 255, 255, 0.88)' : 'rgba(255, 255, 255, 0.08)',
-            border: projectionMode === '2d' ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.12)',
-            boxShadow: projectionMode === '2d' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-            fontSize: '0.74rem',
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)',
+            border: '1.5px solid #7dd3fc',
+            fontSize: '0.80rem',
             fontWeight: 800,
-            color: projectionMode === '2d' ? '#334155' : '#94a3b8',
-            pointerEvents: 'none',
-            zIndex: 10
+            color: '#0369a1'
           }}>
-            <span>{projectionMode === '2d' ? '🗺️ Wähle eine Station auf der Entdecker-Karte' : '👆 Ziehe den Globus mit Maus oder Finger'}</span>
+            <span style={{ fontSize: '0.92rem' }}>{pilotStats.rankBadge}</span>
+            <span>{pilotStats.totalKm.toLocaleString('de-DE')} km</span>
+            <span style={{ opacity: 0.35 }}>•</span>
+            <span style={{ color: '#0f172a', fontWeight: 850 }}>{pilotStats.rankTitle}</span>
           </div>
 
-          {/* ========================================================================= */}
-          {/* ANSICHT A: 2D ILLUSTRIERTE ENTDECKERKARTE (1200 × 580)                    */}
-          {/* ========================================================================= */}
-          {projectionMode === '2d' ? (
-            <svg
-              viewBox="0 0 1200 580"
-              style={{
-                width: '100%',
-                height: '100%',
-                maxHeight: 'calc(100vh - 160px)',
-                overflow: 'visible',
-                pointerEvents: 'auto'
-              }}
+          {/* 🏫 Kollektiver Schul-Meilenstein (simple, schlicht & gemeinschaftsstiftend) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: '100px',
+            background: '#ffffff',
+            border: '1.5px solid #cbd5e1',
+            fontSize: '0.80rem',
+            fontWeight: 800,
+            color: '#0f172a'
+          }} title={`Gemeinsam mit deiner Musikschule erforscht: ${schoolStats.unlockedCount} von ${WORLD_TOUR_COUNTRIES.length} Stationen!`}>
+            <span style={{ fontSize: '0.86rem' }}>🏫</span>
+            <span>Schule: <strong>{schoolStats.unlockedCount} / {WORLD_TOUR_COUNTRIES.length}</strong></span>
+          </div>
+
+          <button
+            onClick={() => setIsPassportOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 15px',
+              borderRadius: '100px',
+              background: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
+              border: '1px solid #3b82f6',
+              color: '#ffffff',
+              fontWeight: 850,
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(30, 58, 138, 0.35)',
+              touchAction: 'manipulation'
+            }}
+            className="hover-scale"
+            title="Öffne deinen persönlichen Expeditions-Reisepass mit allen 21 Stempeln"
+          >
+            <BookOpen size={14} color="#60a5fa" strokeWidth={2.4} />
+            <span>Mein Reisepass ({totalMasteredCountries} / {WORLD_TOUR_COUNTRIES.length})</span>
+          </button>
+        </div>
+
+        {/* Kontinent-Schnellreise Buttons */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          overflowX: 'auto',
+          width: '100%',
+          paddingTop: '6px'
+        }} className="custom-scrollbar">
+          <button
+            onClick={() => handleSelectContinent('all')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '100px',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              border: selectedContinent === 'all' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+              background: selectedContinent === 'all' ? '#0284c7' : '#ffffff',
+              color: selectedContinent === 'all' ? '#ffffff' : '#334155',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Globe size={13} strokeWidth={2.4} />
+            <span>Weltübersicht</span>
+          </button>
+          {CONTINENTS.map(cont => {
+            const isSelected = selectedContinent === cont.id;
+            return (
+              <button
+                key={cont.id}
+                onClick={() => handleSelectContinent(cont.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  border: isSelected ? `2px solid ${cont.color}` : '1px solid #cbd5e1',
+                  background: isSelected ? cont.color : '#ffffff',
+                  color: isSelected ? '#ffffff' : '#334155',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: isSelected ? `0 2px 10px ${cont.color}50` : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background: isSelected ? '#ffffff' : cont.color,
+                  display: 'inline-block'
+                }} />
+                <span>{cont.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ANSICHT 1: 2D ILLUSTRIERTE ABENTEUER-WELTKARTE (1200 × 580 SVG)          */}
+      {/* ========================================================================= */}
+      {activeView === 'map' ? (
+        <div style={{
+          flex: 1,
+          width: '100%',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden'
+        }}>
+          <svg
+            viewBox={`${viewBox.x.toFixed(1)} ${viewBox.y.toFixed(1)} ${viewBox.w.toFixed(1)} ${viewBox.h.toFixed(1)}`}
+            style={{
+              width: '100%',
+              height: '100%',
+              maxHeight: 'calc(100vh - 160px)',
+              overflow: 'hidden',
+              pointerEvents: 'auto'
+            }}
+          >
+            <defs>
+              <style>{`
+                @keyframes planeFloat {
+                  0%, 100% { transform: translateY(0px) rotate(0deg); }
+                  50% { transform: translateY(-4px) rotate(1.2deg); }
+                }
+              `}</style>
+              <filter id="medallionShadow" x="-25%" y="-25%" width="150%" height="150%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.18" floodColor="#0f172a" />
+              </filter>
+              <filter id="medallionGlow" x="-35%" y="-35%" width="170%" height="170%">
+                <feDropShadow dx="0" dy="0" stdDeviation="6" floodOpacity="0.85" floodColor="#facc15" />
+              </filter>
+              <clipPath id="flagClipCircle">
+                <circle cx="0" cy="0" r="17.5" />
+              </clipPath>
+              {/* Meeres-Gradient & Tiefenlicht */}
+              <linearGradient id="oceanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#f0f9ff" />
+                <stop offset="50%" stopColor="#e0f2fe" />
+                <stop offset="100%" stopColor="#dbeafe" />
+              </linearGradient>
+            </defs>
+
+            {/* 1. Ruhiger Ozean-Hintergrund mit edlem Meeresgradient & abgerundeten Ecken (Klick = Zoom-Reset) */}
+            <rect
+              x="15"
+              y="15"
+              width="1170"
+              height="550"
+              rx="24"
+              fill="url(#oceanGradient)"
+              stroke="#93c5fd"
+              strokeWidth="1.5"
+              style={{ cursor: selectedContinent !== 'all' || viewBox.w < 1150 ? 'pointer' : 'default' }}
+              onClick={() => handleSelectContinent('all')}
             >
-              <defs>
-                <filter id="medallionShadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.18" floodColor="#0f172a" />
-                </filter>
-                <filter id="medallionGlow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="0" stdDeviation="6" floodOpacity="0.85" floodColor="#facc15" />
-                </filter>
-              </defs>
+              {(selectedContinent !== 'all' || viewBox.w < 1150) && (
+                <title>Klick auf Ozean: Zurück zur Weltansicht</title>
+              )}
+            </rect>
 
-              {/* 1. Ozean-Hintergrund mit sanften Rändern */}
-              <rect x="15" y="15" width="1170" height="550" rx="28" fill="#e0f2fe" stroke="#bae6fd" strokeWidth="2" />
-
-              {/* 2. Nautisches Gradnetz (Äquator, Tropen, Meridiane) */}
-              {/* Äquator */}
-              <line x1="25" y1="280" x2="1175" y2="280" stroke="#93c5fd" strokeWidth="1.4" strokeDasharray="6 4" opacity="0.75" />
-              <text x="35" y="275" fontSize="10" fontWeight="800" fill="#0284c7" opacity="0.8">Äquator (0°)</text>
-
-              {/* Nördlicher Wendekreis */}
-              <line x1="25" y1="217" x2="1175" y2="217" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-              {/* Südlicher Wendekreis */}
-              <line x1="25" y1="343" x2="1175" y2="343" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-
-              {/* Nullmeridian (Greenwich) */}
-              <line x1="600" y1="25" x2="600" y2="555" stroke="#93c5fd" strokeWidth="1.4" strokeDasharray="6 4" opacity="0.75" />
-              <text x="606" y="550" fontSize="9" fontWeight="800" fill="#0284c7" opacity="0.8">Nullmeridian (0°)</text>
-
-              {/* Meridiane bei -120, -60, +60, +120 */}
-              <line x1="220" y1="25" x2="220" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-              <line x1="410" y1="25" x2="410" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-              <line x1="790" y1="25" x2="790" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-              <line x1="980" y1="25" x2="980" y2="555" stroke="#bae6fd" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-
-              {/* 3. Kontinente der Erde (Pastellfarben) */}
-              {landmasses2D.map(land => (
+            {/* 2. Küstensaum & Kontinentalschelf (Shallow Bathymetry Glow) */}
+            <g opacity={selectedContinent === 'all' ? 0.65 : 0.4} pointerEvents="none">
+              {landmasses2D.filter(l => !l.isWater).map(land => (
                 <path
-                  key={land.id}
+                  key={`shelf-outer-${land.id}`}
                   d={land.d}
-                  fill={land.fill}
-                  stroke={land.stroke}
-                  strokeWidth="1.5"
-                  opacity="0.9"
-                  style={{ transition: 'all 0.2s ease' }}
+                  fill="none"
+                  stroke="#7dd3fc"
+                  strokeWidth="8"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  opacity="0.35"
                 />
               ))}
+              {landmasses2D.filter(l => !l.isWater).map(land => (
+                <path
+                  key={`shelf-inner-${land.id}`}
+                  d={land.d}
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="3.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  opacity="0.25"
+                />
+              ))}
+            </g>
 
-              {/* 4. Nostalgische Kompassrose (Windrose) im Pazifik unten links */}
-              <g transform="translate(100, 480)" pointerEvents="none">
-                <circle cx="0" cy="0" r="28" fill="rgba(255,255,255,0.7)" stroke="#ca8a04" strokeWidth="1.5" />
-                <polygon points="0,-24 5,-6 24,0 6,5 0,24 -5,6 -24,0 -6,-5" fill="#eab308" stroke="#ca8a04" strokeWidth="1" />
-                <polygon points="0,-24 0,0 5,-6" fill="#ca8a04" />
-                <polygon points="24,0 0,0 6,5" fill="#ca8a04" />
-                <polygon points="0,24 0,0 -5,6" fill="#ca8a04" />
-                <polygon points="-24,0 0,0 -6,-5" fill="#ca8a04" />
-                <circle cx="0" cy="0" r="4" fill="#0f172a" />
-                <text x="0" y="-27" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">N</text>
-                <text x="0" y="35" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">S</text>
-                <text x="32" y="3" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">O</text>
-                <text x="-32" y="3" fontSize="9" fontWeight="900" fill="#0f172a" textAnchor="middle">W</text>
+            {/* 2.1 Sanft ziehende Expeditions-Wolken über den Ozeanen (0 Server-Last, GPU-gestützt) */}
+            <g pointerEvents="none" opacity="0.28">
+              <g style={{ animation: 'cloudDriftSlow 120s linear infinite' }}>
+                <path
+                  d="M 20 0 Q 35 -14 55 -10 Q 70 -22 92 -12 Q 110 -20 128 -10 Q 145 -12 155 0 Q 160 14 145 18 Q 120 22 90 18 Q 50 22 35 16 Z"
+                  fill="#ffffff"
+                />
               </g>
+              <g style={{ animation: 'cloudDriftMid 90s linear infinite', animationDelay: '-45s' }}>
+                <path
+                  d="M 30 0 Q 45 -16 70 -12 Q 90 -26 115 -16 Q 135 -24 155 -12 Q 175 -16 185 0 Q 192 16 172 22 Q 140 26 105 22 Q 60 26 42 18 Z"
+                  fill="#ffffff"
+                />
+              </g>
+              <g style={{ animation: 'cloudDriftFast 75s linear infinite', animationDelay: '-20s' }}>
+                <path
+                  d="M 15 0 Q 28 -10 44 -8 Q 58 -18 76 -10 Q 92 -18 108 -8 Q 120 -10 128 0 Q 134 12 120 16 Q 98 20 68 16 Q 36 20 20 14 Z"
+                  fill="#ffffff"
+                />
+              </g>
+            </g>
 
-              {/* 5. Interaktive 36px Flaggen-Medaillons aller 21 Stationen */}
-              {pins2D.map(({ country, x, y }) => {
-                const isSelected = selectedCountryCode === country.code;
-                const isHovered = hoveredCountryCode === country.code;
-                const progress = progressMap[country.code];
-                const stars = progress?.stars ?? 0;
-                const isMastered = stars > 0;
-                const beacon = GLOBE_BEACONS.find(b => b.code === country.code) || {
-                  code: country.code,
-                  name: country.name,
-                  lat: country.geoCoordinates?.lat ?? 0,
-                  lon: country.geoCoordinates?.lon ?? 0,
-                  flag: country.flagEmoji,
-                  continent: country.continent,
-                  chordFrequencies: [261.63, 329.63, 392.00]
-                };
+            {/* 3. Gradnetz (Graticule) nach internationaler IHO-Kartografie */}
+            <g pointerEvents="none" opacity="0.6">
+              {/* Meridiane alle 30° */}
+              {[-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150].map(lon => {
+                const x = ((lon + 180) / 360) * 1140 + 30;
+                const isPrime = lon === 0;
+                return (
+                  <line
+                    key={`meridian-${lon}`}
+                    x1={x}
+                    y1={25}
+                    x2={x}
+                    y2={555}
+                    stroke={isPrime ? '#0284c7' : '#bae6fd'}
+                    strokeWidth={isPrime ? 1.0 : 0.6}
+                    strokeDasharray={isPrime ? '5 3' : '3 3'}
+                    opacity={isPrime ? 0.75 : 0.45}
+                  />
+                );
+              })}
+
+              {/* Parallelen alle 30° */}
+              {[-60, -30, 30, 60].map(lat => {
+                const y = ((90 - lat) / 180) * 480 + 40;
+                return (
+                  <line
+                    key={`parallel-${lat}`}
+                    x1={25}
+                    y1={y}
+                    x2={1175}
+                    y2={y}
+                    stroke="#bae6fd"
+                    strokeWidth={0.6}
+                    strokeDasharray="3 3"
+                    opacity={0.45}
+                  />
+                );
+              })}
+
+              {/* Nördlicher Wendekreis (23.44° N) */}
+              <line
+                x1={25}
+                y1={((90 - 23.44) / 180) * 480 + 40}
+                x2={1175}
+                y2={((90 - 23.44) / 180) * 480 + 40}
+                stroke="#f59e0b"
+                strokeWidth={0.8}
+                strokeDasharray="4 4"
+                opacity={0.45}
+              />
+              <text
+                x="32"
+                y={((90 - 23.44) / 180) * 480 + 37}
+                fontSize="7"
+                fontWeight="700"
+                fill="#d97706"
+                opacity="0.8"
+                letterSpacing="0.06em"
+              >
+                23.5° N • WENDEKREIS DES KREBSES
+              </text>
+
+              {/* Äquator (0°) - Die goldene Referenzlinie */}
+              <line
+                x1={25}
+                y1={280}
+                x2={1175}
+                y2={280}
+                stroke="#0284c7"
+                strokeWidth={1.2}
+                strokeDasharray="6 4"
+                opacity={0.7}
+              />
+              <text
+                x="32"
+                y="276"
+                fontSize="8"
+                fontWeight="850"
+                fill="#0284c7"
+                letterSpacing="0.08em"
+              >
+                0° ÄQUATOR
+              </text>
+              <text
+                x="1168"
+                y="276"
+                textAnchor="end"
+                fontSize="8"
+                fontWeight="850"
+                fill="#0284c7"
+                letterSpacing="0.08em"
+              >
+                EQUATOR • 0°
+              </text>
+
+              {/* Südlicher Wendekreis (23.44° S) */}
+              <line
+                x1={25}
+                y1={((90 - (-23.44)) / 180) * 480 + 40}
+                x2={1175}
+                y2={((90 - (-23.44)) / 180) * 480 + 40}
+                stroke="#f59e0b"
+                strokeWidth={0.8}
+                strokeDasharray="4 4"
+                opacity={0.45}
+              />
+              <text
+                x="32"
+                y={((90 - (-23.44)) / 180) * 480 + 37}
+                fontSize="7"
+                fontWeight="700"
+                fill="#d97706"
+                opacity="0.8"
+                letterSpacing="0.06em"
+              >
+                23.5° S • WENDEKREIS DES STEINBOCKS
+              </text>
+            </g>
+
+            {/* 4. Kontinente der Erde (Natural Earth Topologie & Schweizer Farbpalette) */}
+            {landmasses2D.map(land => (
+              <path
+                key={land.id}
+                d={land.d}
+                fill={land.fill}
+                stroke={land.stroke}
+                strokeWidth={land.isWater ? 1 : 1.2}
+                opacity={land.opacity}
+                style={{ transition: 'opacity 0.25s ease' }}
+              />
+            ))}
+
+            {/* 5. Nautische Windrose (Compass Rose) im Südpazifik */}
+            <g transform="translate(180, 425)" pointerEvents="none" opacity="0.6">
+              <circle r="25" fill="none" stroke="#bae6fd" strokeWidth="1.2" />
+              <circle r="22" fill="none" stroke="#38bdf8" strokeWidth="0.6" strokeDasharray="1.5 1.5" />
+              <circle r="5" fill="#ffffff" stroke="#0284c7" strokeWidth="1.2" />
+
+              {/* Hauptstrahlen N, S, E, W */}
+              <polygon points="0,0 -3,-5 0,-23" fill="#0284c7" />
+              <polygon points="0,0 3,-5 0,-23" fill="#93c5fd" />
+              <polygon points="0,0 3,5 0,23" fill="#0284c7" />
+              <polygon points="0,0 -3,5 0,23" fill="#93c5fd" />
+              <polygon points="0,0 5,-3 23,0" fill="#0284c7" />
+              <polygon points="0,0 5,3 23,0" fill="#93c5fd" />
+              <polygon points="0,0 -5,3 -23,0" fill="#0284c7" />
+              <polygon points="0,0 -5,-3 -23,0" fill="#93c5fd" />
+
+              {/* Diagonale Strahlen NE, NW, SE, SW */}
+              <polygon points="0,0 2,-3 13,-13" fill="#64748b" opacity="0.65" />
+              <polygon points="0,0 3,-2 13,-13" fill="#cbd5e1" opacity="0.65" />
+              <polygon points="0,0 -2,-3 -13,-13" fill="#64748b" opacity="0.65" />
+              <polygon points="0,0 -3,-2 -13,-13" fill="#cbd5e1" opacity="0.65" />
+              <polygon points="0,0 2,3 13,13" fill="#64748b" opacity="0.65" />
+              <polygon points="0,0 3,2 13,13" fill="#cbd5e1" opacity="0.65" />
+              <polygon points="0,0 -2,3 -13,13" fill="#64748b" opacity="0.65" />
+              <polygon points="0,0 -3,2 -13,13" fill="#cbd5e1" opacity="0.65" />
+
+              <text x="0" y="-26" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#0284c7">N</text>
+              <text x="27" y="3" textAnchor="middle" fontSize="6" fontWeight="800" fill="#64748b">E</text>
+              <text x="0" y="32" textAnchor="middle" fontSize="6" fontWeight="800" fill="#64748b">S</text>
+              <text x="-27" y="3" textAnchor="middle" fontSize="6" fontWeight="800" fill="#64748b">W</text>
+            </g>
+
+            {/* 6. Doppelter Atlas-Rahmen & Breitengrad-/Längengrad-Ticks */}
+            <rect x="15" y="15" width="1170" height="550" rx="24" fill="none" stroke="#bae6fd" strokeWidth="2" pointerEvents="none" />
+            <rect x="20" y="20" width="1160" height="540" rx="20" fill="none" stroke="#e0f2fe" strokeWidth="1" strokeDasharray="6 3" pointerEvents="none" />
+
+            {/* Breitengrad-Ticks (links & rechts) */}
+            {[
+              { label: '60°N', y: ((90 - 60) / 180) * 480 + 40 },
+              { label: '30°N', y: ((90 - 30) / 180) * 480 + 40 },
+              { label: '30°S', y: ((90 - (-30)) / 180) * 480 + 40 },
+              { label: '60°S', y: ((90 - (-60)) / 180) * 480 + 40 }
+            ].map(tick => (
+              <g key={`lat-tick-${tick.label}`} pointerEvents="none" opacity="0.75">
+                <line x1="15" y1={tick.y} x2="20" y2={tick.y} stroke="#0284c7" strokeWidth="1.2" />
+                <line x1="1180" y1={tick.y} x2="1185" y2={tick.y} stroke="#0284c7" strokeWidth="1.2" />
+                <text x="23" y={tick.y + 3} fontSize="6.5" fontWeight="700" fill="#64748b">{tick.label}</text>
+                <text x="1177" y={tick.y + 3} textAnchor="end" fontSize="6.5" fontWeight="700" fill="#64748b">{tick.label}</text>
+              </g>
+            ))}
+
+            {/* Längengrad-Ticks (oben & unten) */}
+            {[
+              { label: '120°W', x: ((-120 + 180) / 360) * 1140 + 30 },
+              { label: '60°W', x: ((-60 + 180) / 360) * 1140 + 30 },
+              { label: '0°', x: 600 },
+              { label: '60°E', x: ((60 + 180) / 360) * 1140 + 30 },
+              { label: '120°E', x: ((120 + 180) / 360) * 1140 + 30 }
+            ].map(tick => (
+              <g key={`lon-tick-${tick.label}`} pointerEvents="none" opacity="0.75">
+                <line x1={tick.x} y1="15" x2={tick.x} y2="20" stroke="#0284c7" strokeWidth="1.2" />
+                <line x1={tick.x} y1="560" x2={tick.x} y2="565" stroke="#0284c7" strokeWidth="1.2" />
+                <text x={tick.x} y="28" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#64748b">{tick.label}</text>
+                <text x={tick.x} y="556" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#64748b">{tick.label}</text>
+              </g>
+            ))}
+
+            {/* 7. Keyframe-Definitionen für Vektor-Fluglinien & Radar-Pulse */}
+            <style>{`
+              @keyframes flightDash {
+                to {
+                  stroke-dashoffset: -20;
+                }
+              }
+              @keyframes flightParticles {
+                from {
+                  stroke-dashoffset: 40;
+                }
+                to {
+                  stroke-dashoffset: 0;
+                }
+              }
+              @keyframes planeFloat {
+                0%, 100% { transform: translateY(0px) rotate(-18deg); }
+                50% { transform: translateY(-5px) rotate(-14deg); }
+              }
+              @keyframes cloudDriftSlow {
+                0% { transform: translate(-220px, 90px); }
+                100% { transform: translate(1280px, 90px); }
+              }
+              @keyframes cloudDriftMid {
+                0% { transform: translate(-220px, 290px); }
+                100% { transform: translate(1280px, 290px); }
+              }
+              @keyframes cloudDriftFast {
+                0% { transform: translate(-220px, 460px); }
+                100% { transform: translate(1280px, 460px); }
+              }
+            `}</style>
+
+            {/* 8. Ruhiges, 2-stufiges Flugrouten-Netzwerk (Kein Spinnennetz-Flimmern mehr) */}
+            <g pointerEvents="none">
+              {flightRoutes2D.map(route => {
+                const isHeroRoute = route.isActiveFlight || route.isHovered || route.isHighlighted;
+
+                let stroke = '#94a3b8';
+                let strokeWidth = 0.75;
+                let strokeDasharray = '2 4';
+                let opacity = 0.16;
+
+                if (route.isActiveFlight) {
+                  stroke = '#facc15';
+                  strokeWidth = 3.2;
+                  strokeDasharray = '6 3';
+                  opacity = 1;
+                } else if (route.isHovered) {
+                  stroke = '#facc15';
+                  strokeWidth = 3.0;
+                  strokeDasharray = '6 3';
+                  opacity = 0.98;
+                } else if (route.isHighlighted) {
+                  stroke = '#0284c7';
+                  strokeWidth = 2.4;
+                  strokeDasharray = '5 3';
+                  opacity = 0.92;
+                } else if (route.isMastered) {
+                  stroke = '#86efac';
+                  strokeWidth = 1.0;
+                  strokeDasharray = '3 3';
+                  opacity = 0.35;
+                } else if (route.isAccessible) {
+                  stroke = '#7dd3fc';
+                  strokeWidth = 0.85;
+                  strokeDasharray = '3 3';
+                  opacity = 0.28;
+                }
 
                 return (
-                  <g
-                    key={country.code}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Station ${country.name}, ${country.pieceTitle}. ${isMastered ? 'Gemeistert mit ' + stars + ' Sternen' : 'Station noch offen'}`}
-                    transform={`translate(${x}, ${y})`}
-                    onClick={e => {
+                  <g key={`route-group-${route.key}`}>
+                    {/* Basis-Fluglinie */}
+                    <path
+                      d={route.d}
+                      fill="none"
+                      stroke={stroke}
+                      strokeWidth={strokeWidth}
+                      strokeDasharray={strokeDasharray}
+                      strokeLinecap="round"
+                      opacity={opacity}
+                      style={{
+                        transition: 'all 0.25s ease',
+                        animation: isHeroRoute ? 'flightDash 1.2s linear infinite' : 'none'
+                      }}
+                    />
+
+                    {/* Dynamische FlightRadar-Lichtpartikel NUR auf aktiven Hero-Routen */}
+                    {isHeroRoute && (
+                      <path
+                        d={route.d}
+                        fill="none"
+                        stroke={route.isActiveFlight || route.isHovered ? '#fef08a' : '#7dd3fc'}
+                        strokeWidth={route.isActiveFlight || route.isHovered ? 3.4 : 2.4}
+                        strokeDasharray="6 14"
+                        strokeLinecap="round"
+                        opacity={0.95}
+                        style={{
+                          animation: `flightParticles ${route.isActiveFlight ? '0.7s' : '1.1s'} linear infinite`
+                        }}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+
+            {/* 9. Geparktes Flugzeug & 'Mein Flugzeug' Beacon am aktuellen Standort (wenn nicht im Flug) */}
+            {!flightState && landedPin && (
+              <g transform={`translate(${landedPin.x}, ${landedPin.y}) scale(${pinScale})`} pointerEvents="none">
+                {/* Konzentrische Radar-Wellen des Funkfeuers */}
+                <circle cx="0" cy="0" r="18" fill="none" stroke="#0284c7" strokeWidth="2.2">
+                  <animate attributeName="r" values="18;48" dur="2.4s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.9;0" dur="2.4s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="0" cy="0" r="18" fill="none" stroke="#38bdf8" strokeWidth="1.6">
+                  <animate attributeName="r" values="18;64" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.75;0" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
+                </circle>
+
+                {/* Schwebendes Flugzeug-Sprite mit Schatten (100% reine Vektor-Grafik, Zero-Text) */}
+                <g
+                  transform="translate(18, -20)"
+                  style={{ animation: 'planeFloat 3s ease-in-out infinite' }}
+                >
+                  <AirplaneSprite size={36} fill="#ffffff" stroke="#0284c7" />
+                </g>
+              </g>
+            )}
+
+            {/* 10. Fliegendes Flugzeug im Reiseflug mit Kondensstreifen */}
+            {flightState && (
+              <g pointerEvents="none">
+                {/* Kondensstreifen (Trail) */}
+                {flightState.trail.map((pt, i) => (
+                  <circle
+                    key={`flight-trail-${i}`}
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={Math.max(1.2, (3.4 - i * 0.35) * pinScale)}
+                    fill="#ffffff"
+                    stroke="#38bdf8"
+                    strokeWidth="0.8"
+                    opacity={pt.opacity}
+                  />
+                ))}
+                {/* Flugzeug Vektor */}
+                <g transform={`translate(${flightState.currentX}, ${flightState.currentY}) rotate(${flightState.angleDeg}) scale(${pinScale})`}>
+                  <AirplaneSprite size={30} fill="#ffffff" stroke="#0284c7" />
+                </g>
+              </g>
+            )}
+
+            {/* 11. Touchdown-Feier-Ripples bei erfolgreicher Landung */}
+            {touchdownPin && (
+              <g transform={`translate(${touchdownPin.x}, ${touchdownPin.y}) scale(${pinScale})`} pointerEvents="none">
+                <circle cx="0" cy="0" r="18" fill="none" stroke="#22c55e" strokeWidth="3">
+                  <animate attributeName="r" values="18;48" dur="0.9s" repeatCount="1" />
+                  <animate attributeName="opacity" values="1;0" dur="0.9s" repeatCount="1" />
+                </circle>
+                <circle cx="0" cy="0" r="18" fill="none" stroke="#facc15" strokeWidth="2.2">
+                  <animate attributeName="r" values="18;64" dur="1.1s" repeatCount="1" />
+                  <animate attributeName="opacity" values="0.85;0" dur="1.1s" repeatCount="1" />
+                </circle>
+              </g>
+            )}
+
+            {/* 12. Interaktive Flaggen-Medaillons aller 21 Stationen (Zoom-Adaptiv skaliert) */}
+            {pins2D.map(({ country, baseX, baseY, x, y, isMoved }) => {
+              const isSelected = selectedCountryCode === country.code;
+              const isLanded = currentLandedCountryCode === country.code;
+              const isHovered = hoveredCountryCode === country.code;
+              const progress = progressMap[country.code];
+              const stars = progress?.stars ?? 0;
+              const isMastered = stars > 0;
+              const isAccessible = WorldTourFlightEngine.isCountryAccessible(country.code, progressMap);
+              const canFlyHere = WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap);
+              const isContinentMatch = selectedContinent === 'all' || country.continent === selectedContinent;
+
+              const pinOpacity = !isContinentMatch ? 0.22 : !isAccessible ? 0.42 : 1;
+
+              let borderColor = '#94a3b8';
+              let borderWidth = 1.4;
+              if (isSelected) {
+                borderColor = '#facc15';
+                borderWidth = 3.2;
+              } else if (isLanded) {
+                borderColor = '#0284c7';
+                borderWidth = 3.0;
+              } else if (canFlyHere) {
+                borderColor = '#38bdf8';
+                borderWidth = 2.4;
+              } else if (isMastered) {
+                borderColor = '#22c55e';
+                borderWidth = 1.8;
+              }
+
+              const ariaDesc = isLanded
+                ? `Station ${country.name}, aktueller Standort. ${country.pieceTitle}. ${isMastered ? stars + ' Sterne' : 'Noch zu meistern'}`
+                : canFlyHere
+                ? `Station ${country.name}, Flugroute verfügbar. ${country.pieceTitle}.`
+                : !isAccessible
+                ? `Station ${country.name}, Route noch gesperrt. Meistere zuerst ein Nachbarland.`
+                : `Station ${country.name}, ${country.pieceTitle}.`;
+
+              return (
+                <g
+                  key={country.code}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={ariaDesc}
+                  transform={`translate(${x}, ${y})`}
+                  opacity={pinOpacity}
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleCountryPinClick(country);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
                       e.stopPropagation();
-                      handlePinClick(beacon);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handlePinClick(beacon);
-                      }
-                    }}
-                    onMouseEnter={() => setHoveredCountryCode(country.code)}
-                    onMouseLeave={() => setHoveredCountryCode(null)}
-                    onFocus={() => setHoveredCountryCode(country.code)}
-                    onBlur={() => setHoveredCountryCode(null)}
-                    style={{ cursor: 'pointer', outline: 'none' }}
-                  >
-                    {/* Radar-Impuls bei Auswahl */}
-                    {isSelected && (
-                      <circle cx="0" cy="0" r="22" fill="none" stroke="#facc15" strokeWidth="2.5">
-                        <animate attributeName="r" values="16;32" dur="1.8s" repeatCount="indefinite" />
+                      handleCountryPinClick(country);
+                    }
+                  }}
+                  onMouseEnter={() => setHoveredCountryCode(country.code)}
+                  onMouseLeave={() => setHoveredCountryCode(null)}
+                  onFocus={() => setHoveredCountryCode(country.code)}
+                  onBlur={() => setHoveredCountryCode(null)}
+                  style={{ cursor: 'pointer', outline: 'none', transition: 'opacity 0.2s ease' }}
+                >
+                  {/* Leader-Line zum echten geografischen Bodenpunkt bei Auslenkung */}
+                  {isMoved && (
+                    <g pointerEvents="none">
+                      <line
+                        x1={baseX - x}
+                        y1={baseY - y}
+                        x2={0}
+                        y2={0}
+                        stroke={isSelected ? '#facc15' : '#0284c7'}
+                        strokeWidth={1.4}
+                        strokeDasharray="3 3"
+                        opacity={0.7}
+                      />
+                      <circle
+                        cx={baseX - x}
+                        cy={baseY - y}
+                        r={3.2}
+                        fill={isSelected ? '#facc15' : '#0284c7'}
+                        stroke="#ffffff"
+                        strokeWidth={1.2}
+                      />
+                    </g>
+                  )}
+
+                  {/* 🔬 Zoom-Adaptive Pin-Gruppe (Schützt vor Pin-Gigantismus bei regionalem Zoom in Europa) */}
+                  <g transform={`scale(${pinScale})`}>
+                    {/* Radar-Impuls am aktuellen Flugzeug-Standort */}
+                    {isLanded && (
+                      <circle cx="0" cy="0" r="18" fill="none" stroke="#0284c7" strokeWidth="2.2" pointerEvents="none">
+                        <animate attributeName="r" values="18;38" dur="2s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.85;0" dur="2s" repeatCount="indefinite" />
+                      </circle>
+                    )}
+
+                    {/* Zusätzlicher Auswahl-Impuls, wenn selektiert aber nicht gelandet */}
+                    {isSelected && !isLanded && (
+                      <circle cx="0" cy="0" r="18" fill="none" stroke="#facc15" strokeWidth="2.5" pointerEvents="none">
+                        <animate attributeName="r" values="18;34" dur="1.8s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="1;0" dur="1.8s" repeatCount="indefinite" />
                       </circle>
                     )}
 
-                    {/* Touch-Target 44×44px für Barrierefreiheit */}
-                    <circle cx="0" cy="0" r="22" fill="transparent" pointerEvents="all" />
+                    {/* 🎯 Radar-Impuls am Ziel-Pin, wenn im Expeditions-Widget darüber gehovert wird */}
+                    {hoveredFlightDestCode === country.code && (
+                      <circle cx="0" cy="0" r="18" fill="none" stroke="#facc15" strokeWidth="3" pointerEvents="none">
+                        <animate attributeName="r" values="18;44" dur="0.8s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="1;0" dur="0.8s" repeatCount="indefinite" />
+                      </circle>
+                    )}
 
-                    {/* Medaillon-Körper (36px Kreis) */}
-                    <circle
-                      cx="0"
-                      cy="0"
-                      r="18"
-                      fill={isSelected ? '#0f172a' : '#ffffff'}
-                      stroke={isSelected ? '#facc15' : isMastered ? '#22c55e' : '#0284c7'}
-                      strokeWidth={isSelected ? 3 : isHovered ? 2.5 : 2}
-                      filter={isSelected ? 'url(#medallionGlow)' : 'url(#medallionShadow)'}
-                    />
+                    {/* Touch-Target mindestens 44×44px für Barrierefreiheit */}
+                    <circle cx="0" cy="0" r={Math.max(22, 22 / pinScale)} fill="transparent" pointerEvents="all" />
 
-                    {/* Flaggen-Emoji zentriert */}
-                    <text
-                      x="0"
-                      y="1"
-                      fontSize="18"
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      {country.flagEmoji}
-                    </text>
+                    {/* Medaillon-Körper (36px Kreis, r=18) mit 100% Vektor-Nationalflagge */}
+                    <g filter={isSelected ? 'url(#medallionGlow)' : 'url(#medallionShadow)'}>
+                      <circle
+                        cx="0"
+                        cy="0"
+                        r="18"
+                        fill="#ffffff"
+                      />
+                      <g clipPath="url(#flagClipCircle)">
+                        {renderCountryFlagPaths(country.code)}
+                      </g>
+                      <circle
+                        cx="0"
+                        cy="0"
+                        r="18"
+                        fill="none"
+                        stroke={borderColor}
+                        strokeWidth={isHovered ? borderWidth + 0.8 : borderWidth}
+                      />
+                    </g>
 
-                    {/* Mini Meister-Stern Krone bei gemeisterten Ländern */}
-                    {isMastered && (
+                    {/* Status-Badge oben rechts am Medaillon */}
+                    {isMastered ? (
                       <g transform="translate(12, -12)">
                         <circle r="7.5" fill="#facc15" stroke="#0f172a" strokeWidth="1.2" />
                         <text x="0" y="1" fontSize="8.5" textAnchor="middle" dominantBaseline="central" fill="#0f172a">
                           ★
                         </text>
                       </g>
-                    )}
-
-                    {/* Länder-Kürzel Pill unter dem Medaillon */}
-                    <g transform="translate(0, 27)" pointerEvents="none">
-                      <rect
-                        x="-16"
-                        y="-7"
-                        width="32"
-                        height="14"
-                        rx="7"
-                        fill={isSelected ? '#0f172a' : 'rgba(255, 255, 255, 0.95)'}
-                        stroke={isSelected ? '#facc15' : '#cbd5e1'}
-                        strokeWidth="1"
-                        filter="drop-shadow(0 1px 3px rgba(0,0,0,0.15))"
-                      />
-                      <text
-                        x="0"
-                        y="3"
-                        fontSize="8.5"
-                        fontWeight="900"
-                        textAnchor="middle"
-                        fill={isSelected ? '#facc15' : '#1e293b'}
-                      >
-                        {country.code.startsWith('WA_') ? country.code.replace('WA_', '') : country.code.startsWith('ZA_') ? 'ZA' : country.code.startsWith('CU_') ? 'CU' : country.code.startsWith('BR_') ? 'BR' : country.code.startsWith('PE_') ? 'PE' : country.code.startsWith('IN_') ? 'IN' : country.code.startsWith('EG_') ? 'EG' : country.code.startsWith('NZ_') ? 'NZ' : country.code.startsWith('BG_') ? 'BG' : country.code.startsWith('IE_') ? 'IE' : country.code.startsWith('ES_') ? 'ES' : country.code}
-                      </text>
-                    </g>
+                    ) : canFlyHere ? (
+                      /* 🛫 Flugtor-Badge: Schlanker weißer Richtungspfeil auf Blau (Single-Plane-Axiom) */
+                      <g transform="translate(12, -12)">
+                        <circle r="7.5" fill="#0284c7" stroke="#ffffff" strokeWidth="1.2" />
+                        <polygon points="-2,-3 3.2,0 -2,3" fill="#ffffff" />
+                      </g>
+                    ) : !isAccessible ? (
+                      <g transform="translate(12, -12)">
+                        <circle r="7.5" fill="#64748b" stroke="#ffffff" strokeWidth="1.2" />
+                        <g transform="translate(-4, -4) scale(0.34)">
+                          <Lock size={24} color="#ffffff" strokeWidth={2.6} />
+                        </g>
+                      </g>
+                    ) : null}
                   </g>
-                );
-              })}
-            </svg>
-          ) : (
-            /* ========================================================================= */
-            /* ANSICHT B: 3D DREHBARER KLANG-GLOBUS                                      */
-            /* ========================================================================= */
-            <svg
-            viewBox="0 0 1400 640"
-            style={{
-              width: '100%',
-              height: '100%',
-              maxHeight: 'calc(100vh - 160px)',
-              overflow: 'visible',
-              pointerEvents: 'auto'
-            }}
-          >
-            <defs>
-              {/* Ozean-Tiefen-Gradient mit Sonnenlicht von oben links */}
-              <radialGradient id="globeOcean" cx="35%" cy="30%" r="70%">
-                <stop offset="0%" stopColor="#2563eb" />
-                <stop offset="45%" stopColor="#1e3a8a" />
-                <stop offset="85%" stopColor="#0f172a" />
-                <stop offset="100%" stopColor="#020617" />
-              </radialGradient>
-
-              {/* Erdatmosphäre Äußerer Halo (Rayleigh-Streuung) */}
-              <radialGradient id="atmosphereHalo" cx="50%" cy="50%" r="50%">
-                <stop offset="90%" stopColor="#38bdf8" stopOpacity="0.45" />
-                <stop offset="96%" stopColor="#38bdf8" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-              </radialGradient>
-
-              {/* Sphärischer Schatten an den Kanten (Vignette) */}
-              <radialGradient id="globeShadow" cx="50%" cy="50%" r="50%">
-                <stop offset="75%" stopColor="transparent" />
-                <stop offset="95%" stopColor="#020617" stopOpacity="0.65" />
-                <stop offset="100%" stopColor="#020617" stopOpacity="0.95" />
-              </radialGradient>
-
-              {/* Horizont-Beschneidung: Nur Punkte innerhalb der Kugel */}
-              <clipPath id="globeSphereClip">
-                <circle cx={cx} cy={cy} r={globeRadius} />
-              </clipPath>
-
-              {/* Goldener Schein für ausgewählte Pins */}
-              <filter id="goldGlow" x="-30%" y="-30%" width="160%" height="160%">
-                <feDropShadow dx="0" dy="0" stdDeviation="6" floodOpacity="0.8" floodColor="#facc15" />
-              </filter>
-            </defs>
-
-            {/* 1. Äußere leuchtende Atmosphäre (Halo) */}
-            <circle cx={cx} cy={cy} r={globeRadius + 18} fill="url(#atmosphereHalo)" pointerEvents="none" />
-
-            {/* 2. Ozean-Kugel (Der Planetenkörper) */}
-            <circle
-              cx={cx}
-              cy={cy}
-              r={globeRadius}
-              fill="url(#globeOcean)"
-              stroke="rgba(56, 189, 248, 0.4)"
-              strokeWidth="2"
-              filter="drop-shadow(0 15px 40px rgba(0, 0, 0, 0.6))"
-            />
-
-            {/* ========================================================================= */}
-            {/* ELEMENTE INNERHALB DER KUGEL-BESCHNEIDUNG                                  */}
-            {/* ========================================================================= */}
-            <g clipPath="url(#globeSphereClip)">
-              {/* 3. 3D-Gradnetz: Längenkreise (Meridiane) */}
-              {graticuleMeridians.map((meridian, mIdx) => {
-                const visibleSegments: string[] = [];
-                let currentPath = '';
-
-                meridian.points.forEach((pt, pIdx) => {
-                  if (pt.visible) {
-                    if (!currentPath) {
-                      currentPath = `M ${pt.x},${pt.y}`;
-                    } else {
-                      currentPath += ` L ${pt.x},${pt.y}`;
-                    }
-                  } else {
-                    if (currentPath) {
-                      visibleSegments.push(currentPath);
-                      currentPath = '';
-                    }
-                  }
-                });
-                if (currentPath) visibleSegments.push(currentPath);
-
-                return visibleSegments.map((d, sIdx) => (
-                  <path
-                    key={`meridian-${mIdx}-${sIdx}`}
-                    d={d}
-                    fill="none"
-                    stroke="#38bdf8"
-                    strokeWidth="0.8"
-                    strokeDasharray="3 4"
-                    opacity="0.25"
-                  />
-                ));
-              })}
-
-              {/* 4. 3D-Gradnetz: Breitenkreise (Äquator, Wendekreise) */}
-              {graticuleParallels.map((parallel, pIdx) => {
-                const visibleSegments: string[] = [];
-                let currentPath = '';
-
-                parallel.points.forEach(pt => {
-                  if (pt.visible) {
-                    if (!currentPath) {
-                      currentPath = `M ${pt.x},${pt.y}`;
-                    } else {
-                      currentPath += ` L ${pt.x},${pt.y}`;
-                    }
-                  } else {
-                    if (currentPath) {
-                      visibleSegments.push(currentPath);
-                      currentPath = '';
-                    }
-                  }
-                });
-                if (currentPath) visibleSegments.push(currentPath);
-
-                const isEquator = parallel.lat === 0;
-
-                return visibleSegments.map((d, sIdx) => (
-                  <path
-                    key={`parallel-${pIdx}-${sIdx}`}
-                    d={d}
-                    fill="none"
-                    stroke={isEquator ? '#facc15' : '#38bdf8'}
-                    strokeWidth={isEquator ? 1.5 : 0.8}
-                    strokeDasharray={isEquator ? '5 4' : '3 4'}
-                    opacity={isEquator ? 0.6 : 0.25}
-                  />
-                ));
-              })}
-
-              {/* 5. 3D-Landmassen (Smaragdgrün & Goldgelb) */}
-              {SPHERICAL_LANDMASSES.map(land => {
-                // Projiziere alle Punkte des Kontinents
-                const projected = land.points.map(([lat, lon]) =>
-                  projectOrthographic(lat, lon, rotation.lambda, rotation.phi, globeRadius, cx, cy)
-                );
-
-                // Prüfe, ob mindestens ein Teil des Kontinents auf der Vorderseite liegt
-                const visibleCount = projected.filter(p => p.visible).length;
-                if (visibleCount === 0) return null;
-
-                // Erzeuge geschlossenen Pfad
-                let pathString = `M ${projected[0].x},${projected[0].y}`;
-                for (let i = 1; i < projected.length; i++) {
-                  pathString += ` L ${projected[i].x},${projected[i].y}`;
-                }
-                pathString += ' Z';
-
-                return (
-                  <path
-                    key={land.id}
-                    d={pathString}
-                    fill={land.fill}
-                    stroke="#15803d"
-                    strokeWidth="1.2"
-                    opacity={visibleCount > projected.length * 0.3 ? 0.92 : 0.4}
-                    style={{ transition: 'fill 0.2s ease' }}
-                  />
-                );
-              })}
-
-              {/* 6. Sphärische Vignette / Kanten-Schatten */}
-              <circle cx={cx} cy={cy} r={globeRadius} fill="url(#globeShadow)" pointerEvents="none" />
-            </g>
-
-            {/* ========================================================================= */}
-            {/* 7. INTERAKTIVE 34px FLAGGEN-MEDAILLONS MIT ELASTISCHER RADIAL-REPULSION */}
-            {/* ========================================================================= */}
-            {projectedBeacons.map(beacon => {
-              const isSelected = selectedCountryCode === beacon.code;
-              const isHovered = hoveredCountryCode === beacon.code;
-              const progress = progressMap[beacon.code];
-              const stars = progress?.stars ?? 0;
-              const isMastered = stars > 0;
-
-              const depthScale = Math.max(0.7, Math.min(1.2, 0.75 + beacon.proj.z * 0.45));
-              const depthOpacity = Math.max(0.35, Math.min(1, beacon.proj.z * 2.5 + 0.15));
-              const nameW = Math.max(76, beacon.name.length * 7 + 16);
-
-              return (
-                <g
-                  key={beacon.code}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Station ${beacon.name}, ${beacon.continent}. ${isMastered ? 'Gemeistert mit ' + stars + ' Sternen' : 'Station noch offen'}`}
-                  transform={`translate(${beacon.adjustedX}, ${beacon.adjustedY})`}
-                  opacity={depthOpacity}
-                  onClick={e => {
-                    e.stopPropagation();
-                    handlePinClick(beacon);
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handlePinClick(beacon);
-                    }
-                  }}
-                  onMouseEnter={() => setHoveredCountryCode(beacon.code)}
-                  onMouseLeave={() => setHoveredCountryCode(null)}
-                  onFocus={() => setHoveredCountryCode(beacon.code)}
-                  onBlur={() => setHoveredCountryCode(null)}
-                  style={{ cursor: 'pointer', outline: 'none' }}
-                >
-                  {/* Dotted Leader Line bei Repulsion zum echten Bodenpunkt */}
-                  {beacon.repulsed && (
-                    <line
-                      x1={beacon.proj.x - beacon.adjustedX}
-                      y1={beacon.proj.y - beacon.adjustedY}
-                      x2={0}
-                      y2={0}
-                      stroke={isSelected ? '#facc15' : 'rgba(255,255,255,0.45)'}
-                      strokeWidth={1.2}
-                      strokeDasharray="3 3"
-                    />
-                  )}
-
-                  {/* Hotspot-Punkt auf der Erdoberfläche */}
-                  <circle
-                    cx={beacon.proj.x - beacon.adjustedX}
-                    cy={beacon.proj.y - beacon.adjustedY}
-                    r={(isSelected ? 5 : isHovered ? 4.5 : 3.5) * depthScale}
-                    fill={isMastered ? '#facc15' : isSelected ? '#ffffff' : '#38bdf8'}
-                    stroke={isSelected ? '#facc15' : '#0f172a'}
-                    strokeWidth={1.4 * depthScale}
-                  />
-
-                  {/* Radar-Impuls bei Auswahl */}
-                  {isSelected && (
-                    <circle cx="0" cy="0" r={22 * depthScale} fill="none" stroke="#facc15" strokeWidth="2.4">
-                      <animate attributeName="r" values={`${14 * depthScale};${30 * depthScale}`} dur="1.8s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="1;0" dur="1.8s" repeatCount="indefinite" />
-                    </circle>
-                  )}
-
-                  {/* Touch-Target 44×44px */}
-                  <circle cx="0" cy="0" r={22 * depthScale} fill="transparent" pointerEvents="all" />
-
-                  {/* 34px Kreisrundes Flaggen-Medaillon */}
-                  <circle
-                    cx="0"
-                    cy="0"
-                    r={17 * depthScale}
-                    fill={isSelected ? '#0f172a' : '#ffffff'}
-                    stroke={isSelected ? '#facc15' : isMastered ? '#22c55e' : '#38bdf8'}
-                    strokeWidth={(isSelected ? 2.8 : isHovered ? 2.2 : 1.6) * depthScale}
-                    filter={isSelected ? 'url(#goldGlow)' : 'drop-shadow(0 3px 8px rgba(0,0,0,0.45))'}
-                  />
-
-                  {/* Flaggen-Emoji im Zentrum */}
-                  <text
-                    x="0"
-                    y="1"
-                    fontSize={16 * depthScale}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {beacon.flag}
-                  </text>
-
-                  {/* Mini Meister-Stern Krone */}
-                  {isMastered && (
-                    <g transform={`translate(${11 * depthScale}, ${-11 * depthScale})`}>
-                      <circle r={6.5 * depthScale} fill="#facc15" stroke="#0f172a" strokeWidth={1} />
-                      <text x="0" y="1" fontSize={7.5 * depthScale} textAnchor="middle" dominantBaseline="central" fill="#0f172a">
-                        ★
-                      </text>
-                    </g>
-                  )}
-
-                  {/* Schwebendes Namens-Pill (NUR bei Hover oder Fokus/Auswahl) */}
-                  {(isSelected || isHovered) && (
-                    <g transform={`translate(0, ${-26 * depthScale})`} pointerEvents="none">
-                      <rect
-                        x={-nameW / 2}
-                        y={-10}
-                        width={nameW}
-                        height={20}
-                        rx={10}
-                        fill="#0f172a"
-                        stroke="#facc15"
-                        strokeWidth={1.4}
-                        filter="drop-shadow(0 4px 12px rgba(0,0,0,0.6))"
-                      />
-                      <text
-                        x="0"
-                        y="4"
-                        textAnchor="middle"
-                        fontSize="9.5"
-                        fontWeight="900"
-                        fill="#ffffff"
-                      >
-                        {beacon.name}
-                      </text>
-                    </g>
-                  )}
                 </g>
               );
             })}
           </svg>
-        )}
 
           {/* ========================================================================= */}
-          {/* 🗂️ SCHWEBENDE EXPEDITIONS-AKTE (Floating Glassmorphism Card am Boden)     */}
+          {/* 🗂️ SCHWEBENDES COCKPIT-DOCK (Ultra-Slim Anti-Occlusion Apple Glass Dock) */}
           {/* ========================================================================= */}
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              position: 'absolute',
-              bottom: isMobileView ? 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 20px) + 16px)' : '20px',
-              left: '20px',
-              right: '20px',
-              maxWidth: '920px',
-              margin: '0 auto',
-              background: 'rgba(15, 23, 42, 0.92)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '20px',
-              border: '1.5px solid rgba(255, 255, 255, 0.15)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-              padding: '14px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '14px',
-              zIndex: 15,
-              animation: 'fade-in 0.25s ease'
-            }}
-          >
-            {/* Country Identity Details */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <span style={{ fontSize: '2.6rem', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.4))' }}>
-                {activeCountry.flagEmoji}
-              </span>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', margin: 0 }}>
-                    {activeCountry.name}
-                  </h3>
-                  <span style={{
-                    fontSize: '0.70rem',
-                    fontWeight: 800,
-                    padding: '2px 8px',
+          {(() => {
+            const isLanded = activeCountry.code === currentLandedCountryCode;
+            const isAccessible = WorldTourFlightEngine.isCountryAccessible(activeCountry.code, progressMap);
+            const canFlyDirectly = WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, activeCountry.code, progressMap);
+            const routeInfo = WorldTourFlightEngine.getRouteInfo(currentLandedCountryCode, activeCountry.code);
+            const availableConnections = WorldTourFlightEngine.getConnectionsFrom(activeCountry.code, progressMap);
+            const accessRoutesTo = WorldTourFlightEngine.getAccessRoutesTo(activeCountry.code, progressMap);
+            const landedCountry = WORLD_TOUR_COUNTRIES.find(c => c.code === currentLandedCountryCode) || WORLD_TOUR_COUNTRIES[0];
+
+            /* A. MINIMIERTER MODUS: 34px Schwebendes Micro-Dock (100% Freie Kartensicht) */
+            if (isWidgetCollapsed) {
+              return (
+                <div
+                  onClick={e => {
+                    e.stopPropagation();
+                    setIsWidgetCollapsed(false);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    bottom: isMobileView ? 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 20px) + 12px)' : '16px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(255, 255, 255, 0.96)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
                     borderRadius: '100px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: '#94a3b8'
-                  }}>
-                    {activeCountry.era} ({activeCountry.composedYear})
-                  </span>
+                    border: '1.5px solid rgba(203, 213, 225, 0.95)',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                    padding: '4px 14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    zIndex: 15,
+                    cursor: 'pointer',
+                    animation: 'fade-in 0.2s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                  className="hover-scale"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setIsWidgetCollapsed(false);
+                    }
+                  }}
+                  title="Expeditions-Cockpit einblenden"
+                  aria-label="Expeditions-Cockpit wieder einblenden"
+                >
+                  <WorldTourCountryFlag countryCode={activeCountry.code} size={22} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>{activeCountry.name}</span>
+                  <span style={{ fontSize: '0.76rem', fontWeight: 750, color: '#0284c7' }}>• „{activeCountry.pieceTitle || activeCountry.anthemTitle}“</span>
                   {activeStars > 0 && (
-                    <span style={{ fontSize: '0.9rem' }}>
-                      {'⭐'.repeat(activeStars)}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ca8a04', fontSize: '0.74rem' }}>
+                      {Array.from({ length: activeStars }).map((_, s) => (
+                        <Star key={s} size={12} fill="#facc15" stroke="#ca8a04" />
+                      ))}
                     </span>
                   )}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 9px',
+                    borderRadius: '100px',
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    color: '#0284c7',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    marginLeft: '4px'
+                  }}>
+                    <ChevronUp size={13} strokeWidth={2.8} />
+                    <span>Cockpit</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.86rem', fontWeight: 750, color: '#38bdf8', marginTop: '2px' }}>
-                  „{activeCountry.pieceTitle || activeCountry.anthemTitle}“
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                  Kultur/Komponist: <strong style={{ color: '#ffffff' }}>{activeCountry.composer}</strong> ({activeCountry.composerDates})
-                </div>
-              </div>
-            </div>
+              );
+            }
 
-            {/* Quick Actions (15s Story Audio & Primary "Notenpult öffnen ➔" Button) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                onClick={handlePlayStory}
+            /* B. ULTRA-SLIM COCKPIT DOCK (Bauhöhe ~52px - 76px, Anti-Occlusion) */
+            return (
+              <div
+                onClick={e => e.stopPropagation()}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '12px',
-                  background: isStoryPlaying ? '#0284c7' : 'rgba(255, 255, 255, 0.1)',
-                  color: '#ffffff',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  fontWeight: 800,
-                  fontSize: '0.80rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  touchAction: 'manipulation'
-                }}
-                className="hover-scale"
-                title="15-Sekunden Audio-Geschichte anhören"
-              >
-                <Volume2 size={16} />
-                <span>{isStoryPlaying ? 'Pause' : 'Story (15s)'}</span>
-              </button>
-
-              <button
-                onClick={() => setActiveView('score')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
+                  position: 'absolute',
+                  bottom: isMobileView ? 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 20px) + 8px)' : '16px',
+                  left: isMobileView ? '10px' : '20px',
+                  right: isMobileView ? '10px' : '20px',
+                  maxWidth: '920px',
+                  margin: '0 auto',
+                  background: 'rgba(255, 255, 255, 0.96)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  borderRadius: '18px',
+                  border: '1.5px solid rgba(226, 232, 240, 0.95)',
+                  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04)',
+                  padding: isMobileView ? '8px 12px' : '9px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
                   gap: '8px',
-                  padding: '10px 22px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 900,
-                  fontSize: '0.88rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(2, 132, 199, 0.45)',
-                  touchAction: 'manipulation'
+                  zIndex: 15,
+                  animation: 'fade-in 0.2s ease'
                 }}
-                className="hover-scale"
-                title="Notenpult öffnen und Kulturstück üben oder prüfen"
               >
-                <span>Notenpult öffnen</span>
-                <ChevronRight size={18} strokeWidth={2.8} />
-              </button>
-            </div>
-          </div>
+                {/* 1. Hauptzeile: Identität, Quick-Routing & Primäre Aktionen */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  width: '100%'
+                }}>
+                  {/* Linker Block: Flagge & Metadaten */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 auto' }}>
+                    <WorldTourCountryFlag
+                      countryCode={activeCountry.code}
+                      size={32}
+                      style={{ flexShrink: 0, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.14))' }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                          {activeCountry.name}
+                        </span>
+                        <span style={{
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          color: '#0284c7',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          • „{activeCountry.pieceTitle || activeCountry.anthemTitle}“
+                        </span>
+
+                        {activeStars > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ca8a04', fontSize: '0.76rem', fontWeight: 800 }}>
+                            {Array.from({ length: activeStars }).map((_, s) => (
+                              <Star key={s} size={13} fill="#facc15" stroke="#ca8a04" />
+                            ))}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{
+                        fontSize: '0.70rem',
+                        color: '#64748b',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {activeCountry.composer} • {activeCountry.era}
+                        {activeCountry.composedYear ? ` (${activeCountry.composedYear})` : ''}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mittlerer Block: Kompakter Flugkorridor (nur wenn Hinflug bereit ist) */}
+                  {canFlyDirectly && (
+                    <div style={{
+                      display: isMobileView ? 'none' : 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '4px 12px',
+                      borderRadius: '100px',
+                      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                      border: '1.2px solid #bae6fd',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      color: '#0369a1',
+                      flexShrink: 0
+                    }}>
+                      <span>{landedCountry.flagEmoji} {landedCountry.name}</span>
+                      <span style={{ color: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Plane size={12} strokeWidth={2.4} />
+                        <span>{routeInfo.distanceKm.toLocaleString('de-DE')} km</span>
+                        <ChevronRight size={12} strokeWidth={2.6} />
+                      </span>
+                      <span>{activeCountry.flagEmoji} {activeCountry.name}</span>
+                    </div>
+                  )}
+
+                  {/* Rechter Block: Story-Audio, Primär-Button & Einklapp-Toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <button
+                      onClick={handlePlayStory}
+                      aria-label="15-Sekunden Audio-Geschichte anhören"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '7px 11px',
+                        borderRadius: '12px',
+                        background: isStoryPlaying ? '#0284c7' : '#f1f5f9',
+                        color: isStoryPlaying ? '#ffffff' : '#334155',
+                        border: '1.2px solid #cbd5e1',
+                        fontWeight: 800,
+                        fontSize: '0.76rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        touchAction: 'manipulation'
+                      }}
+                      className="hover-scale"
+                      title="15-Sekunden Audio-Geschichte anhören"
+                    >
+                      <Volume2 size={14} />
+                      <span style={{ display: isMobileView ? 'none' : 'inline' }}>{isStoryPlaying ? 'Pause' : 'Story'}</span>
+                    </button>
+
+                    {/* Primärer CTA */}
+                    {isLanded ? (
+                      <button
+                        onClick={() => setActiveView('score')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 16px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 900,
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 3px 12px rgba(2, 132, 199, 0.32)',
+                          touchAction: 'manipulation',
+                          whiteSpace: 'nowrap'
+                        }}
+                        className="hover-scale"
+                        title="Notenpult öffnen und Stück üben"
+                      >
+                        <span>{activeStars > 0 ? 'Notenpult' : 'Notenpult öffnen'}</span>
+                        <ChevronRight size={15} strokeWidth={2.8} />
+                      </button>
+                    ) : canFlyDirectly ? (
+                      <button
+                        onClick={() => startFlight(activeCountry.code)}
+                        disabled={isFlying}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 18px',
+                          borderRadius: '12px',
+                          background: isFlying ? '#94a3b8' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 900,
+                          fontSize: '0.84rem',
+                          cursor: isFlying ? 'not-allowed' : 'pointer',
+                          boxShadow: '0 3px 14px rgba(2, 132, 199, 0.35)',
+                          touchAction: 'manipulation',
+                          whiteSpace: 'nowrap'
+                        }}
+                        className="hover-scale"
+                        title={`Flugzeug starten nach ${activeCountry.name} (${routeInfo.distanceKm} km)`}
+                      >
+                        <Plane size={15} strokeWidth={2.6} />
+                        <span>{isFlying ? 'Im Anflug...' : `Abflug (${routeInfo.distanceKm} km)`}</span>
+                        <ChevronRight size={15} strokeWidth={2.8} />
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 14px',
+                          borderRadius: '12px',
+                          background: '#f1f5f9',
+                          color: '#94a3b8',
+                          border: '1.2px solid #e2e8f0',
+                          fontWeight: 800,
+                          fontSize: '0.80rem',
+                          cursor: 'not-allowed',
+                          touchAction: 'manipulation',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <Lock size={13} />
+                        <span>Gesperrt</span>
+                      </button>
+                    )}
+
+                    {/* Einklapp-Pill / Minimieren */}
+                    <button
+                      onClick={() => setIsWidgetCollapsed(true)}
+                      aria-label="Cockpit minimieren für volle Kartensicht"
+                      title="Cockpit minimieren (volle Kartensicht)"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '10px',
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        flexShrink: 0
+                      }}
+                      className="hover-scale"
+                    >
+                      <ChevronDown size={17} strokeWidth={2.4} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Kompakte Anschluss-Gates Leiste (NUR wenn Land gemeistert ist und weitere Tore offen sind) */}
+                {isLanded && activeStars > 0 && availableConnections.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    paddingTop: '6px',
+                    borderTop: '1px solid #f1f5f9',
+                    overflowX: 'auto',
+                    width: '100%'
+                  }} className="custom-scrollbar">
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      flexShrink: 0,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <Compass size={13} color="#0284c7" />
+                      <span>ABFLUG-GATES:</span>
+                    </div>
+
+                    {availableConnections.map(({ country: dest, isMastered: destMastered }) => {
+                      const destRoute = WorldTourFlightEngine.getRouteInfo(activeCountry.code, dest.code);
+                      const isTargetSelected = selectedCountryCode === dest.code;
+                      const isHovered = hoveredFlightDestCode === dest.code;
+
+                      return (
+                        <button
+                          key={dest.code}
+                          onClick={() => {
+                            if (isTargetSelected) {
+                              // 2. Klick auf dasselbe Abflug-Gate: Sofort abfliegen!
+                              startFlight(dest.code);
+                            } else {
+                              // 1. Klick: Ziel selektieren, Flugkorridor auto-framen & Jingle abspielen
+                              setSelectedCountryCode(dest.code);
+                              frameFlightCorridor(activeCountry.code, dest.code);
+                              if (dest.audioJingleFrequencies) {
+                                playCultureJingle(dest.audioJingleFrequencies);
+                              }
+                            }
+                          }}
+                          onMouseEnter={() => {
+                            setHoveredFlightDestCode(dest.code);
+                          }}
+                          onMouseLeave={() => setHoveredFlightDestCode(null)}
+                          onFocus={() => {
+                            setHoveredFlightDestCode(dest.code);
+                          }}
+                          onBlur={() => setHoveredFlightDestCode(null)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            background: isTargetSelected
+                              ? '#e0f2fe'
+                              : isHovered
+                              ? '#fefce8'
+                              : '#ffffff',
+                            border: isTargetSelected
+                              ? '1.5px solid #0284c7'
+                              : isHovered
+                              ? '1.5px solid #facc15'
+                              : '1px solid #cbd5e1',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            color: '#0f172a',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale"
+                          title={isTargetSelected ? `Direkt nach ${dest.name} abfliegen!` : `Flugtor nach ${dest.name} ansteuern (${destRoute.distanceKm.toLocaleString('de-DE')} km)`}
+                        >
+                          <span style={{ fontSize: '0.88rem' }}>{dest.flagEmoji}</span>
+                          <span>{dest.name}</span>
+                          <span style={{ fontSize: '0.66rem', color: '#0369a1', fontWeight: 800 }}>
+                            {destRoute.distanceKm.toLocaleString('de-DE')} km
+                          </span>
+                          {isTargetSelected ? (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                              padding: '1px 6px',
+                              borderRadius: '100px',
+                              background: '#0284c7',
+                              color: '#ffffff',
+                              fontSize: '0.62rem',
+                              fontWeight: 900
+                            }}>
+                              <Plane size={9} strokeWidth={2.6} />
+                              <span>ABFLUG ➔</span>
+                            </span>
+                          ) : destMastered ? (
+                            <span style={{ color: '#ca8a04', fontSize: '0.64rem' }}>★</span>
+                          ) : (
+                            <span style={{ color: '#16a34a', fontSize: '0.64rem' }}>✨</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 3. Gesperrter Quest-Wegweiser (Simple & schlichte Reiseroute) */}
+                {!isLanded && !isAccessible && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    paddingTop: '6px',
+                    borderTop: '1px solid #f1f5f9',
+                    fontSize: '0.72rem',
+                    flexWrap: 'wrap'
+                  }}>
+                    {shortestRouteToActive ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0369a1', fontWeight: 800, flexWrap: 'wrap' }}>
+                        <Compass size={13} color="#0284c7" />
+                        <span style={{ color: '#0f172a' }}>Reiseroute ab {landedCountry.name}:</span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          {shortestRouteToActive.path.map((step, idx) => (
+                            <span key={step.code} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <span>{step.flagEmoji}</span>
+                              <span style={{
+                                fontWeight: idx === shortestRouteToActive.path.length - 1 ? 950 : 700,
+                                color: idx === shortestRouteToActive.path.length - 1 ? '#0284c7' : '#475569'
+                              }}>
+                                {step.name}
+                              </span>
+                              {idx < shortestRouteToActive.path.length - 1 && (
+                                <span style={{ color: '#94a3b8', fontSize: '0.62rem' }}>➔</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                        <span style={{ color: '#64748b', fontSize: '0.66rem', fontWeight: 700 }}>
+                          ({shortestRouteToActive.stepsCount} {shortestRouteToActive.stepsCount === 1 ? 'Station' : 'Stationen'} • {shortestRouteToActive.totalKm.toLocaleString('de-DE')} km)
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b', fontWeight: 750 }}>
+                        <Compass size={13} color="#0284c7" />
+                        <span>Schalte {activeCountry.name} über ein Zubringer-Land frei</span>
+                      </div>
+                    )}
+
+                    {shortestRouteToActive && shortestRouteToActive.path[1] && (
+                      <button
+                        onClick={() => {
+                          const nextHop = shortestRouteToActive.path[1];
+                          setSelectedCountryCode(nextHop.code);
+                          focusCountry(nextHop.code);
+                          const cont = nextHop.continent;
+                          if (selectedContinent !== 'all' && selectedContinent !== cont) {
+                            setSelectedContinent(cont);
+                          }
+                          if (nextHop.audioJingleFrequencies) {
+                            playCultureJingle(nextHop.audioJingleFrequencies);
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 10px',
+                          borderRadius: '100px',
+                          background: '#e0f2fe',
+                          border: '1.2px solid #bae6fd',
+                          color: '#0284c7',
+                          fontWeight: 850,
+                          fontSize: '0.68rem',
+                          cursor: 'pointer',
+                          touchAction: 'manipulation'
+                        }}
+                        className="hover-scale"
+                        title={`Zur nächsten Etappe: ${shortestRouteToActive.path[1].name}`}
+                      >
+                        <span>Nächste Etappe: {shortestRouteToActive.path[1].flagEmoji} {shortestRouteToActive.path[1].name}</span>
+                        <ChevronRight size={11} strokeWidth={2.8} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       ) : (
         /* ========================================================================= */
@@ -1559,80 +2602,101 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
           flex: 1,
           width: '100%',
           overflowY: 'auto',
-          padding: isMobileView ? '16px 14px' : '24px 32px',
+          padding: isMobileView ? '10px 10px' : '14px 20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px'
+          gap: '12px'
         }} className="custom-scrollbar">
-          {/* Country Dossier Header Card */}
+          {/* 🎼 Zeile 1: Kompakte Notenpult-Kopfzeile (44px, Ultra-Schlank & Zero Waste) */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px',
-            padding: '20px 24px',
-            background: '#ffffff',
-            borderRadius: '20px',
+            gap: '12px',
+            padding: '6px 16px',
+            background: 'rgba(255, 255, 255, 0.96)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: '14px',
             border: '1.5px solid #e2e8f0',
-            boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
-            color: '#0f172a'
+            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+            color: '#0f172a',
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            zIndex: 30
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <span style={{ fontSize: '3.2rem', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.15))' }}>
-                {activeCountry.flagEmoji}
-              </span>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <h1 style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
-                    {activeCountry.name}
-                  </h1>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    padding: '3px 10px',
-                    borderRadius: '100px',
-                    background: '#f1f5f9',
-                    color: '#475569'
-                  }}>
-                    {activeCountry.era} ({activeCountry.composedYear})
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.94rem', fontWeight: 750, color: '#334155', marginTop: '4px' }}>
-                  „{activeCountry.anthemTitle}“
-                </div>
-                <div style={{ fontSize: '0.80rem', color: '#64748b', marginTop: '2px' }}>
-                  Komponist: <strong style={{ color: '#0f172a' }}>{activeCountry.composer}</strong> ({activeCountry.composerDates})
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              {/* 15s Story Audio Button */}
+            {/* Links: Zur Weltkarte Button + Flagge + Titel */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
               <button
-                onClick={handlePlayStory}
+                onClick={() => setActiveView('map')}
+                aria-label="Zurück zur Weltkarte"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '9px 16px',
-                  borderRadius: '12px',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#0f172a',
+                  fontWeight: 800,
+                  fontSize: '0.80rem',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  flexShrink: 0
+                }}
+                className="hover-scale"
+              >
+                <ArrowLeft size={15} />
+                <span>Weltkarte</span>
+              </button>
+
+              <WorldTourCountryFlag
+                countryCode={activeCountry.code}
+                size={26}
+                style={{ flexShrink: 0, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
+              />
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                  {activeCountry.name}
+                </span>
+                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0284c7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  • „{activeCountry.pieceTitle || activeCountry.anthemTitle}“
+                </span>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  ({activeCountry.era}{activeCountry.composedYear ? ` ${activeCountry.composedYear}` : ''})
+                </span>
+              </div>
+            </div>
+
+            {/* Rechts: 15s Story Audio & Faltbares Kultur-Dossier */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                onClick={handlePlayStory}
+                aria-label="15-Sekunden Audio-Geschichte anhören"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '6px 11px',
+                  borderRadius: '10px',
                   background: isStoryPlaying ? '#0284c7' : '#f0f9ff',
                   color: isStoryPlaying ? '#ffffff' : '#0369a1',
-                  border: '1.5px solid #bae6fd',
+                  border: '1px solid #bae6fd',
                   fontWeight: 800,
-                  fontSize: '0.82rem',
+                  fontSize: '0.76rem',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   touchAction: 'manipulation'
                 }}
                 className="hover-scale"
               >
-                <Volume2 size={16} />
-                <span>{isStoryPlaying ? 'Story pausieren' : 'Expeditions-Story (15s)'}</span>
+                <Volume2 size={14} />
+                <span>{isStoryPlaying ? 'Pause' : 'Story (15s)'}</span>
               </button>
 
-              {/* Faltbares Kultur-Dossier Button */}
               <button
                 onClick={() => setIsDossierOpen(prev => !prev)}
                 aria-expanded={isDossierOpen}
@@ -1640,23 +2704,23 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '9px 15px',
-                  borderRadius: '12px',
+                  gap: '5px',
+                  padding: '6px 11px',
+                  borderRadius: '10px',
                   background: isDossierOpen ? '#f1f5f9' : '#ffffff',
                   color: isDossierOpen ? '#0f172a' : '#475569',
-                  border: '1.5px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   fontWeight: 800,
-                  fontSize: '0.82rem',
+                  fontSize: '0.76rem',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   touchAction: 'manipulation'
                 }}
                 className="hover-scale"
               >
-                <BookOpen size={16} color={isDossierOpen ? '#0284c7' : '#64748b'} />
-                <span>{isDossierOpen ? 'Dossier einklappen' : 'Kultur-Dossier & Tipp'}</span>
-                {isDossierOpen ? <ChevronUp size={15} color="#64748b" /> : <ChevronDown size={15} color="#64748b" />}
+                <BookOpen size={14} color={isDossierOpen ? '#0284c7' : '#64748b'} />
+                <span>Dossier</span>
+                {isDossierOpen ? <ChevronUp size={13} color="#64748b" /> : <ChevronDown size={13} color="#64748b" />}
               </button>
             </div>
           </div>
@@ -1719,8 +2783,37 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             studentId={studentId}
             onMasteryAchieved={handleMasteryAchieved}
             uiLevel={uiLevel}
+            onBackToMap={() => setActiveView('map')}
           />
         </div>
+      )}
+
+      {/* 🛂 Interaktiver 2027 Expeditions-Reisepass */}
+      {isPassportOpen && (
+        <WorldTourPassportModal
+          isOpen={isPassportOpen}
+          onClose={() => setIsPassportOpen(false)}
+          studentName={studentName}
+          studentInstrument={studentInstrument}
+          studentAvatarUrl={studentAvatarUrl}
+          uiLevel={uiLevel}
+          progressMap={progressMap}
+          currentLandedCountryCode={currentLandedCountryCode}
+          onNavigateToCountry={(countryCode) => {
+            setSelectedCountryCode(countryCode);
+            setIsPassportOpen(false);
+            setActiveView('map');
+          }}
+          onSelectCountry={(countryCode) => {
+            setSelectedCountryCode(countryCode);
+            setIsPassportOpen(false);
+            setActiveView('score');
+          }}
+          onOpenDiploma={() => {
+            setIsPassportOpen(false);
+            setIsDiplomaOpen(true);
+          }}
+        />
       )}
 
       {/* A4 Printable Diploma Modal */}
@@ -1729,7 +2822,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
           isOpen={isDiplomaOpen}
           onClose={() => setIsDiplomaOpen(false)}
           studentName={studentName}
-          instrumentName={studentInstrument || 'Klavier'}
+          instrumentName={studentInstrument || 'Gitarre'}
           unlockedCount={totalMasteredCountries}
           totalCountries={WORLD_TOUR_COUNTRIES.length}
         />

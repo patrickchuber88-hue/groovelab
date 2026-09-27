@@ -39,10 +39,14 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
   const effectiveCertId = certificateId || `MW-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-100`;
 
   const sanitizedStudentName = formatStudentPureFirstName(studentName, 'Musik-Schüler');
+  const cleanSongTitle = (songTitle || 'Meisterwerk')
+    .replace(/\s*\((?:gitarre|guitar|bass|drums|schlagzeug|klavier|piano|gesang|vocals|lead|arrangement|song|playback|text|audio)[^)]*\)/gi, '')
+    .replace(/\s*-\s*(?:gitarre|guitar|bass|drums|schlagzeug|klavier|piano|gesang)/gi, '')
+    .trim() || songTitle;
 
   const handleShareMasterpiece = async () => {
-    const shareTitle = `🏆 Meisterwerk-Urkunde: ${songTitle}`;
-    const shareText = `🎵 ${sanitizedStudentName} hat das musikalische Meisterwerk »${songTitle}« (${instrument}) mit Bravour an der ${schoolName} gemeistert!`;
+    const shareTitle = `🏆 Meisterwerk-Urkunde: ${cleanSongTitle}`;
+    const shareText = `🎵 ${sanitizedStudentName} hat das musikalische Meisterwerk »${cleanSongTitle}« (${instrument}) mit Bravour an der ${schoolName} gemeistert!`;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
 
     if (typeof navigator !== 'undefined' && (navigator as any).share) {
@@ -112,7 +116,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
       pdf.addImage(dataUrl, 'PNG', posX, posY, renderWidth, renderHeight, undefined, 'FAST');
       
       const cleanStudent = sanitizedStudentName.replace(/\s+/g, '_');
-      const cleanSong = songTitle.replace(/\s+/g, '_');
+      const cleanSong = cleanSongTitle.replace(/\s+/g, '_');
       const filename = `Meisterwerk_Urkunde_${cleanStudent}_${cleanSong}.pdf`;
       const blob = pdf.output('blob');
 
@@ -384,7 +388,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
             {/* Song Title & Instrument Badge */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
-                » {songTitle} «
+                » {cleanSongTitle} «
               </div>
               <div style={{ 
                 background: '#fef3c7', 

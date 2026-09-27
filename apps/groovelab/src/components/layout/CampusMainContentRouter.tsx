@@ -4,7 +4,8 @@ import { ErrorBoundary, DashboardLoader } from '../ui/ErrorBoundary';
 import { generateRandomBandName } from '../../utils/bandNameGenerator';
 
 const EnsembleDashboard = lazy(() => import('../EnsembleDashboard').then(m => ({ default: m.EnsembleDashboard })));
-const TeacherDashboard = lazy(() => import('../TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
+const teacherDashboardPromise = import('../TeacherDashboard');
+const TeacherDashboard = lazy(() => teacherDashboardPromise.then(m => ({ default: m.TeacherDashboard })));
 const StudentAvatarDashboard = lazy(() => import('../StudentAvatarDashboard').then(m => ({ default: m.StudentAvatarDashboard })));
 const AdminDashboard = lazy(() => import('../AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const CampusStaffProfileView = lazy(() => import('../campus/CampusStaffProfileView').then(m => ({ default: m.CampusStaffProfileView })));
@@ -226,6 +227,16 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
     }
   }, [isLiveLabActive, hasVisitedLiveLab]);
 
+  // 🛡️ Fail-Safe GrooveLab Guard: Verhindert weiße Bildschirme für Schüler, falls ein Campus-Tab (z.B. 'briefing') aktiv blieb
+  React.useEffect(() => {
+    if (isStudent && activePlatform === 'groovelab') {
+      const validGrooveTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages', 'profile'];
+      if (!validGrooveTabs.includes(activeStudentTab)) {
+        setActiveStudentTab('live');
+      }
+    }
+  }, [isStudent, activePlatform, activeStudentTab, setActiveStudentTab]);
+
   // 🚀 Performance Optimization: Lazy-mount and preserve Admin/Teacher Suite & Messages
   const isStaffRole = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary';
   const isAdminTeacherSuiteActive = isStaffRole && activePlatform !== 'ensembles' && activeStudentTab !== 'profile' && activeStudentTab !== 'messages';
@@ -248,15 +259,19 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
 
   return (
     <main id="main-content" tabIndex={-1} className="main-content" style={{ 
-      overflow: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : 'hidden', 
+      overflowY: windowWidth <= 768 ? ((isStudent && activeStudentTab === 'live') ? 'hidden' : 'auto') : ((activeStudentTab !== 'live') ? 'auto' : 'hidden'), 
+      overflowX: 'hidden',
+      WebkitOverflowScrolling: 'touch',
+      overscrollBehaviorY: 'contain',
       flex: 1, 
+      minHeight: 0,
       display: 'flex', 
       flexDirection: 'column', 
       padding: windowWidth <= 768 
-        ? (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) 4px') 
+        ? (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px)) 4px') 
         : (['homework', 'homework_book'].includes(activeStudentTab) ? '12px 16px' : (user?.role?.toLowerCase() === 'student' ? '20px 24px 32px 24px' : '10px')),
       scrollPaddingTop: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))' : undefined,
-      scrollPaddingBottom: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px)))' : undefined,
+      scrollPaddingBottom: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px))' : undefined,
       boxSizing: 'border-box',
       minWidth: 0,
       width: '100%'
@@ -289,10 +304,9 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
             </div>
 
             {/* If active tab is a togglable board, show quick release toggle in the header */}
-            {['practice_board', 'mediathek', 'events', 'campus_cup', 'messages'].includes(activeStudentTab) && (() => {
+            {['practice_board', 'events', 'campus_cup', 'messages'].includes(activeStudentTab) && (() => {
               const boardNames: Record<string, string> = {
                 practice_board: 'Übe-Pfad',
-                mediathek: 'Mediathek',
                 events: 'Termine',
                 campus_cup: 'Klassen-Highlights & Team-Power',
                 messages: 'Nachrichten'
@@ -434,7 +448,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           width: '100%' 
         }}>
           <ErrorBoundary>
-            <div className="animation-slide-up" style={{ width: '100%', padding: windowWidth <= 768 ? '8px 4px 4px 4px' : '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
+            <div className="animation-slide-up" style={{ width: '100%', padding: windowWidth <= 768 ? '8px 4px 4px 4px' : '12px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
               <Suspense fallback={<DashboardLoader />}>
                 <TeacherDashboard 
                   key="student-live-dashboard"
@@ -534,7 +548,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
                 supabase={supabase}
                 fetchPlanningData={fetchPlanningData}
                 onChangeAvatar={() => {
-                  setAvatarPickerType('teacher');
+                  setAvatarPickerType(user?.role === 'student' ? 'student' : 'teacher');
                   setShowAvatarPicker(true);
                 }}
                 onShowQr={() => setShowQR(true)}
@@ -551,6 +565,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
                 plannedSlots={plannedSlots}
                 toggleSlot={toggleSlot}
                 loggedInUserId={loggedInUserId}
+                onTabChange={setActiveStudentTab}
               />
             )}
           </Suspense>
@@ -652,6 +667,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
               setActivePdfSong(song);
               setActivePdfFolderUrl(folderUrl);
             }}
+            onTabChange={setActiveStudentTab}
             isMobile={isMobile}
           />
         </Suspense>
@@ -711,6 +727,9 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           <StudentLibraryTab
             globalSongs={globalSongs}
             userSongs={userSongs}
+            groupedPracticeSongs={groupedPracticeSongs}
+            repertoireSongs={groupedRepertoireSongs}
+            setActiveStudentTab={setActiveStudentTab}
             brandColor={brandColor}
             onAddSongToRepertoire={handleAddSongToRepertoire}
             isMobile={isMobile}

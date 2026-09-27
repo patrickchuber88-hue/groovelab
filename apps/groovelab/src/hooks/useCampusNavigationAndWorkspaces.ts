@@ -85,12 +85,18 @@ export function useCampusNavigationAndWorkspaces({
     const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
     if (platform === 'campus') {
       const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
-      return tab === 'live' ? 'briefing' : tab;
+      return (tab === 'live' || tab === 'mediathek' || tab === 'songs') ? 'briefing' : tab;
     }
     if (platform === 'ensembles') {
       return (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
     }
-    return (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
+    // GrooveLab: Startseite ist autoritativ das Live Lab ('live')
+    const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
+    const validStudentGrooveTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages', 'profile'];
+    if (user?.role?.toLowerCase() === 'student' && !validStudentGrooveTabs.includes(tab)) {
+      return 'live';
+    }
+    return tab;
   });
 
   const setActivePlatform = useCallback((val: any, _forceUnlock = false) => {
@@ -137,8 +143,12 @@ export function useCampusNavigationAndWorkspaces({
         const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
         setActiveStudentTabRaw(savedTab);
       } else {
-        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
-        setActiveStudentTabRaw(savedTab);
+        // 🎵 Beim Wechsel auf GrooveLab MUSS das Live Lab als Startseite geladen werden
+        setActiveStudentTabRaw('live');
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_active_tab', 'live');
+          localStorage.setItem('groovelab_active_tab', 'live');
+        }
       }
     });
     if (typeof window !== 'undefined') {
@@ -165,13 +175,14 @@ export function useCampusNavigationAndWorkspaces({
   }, []);
 
   const setActiveStudentTab = useCallback((val: any) => {
-    if (val === 'messages') {
+    const targetVal = (val === 'mediathek' || val === 'songs') ? 'briefing' : val;
+    if (targetVal === 'messages') {
       onResetRecipient?.();
     }
-    if (val === 'homework_book') {
+    if (targetVal === 'homework_book') {
       window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
     }
-    setActiveStudentTabRaw(val);
+    setActiveStudentTabRaw(targetVal);
     const tabLabels: Record<string, string> = {
       briefing: 'Briefing-Dashboard geöffnet',
       homework_book: 'Hausaufgabenheft geöffnet',

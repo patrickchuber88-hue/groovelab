@@ -6703,8 +6703,8 @@ export function CampusEventsBoard({
           </button>
         </div>
 
-        {/* Scrollable list (Invisible Scrollbar) */}
-        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '140px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Scrollable list (Single Source of Scroll on Mobile) */}
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : 1, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: isMobilePortrait ? undefined : 'none', msOverflowStyle: isMobilePortrait ? undefined : 'none' }}>
           {loadingLessons ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Stundenplan lädt...
@@ -6886,19 +6886,19 @@ export function CampusEventsBoard({
   const renderTimelineColumn = () => {
     return (
       <div id="tour-timeline-column" style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '24px',
-        padding: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        background: isMobilePortrait ? 'transparent' : '#ffffff',
+        border: isMobilePortrait ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: isMobilePortrait ? '0' : '24px',
+        padding: isMobilePortrait ? '0' : '10px',
+        boxShadow: isMobilePortrait ? 'none' : '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        height: 'calc(100vh - 120px)',
-        overflow: 'hidden'
+        height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
+        overflow: isMobilePortrait ? 'visible' : 'hidden'
       }}>
         {/* Title */}
         <div>
@@ -6915,8 +6915,8 @@ export function CampusEventsBoard({
 
 
 
-        {/* Unified Timeline List (Invisible Scrollbar) */}
-        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '140px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Unified Timeline List (Single Source of Scroll on Mobile) */}
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : 1, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: isMobilePortrait ? undefined : 'none', msOverflowStyle: isMobilePortrait ? undefined : 'none' }}>
           {loadingEvents ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Termine werden geladen...
@@ -7127,19 +7127,19 @@ export function CampusEventsBoard({
   const renderFeatureComingSoonColumn = (isForStudent: boolean) => {
     return (
       <div id="tour-student-events" style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '24px',
-        padding: '24px 20px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        background: isMobilePortrait ? 'transparent' : '#ffffff',
+        border: isMobilePortrait ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: isMobilePortrait ? '0' : '24px',
+        padding: isMobilePortrait ? '0' : '24px 20px',
+        boxShadow: isMobilePortrait ? 'none' : '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        height: 'calc(100vh - 120px)',
-        overflowY: 'auto'
+        height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
+        overflowY: isMobilePortrait ? 'visible' : 'auto'
       }}>
         {/* Header */}
         <div>
@@ -7263,19 +7263,19 @@ export function CampusEventsBoard({
 
     return (
       <div id="tour-student-events" style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '24px',
-        padding: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        background: isMobilePortrait ? 'transparent' : '#ffffff',
+        border: isMobilePortrait ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: isMobilePortrait ? '0' : '24px',
+        padding: isMobilePortrait ? '0' : '10px',
+        boxShadow: isMobilePortrait ? 'none' : '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        height: 'calc(100vh - 120px)',
-        overflowY: 'auto'
+        height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
+        overflowY: isMobilePortrait ? 'visible' : 'auto'
       }}>
         <div>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -7677,16 +7677,16 @@ export function CampusEventsBoard({
   const renderAnnouncementsColumn = () => {
     return (
       <div id="tour-announcements-column" style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '24px',
-        padding: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        background: isMobilePortrait ? 'transparent' : '#ffffff',
+        border: isMobilePortrait ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: isMobilePortrait ? '0' : '24px',
+        padding: isMobilePortrait ? '0' : '10px',
+        boxShadow: isMobilePortrait ? 'none' : '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        height: 'calc(100vh - 120px)',
-        overflowY: 'auto'
+        height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
+        overflowY: isMobilePortrait ? 'visible' : 'auto'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -7990,19 +7990,23 @@ export function CampusEventsBoard({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         style={{
-          background: '#ffffff',
-          border: isDragOverPlanning ? `2px dashed ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)',
-          borderRadius: '24px',
-          padding: '10px',
-          boxShadow: isDragOverPlanning ? `0 12px 40px ${brandColor}15` : '0 8px 32px rgba(0,0,0,0.02)',
+          background: isMobilePortrait ? 'transparent' : '#ffffff',
+          border: isMobilePortrait 
+            ? (isDragOverPlanning ? `2px dashed ${brandColor}` : 'none') 
+            : (isDragOverPlanning ? `2px dashed ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)'),
+          borderRadius: isMobilePortrait ? '0' : '24px',
+          padding: isMobilePortrait ? '0' : '10px',
+          boxShadow: isMobilePortrait 
+            ? 'none' 
+            : (isDragOverPlanning ? `0 12px 40px ${brandColor}15` : '0 8px 32px rgba(0,0,0,0.02)'),
           display: 'flex',
           flexDirection: 'column',
           gap: '10px',
           width: '100%',
           minWidth: 0,
           boxSizing: 'border-box',
-          height: 'calc(100vh - 120px)',
-          overflowY: 'auto',
+          height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
+          overflowY: isMobilePortrait ? 'visible' : 'auto',
           transition: 'all 0.2s ease',
           transform: isDragOverPlanning ? 'scale(1.01)' : 'none'
         }}

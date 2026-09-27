@@ -20,6 +20,9 @@ export interface UseTeacherAbsenceProps {
   briefingData: any;
   crisisNotifications: any[];
   showRealNames: boolean;
+  viewMode?: 'admin' | 'student';
+  activeTab?: string;
+  hideHeader?: boolean;
   onRefresh?: () => Promise<void> | void;
 }
 
@@ -32,6 +35,9 @@ export function useTeacherAbsence({
   briefingData,
   crisisNotifications,
   showRealNames,
+  viewMode = 'admin',
+  activeTab = 'briefing',
+  hideHeader = false,
   onRefresh
 }: UseTeacherAbsenceProps) {
   const [quickAbsencePreset, setQuickAbsencePreset] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
@@ -69,7 +75,8 @@ export function useTeacherAbsence({
   const [optimisticContacted, setOptimisticContacted] = useState<Record<string, { status: string; at: string }>>({});
 
   const fetchUrgentCancellations = useCallback(async () => {
-    if (!userId || teacher?.role?.toLowerCase() === 'student') return;
+    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
+    if (!userId || isStudent || activeTab === 'live') return;
     try {
       const { data, error } = await supabase.rpc('get_urgent_unacknowledged_cancellations', {
         p_teacher_id: userId
@@ -94,7 +101,7 @@ export function useTeacherAbsence({
     } catch (err) {
       console.warn('Exception in fetchUrgentCancellations:', err);
     }
-  }, [userId, urgentSnoozeUntil]);
+  }, [userId, urgentSnoozeUntil, teacher?.role, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -139,7 +146,8 @@ export function useTeacherAbsence({
   const [selectedMakeupToken, setSelectedMakeupToken] = useState<any>(null);
 
   const fetchActiveMakeupTokens = useCallback(async () => {
-    if (!userId || teacher?.role?.toLowerCase() === 'student') return;
+    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
+    if (!userId || isStudent || activeTab === 'live') return;
     try {
       const { data, error } = await supabase.rpc('get_teacher_active_makeup_tokens', {
         p_teacher_id: userId
@@ -150,7 +158,7 @@ export function useTeacherAbsence({
     } catch (err) {
       console.warn('Exception in fetchActiveMakeupTokens:', err);
     }
-  }, [userId]);
+  }, [userId, teacher?.role, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
     fetchActiveMakeupTokens();

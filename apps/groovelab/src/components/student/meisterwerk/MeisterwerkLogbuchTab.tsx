@@ -294,27 +294,9 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
 
             const masteredSongsMap = new Map<string, any>();
 
-            // 1. From activeSongSkills
-            (activeSongSkills || []).forEach(skill => {
-              if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
-                const title = skill.songs?.title || skill.title || skill.song_title;
-                const artist = skill.songs?.artist || skill.artist || 'Unbekannt';
-                if (title) {
-                  const key = title.toLowerCase().trim();
-                  const skillAudio = (skill as any)?.audio_url || (skill as any)?.recording_url || resolveMasteredSongAudio(skill.id, title, key);
-                  masteredSongsMap.set(key, {
-                    title,
-                    artist,
-                    instrument: skill.instrument || student?.instrument || 'Campus',
-                    id: skill.id,
-                    audioUrl: skillAudio,
-                    masteredDate: skill.updated_at || skill.created_at
-                  });
-                }
-              }
-            });
-
-            // 2. From progressItems
+            // 🛡️ Bounded Context Isolation (Axiom 1):
+            // Campus-Meisterwerke speisen sich ausschließlich aus der didaktischen Campus-Tabelle progress_matrix (progressItems).
+            // GrooveLab-Band-Skills (user_song_skills / is_stage_ready) bleiben hermetisch im GrooveLab isoliert.
             (progressItems || []).forEach((item: any) => {
               const rawTopic = (item.topic_name || item.title || '').trim();
               if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase() === 'test' || rawTopic.toLowerCase() === 'test - test' || rawTopic.toLowerCase() === 'test-test') return;

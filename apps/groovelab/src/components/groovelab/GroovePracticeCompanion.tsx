@@ -22,6 +22,7 @@ import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard
 import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
 import { FocusAbortedModal } from '../focus/FocusAbortedModal';
 import { extractWaveformPeaks } from '../../utils/waveformHelper';
+import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 
 // Helper to decode Base64 WAV into AudioBuffer with true header sample rate
 const decodeBase64Wav = (ctx: AudioContext | BaseAudioContext, b64Uri: string): AudioBuffer => {
@@ -813,7 +814,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         setTimeout(() => {
           try {
             chamberOscRef.current?.stop();
-            chamberCtxRef.current?.close();
+            chamberOscRef.current?.disconnect();
+            chamberGainRef.current?.disconnect();
           } catch {}
           chamberOscRef.current = null;
           chamberGainRef.current = null;
@@ -831,7 +833,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     }
     stopChamberPitch();
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = SharedAudioEngine.getContext();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
@@ -3050,7 +3052,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         onClick={() => {
                           setClickPresence(p.id as 'soft' | 'standard' | 'punchy');
                           try {
-                            const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+                            const ctx = audioCtxRef.current || SharedAudioEngine.getContext();
                             ctx.resume().then(() => {
                               playKlopfgeistClick(
                                 ctx,

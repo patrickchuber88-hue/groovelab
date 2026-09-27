@@ -52,9 +52,8 @@ import { MeisterwerkLogbuchTab } from './student/meisterwerk/MeisterwerkLogbuchT
 import { MeisterwerkStickerAlbumTab } from './student/meisterwerk/MeisterwerkStickerAlbumTab';
 import { MeisterwerkSkillRadarTab } from './student/meisterwerk/MeisterwerkSkillRadarTab';
 import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
-import { WorldTourMapSpread } from './student/meisterwerk/worldtour/WorldTourMapSpread';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
-import { resolveCampusStudentAvatar } from './student/studentAvatars.constants';
+import { resolveCampusStudentAvatar, getEffectiveInstrument } from '../utils/avatarResolutionEngine';
 import { formatTeacherFullName, copyTextToClipboard, capitalizeFirstLetter, formatSongTitleCase } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { getSimulatedNow, CANONICAL_LEHRWERK_COLOR, getLehrwerkColor as getLehrwerkColorUtil, getSongColor } from './student/studentDateUtils';
@@ -73,6 +72,7 @@ const GrooveLoopstation = lazy(() => import('./groovelab/GrooveLoopstation').the
 const CampusTuner = lazy(() => import('./campus/CampusTuner').then(m => ({ default: m.CampusTuner })));
 const EarLabStudioModal = lazy(() => import('./campus/EarLabStudioModal').then(m => ({ default: m.EarLabStudioModal })));
 const AudioBiographyView = lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
+const WorldTourMapSpread = lazy(() => import('./student/meisterwerk/worldtour/WorldTourMapSpread').then(m => ({ default: m.WorldTourMapSpread })));
 
 // 100% Backward Compatible Re-Exports
 export type {
@@ -3151,27 +3151,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             padding: 0,
             overflow: 'hidden'
           }}>
-            <WorldTourMapSpread
-              studentId={student?.id}
-              studentName={displayedStudentName}
-              studentInstrument={(student as any)?.instrument || (student as any)?.resolved_instrument || 'Klavier'}
-              uiLevel={uiLevel}
-              isMobileView={isMobileOrSim}
-              onMasteryAchieved={async (stars, score, xp, countryCode) => {
-                if (stars >= 1) {
-                  handleImproveSkill('klang');
-                  const scoreTag = `WORLDTOUR_MASTERY:${countryCode}|${stars}STARS|${score}%|+${xp}XP`;
-                  const currentList = Array.isArray(homeworkNotesList) ? [...homeworkNotesList] : [];
-                  const filtered = currentList.filter((n: unknown) => typeof n !== 'string' || !n.startsWith(`WORLDTOUR_MASTERY:${countryCode}`));
-                  const updatedList = [...filtered, scoreTag];
-                  setHomeworkNotesList(updatedList);
-                  try {
-                    await syncHomeworkNotes(updatedList);
-                  } catch (_) {}
-                  notifyHomeworkChange?.();
-                }
-              }}
-            />
+            <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade World Tour...</div>}>
+              <WorldTourMapSpread
+                studentId={student?.id}
+                studentName={displayedStudentName}
+                studentInstrument={getEffectiveInstrument(student) || (student as any)?.instrument || (student as any)?.resolved_instrument || 'Gitarre'}
+                studentAvatarUrl={resolveCampusStudentAvatar(student)}
+                uiLevel={uiLevel}
+                isMobileView={isMobileOrSim}
+                onMasteryAchieved={async (stars, score, xp, countryCode) => {
+                  if (stars >= 1) {
+                    handleImproveSkill('klang');
+                    const scoreTag = `WORLDTOUR_MASTERY:${countryCode}|${stars}STARS|${score}%|+${xp}XP`;
+                    const currentList = Array.isArray(homeworkNotesList) ? [...homeworkNotesList] : [];
+                    const filtered = currentList.filter((n: unknown) => typeof n !== 'string' || !n.startsWith(`WORLDTOUR_MASTERY:${countryCode}`));
+                    const updatedList = [...filtered, scoreTag];
+                    setHomeworkNotesList(updatedList);
+                    try {
+                      await syncHomeworkNotes(updatedList);
+                    } catch (_) {}
+                    notifyHomeworkChange?.();
+                  }
+                }}
+              />
+            </Suspense>
           </div>
         ) : activeViewMode === 'recordings' ? (
           <div style={{

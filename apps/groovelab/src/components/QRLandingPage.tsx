@@ -586,6 +586,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }, 4000);
   };
 
+  // 🛡️ Enterprise+ Authoritative RPC Helper für Eltern-Einstellungen
+  const saveParentSettingsViaRpc = async (studentId: string, settings: Record<string, any>, pin?: string) => {
+    const activeLease = typeof window !== 'undefined'
+      ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
+      : null;
+    const payload: Record<string, any> = {
+      ...settings,
+      ...(activeLease ? { lease_token: activeLease } : {}),
+      ...(pin ? { parent_pin: pin } : {})
+    };
+    return await supabase.rpc('save_parent_controls', {
+      p_student_id: studentId,
+      p_settings: payload
+    });
+  };
+
   // PWA Installation states
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [isInstallDismissed, setIsInstallDismissed] = useState<boolean>(() => {
@@ -7916,22 +7932,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           try {
                             const isOk = await verifyParentPinClient(profile.id, nextVal.trim(), profile.parent_pin);
                             if (isOk) {
-                              // Persist to Supabase
-                              await supabase.from('users').update({
+                              // Persist via authoritative save_parent_controls RPC
+                              const { error: rpcErr } = await saveParentSettingsViaRpc(profile.id, {
                                 campus_ui_level: effectiveUiLevel,
-                                app_usage_mode: effectiveUiLevel === 'junior' ? 'student_only' : (effectiveUiLevel === 'teen' ? 'teen' : 'adult'),
                                 parent_allow_absences: effectiveAllowAbsences,
                                 parent_allow_chat: effectiveAllowChat,
                                 parent_allow_leaderboard: effectiveAllowLeaderboard
-                              }).eq('id', profile.id);
-                              try {
-                                await supabase.from('students').update({
-                                  campus_ui_level: effectiveUiLevel,
-                                  parent_allow_absences: effectiveAllowAbsences,
-                                  parent_allow_chat: effectiveAllowChat,
-                                  parent_allow_leaderboard: effectiveAllowLeaderboard
-                                }).eq('id', profile.id);
-                              } catch(e) {}
+                              }, nextVal.trim());
+
+                              if (rpcErr) {
+                                setSavePinError(rpcErr.message || 'Speichern der Eltern-Einstellungen fehlgeschlagen.');
+                                setSavePinLoading(false);
+                                return;
+                              }
 
                               // Save local states
                               localStorage.setItem('campus_student_ui_level', effectiveUiLevel);
@@ -11467,7 +11480,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           checked={profile.parent_allow_chat !== undefined && profile.parent_allow_chat !== null ? Boolean(profile.parent_allow_chat) : (profile.campus_ui_level !== 'junior')}
                           onChange={async (e) => {
                             const checked = e.target.checked;
-                            const { error } = await supabase.from('users').update({ parent_allow_chat: checked }).eq('id', profile.id);
+                            const { error } = await saveParentSettingsViaRpc(profile.id, { parent_allow_chat: checked });
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_chat: checked } : null);
                           }}
                           style={{ accentColor: '#34a853' }}
@@ -11483,7 +11496,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           checked={profile.parent_allow_timer !== false}
                           onChange={async (e) => {
                             const checked = e.target.checked;
-                            const { error } = await supabase.from('users').update({ parent_allow_timer: checked }).eq('id', profile.id);
+                            const { error } = await saveParentSettingsViaRpc(profile.id, { parent_allow_timer: checked });
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_timer: checked } : null);
                           }}
                           style={{ accentColor: '#34a853' }}
@@ -11499,7 +11512,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           checked={Boolean(profile.parent_allow_leaderboard)}
                           onChange={async (e) => {
                             const checked = e.target.checked;
-                            const { error } = await supabase.from('users').update({ parent_allow_leaderboard: checked }).eq('id', profile.id);
+                            const { error } = await saveParentSettingsViaRpc(profile.id, { parent_allow_leaderboard: checked });
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_leaderboard: checked } : null);
                           }}
                           style={{ accentColor: '#34a853' }}
@@ -11515,7 +11528,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           checked={Boolean(profile.parent_allow_groups)}
                           onChange={async (e) => {
                             const checked = e.target.checked;
-                            const { error } = await supabase.from('users').update({ parent_allow_groups: checked }).eq('id', profile.id);
+                            const { error } = await saveParentSettingsViaRpc(profile.id, { parent_allow_groups: checked });
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_groups: checked } : null);
                           }}
                           style={{ accentColor: '#34a853' }}
@@ -11531,7 +11544,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           checked={profile.parent_allow_proposals ?? true}
                           onChange={async (e) => {
                             const checked = e.target.checked;
-                            const { error } = await supabase.from('users').update({ parent_allow_proposals: checked }).eq('id', profile.id);
+                            const { error } = await saveParentSettingsViaRpc(profile.id, { parent_allow_proposals: checked });
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_proposals: checked } : null);
                           }}
                           style={{ accentColor: '#34a853' }}

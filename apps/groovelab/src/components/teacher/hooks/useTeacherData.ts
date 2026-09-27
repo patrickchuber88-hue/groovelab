@@ -100,6 +100,8 @@ export function useTeacherData({
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [teacherDunningStatus, setTeacherDunningStatus] = useState<SchoolDunningStatus | null>(null);
   const initialSchoolId = teacher?.school_id || 
+    initialTeacher?.school_id ||
+    session?.users?.school_id ||
     (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '');
 
   const [rooms, setRooms] = useState<any[]>(() => {
@@ -173,7 +175,16 @@ export function useTeacherData({
       }
     }
   }, [session, initialSchoolId]);
-  const [isSyncing, setIsSyncing] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(() => {
+    if (initialSchoolId) {
+      const cachedRooms = getCachedRoomsSync(initialSchoolId, activePlatform);
+      const cachedStations = getCachedStationsSync(initialSchoolId);
+      if (cachedRooms && cachedRooms.length > 0 && cachedStations && cachedStations.length > 0) {
+        return false;
+      }
+    }
+    return true;
+  });
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [unreadShouts, setUnreadShouts] = useState<any[]>([]);
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
@@ -187,6 +198,11 @@ export function useTeacherData({
     return false;
   });
 
+  const selectedRoomIdRef = useRef(selectedRoomId);
+  useEffect(() => {
+    selectedRoomIdRef.current = selectedRoomId;
+  }, [selectedRoomId]);
+
   const isFetchingRef = useRef<Promise<void> | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -197,11 +213,34 @@ export function useTeacherData({
 
     const runFetch = async () => {
       setFetchError(null);
-      setIsSyncing(true);
+      // Only show syncing sweep if we don't already have rooms and stations in memory (prevent flicker)
+      setIsSyncing(prev => (rooms.length > 0 && stations.length > 0) ? false : true);
 
       const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
       const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '';
       const ghostSchoolName = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule') : 'Musikschule';
+
+      // ⚡ 0,1% Goldstandard: Waterfall-Bruch - Early School ID aus bekannten Props/Memory ableiten
+      const earlySchoolId = ghostSchoolId || initialSchoolId || teacher?.school_id || session?.users?.school_id || (Array.isArray(teacher?.schools) ? teacher?.schools[0]?.id : teacher?.schools?.id);
+
+      // 🚀 Stage 1 Pipeline (Fast Path ~50ms): Core Layout, Stations, Sessions & Staff
+      // Säule 1: SWR Cache-First (force=false auf fetchActiveSessions)
+      const stage1Query = (targetSchoolId: string) => Promise.all([
+        fetchRoomsBySchool(targetSchoolId, false, activePlatform).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+        fetchActiveSessions(targetSchoolId, false).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+        fetchSchoolStaff(targetSchoolId).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+        fetchStationsBySchool(targetSchoolId, false).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+        supabase
+          .from('help_requests')
+          .select('*, users(*)')
+          .eq('school_id', targetSchoolId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e }))
+      ]);
+
+      // ⚡ Parallel ab Millisekunde 0 starten, statt auf die users-Query zu warten!
+      const earlyStage1Promise = earlySchoolId ? stage1Query(earlySchoolId) : null;
 
       try {
         let bIds: string[] = [];
@@ -303,7 +342,7 @@ export function useTeacherData({
           setSchoolData(sd);
           setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
 
-          if (!isStudent) {
+          if (!isStudent && activeTab !== 'live') {
             supabase
               .from('invoices')
               .select('id, type, amount, status, billing_date, due_date, items')
@@ -328,29 +367,21 @@ export function useTeacherData({
           }
 
           // 🚀 Stage 1 (Fast Path ~50ms): Core Layout, Stations, Sessions & Staff (Unblocks Live Lab immediately)
+          // ⚡ 0,1% Goldstandard Waterfall-Bruch: Nutzt das bereits parallel ab Millisekunde 0 laufende earlyStage1Promise
           const [
             rRes,
             sessRes,
             coachesRes,
             stationsRes,
             helpRes
-          ] = await Promise.all([
-            fetchRoomsBySchool(tData.school_id, false, activePlatform).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            fetchActiveSessions(tData.school_id, true).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            fetchSchoolStaff(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            fetchStationsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            supabase
-              .from('help_requests')
-              .select('*, users(*)')
-              .eq('school_id', tData.school_id)
-              .eq('status', 'pending')
-              .order('created_at', { ascending: false })
-              .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e }))
-          ]);
+          ] = (earlyStage1Promise && earlySchoolId === tData.school_id)
+            ? await earlyStage1Promise
+            : await stage1Query(tData.school_id);
 
-          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Non-blocking, skipped for students)
+          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Skipped for students or live lab)
+          const shouldLoadStage2 = !isStudent && activeTab !== 'live';
           Promise.all([
-            !isStudent
+            shouldLoadStage2
               ? supabase
                   .from('bands')
                   .select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
@@ -359,7 +390,7 @@ export function useTeacherData({
                   .order('name')
                   .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e }))
               : Promise.resolve({ data: [], error: null }),
-            !isStudent
+            shouldLoadStage2
               ? fetchCrisisNotifications(tData.is_ghost_mode ? tData.school_id : userId, tData.is_ghost_mode).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
               : Promise.resolve({ data: [], error: null })
           ]).then(([bandsRes, crisisRes]) => {
@@ -383,15 +414,17 @@ export function useTeacherData({
             effectiveRooms = rRes.data || [];
           }
 
-          setRooms(prev => areArraysEqualFast(prev, effectiveRooms) ? prev : effectiveRooms);
+          if (effectiveRooms.length > 0) {
+            setRooms(prev => areArraysEqualFast(prev, effectiveRooms) ? prev : effectiveRooms);
+          }
 
           const stationsList: any[] = stationsRes.data || [];
-          if (stationsRes.data) {
+          if (stationsRes.data && stationsRes.data.length > 0) {
             setStations(prev => areArraysEqualFast(prev, stationsRes.data) ? prev : stationsRes.data);
           }
 
           if (effectiveRooms.length > 0) {
-            let chosenRoomId = selectedRoomId;
+            let chosenRoomId = selectedRoomIdRef.current;
             const currentHasStations = chosenRoomId && stationsList.some((s: any) => s.room_id === chosenRoomId);
 
             if (!chosenRoomId || !effectiveRooms.some((r: any) => r.id === chosenRoomId) || (!currentHasStations && stationsList.length > 0)) {
@@ -407,7 +440,7 @@ export function useTeacherData({
                 }
               }
             }
-            if (chosenRoomId && chosenRoomId !== selectedRoomId) {
+            if (chosenRoomId && chosenRoomId !== selectedRoomIdRef.current) {
               setSelectedRoomId(chosenRoomId);
             }
           }
@@ -472,7 +505,7 @@ export function useTeacherData({
 
     isFetchingRef.current = runFetch();
     return isFetchingRef.current;
-  }, [userId, initialTeacher, activePlatform, selectedRoomId]);
+  }, [userId, initialTeacher, activePlatform, activeTab, viewMode]);
 
   useEffect(() => {
     fetchData();
@@ -489,9 +522,42 @@ export function useTeacherData({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sessions' },
-        async () => {
+        async (payload: any) => {
           // Immediately invalidate the SWR cache so stale data is never served
           invalidateActiveSessionsCache(effectiveSchoolId);
+
+          const eventType = payload?.eventType;
+          const newRow = payload?.new;
+          const oldRow = payload?.old;
+
+          // ⚡ Säule 4: 0ms Instant Delta-Patching (Frame-1 local state update)
+          if (eventType === 'DELETE' && oldRow?.id) {
+            setActiveSessions(prev => prev.filter(s => s && s.id !== oldRow.id));
+            return;
+          }
+
+          if ((eventType === 'UPDATE' || eventType === 'INSERT') && newRow?.id) {
+            if (newRow.check_out_time) {
+              setActiveSessions(prev => prev.filter(s => s && s.id !== newRow.id));
+              // ⚡ 0,1% Goldstandard: Multi-Device Remote-Checkout Event
+              if (newRow.user_id === userId) {
+                window.dispatchEvent(new CustomEvent('groovelab_remote_checkout', { detail: { sessionId: newRow.id } }));
+              }
+              return;
+            }
+
+            setActiveSessions(prev => {
+              const existingIdx = prev.findIndex(s => s && s.id === newRow.id);
+              if (existingIdx !== -1) {
+                const next = [...prev];
+                next[existingIdx] = { ...next[existingIdx], ...newRow };
+                return next;
+              }
+              return [newRow, ...prev];
+            });
+          }
+
+          // Background reconciliation for deep relational joins (users, stations)
           try {
             const freshSessions = await fetchActiveSessions(effectiveSchoolId, true);
             if (Array.isArray(freshSessions)) {
@@ -507,7 +573,7 @@ export function useTeacherData({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [schoolData?.id, teacher?.school_id, initialSchoolId]);
+  }, [schoolData?.id, teacher?.school_id, initialSchoolId, userId]);
 
   return {
     teacher,

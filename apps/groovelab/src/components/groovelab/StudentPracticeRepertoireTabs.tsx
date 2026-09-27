@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useState, useEffect, useRef, useMemo } from 'rea
 import { Award, Search, Check, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor as defaultBrandColor } from '../../constants/instruments';
+import { normalizeInstrument } from '../../utils/instruments';
 
 const GroupedSongCard = lazy(() => import('../GroupedSongCard').then(m => ({ default: m.GroupedSongCard })));
 
@@ -31,6 +32,7 @@ export interface StudentPracticeRepertoireTabsProps {
   handleSubmitForApproval: (skillId: string) => Promise<void> | void;
   handleDeleteSong: (skillId: string) => Promise<void> | void;
   onOpenPdfViewer: (song: any, folderUrl: string) => void;
+  onTabChange?: (tab: string) => void;
   isMobile: boolean;
 }
 
@@ -61,6 +63,7 @@ export function StudentPracticeRepertoireTabs({
   handleSubmitForApproval,
   handleDeleteSong,
   onOpenPdfViewer,
+  onTabChange,
   isMobile
 }: StudentPracticeRepertoireTabsProps) {
   const activeBrandColor = brandColor || defaultBrandColor;
@@ -105,14 +108,57 @@ export function StudentPracticeRepertoireTabs({
     return () => observer.disconnect();
   }, [groupedPracticeSongs.length]);
 
+  // 0,1% Goldstandard 1-Tap Repertoire Instrument Filter State
+  const [repertoireInstrumentFilter, setRepertoireInstrumentFilter] = useState<'all' | 'E-Gitarre' | 'E-Drums' | 'E-Piano' | 'E-Bass' | 'Vocals'>('all');
+
+  const repertoireCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: (groupedRepertoireSongs || []).length,
+      'E-Gitarre': 0,
+      'E-Drums': 0,
+      'E-Piano': 0,
+      'E-Bass': 0,
+      'Vocals': 0,
+    };
+
+    (groupedRepertoireSongs || []).forEach((group: any) => {
+      const masteredInsts = new Set<string>();
+      (group.skills || []).forEach((s: any) => {
+        const norm = normalizeInstrument(s.instrument);
+        if (counts[norm] !== undefined) {
+          masteredInsts.add(norm);
+        }
+      });
+      masteredInsts.forEach(norm => {
+        counts[norm] = (counts[norm] || 0) + 1;
+      });
+    });
+
+    return counts;
+  }, [groupedRepertoireSongs]);
+
+  const filteredRepertoireSongs = useMemo(() => {
+    if (repertoireInstrumentFilter === 'all') {
+      return groupedRepertoireSongs || [];
+    }
+    return (groupedRepertoireSongs || []).filter((group: any) => {
+      return (group.skills || []).some((s: any) => normalizeInstrument(s.instrument) === repertoireInstrumentFilter);
+    });
+  }, [groupedRepertoireSongs, repertoireInstrumentFilter]);
+
+  // Reset pagination window on repertoire filter change
+  useEffect(() => {
+    setVisibleRepertoireCount(INITIAL_REPERTOIRE_BATCH);
+  }, [repertoireInstrumentFilter]);
+
   useEffect(() => {
     const sentinel = repertoireSentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
         setVisibleRepertoireCount(prev => {
-          if (prev < groupedRepertoireSongs.length) {
-            return Math.min(prev + REPERTOIRE_BATCH_STEP, groupedRepertoireSongs.length);
+          if (prev < filteredRepertoireSongs.length) {
+            return Math.min(prev + REPERTOIRE_BATCH_STEP, filteredRepertoireSongs.length);
           }
           return prev;
         });
@@ -121,15 +167,15 @@ export function StudentPracticeRepertoireTabs({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [groupedRepertoireSongs.length]);
+  }, [filteredRepertoireSongs.length]);
 
   const displayedPracticeSongs = useMemo(() => {
     return groupedPracticeSongs.slice(0, visiblePracticeCount);
   }, [groupedPracticeSongs, visiblePracticeCount]);
 
   const displayedRepertoireSongs = useMemo(() => {
-    return groupedRepertoireSongs.slice(0, visibleRepertoireCount);
-  }, [groupedRepertoireSongs, visibleRepertoireCount]);
+    return filteredRepertoireSongs.slice(0, visibleRepertoireCount);
+  }, [filteredRepertoireSongs, visibleRepertoireCount]);
 
   if (activeStudentTab === 'practice') {
     return (
@@ -350,12 +396,80 @@ export function StudentPracticeRepertoireTabs({
       <ErrorBoundary>
         <section className="exercises-section animation-slide-up" style={{ padding: isMobile ? '12px' : '24px' }}>
           <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-            <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
+            <div style={{ marginBottom: isMobile ? '16px' : '24px' }}>
               <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                 <div style={{ color: '#34a853' }}><Award size={isMobile ? 22 : 32} /></div>
                 Dein Repertoire
               </h2>
               {!isMobile && <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Hier sind deine Meisterleistungen. Du hast diese Songs zu 100% gemeistert!</p>}
+            </div>
+
+            {/* 0,1% Goldstandard 1-Tap Instrument Filterdock */}
+            <div 
+              className="hide-scrollbar"
+              style={{ 
+                display: 'flex', 
+                gap: '8px', 
+                overflowX: 'auto', 
+                scrollbarWidth: 'none', 
+                WebkitOverflowScrolling: 'touch', 
+                marginBottom: isMobile ? '20px' : '28px',
+                paddingBottom: '4px'
+              }}
+              role="tablist"
+              aria-label="Repertoire nach Instrument filtern"
+            >
+              {[
+                { id: 'all', label: 'ALLE', icon: '🏆', count: repertoireCounts.all },
+                { id: 'E-Gitarre', label: 'GITARRE', icon: '🎸', count: repertoireCounts['E-Gitarre'] },
+                { id: 'E-Drums', label: 'DRUMS', icon: '🥁', count: repertoireCounts['E-Drums'] },
+                { id: 'E-Piano', label: 'PIANO', icon: '🎹', count: repertoireCounts['E-Piano'] },
+                { id: 'E-Bass', label: 'BASS', icon: '🎸', count: repertoireCounts['E-Bass'] },
+                { id: 'Vocals', label: 'GESANG', icon: '🎤', count: repertoireCounts['Vocals'] },
+              ].map(tab => {
+                const isActive = repertoireInstrumentFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setRepertoireInstrumentFilter(tab.id as any)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: isMobile ? '8px 14px' : '10px 18px',
+                      borderRadius: '12px',
+                      border: isActive ? '1.5px solid #1e293b' : '1px solid #e2e8f0',
+                      background: isActive ? '#1e293b' : '#f8fafc',
+                      color: isActive ? '#ffffff' : (tab.count > 0 ? '#1e293b' : '#94a3b8'),
+                      fontWeight: 800,
+                      fontSize: isMobile ? '0.78rem' : '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.12)' : 'none',
+                      transition: 'all 0.2s',
+                      minHeight: '44px',
+                      touchAction: 'manipulation',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                  >
+                    <span style={{ fontSize: '1.05rem' }}>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                    <span style={{
+                      background: isActive ? 'rgba(255,255,255,0.2)' : (tab.count > 0 ? '#e2e8f0' : '#f1f5f9'),
+                      color: isActive ? '#ffffff' : (tab.count > 0 ? '#475569' : '#cbd5e1'),
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 900
+                    }}>
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="exercises-grid">
@@ -364,6 +478,44 @@ export function StudentPracticeRepertoireTabs({
                 <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>🏆</div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px' }}>Noch keine Meilensteine</h3>
                 <p style={{ fontSize: '1rem', lineHeight: 1.6, maxWidth: '400px', margin: '0 auto' }}>Übe weiter! Sobald ein Song auf 100% ist, landet er hier in deiner Hall of Fame.</p>
+              </div>
+            ) : filteredRepertoireSongs.length === 0 ? (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: isMobile ? '40px 20px' : '60px 40px', background: 'white', borderRadius: '24px', color: '#64748b', border: '2px dashed #e2e8f0' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '16px' }}>
+                  {repertoireInstrumentFilter === 'E-Drums' ? '🥁' : repertoireInstrumentFilter === 'E-Piano' ? '🎹' : repertoireInstrumentFilter === 'E-Bass' ? '🎸' : repertoireInstrumentFilter === 'Vocals' ? '🎤' : '🎸'}
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>
+                  Noch kein Meilenstein auf {repertoireInstrumentFilter === 'Vocals' ? 'dem Gesang' : `den ${repertoireInstrumentFilter === 'E-Drums' ? 'E-Drums' : repertoireInstrumentFilter === 'E-Piano' ? 'E-Pianos' : repertoireInstrumentFilter === 'E-Bass' ? 'E-Bässen' : 'E-Gitarren'}`}
+                </h3>
+                <p style={{ fontSize: '0.9rem', color: '#64748b', maxWidth: '420px', margin: '0 auto 20px auto', lineHeight: 1.5 }}>
+                  Möchtest du dein {repertoireInstrumentFilter}-Repertoire eröffnen? Übe Songs im Üben-Board und meistere diesen Part!
+                </p>
+                {onTabChange && (
+                  <button
+                    type="button"
+                    onClick={() => onTabChange('practice')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '12px 24px',
+                      borderRadius: '14px',
+                      border: 'none',
+                      background: '#34a853',
+                      color: 'white',
+                      fontWeight: 900,
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                      transition: 'all 0.2s',
+                      minHeight: '44px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <span>Jetzt im Üben-Board starten</span>
+                    <span style={{ fontSize: '1.1rem' }}>➔</span>
+                  </button>
+                )}
               </div>
             ) : (
               displayedRepertoireSongs.map((group: any) => (
@@ -379,11 +531,31 @@ export function StudentPracticeRepertoireTabs({
                   </div>
                   
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                    {group.skills.map((s: any) => (
-                      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
-                        {APP_INSTRUMENT_ICONS[s.instrument as keyof typeof APP_INSTRUMENT_ICONS]} {s.instrument}
-                      </div>
-                    ))}
+                    {group.skills.map((s: any) => {
+                      const isHighlighted = repertoireInstrumentFilter !== 'all' && normalizeInstrument(s.instrument) === repertoireInstrumentFilter;
+                      return (
+                        <div 
+                          key={s.id} 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px', 
+                            background: isHighlighted ? '#e6f4ea' : '#f8fafc', 
+                            border: isHighlighted ? '1.5px solid #34a853' : '1px solid transparent',
+                            padding: '2px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: isHighlighted ? 900 : 700, 
+                            color: isHighlighted ? '#137333' : '#64748b',
+                            boxShadow: isHighlighted ? '0 2px 8px rgba(52, 168, 83, 0.15)' : 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {APP_INSTRUMENT_ICONS[s.instrument as keyof typeof APP_INSTRUMENT_ICONS] || '🎸'} {s.instrument}
+                          {isHighlighted && <Check size={11} color="#137333" strokeWidth={3} style={{ marginLeft: '2px' }} />}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div style={{ background: '#34a853', height: '3px', borderRadius: '2px', width: '100%', marginBottom: isMobile ? '4px' : '6px' }}></div>
@@ -412,13 +584,13 @@ export function StudentPracticeRepertoireTabs({
           </div>
 
           {/* Progressive DOM Batch Sentinel & Accessible Fallback Button for Repertoire (PERF-02) */}
-          {visibleRepertoireCount < groupedRepertoireSongs.length && (
+          {visibleRepertoireCount < filteredRepertoireSongs.length && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '24px', gap: '8px' }}>
               <div ref={repertoireSentinelRef} style={{ height: '10px', width: '100%', pointerEvents: 'none' }} aria-hidden="true" />
               <button
                 type="button"
-                onClick={() => setVisibleRepertoireCount(prev => Math.min(prev + REPERTOIRE_BATCH_STEP, groupedRepertoireSongs.length))}
-                aria-label={`Weitere Repertoire-Songs laden. Aktuell ${displayedRepertoireSongs.length} von ${groupedRepertoireSongs.length} Songs angezeigt.`}
+                onClick={() => setVisibleRepertoireCount(prev => Math.min(prev + REPERTOIRE_BATCH_STEP, filteredRepertoireSongs.length))}
+                aria-label={`Weitere Repertoire-Songs laden. Aktuell ${displayedRepertoireSongs.length} von ${filteredRepertoireSongs.length} Songs angezeigt.`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -439,7 +611,7 @@ export function StudentPracticeRepertoireTabs({
                 }}
               >
                 <ChevronDown size={18} color="#34a853" />
-                <span>Weitere Songs laden ({displayedRepertoireSongs.length} von {groupedRepertoireSongs.length})</span>
+                <span>Weitere Songs laden ({displayedRepertoireSongs.length} von {filteredRepertoireSongs.length})</span>
               </button>
             </div>
           )}

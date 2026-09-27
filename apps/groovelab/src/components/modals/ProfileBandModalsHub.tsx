@@ -903,13 +903,14 @@ export const ProfileBandModalsHub: React.FC<ProfileBandModalsHubProps> = ({
                 }
                 
                 const role = (user?.role || '').toLowerCase();
+                const isStudent = role === 'student';
                 let list: any[] = STUDENT_AVATARS;
                 if (activePlatform === 'campus') {
-                  if (role !== 'student') list = CAMPUS_AVATARS;
-                } else if (role === 'teacher' || role === 'admin' || role === 'secretary' || avatarPickerType === 'teacher') {
+                  if (!isStudent) list = CAMPUS_AVATARS;
+                } else if (!isStudent && (role === 'teacher' || role === 'admin' || role === 'secretary' || avatarPickerType === 'teacher')) {
                   list = TEACHER_AVATARS;
                 }
-                if (avatarInstrumentFilter !== 'Alle' && !(role === 'teacher' || role === 'admin' || role === 'secretary' || avatarPickerType === 'teacher')) {
+                if (avatarInstrumentFilter !== 'Alle' && isStudent) {
                   list = list.filter((av: any) => av.category === avatarInstrumentFilter);
                 }
 

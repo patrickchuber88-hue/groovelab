@@ -9,6 +9,9 @@ export interface UseTeacherStudentsProps {
   teacher: any;
   schoolData: any;
   activePlatform: 'campus' | 'groovelab';
+  viewMode?: 'admin' | 'student';
+  activeTab?: string;
+  hideHeader?: boolean;
   onRefresh?: () => Promise<void> | void;
 }
 
@@ -17,6 +20,9 @@ export function useTeacherStudents({
   teacher,
   schoolData,
   activePlatform,
+  viewMode = 'admin',
+  activeTab = 'briefing',
+  hideHeader = false,
   onRefresh
 }: UseTeacherStudentsProps) {
   const [allStudents, setAllStudents] = useState<any[]>([]);
@@ -38,8 +44,9 @@ export function useTeacherStudents({
 
   // 🏛️ Authoritative Supabase Student Hydration for Teacher Dashboard
   const loadStudents = useCallback(async () => {
-    if (teacher?.role?.toLowerCase() === 'student') {
-      setAllStudents([]);
+    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
+    if (isStudent || activeTab === 'live') {
+      if (isStudent) setAllStudents([]);
       return;
     }
     const effectiveSchoolId = schoolData?.id || teacher?.school_id || (Array.isArray(teacher?.schools) ? teacher?.schools[0]?.id : teacher?.schools?.id);
@@ -81,7 +88,7 @@ export function useTeacherStudents({
     } catch (err) {
       console.error('[useTeacherStudents] Failed to load students from Supabase:', err);
     }
-  }, [schoolData?.id, teacher?.school_id, teacher?.schools, userId, teacher?.id, activePlatform]);
+  }, [schoolData?.id, teacher?.school_id, teacher?.schools, userId, teacher?.id, activePlatform, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
     loadStudents();

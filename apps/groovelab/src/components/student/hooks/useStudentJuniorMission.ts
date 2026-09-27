@@ -23,6 +23,8 @@ export interface UseStudentJuniorMissionParams {
     setShowCelebration: (show: boolean) => void;
     finishPracticeSession: (xpBonus?: number) => Promise<any>;
     fokusLogs?: any[];
+    isSessionPaused?: boolean;
+    setIsSessionPaused?: (paused: boolean) => void;
   };
   streaks: {
     avatar: any;
@@ -68,8 +70,16 @@ export function useStudentJuniorMission({
     message: string;
   } | null>(null);
   const [isJuniorTabPaused, setIsJuniorTabPaused] = useState(false);
-  const [isJuniorMissionPaused, setIsJuniorMissionPaused] = useState(false);
+  const [isJuniorMissionPaused, setIsJuniorMissionPausedState] = useState(false);
   const isJuniorMissionPausedRef = useRef(false);
+
+  const setIsJuniorMissionPaused = useCallback((paused: boolean) => {
+    setIsJuniorMissionPausedState(paused);
+    isJuniorMissionPausedRef.current = paused;
+    if (practice?.setIsSessionPaused) {
+      practice.setIsSessionPaused(paused);
+    }
+  }, [practice]);
   const [showJuniorCheatSheet, setShowJuniorCheatSheet] = useState(false);
   const [juniorMissionCountdown, setJuniorMissionCountdown] = useState<number | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});

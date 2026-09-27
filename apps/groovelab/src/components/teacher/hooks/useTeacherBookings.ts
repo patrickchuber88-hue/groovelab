@@ -21,6 +21,9 @@ export interface UseTeacherBookingsProps {
   mySubmittedProgramPoints?: any[];
   isTeacherBriefingSidebarCollapsed?: boolean;
   lastSeenFeedTime?: number;
+  viewMode?: 'admin' | 'student';
+  activeTab?: string;
+  hideHeader?: boolean;
   onTabChange?: (tab: string) => void;
 }
 
@@ -39,6 +42,9 @@ export function useTeacherBookings({
   mySubmittedProgramPoints = [],
   isTeacherBriefingSidebarCollapsed = false,
   lastSeenFeedTime = 0,
+  viewMode = 'admin',
+  activeTab = 'briefing',
+  hideHeader = false,
   onTabChange
 }: UseTeacherBookingsProps) {
   const [holidays, setHolidays] = useState<HolidayRange[]>([]);
@@ -65,7 +71,8 @@ export function useTeacherBookings({
   const [scheduleChangesTimeWindow, setScheduleChangesTimeWindow] = useState<'7days' | 'all'>('7days');
 
   const loadMyBookings = useCallback(async () => {
-    if (!userId) return;
+    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
+    if (!userId || isStudent || activeTab === 'live') return;
     try {
       let allBookings: any[] = [];
       const sId = teacher?.school_id || '';
@@ -401,7 +408,7 @@ export function useTeacherBookings({
     } catch (err) {
       console.error('Failed to load my bookings:', err);
     }
-  }, [userId, teacher, activePlatform, rooms, showRealNames]);
+  }, [userId, teacher, activePlatform, rooms, showRealNames, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
     const handleFilteredStorage = (e: StorageEvent) => {

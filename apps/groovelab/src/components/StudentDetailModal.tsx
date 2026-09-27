@@ -8,6 +8,9 @@ const AdminStudentDetailModal = React.lazy(() =>
 const TeacherStudentDetailModal = React.lazy(() =>
   import('./student/detail/TeacherStudentDetailModal').then(m => ({ default: m.TeacherStudentDetailModal }))
 );
+const GroovelabStudentDetailModal = React.lazy(() =>
+  import('./student/detail/GroovelabStudentDetailModal').then(m => ({ default: m.GroovelabStudentDetailModal }))
+);
 
 export { getFormattedScheduleDayTime };
 
@@ -28,16 +31,40 @@ export interface StudentDetailModalProps {
  * dem volljuristischen Drei-Töpfe-Prinzip (OWASP ASVS Level 3 / Fail-Closed Least-Privilege):
  * - Pädagogik (Teacher): TeacherStudentDetailModal (Unterricht, Hausaufgaben, Kompetenzen & PIN-Hilfe)
  * - Verwaltung (Admin / Secretary): AdminStudentDetailModal (Vertrag, Gebühren, FinOps & DSGVO Art. 15)
+ * - GrooveLab (Live Lab): GroovelabStudentDetailModal (Reine GrooveLab-Metriken: 5-Säulen-Radar, Songs, XP, Station)
  *
  * Invariante:
- * Befindet sich der Benutzer im Lehrer-Dashboard oder im Lehrer-Workspace (activeWorkspace === 'teacher'
- * oder callerDashboard === 'teacher'), wird ausnahmslos das pädagogische TeacherStudentDetailModal
- * gerendert – selbst wenn der Account administrative Zusatzrollen besitzt.
+ * Befindet sich der Benutzer im GrooveLab (activePlatform === 'groovelab'), wird ausnahmslos
+ * das reine GroovelabStudentDetailModal ohne Campus-Stammdaten oder Hausaufgaben geladen.
  */
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = (props) => {
   const activeWorkspace = typeof window !== 'undefined'
     ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
     : null;
+
+  // ⚡ 0,1% Goldstandard: Bounded Context GrooveLab Live Lab
+  // Zeigt im GrooveLab ausschließlich reine Fachinformationen (Skill-Radar, Songs, XP) ohne Campus-Verwaltungsdaten
+  const isGroovelabContext =
+    props.activePlatform === 'groovelab' ||
+    (!props.activePlatform && (
+      (typeof window !== 'undefined' && (
+        sessionStorage.getItem('groovelab_active_platform') === 'groovelab' ||
+        localStorage.getItem('groovelab_active_platform') === 'groovelab'
+      ))
+    ));
+
+  if (isGroovelabContext) {
+    return (
+      <React.Suspense fallback={<LiquidGlassSkeleton type="modal" />}>
+        <GroovelabStudentDetailModal 
+          student={props.student}
+          onClose={props.onClose}
+          onOpenBandProfile={props.onOpenBandProfile}
+          callerDashboard={props.callerDashboard}
+        />
+      </React.Suspense>
+    );
+  }
 
   // Strikte pädagogische Priorisierung: Im Lehrer-Kontext niemals Verwaltungsdaten exponieren
   const isTeacherContext =

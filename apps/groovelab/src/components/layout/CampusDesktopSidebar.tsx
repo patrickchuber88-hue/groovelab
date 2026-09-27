@@ -95,19 +95,18 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
             role="tablist"
             aria-label="Plattformauswahl"
             style={{
-              display: 'flex',
-              alignItems: 'center',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
               background: '#f1f5f9',
-              padding: '3px',
-              borderRadius: '11px',
+              padding: '4px',
+              borderRadius: '13px',
               border: '1px solid #e2e8f0',
               width: '100%',
-              height: '36px',
-              gap: '2px',
+              gap: '4px',
               boxSizing: 'border-box'
             }}
           >
-            {/* Campus Segment */}
+            {/* Campus Segment - 2-zeilig (Icon über Text) */}
             <button
               type="button"
               role="tab"
@@ -122,48 +121,40 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 }
               }}
               style={{
-                flex: 1,
-                height: '28px',
-                borderRadius: '8px',
+                height: '50px',
+                borderRadius: '10px',
                 border: 'none',
                 background: activePlatform === 'campus' ? '#34a853' : 'transparent',
                 color: activePlatform === 'campus' ? '#ffffff' : '#64748b',
                 fontWeight: activePlatform === 'campus' ? 800 : 650,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
-                display: 'inline-flex',
+                display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '3px',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                 boxShadow: activePlatform === 'campus' ? '0 2px 8px rgba(52, 168, 83, 0.32)' : 'none',
                 outline: 'none',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                 letterSpacing: '-0.01em',
-                userSelect: 'none'
+                userSelect: 'none',
+                touchAction: 'manipulation',
+                boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
-              title="Zu Campus Studio wechseln"
+              title="Zu Campus wechseln"
             >
               <GraduationCap 
-                size={14} 
-                color={activePlatform === 'campus' ? '#ffffff' : 'rgba(52, 168, 83, 0.70)'} 
+                size={18} 
+                color={activePlatform === 'campus' ? '#ffffff' : 'rgba(52, 168, 83, 0.85)'} 
                 strokeWidth={2.4} 
               />
               <span>Campus</span>
-              {activePlatform === 'campus' && (
-                <span style={{
-                  width: '4px',
-                  height: '4px',
-                  borderRadius: '50%',
-                  background: '#ffffff',
-                  boxShadow: '0 0 5px rgba(255, 255, 255, 0.9)',
-                  flexShrink: 0
-                }} />
-              )}
             </button>
 
-            {/* GrooveLab Segment */}
+            {/* GrooveLab Segment - 2-zeilig (Icon über Text) */}
             <button
               type="button"
               role="tab"
@@ -184,45 +175,37 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 }
               }}
               style={{
-                flex: 1,
-                height: '28px',
-                borderRadius: '8px',
+                height: '50px',
+                borderRadius: '10px',
                 border: 'none',
                 background: activePlatform === 'groovelab' ? '#facc15' : 'transparent',
                 color: activePlatform === 'groovelab' ? '#0f172a' : '#64748b',
                 fontWeight: activePlatform === 'groovelab' ? 800 : 650,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
-                display: 'inline-flex',
+                display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '3px',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                 boxShadow: activePlatform === 'groovelab' ? '0 2px 8px rgba(234, 179, 8, 0.35)' : 'none',
                 outline: 'none',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                 letterSpacing: '-0.01em',
-                userSelect: 'none'
+                userSelect: 'none',
+                touchAction: 'manipulation',
+                boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
-              title="Zu GrooveLab Studio wechseln"
+              title="Zu GrooveLab wechseln"
             >
               <Music 
-                size={13} 
-                color={activePlatform === 'groovelab' ? '#0f172a' : 'rgba(202, 138, 4, 0.75)'} 
+                size={17} 
+                color={activePlatform === 'groovelab' ? '#0f172a' : 'rgba(202, 138, 4, 0.85)'} 
                 strokeWidth={2.4} 
               />
               <span>GrooveLab</span>
-              {activePlatform === 'groovelab' && (
-                <span style={{
-                  width: '4px',
-                  height: '4px',
-                  borderRadius: '50%',
-                  background: '#0f172a',
-                  boxShadow: '0 0 5px rgba(15, 23, 42, 0.5)',
-                  flexShrink: 0
-                }} />
-              )}
             </button>
           </div>
         ) : (
@@ -284,9 +267,6 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
             const isBoardAllowedForChild = (boardId: string) => {
               if (campusStudentUiLevel === 'pro') return true;
 
-              // Mediathek (reine Metadaten, Play-Alongs & Übe-Fahrpläne) ist für alle Altersstufen immer aktiv
-              if (boardId === 'mediathek') return true;
-
               // Local override if parent configured it
               if (typeof window !== 'undefined') {
                 const override = localStorage.getItem(`campus_board_override_${boardId}`);
@@ -295,7 +275,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               }
 
               if (campusStudentUiLevel === 'junior') {
-                const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'mediathek', 'events', 'settings'];
+                const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
                 return juniorAllowed.includes(boardId);
               }
               return true;
@@ -410,17 +390,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                     {renderParentStatusPill('practice_board')}
                   </button>
                 )}
-                {(parentUnlocked || isBoardAllowedForChild('mediathek')) && (
-                  <button 
-                    type="button"
-                    onClick={() => setActiveStudentTab('mediathek')} 
-                    className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}
-                    style={{ opacity: parentUnlocked && !isBoardAllowedForChild('mediathek') ? 0.72 : 1 }}
-                  >
-                    <Library size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Mediathek</span>
-                    {renderParentStatusPill('mediathek')}
-                  </button>
-                )}
+
                 {(parentUnlocked || isBoardAllowedForChild('events')) && (
                   <button 
                     type="button"
@@ -467,15 +437,32 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   onClick={() => setActiveStudentTab('settings')} 
                   className={`sidebar-item ${activeStudentTab === 'settings' ? `active ${activePlatform}` : ''}`}
                 >
-                  {(campusStudentUiLevel === 'junior' || campusStudentUiLevel === 'teen') && !parentUnlocked ? (
-                    <>
-                      <ShieldCheck size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Elternbereich</span>
-                    </>
-                  ) : (
-                    <>
-                      <Settings size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Einstellungen</span>
-                    </>
-                  )}
+                  {(() => {
+                    const isAdult = Boolean(
+                      user?.is_adult === true || (() => {
+                        const rawBd = (user as any)?.birthdate || (user as any)?.birth_date;
+                        if (!rawBd) return false;
+                        const bd = new Date(rawBd);
+                        if (isNaN(bd.getTime())) return false;
+                        const age = Math.abs(new Date(Date.now() - bd.getTime()).getUTCFullYear() - 1970);
+                        return age >= 18;
+                      })()
+                    );
+                    const isMinor = user?.role === 'student' && !isAdult;
+
+                    if (isMinor && !parentUnlocked) {
+                      return (
+                        <>
+                          <ShieldCheck size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Elternbereich</span>
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        <Settings size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isMinor ? 'Einstellungen' : 'Mein Account'}</span>
+                      </>
+                    );
+                  })()}
                 </button>
               </>
             );
@@ -807,12 +794,12 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               boxShadow: '0 4px 12px rgba(0,0,0,0.06)' 
             }}>
               <StudioAvatar 
-                src={user.photo_url} 
+                src={user.avatar_url || user.photo_url} 
                 user={{
                   ...user,
                   role: (activeWorkspace === 'teacher' || user.role === 'teacher') ? 'teacher' : user.role,
                   isTeacherContext: (activeWorkspace === 'teacher' || user.role === 'teacher'),
-                  resolved_instrument: user.resolved_instrument || user.instrument || (teachers.find(t => t.id === user.teacher_id)?.instrument) || (teachers[0]?.instrument) || 'Gitarre'
+                  resolved_instrument: user.resolved_instrument || user.instrument || (teachers.find(t => t.id === user.teacher_id)?.instrument) || 'Gitarre'
                 }} 
                 activePlatform={activePlatform} 
                 onClick={() => setActiveStudentTab('profile')} 

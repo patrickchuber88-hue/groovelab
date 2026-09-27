@@ -10,7 +10,7 @@ import {
   ChevronUp, 
   Search 
 } from 'lucide-react';
-import { StudioAvatar, renderBandAvatar } from '../StudioAvatar';
+import { StudioAvatar, renderBandAvatar, getDefaultMusicianAvatarUrl } from '../StudioAvatar';
 import { normalizeInstrument, renderInstrumentIcon } from '../../utils/instruments';
 import { APP_INSTRUMENT_ICONS, brandColor as defaultBrandColor } from '../../constants/instruments';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
@@ -250,7 +250,7 @@ export function StudentBandMatchingSuite({
                                 const bMine = (b.members || []).some((m: any) => m.user_id === user?.id);
                                 if (aMine && !bMine) return -1;
                                 if (!aMine && bMine) return 1;
-                                return 0;
+                                return (a.formation_index || 0) - (b.formation_index || 0);
                               });
                               
                               return (
@@ -300,7 +300,12 @@ export function StudentBandMatchingSuite({
 
                                     const isGuestSearch = !!form.originBand;
                                     const isProposal = form.status === 'proposal';
-                                    const mySkill = userSongs.find(us => {
+                                    const mySlotInstLabel = mySlot?.instrument 
+                                      ? normalizeInstrument(mySlot.instrument).replace(/^E-/, '').toUpperCase() 
+                                      : '';
+                                    const formBandNumber = form.formation_index || (fIndex + 1);
+
+                                    const matchingUserSkills = userSongs.filter(us => {
                                       if (us.song_id !== song.song_id) return false;
                                       const usLevel = (us.difficulty_level || 'original').toLowerCase();
                                       const normUs = (usLevel === 'original' || usLevel === 'pro') ? 'pro' : 'starter';
@@ -308,15 +313,16 @@ export function StudentBandMatchingSuite({
                                       const normSong = (songLvl === 'original' || songLvl === 'pro') ? 'pro' : 'starter';
                                       return normUs === normSong;
                                     });
-                                    const normMyInst = mySkill ? normalizeInstrument(mySkill.instrument) : '';
-                                    const reqInstCount = mySkill ? (
-                                      Object.entries(song.instrumentation || {}).find(([k]) => normalizeInstrument(k) === normMyInst)?.[1] || 0
-                                    ) : 0;
-                                    const filledInstCount = mySkill ? (
-                                      (form.members || []).filter((m: any) => normalizeInstrument(m.instrument) === normMyInst).length
-                                    ) : 0;
-                                    const hasOpenSlotForMyInst = (reqInstCount as number) > filledInstCount;
-                                    const canJoin = mySkill && !isMySlot && hasOpenSlotForMyInst && !form.isComplete;
+
+                                    const joinableSkill = matchingUserSkills.find(skill => {
+                                      const normInst = normalizeInstrument(skill.instrument);
+                                      const reqCount = Object.entries(song.instrumentation || {}).find(([k]) => normalizeInstrument(k) === normInst)?.[1] || 0;
+                                      const filledCount = (form.members || []).filter((m: any) => normalizeInstrument(m.instrument) === normInst).length;
+                                      return (reqCount as number) > filledCount;
+                                    });
+
+                                    const mySkill = joinableSkill || matchingUserSkills[0];
+                                    const canJoin = !!joinableSkill && !isMySlot && !form.isComplete;
 
                                     return (
                                       <div key={form.id} style={{ 
@@ -344,7 +350,11 @@ export function StudentBandMatchingSuite({
                                                   ? `📢 BAND-PROJEKT (ABSTIMMUNG LÄUFT)` 
                                                   : (isGuestSearch 
                                                       ? `🎸 GASTMUSIKER-SUCHE ${isMySlot ? '(DEINE BAND)' : ''}` 
-                                                      : (isMySlot ? '✨ Deine Formation' : (form.isInitial ? '📢 Offenes Recruiting' : `Band-Slot #${fIndex + 1}`)))
+                                                      : (isMySlot 
+                                                          ? `✨ DEINE FORMATION · BAND #${formBandNumber}${mySlotInstLabel ? ` (${mySlotInstLabel})` : ''}` 
+                                                          : (form.isInitial 
+                                                              ? `📢 OFFENES RECRUITING · BAND #${formBandNumber}` 
+                                                              : `BAND-SLOT #${formBandNumber}`)))
                                                 }
                                               </span>
                                             </div>
@@ -445,13 +455,16 @@ export function StudentBandMatchingSuite({
                                                       {member ? (
                                                         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                                                           <img 
-                                                            src={member.photo_url || '/avatar_ghost.jpg'} 
+                                                            src={member.photo_url || getDefaultMusicianAvatarUrl(member.instrument || inst, 'student')} 
+                                                            onError={(e) => {
+                                                              e.currentTarget.src = getDefaultMusicianAvatarUrl(member.instrument || inst, 'student');
+                                                            }}
                                                             onClick={(e) => {
                                                               e.stopPropagation();
                                                               if (onPreviewStudent) onPreviewStudent(member);
                                                             }}
                                                             style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }} 
-                                                            alt="" 
+                                                            alt={member.first_name || 'Bandmitglied'} 
                                                           />
                                                           {member.isMastered && (
                                                             <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: '#34a853', color: 'white', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
@@ -460,7 +473,9 @@ export function StudentBandMatchingSuite({
                                                           )}
                                                         </div>
                                                       ) : (
-                                                        <div style={{ fontSize: '1.75rem', opacity: 0.35 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
+                                                        <div style={{ opacity: 0.35, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                          {renderInstrumentIcon(inst, undefined, 36)}
+                                                        </div>
                                                       )}
                                                     </div>
                                                     <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
@@ -703,7 +718,14 @@ export function StudentBandMatchingSuite({
                                 return (
                                   <div key={idx} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white', marginLeft: idx === 0 ? 0 : '-12px', overflow: 'hidden', background: m.user_id ? '#f1f5f9' : '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={`${u?.first_name || m.external_name || 'Mitglied'} (${m.instrument})`}>
                                       {m.user_id ? (
-                                        <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                        <img 
+                                          src={u?.photo_url || getDefaultMusicianAvatarUrl(m.instrument || 'Gitarre', 'student')} 
+                                          onError={(e) => {
+                                            e.currentTarget.src = getDefaultMusicianAvatarUrl(m.instrument || 'Gitarre', 'student');
+                                          }}
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                          alt={u?.first_name || 'Mitglied'} 
+                                        />
                                       ) : (
                                         <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
                                       )}

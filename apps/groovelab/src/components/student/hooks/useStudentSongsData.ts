@@ -588,7 +588,7 @@ export function useStudentSongsData({
       }
       return false;
     });
-    if (skill && (skill.is_stage_ready || (skill.progress_percent || 0) === 100 || skill.status === 'MASTERED')) return true;
+    if (skill && ((skill.progress_percent || 0) === 100 || skill.status === 'MASTERED')) return true;
     return false;
   }, [progressItems, activeSongSkills]);
 

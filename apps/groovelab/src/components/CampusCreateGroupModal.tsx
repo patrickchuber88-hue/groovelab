@@ -20,10 +20,48 @@ import {
   Award,
   ShieldCheck,
   Lock,
-  CheckSquare
+  CheckSquare,
+  Disc,
+  Volume2,
+  Speaker,
+  Zap,
+  Repeat,
+  GraduationCap,
+  BookOpen,
+  Medal,
+  FolderGit2,
+  Archive,
+  Activity
 } from 'lucide-react';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { resolveCampusStudentAvatar } from './StudioAvatar';
+
+const getStudentMonogramGradient = (idOrName: string) => {
+  const gradients = [
+    'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+    'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+    'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+    'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+    'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)',
+    'linear-gradient(135deg, #f97316 0%, #c2410c 100%)'
+  ];
+  let hash = 0;
+  const str = idOrName || 'student';
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return gradients[Math.abs(hash) % gradients.length];
+};
+
+const getStudentInitials = (student: any): string => {
+  const first = (student?.first_name || student?.name || '').trim();
+  const last = (student?.full_last_name || student?.last_name || '').trim();
+  if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+  if (first.length >= 2) return first.slice(0, 2).toUpperCase();
+  return first[0]?.toUpperCase() || '?';
+};
 
 export interface CampusCreateGroupModalProps {
   isOpen: boolean;
@@ -33,27 +71,47 @@ export interface CampusCreateGroupModalProps {
   onGroupCreated: (newGroup: any) => void;
 }
 
-const CURATED_ICONS = [
-  { id: 'music', label: 'Musik', Icon: Music },
-  { id: 'users', label: 'Ensemble', Icon: Users },
-  { id: 'guitar', label: 'Gitarre', Icon: Guitar },
-  { id: 'mic', label: 'Gesang', Icon: Mic },
-  { id: 'headphones', label: 'Studio', Icon: Headphones },
-  { id: 'radio', label: 'Band', Icon: Radio },
-  { id: 'sparkles', label: 'Projekt', Icon: Sparkles },
-  { id: 'trophy', label: 'Meisterklasse', Icon: Trophy },
-  { id: 'flame', label: 'Live Lab', Icon: Flame },
-  { id: 'layers', label: 'Theorie', Icon: Layers },
-  { id: 'compass', label: 'Orchester', Icon: Compass },
-  { id: 'award', label: 'Konzert', Icon: Award }
+export const CURATED_ICONS = [
+  // 1. Instrumente (8)
+  { id: 'guitar', label: 'E-Gitarre', category: 'instruments', Icon: Guitar },
+  { id: 'acoustic_guitar', label: 'Akustik-Gitarre', category: 'instruments', Icon: Music },
+  { id: 'piano', label: 'Klavier / Tasten', category: 'instruments', Icon: Layers },
+  { id: 'drums', label: 'Schlagzeug', category: 'instruments', Icon: Disc },
+  { id: 'mic', label: 'Gesang / Mic', category: 'instruments', Icon: Mic },
+  { id: 'violin', label: 'Violine / Streicher', category: 'instruments', Icon: Activity },
+  { id: 'brass', label: 'Bläser / Saxophon', category: 'instruments', Icon: Radio },
+  { id: 'bass', label: 'Bass / Rhythmus', category: 'instruments', Icon: Volume2 },
+
+  // 2. Bands & Ensembles (8)
+  { id: 'rockband', label: 'Rockband', category: 'ensembles', Icon: Flame },
+  { id: 'bigband', label: 'Bigband / Jazz', category: 'ensembles', Icon: Speaker },
+  { id: 'orchestra', label: 'Orchester', category: 'ensembles', Icon: Compass },
+  { id: 'choir', label: 'Chor / Gesang', category: 'ensembles', Icon: Users },
+  { id: 'ensemble', label: 'Ensemble', category: 'ensembles', Icon: Sparkles },
+  { id: 'jam', label: 'Jam-Session', category: 'ensembles', Icon: Zap },
+  { id: 'duo', label: 'Duo / Kammer', category: 'ensembles', Icon: Headphones },
+  { id: 'percussion', label: 'Percussion', category: 'ensembles', Icon: Repeat },
+
+  // 3. Klasse & Events (8)
+  { id: 'klassenchat', label: 'Klassenchat', category: 'classes', Icon: GraduationCap },
+  { id: 'concert', label: 'Konzert / Bühne', category: 'classes', Icon: Award },
+  { id: 'theory', label: 'Theorie & Gehör', category: 'classes', Icon: BookOpen },
+  { id: 'masterclass', label: 'Meisterklasse', category: 'classes', Icon: Trophy },
+  { id: 'competition', label: 'Wettbewerb / JuMu', category: 'classes', Icon: Medal },
+  { id: 'project', label: 'Projektgruppe', category: 'classes', Icon: FolderGit2 },
+  { id: 'parents', label: 'Eltern-Forum', category: 'classes', Icon: ShieldCheck },
+  { id: 'archive', label: 'Archiv', category: 'classes', Icon: Archive }
 ];
 
-const CURATED_COLORS = [
-  { id: '#34a853', name: 'Campus-Grün', border: '#2e9549' },
-  { id: '#2563eb', name: 'Königsblau', border: '#1d4ed8' },
-  { id: '#7c3aed', name: 'Violett', border: '#6d28d9' },
-  { id: '#d97706', name: 'Bernstein', border: '#b45309' },
-  { id: '#e11d48', name: 'Rose', border: '#be123c' }
+export const CURATED_COLORS = [
+  { id: '#15803d', name: 'Campus-Grün', border: '#166534' },
+  { id: '#2563eb', name: 'Studio-Blau', border: '#1d4ed8' },
+  { id: '#eab308', name: 'Groove-Gold', border: '#ca8a04' },
+  { id: '#ea580c', name: 'Sunset-Orange', border: '#c2410c' },
+  { id: '#7c3aed', name: 'Jazz-Violett', border: '#6d28d9' },
+  { id: '#e11d48', name: 'Crimson-Rose', border: '#be123c' },
+  { id: '#0891b2', name: 'Ocean-Cyan', border: '#0e7490' },
+  { id: '#475569', name: 'Slate-Graphit', border: '#334155' }
 ];
 
 export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
@@ -70,8 +128,9 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
   // Step 2 Fields
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('music');
-  const [selectedColor, setSelectedColor] = useState('#34a853');
+  const [selectedIcon, setSelectedIcon] = useState('guitar');
+  const [selectedColor, setSelectedColor] = useState('#15803d');
+  const [iconCategory, setIconCategory] = useState<'instruments' | 'ensembles' | 'classes'>('instruments');
   const [adminOnlyMessaging, setAdminOnlyMessaging] = useState(false);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,8 +144,9 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
       setSelectedStudentIds([]);
       setGroupName('');
       setGroupDescription('');
-      setSelectedIcon('music');
-      setSelectedColor('#34a853');
+      setSelectedIcon('guitar');
+      setSelectedColor('#15803d');
+      setIconCategory('instruments');
       setAdminOnlyMessaging(false);
       setErrorMessage('');
       setIsSubmitting(false);
@@ -408,11 +468,23 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                           flexShrink: 0
                         }}
                       >
-                        <img 
-                          src={resolveCampusStudentAvatar(student)} 
-                          alt="" 
-                          style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }} 
-                        />
+                        <div 
+                          style={{ 
+                            width: '22px', 
+                            height: '22px', 
+                            borderRadius: '50%', 
+                            background: getStudentMonogramGradient(student.id || student.first_name),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            fontSize: '0.60rem',
+                            fontWeight: 800,
+                            flexShrink: 0
+                          }}
+                        >
+                          {getStudentInitials(student)}
+                        </div>
                         <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#166534' }}>
                           {formatSingleStudentAnonymized(student.first_name, student.full_last_name || student.last_name, student.id)}
                         </span>
@@ -539,11 +611,24 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <img 
-                            src={avatarUrl} 
-                            alt="" 
-                            style={{ width: '38px', height: '38px', borderRadius: '12px', objectFit: 'cover', background: '#e2e8f0' }} 
-                          />
+                          <div 
+                            style={{ 
+                              width: '38px', 
+                              height: '38px', 
+                              borderRadius: '12px', 
+                              background: getStudentMonogramGradient(student.id || student.first_name),
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              flexShrink: 0,
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                            }}
+                          >
+                            {getStudentInitials(student)}
+                          </div>
                           <div>
                             <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
                               {displayName}
@@ -627,17 +712,65 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                 />
               </div>
 
-              {/* Curated Monochrome Icon Grid */}
+              {/* Curated Apple Squircle Icon Grid with 3 Categories */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-                  Gruppen-Symbol (Monochrom)
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Gruppen-Symbol (24 Apple-Icons)
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    Kategorie wählen
+                  </span>
+                </div>
+
+                {/* 3-Category Segmented Control Tabs */}
+                <div style={{
+                  display: 'flex',
+                  background: '#f1f5f9',
+                  padding: '3px',
+                  borderRadius: '12px',
+                  marginBottom: '10px',
+                  gap: '4px'
+                }}>
+                  {[
+                    { id: 'instruments', label: '🎸 Instrumente' },
+                    { id: 'ensembles', label: '🔥 Bands & Ensembles' },
+                    { id: 'classes', label: '🎓 Klasse & Events' }
+                  ].map(tab => {
+                    const isActive = iconCategory === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setIconCategory(tab.id as any)}
+                        style={{
+                          flex: 1,
+                          padding: '7px 10px',
+                          borderRadius: '9px',
+                          border: 'none',
+                          background: isActive ? '#ffffff' : 'transparent',
+                          color: isActive ? '#0f172a' : '#64748b',
+                          fontSize: '0.76rem',
+                          fontWeight: isActive ? 850 : 650,
+                          cursor: 'pointer',
+                          boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                          transition: 'all 0.15s',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 4x2 Icon Grid */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
                   gap: '10px'
                 }}>
-                  {CURATED_ICONS.map(item => {
+                  {CURATED_ICONS.filter(item => item.category === iconCategory).map(item => {
                     const isSelected = selectedIcon === item.id;
                     const IconComp = item.Icon;
                     return (
@@ -648,32 +781,45 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                         aria-label={item.label}
                         title={item.label}
                         style={{
-                          height: '52px',
+                          height: '58px',
                           borderRadius: '14px',
                           border: isSelected ? `2px solid ${selectedColor}` : '1px solid #e2e8f0',
-                          background: isSelected ? '#f8fafc' : '#ffffff',
+                          background: isSelected ? `${selectedColor}14` : '#ffffff',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          gap: '4px',
                           cursor: 'pointer',
                           transition: 'all 0.15s',
-                          boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.06)' : 'none'
+                          boxShadow: isSelected ? `0 2px 8px ${selectedColor}22` : 'none',
+                          boxSizing: 'border-box'
                         }}
                       >
-                        <IconComp size={22} color={isSelected ? selectedColor : '#64748b'} strokeWidth={isSelected ? 2.5 : 2} />
+                        <IconComp size={20} color={isSelected ? selectedColor : '#64748b'} strokeWidth={isSelected ? 2.5 : 2} />
+                        <span style={{ 
+                          fontSize: '0.65rem', 
+                          fontWeight: isSelected ? 850 : 600, 
+                          color: isSelected ? selectedColor : '#64748b', 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          maxWidth: '90%' 
+                        }}>
+                          {item.label}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Color Accent Picker */}
+              {/* Color Accent Picker: 8 Curated Apple Brand Colors */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-                  Farb-Akzent
+                  Farb-Akzent (8 Marken-Themen)
                 </label>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {CURATED_COLORS.map(c => {
                     const isSelected = selectedColor === c.id;
                     return (
@@ -684,8 +830,8 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                         aria-label={c.name}
                         title={c.name}
                         style={{
-                          width: '36px',
-                          height: '36px',
+                          width: '34px',
+                          height: '34px',
                           borderRadius: '50%',
                           background: c.id,
                           border: isSelected ? '3px solid #ffffff' : 'none',

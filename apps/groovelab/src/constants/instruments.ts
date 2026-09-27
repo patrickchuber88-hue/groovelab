@@ -15,14 +15,17 @@ export const APP_INSTRUMENT_ICONS: Record<string, any> = new Proxy({
 export const APP_INSTRUMENT_COLORS: Record<string, string> = { 
   "Guitar": "#ef4444", 
   "E-Gitarre": "#ef4444",
+  "Gitarre": "#ef4444",
   "Bass": "#eab308", 
   "E-Bass": "#eab308", 
   "Drums": "#3b82f6", 
   "E-Drums": "#3b82f6", 
+  "Schlagzeug": "#3b82f6",
   "Vocals": "#34a853", 
   "Piano": "#a855f7", 
   "E-Piano": "#a855f7", 
-  "Keys": "#a855f7" 
+  "Keys": "#a855f7",
+  "Klavier": "#a855f7" 
 };
 
 export const brandColor = "#f59e0b"; // Orange (matched with legend)

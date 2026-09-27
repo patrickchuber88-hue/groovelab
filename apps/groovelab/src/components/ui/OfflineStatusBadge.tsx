@@ -46,7 +46,7 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = () => {
   const containerStyle: React.CSSProperties = {
     position: 'fixed',
     bottom: 'calc(var(--bottom-bar-height, 0px) + env(safe-area-inset-bottom) + 24px)',
-    right: '24px',
+    right: '84px',
     zIndex: 9999,
     pointerEvents: offlineState.isSyncing || recentlySynced ? 'none' : 'auto',
     animation: 'slideUpBadge 0.25s cubic-bezier(0.16, 1, 0.3, 1)'

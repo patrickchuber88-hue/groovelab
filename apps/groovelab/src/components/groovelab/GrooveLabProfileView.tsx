@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useMemo } from 'react';
 import { useWindowSize } from 'react-use';
-import { User, Star, QrCode, Users, Clock, Music, Calendar, Zap, Trash2 } from 'lucide-react';
+import { User, Star, Users, Clock, Music, Calendar, Zap, Trash2, Play } from 'lucide-react';
 import { StudioAvatar, renderBandAvatar } from '../StudioAvatar';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS } from '../../constants/instruments';
@@ -33,6 +33,7 @@ export interface GrooveLabProfileViewProps {
   onOpenCancellation: () => void;
   onOpenImpressum: () => void;
   onOpenAccessibility: () => void;
+  onTabChange?: (tab: string) => void;
 }
 
 export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
@@ -59,32 +60,53 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
   onOpenCancellation,
   onOpenImpressum,
   onOpenAccessibility,
+  onTabChange,
 }) => {
   const { width = 1024 } = useWindowSize();
   const myBands = userBands || [];
 
   const calculateSkillXP = (skill: any) => {
     const prog = skill.progress || 0;
-    if (skill.is_stage_ready || prog === 100) return 500;
-    return prog * 2;
+    if (skill.is_stage_ready || prog === 100) return 100;
+    return 0;
   };
 
   const studentRadarData = useMemo(() => {
-    const radarBase: Record<string, number> = { Guitar: 0, Bass: 0, Drums: 0, Keys: 0, Vocals: 0 };
-    (userSongs || []).forEach((s: any) => {
-      const sInst = s.instrument?.toLowerCase();
-      if (!sInst) return;
-      let target: string | null = null;
-      if (sInst === 'guitar' || sInst === 'e-gitarre') target = 'Guitar';
-      else if (sInst === 'bass' || sInst === 'e-bass') target = 'Bass';
-      else if (sInst === 'drums' || sInst === 'e-drums') target = 'Drums';
-      else if (sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano') target = 'Keys';
-      else if (sInst === 'vocals' || sInst === 'gesang') target = 'Vocals';
-      if (target && radarBase[target] !== undefined) {
-        radarBase[target] += calculateSkillXP(s);
-      }
+    const instruments = [
+      { key: 'Gitarre', match: ['git'] },
+      { key: 'Bass', match: ['bass'] },
+      { key: 'Drums', match: ['drum', 'schlag'] },
+      { key: 'Piano', match: ['piano', 'key'] },
+      { key: 'Gesang', match: ['vocal', 'gesang'] }
+    ];
+
+    return instruments.map(({ key, match }) => {
+      const matching = (userSongs || []).filter((s: any) => {
+        const sInst = (s.instrument || '').toLowerCase();
+        return match.some(m => sInst.includes(m));
+      });
+
+      const maxProgress = matching.length > 0
+        ? Math.max(0, ...matching.map((s: any) => s.progress || (s.is_stage_ready ? 100 : 0)))
+        : 0;
+
+      // Didaktische 15%-Starter-Baseline: Garantiert, dass das Polygon niemals zu einer 0-Fläche kollabiert
+      const xp = Math.max(15, maxProgress);
+
+      return {
+        instrument: key,
+        xp,
+        realProgress: maxProgress
+      };
     });
-    return Object.entries(radarBase).map(([inst, xp]) => ({ instrument: inst, xp }));
+  }, [userSongs]);
+
+  // Autoritatives GrooveLab XP: Exakt 100 Punkte pro gemeistertem Song
+  const studentTotalXP = useMemo(() => {
+    return (userSongs || []).reduce((sum: number, s: any) => {
+      const isMastered = (s.progress || 0) === 100 || s.is_stage_ready === true;
+      return sum + (isMastered ? 100 : 0);
+    }, 0);
   }, [userSongs]);
 
   const getTeacherTheme = (name: string, userId: string) => {
@@ -276,9 +298,14 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
   return (
                 <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '100%', margin: '0 auto', width: '100%', marginTop: '14px' }}>
               {/* Top: Massive Hero Card */}
-              <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '440px' }}>
-                <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
-                  <StudioAvatar src={user.photo_url || '/avatar_ghost.jpg'} user={user} style={{ position: 'absolute', inset: 0 }} />
+              <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', flexDirection: width <= 768 ? 'column' : 'row', overflow: 'hidden', minHeight: width <= 768 ? 'auto' : '340px' }}>
+                <div style={{ flex: width <= 768 ? '1 1 260px' : '0 0 38%', minHeight: width <= 768 ? '260px' : 'auto', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
+                  <StudioAvatar 
+                    src={user.avatar_url || user.photo_url} 
+                    user={user} 
+                    activePlatform={activePlatform || undefined}
+                    style={{ position: 'absolute', inset: 0 }} 
+                  />
                   {/* Edit Button Overlay */}
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', transition: 'all 0.3s' }} className="photo-overlay">
                     <button 
@@ -297,55 +324,43 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                   </div>
                 </div>
                 
-                <div style={{ flex: '1', padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ flex: '1', padding: width <= 768 ? '24px 20px' : '36px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   {/* Badge row */}
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
                     <span style={{
-                      background: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'linear-gradient(135deg, #eab308, #ca8a04)' : '#f59e0b',
+                      background: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'linear-gradient(135deg, #eab308, #ca8a04)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
                       color: 'white', padding: '4px 12px', borderRadius: '8px',
                       fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
                       boxShadow: '0 4px 10px rgba(234, 179, 8, 0.25)'
                     }}>
                       {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'GrooveLab Coach' : 'Pro Artist'}
                     </span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Campus-Groovelab'}</span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }}>• Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}</span>
+                    <span style={{ 
+                      background: '#f1f5f9', 
+                      color: '#475569', 
+                      padding: '4px 10px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 800 
+                    }}>
+                      {user.schools?.name || 'Campus-Groovelab'}
+                    </span>
 
-                    {/* XP only for students */}
+                    {/* XP badge only for students */}
                     {user.role === 'student' && (
                       <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-                        <Star size={12} fill="white" /> {userSongs.filter(s => s.progress === 100).length * 100} XP
+                        <Star size={12} fill="white" /> {studentTotalXP} Punkte
                       </div>
-                    )}
-
-                    {/* Campus-Ausweis Button */}
-                    {(user?.qr_token || user?.teacher_qr_token) && (
-                      <button 
-                        onClick={onShowQr}
-                        style={{
-                          background: 'linear-gradient(135deg, #eab308, #ca8a04)',
-                          color: 'white',
-                          padding: '4px 12px',
-                          borderRadius: '8px',
-                          fontSize: '0.75rem',
-                          fontWeight: 950,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          border: 'none',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
-                        }}
-                      >
-                        <QrCode size={12} />
-                        <span>CAMPUS-GROOVELAB AUSWEIS</span>
-                      </button>
                     )}
                   </div>
 
-                  <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: '#1e293b', margin: '0 0 16px 0', letterSpacing: '-0.03em' }}>
+                  <h1 style={{ fontSize: width <= 768 ? '2.2rem' : '3.2rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
                     {user.role === 'student' ? (activePlatform === 'groovelab' ? user.first_name : 'Hausaufgabenheft') : formatTeacherFullName(user.first_name, user.last_name)}
                   </h1>
+
+                  <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600, marginBottom: '20px' }}>
+                    Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString('de-DE') : 'unbekannt'}
+                  </div>
 
                   {/* GrooveLab Instrument Selection Buttons for Coach */}
                   {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? (
@@ -443,25 +458,60 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                       );
                     })()
                   ) : (
-                    // STUDENT: show instrument challenge counters
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                    // STUDENT: show active instrument repertoire status (Simple, schlicht, kompakt: Nur Zahl gemeisterter Songs)
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
                       {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
-                        const count = userSongs.filter(s => {
-                          const sInst = s.instrument?.toLowerCase();
+                        const matchingSongs = (userSongs || []).filter((s: any) => {
+                          const sInst = (s.instrument || '').toLowerCase();
                           const target = inst.toLowerCase();
-                          let match = false;
-                          if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre';
-                          else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
-                          else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums';
-                          else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano';
-                          else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
-                          else match = sInst === target;
-                          return match && s.progress === 100;
-                        }).length;
+                          if (target === 'guitar') return sInst.includes('guitar') || sInst.includes('gitarre');
+                          if (target === 'bass') return sInst.includes('bass');
+                          if (target === 'drums') return sInst.includes('drum') || sInst.includes('schlagzeug');
+                          if (target === 'keys') return sInst.includes('key') || sInst.includes('piano');
+                          if (target === 'vocals') return sInst.includes('vocal') || sInst.includes('gesang');
+                          return sInst === target;
+                        });
+
+                        const masteredSongs = matchingSongs.filter((s: any) => (s.progress || 0) === 100 || s.is_stage_ready === true);
+                        const hasMastered = masteredSongs.length > 0;
+                        const label = inst === 'Guitar' ? 'Gitarre' : inst === 'Keys' ? 'Piano' : inst;
+                        const icon = APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || (inst === 'Vocals' ? '🎤' : '🎵');
+
                         return (
-                          <div key={inst} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 14px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                            <span style={{ fontSize: '1.25rem' }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || (inst === 'Vocals' ? '🎤' : '🎵')}</span>
-                            <span style={{ fontSize: '1rem', fontWeight: 900, color: count > 0 ? brandColor : '#94a3b8' }}>{count}</span>
+                          <div 
+                            key={inst} 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '8px', 
+                              background: hasMastered ? '#fffbeb' : '#f8fafc', 
+                              padding: '6px 14px', 
+                              borderRadius: '12px', 
+                              border: hasMastered ? '1.5px solid #fde68a' : '1px solid #f1f5f9',
+                              boxShadow: hasMastered ? '0 2px 8px rgba(245, 158, 11, 0.08)' : 'none',
+                              transition: 'all 0.2s ease'
+                            }}
+                            title={`${label}: ${masteredSongs.length} gemeisterte Songs`}
+                          >
+                            <span style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center' }}>
+                              {renderInstrumentIcon(inst, hasMastered ? '#f59e0b' : '#94a3b8', 18) || icon}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: hasMastered ? '#78350f' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              {label}
+                            </span>
+                            <span style={{ 
+                              fontSize: '0.85rem', 
+                              fontWeight: 950, 
+                              color: hasMastered ? '#b45309' : '#94a3b8',
+                              background: hasMastered ? 'rgba(245, 158, 11, 0.15)' : '#e2e8f0',
+                              padding: '2px 8px',
+                              borderRadius: '8px',
+                              minWidth: '20px',
+                              textAlign: 'center',
+                              lineHeight: '1.2'
+                            }}>
+                              {masteredSongs.length}
+                            </span>
                           </div>
                         );
                       })}
@@ -498,23 +548,175 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                 </div>
               </div>
               {user.role === 'student' && (
-                <>
-                  {/* Bottom: Radar & Planner */}
-                  <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-                    {/* Skill Radar */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: width < 900 ? '1fr' : '1fr 1fr', 
+                  gap: '24px', 
+                  alignItems: 'start', 
+                  paddingBottom: '32px' 
+                }}>
+                  {/* LEFT COLUMN: Skill Radar + Aktuelle Songs (Stacked vertically) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {/* 1. Skill Radar */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ color: '#f59e0b' }}><Music size={24} /></div>
                         Skill Radar
                       </h3>
-                      <Suspense fallback={<div style={{ height: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Lade Radar...</div>}>
+                      <Suspense fallback={<div style={{ height: '420px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Lade Radar...</div>}>
                         <StudentRadarChart studentRadarData={studentRadarData} />
                       </Suspense>
                     </div>
 
-                    {/* Wochen-Planner */}
+                    {/* 2. Aktuelle Songs */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ color: brandColor }}><Music size={24} /></div>
+                        Aktuelle Songs
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {(() => {
+                          const grouped = userSongs.reduce((acc: any, skill: any) => {
+                            const level = skill.difficulty_level || 'original';
+                            const key = `${skill.song_id}_${level}`;
+                            if (!acc[key]) {
+                              acc[key] = {
+                                song_id: skill.song_id,
+                                title: skill.title,
+                                artist: skill.artist,
+                                level: level,
+                                media_link: skill.media_link,
+                                tomplay_url: skill.tomplay_url,
+                                instrumentation: skill.instrumentation,
+                                skills: []
+                              };
+                            }
+                            acc[key].skills.push(skill);
+                            return acc;
+                          }, {});
+
+                          const activeGroups = Object.values(grouped).filter((group: any) => {
+                            const groupProgress = Math.max(...group.skills.map((s: any) => s.progress || 0));
+                            return groupProgress > 0 && groupProgress < 100;
+                          });
+
+                          if (activeGroups.length === 0) {
+                            return <div style={{ textAlign: 'center', padding: '40px 0', color: '#cbd5e1', fontSize: '0.9rem' }}>Keine aktiven Songs in Arbeit. Alle angefangenen Songs sind entweder neu oder bereits zu 100% gemeistert!</div>;
+                          }
+
+                          return activeGroups.map((group: any) => {
+                            const rawArtist = group.artist || '';
+                            const cleanArtist = rawArtist.replace(/linken park/gi, 'Linkin Park');
+                            const groupProgress = Math.max(...group.skills.map((s: any) => s.progress || 0));
+
+                            return (
+                              <div key={`${group.song_id}_${group.level}`} style={{ background: '#f8fafc', padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', position: 'relative' }}>
+                                <div style={{ 
+                                  position: 'absolute', 
+                                  top: '24px', 
+                                  right: '24px', 
+                                  background: group.level === 'original' ? '#eff6ff' : '#fff7ed', 
+                                  color: group.level === 'original' ? '#3b82f6' : '#f59e0b',
+                                  padding: '4px 10px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 900,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <Zap size={10} fill="currentColor" /> {group.level === 'original' ? 'PRO' : 'STARTER'}
+                                </div>
+
+                                <div style={{ marginBottom: '14px' }}>
+                                  <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{cleanArtist}</div>
+                                  <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#1e293b', marginTop: '2px' }}>{group.title}</div>
+                                </div>
+
+                                {/* Unicolor Progress Bar */}
+                                <div style={{ marginBottom: '16px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Song-Fortschritt</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#b45309' }}>{groupProgress}%</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${groupProgress}%`, height: '100%', background: '#f59e0b', borderRadius: '999px', transition: 'width 0.3s ease' }} />
+                                  </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {group.skills
+                                      .filter((s: any) => s.instrument !== 'Vocals')
+                                      .map((s: any) => (
+                                        <div 
+                                          key={s.id} 
+                                          style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '6px', 
+                                            padding: '4px 10px', 
+                                            background: s.progress > 0 ? `${APP_INSTRUMENT_COLORS[s.instrument]}15` : '#f8fafc',
+                                            borderRadius: '10px',
+                                            border: `1px solid ${s.progress > 0 ? `${APP_INSTRUMENT_COLORS[s.instrument]}25` : '#f1f5f9'}`,
+                                            opacity: s.progress > 0 ? 1 : 0.35,
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                          }}
+                                        >
+                                          <span style={{ fontSize: '1rem' }}>{APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}</span>
+                                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] : '#94a3b8' }}>
+                                            {s.progress}%
+                                          </span>
+                                        </div>
+                                      ))}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => onTabChange?.('practice')}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '8px 14px',
+                                      borderRadius: '12px',
+                                      background: '#1e293b',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 4px 12px rgba(30, 41, 59, 0.12)',
+                                      transition: 'all 0.2s ease',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseOver={(e) => {
+                                      e.currentTarget.style.background = '#0f172a';
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                      e.currentTarget.style.background = '#1e293b';
+                                      e.currentTarget.style.transform = 'none';
+                                    }}
+                                  >
+                                    <Play size={12} fill="currentColor" /> Jetzt weiterüben
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RIGHT COLUMN: Wochen-Planner + Meine Bands (Stacked vertically) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {/* 3. Wochen-Planner */}
+                    <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                         <div>
                           <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div style={{ color: '#f59e0b' }}><Clock size={24} /></div>
@@ -552,7 +754,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>Plane deine Sessions & vermeide Stoßzeiten.</p>
                         </div>
                         {/* Legend */}
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                             <div style={{ 
                               width: '10px', 
@@ -569,7 +771,6 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                             <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
                           </div>
-                          
                         </div>
                       </div>
 
@@ -606,10 +807,20 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
 
                           return (
                             <>
-                              <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${activeDays.length}, 1fr)`, gap: '6px', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '12px', borderRadius: '24px' }}>
-                                <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#cbd5e1' }}></div>
+                              <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: `54px repeat(${activeDays.length}, 1fr)`, 
+                                gap: '4px', 
+                                border: '1px solid #f1f5f9', 
+                                background: '#f8fafc', 
+                                padding: '10px', 
+                                borderRadius: '20px',
+                                maxHeight: '380px',
+                                overflowY: 'auto'
+                              }}>
+                                <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1' }}></div>
                                 {activeDays.map(d => (
-                                  <div key={d.id} style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, color: '#64748b' }}>{d.id}</div>
+                                  <div key={d.id} style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 800, color: '#64748b' }}>{d.id}</div>
                                 ))}
 
                                 {(() => {
@@ -639,7 +850,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                     const time = current;
                                     timeRows.push(
                                       <React.Fragment key={time}>
-                                        <div style={{ fontSize: '0.6rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', fontWeight: 600 }}>{time}</div>
+                                        <div style={{ fontSize: '0.58rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px', fontWeight: 600 }}>{time}</div>
                                         {activeDays.map(day => {
                                           const key = `${day.id}-${time}`;
                                           const isPlanned = plannedSlots.includes(key);
@@ -651,13 +862,6 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                             s.profiles?.role?.toLowerCase() !== 'teacher' && 
                                             s.profiles?.role?.toLowerCase() !== 'admin'
                                           ).length;
-
-                                          const teachersInSlot = globalPlannedSlots.filter(s => 
-                                            s.day === day.id && 
-                                            s.time === time && 
-                                            (s.profiles?.role?.toLowerCase() === 'teacher' || s.profiles?.role?.toLowerCase() === 'admin')
-                                          );
-                                          const hasTeacher = teachersInSlot.length > 0;
 
                                           const dayHours = hours[day.key];
                                           const isOpen = (dayHours?.active !== false) && time >= (dayHours?.start || '08:00') && time < (dayHours?.end || '20:00');
@@ -672,16 +876,13 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                             bgColor = '#f1f5f9';
                                             textColor = '#cbd5e1';
                                             cursor = 'not-allowed';
-                                            content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
+                                            content = <span style={{ opacity: 0.3, fontSize: '0.55rem' }}>✕</span>;
                                           } else {
-                                            // 1. Determine Background, Border, and Text Color based strictly on heatmap density and coach presence
                                             if (isPlanned) {
-                                              // Solid brand gold-amber für eigene geplante Zeiten — durchgehend kräftig, leuchtend und einheitlich!
                                               bgColor = '#f59e0b';
                                               textColor = 'white';
                                               border = '1px solid #d97706';
                                             } else {
-                                              // Soft transparent purple/blue heatmap for other slots — linear progressive up to 8 stations!
                                               if (totalCount > 0) {
                                                 const maxCapacity = 8;
                                                 const minOpacity = 0.08;
@@ -692,18 +893,11 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                                 textColor = opacity >= 0.35 ? 'white' : '#4f46e5';
                                                 border = `1px solid rgba(79, 70, 229, ${opacity + 0.1})`;
                                               }
-                                              
-                                              // Teacher slots are not highlighted in student planner as requested
                                             }
-                                            
-                                            
-
-                                            // 2. Determine Inner Content (Student Count + Coach Badge)
-                                            
 
                                             if (totalCount > 0) {
                                               content = (
-                                                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
+                                                <span style={{ fontSize: '0.7rem', fontWeight: 900 }}>
                                                   {totalCount}
                                                 </span>
                                               );
@@ -718,18 +912,18 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                               }}
                                               style={{ 
                                                 cursor: cursor, 
-                                                height: '24px', 
+                                                height: '20px', 
                                                 background: bgColor,
-                                                borderRadius: '5px', 
+                                                borderRadius: '4px', 
                                                 border: border,
                                                 display: 'flex', 
                                                 alignItems: 'center', 
                                                 justifyContent: 'center', 
                                                 color: textColor,
-                                                fontSize: '0.65rem', 
+                                                fontSize: '0.62rem', 
                                                 fontWeight: 900, 
                                                 transition: 'all 0.1s',
-                                                boxShadow: isPlanned ? `0 2px 8px ${bgColor}50` : 'none',
+                                                boxShadow: isPlanned ? `0 2px 6px ${bgColor}50` : 'none',
                                                 opacity: isOpen ? 1 : 0.6,
                                                 padding: 0,
                                                 width: '100%',
@@ -763,9 +957,9 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                 });
 
                                 return (
-                                  <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
+                                  <div style={{ marginTop: '16px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                                    <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontSize: '1rem' }}>👨‍🏫</span>
                                       Anwesende Coaches diese Woche:
                                     </h4>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -775,12 +969,12 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                         return (
                                           <div key={teacherName} style={{ 
                                             display: 'flex', 
-                                            alignItems: 'center',
-                                            flexWrap: 'wrap',
-                                            gap: '6px',
+                                            alignItems: 'center', 
+                                            flexWrap: 'wrap', 
+                                            gap: '6px', 
                                             background: '#f8fafc', 
                                             border: '1px solid #f1f5f9', 
-                                            padding: '7px 12px', 
+                                            padding: '6px 12px', 
                                             borderRadius: '12px' 
                                           }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
@@ -805,111 +999,78 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                           );
                         })()}
                     </div>
-                  </div>
 
-                  {/* Third Row: Repertoire & Bands */}
-                  <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px', paddingBottom: '32px' }}>
-                    {/* Übesongs */}
+                    {/* 4. Meine Bands */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ color: brandColor }}><Music size={24} /></div>
-                        Aktuelle Songs
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {(() => {
-                          const grouped = userSongs.reduce((acc: any, skill: any) => {
-                            const level = skill.difficulty_level || 'original';
-                            const key = `${skill.song_id}_${level}`;
-                            if (!acc[key]) {
-                              acc[key] = {
-                                song_id: skill.song_id,
-                                title: skill.title,
-                                artist: skill.artist,
-                                level: level,
-                                media_link: skill.media_link,
-                                tomplay_url: skill.tomplay_url,
-                                instrumentation: skill.instrumentation,
-                                skills: []
-                              };
-                            }
-                            acc[key].skills.push(skill);
-                            return acc;
-                          }, {});
-
-                          const activeGroups = Object.values(grouped).filter((group: any) => 
-                            group.skills.some((s: any) => s.progress > 0)
-                          );
-
-                          if (activeGroups.length === 0) {
-                            return <div style={{ textAlign: 'center', padding: '40px 0', color: '#cbd5e1', fontSize: '0.9rem' }}>Noch keine aktiven Songs im Repertoire (&gt;0%).</div>;
-                          }
-
-                          return activeGroups.map((group: any) => (
-                            <div key={`${group.song_id}_${group.level}`} style={{ background: '#f8fafc', padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', position: 'relative' }}>
-                              <div style={{ 
-                                position: 'absolute', 
-                                top: '24px', 
-                                right: '24px', 
-                                background: group.level === 'original' ? '#eff6ff' : '#fff7ed', 
-                                color: group.level === 'original' ? '#3b82f6' : '#f59e0b',
-                                padding: '4px 10px',
-                                borderRadius: '8px',
-                                fontSize: '0.65rem',
-                                fontWeight: 900,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}>
-                                <Zap size={10} fill="currentColor" /> {group.level === 'original' ? 'PRO' : 'STARTER'}
-                              </div>
-
-                              <div style={{ marginBottom: '20px' }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{group.artist}</div>
-                                <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#1e293b', marginTop: '2px' }}>{group.title}</div>
-                              </div>
-                              
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                {group.skills
-                                  .filter((s: any) => s.instrument !== 'Vocals')
-                                  .map((s: any) => (
-                                    <div 
-                                      key={s.id} 
-                                      style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: '6px', 
-                                        padding: '6px 12px', 
-                                        background: s.progress > 0 ? `${APP_INSTRUMENT_COLORS[s.instrument]}15` : '#f8fafc',
-                                        borderRadius: '12px',
-                                        border: `1px solid ${s.progress > 0 ? `${APP_INSTRUMENT_COLORS[s.instrument]}20` : '#f1f5f9'}`,
-                                        opacity: s.progress > 0 ? 1 : 0.3,
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                                      }}
-                                    >
-                                      <span style={{ fontSize: '1.1rem' }}>{APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}</span>
-                                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] : '#94a3b8' }}>
-                                        {s.progress}%
-                                      </span>
-                                    </div>
-                                  ))}
-                              </div>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Bands */}
-                    <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ color: '#ec4899' }}><Users size={24} /></div>
                         Meine Bands
                       </h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {myBands.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '40px 0', color: '#cbd5e1' }}>Du bist noch in keiner Band. Übe fleißig für dein erstes Stage Ready!</div>
+                          <div style={{ 
+                            textAlign: 'center', 
+                            padding: '36px 20px', 
+                            background: '#f8fafc', 
+                            borderRadius: '24px', 
+                            border: '1.5px dashed #e2e8f0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}>
+                            <div style={{ 
+                              width: '48px', 
+                              height: '48px', 
+                              borderRadius: '50%', 
+                              background: '#fdf2f8', 
+                              color: '#ec4899', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              boxShadow: '0 4px 12px rgba(236, 72, 153, 0.15)'
+                            }}>
+                              <Users size={24} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px' }}>
+                                Noch in keiner Band?
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.4 }}>
+                                Finde passende Mitspieler an deiner Musikschule und gründe deine erste GrooveLab-Band!
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => onTabChange?.('matching')}
+                              style={{
+                                marginTop: '6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 20px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #ec4899, #db2777)',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '0.82rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 14px rgba(236, 72, 153, 0.3)',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 6px 18px rgba(236, 72, 153, 0.4)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = '0 4px 14px rgba(236, 72, 153, 0.3)';
+                              }}
+                            >
+                              <Users size={15} /> Band-Matching öffnen
+                            </button>
+                          </div>
                         ) : (
                           myBands.map((b: any) => (
                             <button 
@@ -962,7 +1123,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
               {user.role !== 'student' && (
                 <>

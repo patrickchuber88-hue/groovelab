@@ -2,10 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useWindowSize } from 'react-use';
 import { 
   Music, Users, Play, ChevronDown, ExternalLink, 
-  Clock, Award, Zap, Star, Check, X, Trash2 
+  Clock, Award, Zap, Star, Check, X, Trash2, Lock 
 } from 'lucide-react';
 import { StudioAvatar } from './StudioAvatar';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor } from '../constants/instruments';
+import { normalizeInstrument } from '../utils/instruments';
+
+const normalizeDifficulty = (diff?: string | null): 'starter' | 'original' => {
+  const d = (diff || '').toLowerCase().trim();
+  if (d === 'pro' || d === 'original') return 'original';
+  return 'starter';
+};
 
 export interface GroupedSongCardProps {
   songGroup: any;
@@ -29,17 +36,36 @@ export function GroupedSongCard({
   userBands = [], 
   userId, 
   isExpanded, 
-  onToggle,
+  onToggle, 
   onOpenPdfViewer
 }: GroupedSongCardProps) {
   const { width } = useWindowSize();
   const isMobile = width < 768;
-  const [activeDifficulty, setActiveDifficulty] = useState<'starter' | 'original'>('starter');
+  const [activeDifficulty, setActiveDifficulty] = useState<'starter' | 'original'>(() => {
+    const skills = songGroup?.skills || [];
+    // 0,1% Goldstandard Smart Focus: Focus the difficulty level with highest progress or 100% mastery
+    const hasOriginalMastery = skills.some((s: any) => 
+      normalizeDifficulty(s.difficulty_level) === 'original' && (s.progress === 100 || s.is_stage_ready)
+    );
+    const hasOriginalProgress = skills.some((s: any) => 
+      normalizeDifficulty(s.difficulty_level) === 'original' && (s.progress > 0 || s.is_stage_ready)
+    );
+    const hasStarterProgress = skills.some((s: any) => 
+      normalizeDifficulty(s.difficulty_level) === 'starter' && (s.progress > 0 || s.is_stage_ready)
+    );
+
+    if (hasOriginalMastery || (hasOriginalProgress && !hasStarterProgress)) {
+      return 'original';
+    }
+    return 'starter';
+  });
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isChallengeHovered, setIsChallengeHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  const currentLevelSkills = (songGroup.skills || []).filter((s: any) => s.difficulty_level === activeDifficulty);
+  const currentLevelSkills = (songGroup.skills || []).filter((s: any) => 
+    normalizeDifficulty(s.difficulty_level) === activeDifficulty
+  );
 
   // Find the band this song belongs to (Finalized Band or Pending Proposal)
   const matchingBand = (songGroup.isBandSong || true) ? userBands.find((b: any) => 
@@ -48,78 +74,108 @@ export function GroupedSongCard({
     (b.status === 'proposal' && b.song_id === songGroup.song_id)
   ) : null;
 
+  // Identify student's assigned instrument in this band
+  const myBandMember = matchingBand?.band_members?.find((m: any) => {
+    const uid = m.user_id || m.users?.id || (Array.isArray(m.users) ? m.users[0]?.id : undefined);
+    return uid === userId;
+  });
+  const effectiveUserBandInst = matchingBand?.myInstrument || myBandMember?.instrument;
+
   // Generate all required slots based on song instrumentation
   const instrumentation = songGroup.instrumentation || {};
   const slots: any[] = [];
   
-  // Normalize instrumentation keys to prevent duplicates like "Guitar" and "E-Gitarre"
+  // Normalize instrumentation keys to prevent duplicates like "Guitar", "Gitarre" and "E-Gitarre"
   const normalizedInst: Record<string, number> = {};
   Object.entries(instrumentation).forEach(([inst, count]) => {
-    let key = inst;
-    const lower = inst.toLowerCase();
-    if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
-    else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
-    else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
-    else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
-    else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
-    
-    normalizedInst[key] = Math.max(normalizedInst[key] || 0, count as number);
+    const key = normalizeInstrument(inst);
+    if (key && !key.toLowerCase().includes('vocal') && !key.toLowerCase().includes('gesang')) {
+      normalizedInst[key] = Math.max(normalizedInst[key] || 0, count as number);
+    }
   });
 
+  // 0,1% Goldstandard Defensive Ensemble Fallback:
+  // GrooveLab is an ensemble & band system. A song must never collapse to a single instrument.
+  // If instrumentation is empty or has no active instruments, default to the canonical 4-track arrangement.
+  const activeInstrumentCount = Object.keys(normalizedInst).filter(k => !k.toLowerCase().includes('vocal') && normalizedInst[k] > 0).length;
+  if (activeInstrumentCount === 0) {
+    normalizedInst['E-Gitarre'] = 1;
+    normalizedInst['E-Drums'] = 1;
+    normalizedInst['E-Piano'] = 1;
+    normalizedInst['E-Bass'] = 1;
+  }
+
   Object.entries(normalizedInst).forEach(([inst, count]) => {
-    if (inst.toLowerCase().includes('vocals') || inst.toLowerCase().includes('gesang')) return;
     for (let i = 1; i <= (count as number); i++) {
       slots.push({ instrument: inst, partNumber: i });
     }
   });
 
   if (slots.length === 0) {
-    const uniqueInsts = Array.from(new Set((songGroup.skills || []).map((s: any) => s.instrument)));
-    uniqueInsts.forEach((inst: any) => {
-       if (!inst.toLowerCase().includes('vocals')) slots.push({ instrument: inst, partNumber: 1 });
-    });
+    slots.push({ instrument: 'E-Gitarre', partNumber: 1 });
+    slots.push({ instrument: 'E-Drums', partNumber: 1 });
+    slots.push({ instrument: 'E-Piano', partNumber: 1 });
+    slots.push({ instrument: 'E-Bass', partNumber: 1 });
   }
 
-  const getBaseInst = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('gitarre') || n.includes('guitar')) return 'Guitar';
-    if (n.includes('drums') || n.includes('schlagzeug')) return 'Drums';
-    if (n.includes('piano') || n.includes('keys')) return 'Piano';
-    if (n.includes('bass')) return 'Bass';
-    return name;
-  };
-
   slots.sort((a, b) => {
-    const orderMap: Record<string, number> = { 'Guitar': 1, 'Drums': 2, 'Piano': 3, 'Bass': 4 };
-    const idxA = orderMap[getBaseInst(a.instrument)] || 99;
-    const idxB = orderMap[getBaseInst(b.instrument)] || 99;
+    const orderMap: Record<string, number> = { 'E-Gitarre': 1, 'E-Drums': 2, 'E-Piano': 3, 'E-Bass': 4, 'Vocals': 5 };
+    const normA = normalizeInstrument(a.instrument);
+    const normB = normalizeInstrument(b.instrument);
+    const idxA = orderMap[normA] || 99;
+    const idxB = orderMap[normB] || 99;
     if (idxA !== idxB) return idxA - idxB;
     return a.partNumber - b.partNumber;
   });
 
   const displaySkills = slots.map(slot => {
+    // 1. Direct match on current active difficulty level
     const existing = currentLevelSkills.find((s: any) => {
-      const sInst = (s.instrument || '').toLowerCase();
-      const tInst = slot.instrument.toLowerCase();
-      const isMatch = sInst === tInst || 
-             (sInst === 'guitar' && tInst === 'e-gitarre') || (sInst === 'e-gitarre' && tInst === 'guitar') ||
-             (sInst === 'bass' && tInst === 'e-bass') || (sInst === 'e-bass' && tInst === 'bass') ||
-             (sInst === 'drums' && tInst === 'e-drums') || (sInst === 'e-drums' && tInst === 'drums') ||
-             (sInst === 'piano' && tInst === 'e-piano') || (sInst === 'e-piano' && tInst === 'piano') || (sInst === 'keys' && tInst === 'e-piano');
-      
+      const isMatch = normalizeInstrument(s.instrument) === normalizeInstrument(slot.instrument);
       return isMatch && (s.part_number || 1) === slot.partNumber;
     });
-    const result = existing ? { ...existing } : {
-      id: `mock::${songGroup.song_id}::${slot.instrument}::${slot.partNumber}::${activeDifficulty}`,
-      song_id: songGroup.song_id,
-      instrument: slot.instrument,
-      part_number: slot.partNumber,
-      difficulty_level: activeDifficulty,
-      progress: 0,
-      is_stage_ready: false,
-      is_pending_approval: false,
-      isMock: true
-    };
+
+    // 2. Cross-Difficulty Mastery Check:
+    // If student has mastered this instrument on ANY difficulty (e.g. 100% stage ready on Pro),
+    // inherit the 100% mastery across both tabs (Didactic Mastery Goldstandard)
+    const crossMasterySkill = (songGroup.skills || []).find((s: any) => {
+      const isMatch = normalizeInstrument(s.instrument) === normalizeInstrument(slot.instrument);
+      const isSamePart = (s.part_number || 1) === slot.partNumber;
+      const isMastered = (s.progress === 100 || s.is_stage_ready) && !s.is_pending_approval;
+      return isMatch && isSamePart && isMastered;
+    });
+
+    let result: any;
+    if (existing) {
+      result = { ...existing };
+      result.instrument = normalizeInstrument(result.instrument || slot.instrument);
+      if (crossMasterySkill && !result.is_stage_ready && (result.progress || 0) < 100) {
+        result.is_stage_ready = true;
+        result.progress = 100;
+        result.masteredOnDifficulty = crossMasterySkill.difficulty_level || 'original';
+      }
+    } else if (crossMasterySkill) {
+      result = {
+        ...crossMasterySkill,
+        id: `inherited::${songGroup.song_id}::${slot.instrument}::${slot.partNumber}::${activeDifficulty}`,
+        instrument: normalizeInstrument(crossMasterySkill.instrument || slot.instrument),
+        difficulty_level: activeDifficulty,
+        masteredOnDifficulty: crossMasterySkill.difficulty_level || 'original'
+      };
+    } else {
+      result = {
+        id: `mock::${songGroup.song_id}::${slot.instrument}::${slot.partNumber}::${activeDifficulty}`,
+        song_id: songGroup.song_id,
+        instrument: slot.instrument,
+        part_number: slot.partNumber,
+        difficulty_level: activeDifficulty,
+        progress: 0,
+        is_stage_ready: false,
+        is_pending_approval: false,
+        isMock: true
+      };
+    }
+
     if (!result.part_number) {
       result.part_number = slot.partNumber;
     }
@@ -143,12 +199,12 @@ export function GroupedSongCard({
     const pending = displaySkills.find((s: any) => s?.is_pending_approval);
     if (pending) return pending.id;
 
-    const userBandInst = matchingBand?.myInstrument;
+    const userBandInst = effectiveUserBandInst;
     if (userBandInst) {
       const matchedSlot = displaySkills.find((s: any) => {
-        const sBase = getBaseInst(s.instrument);
-        const uBase = getBaseInst(userBandInst);
-        if (sBase === uBase) {
+        const sNorm = normalizeInstrument(s.instrument);
+        const uNorm = normalizeInstrument(userBandInst);
+        if (sNorm === uNorm) {
           const partMatch = userBandInst.match(/\d+/);
           const userPartNum = partMatch ? parseInt(partMatch[0]) : 1;
           return (s.part_number || 1) === userPartNum;
@@ -157,9 +213,13 @@ export function GroupedSongCard({
       });
       if (matchedSlot) return matchedSlot.id;
       
-      const baseMatchedSlot = displaySkills.find((s: any) => getBaseInst(s.instrument) === getBaseInst(userBandInst));
+      const baseMatchedSlot = displaySkills.find((s: any) => normalizeInstrument(s.instrument) === normalizeInstrument(userBandInst));
       if (baseMatchedSlot) return baseMatchedSlot.id;
     }
+
+    // Default to the first slot that has mastery or progress, or the first slot
+    const firstWithProgress = displaySkills.find((s: any) => s.progress > 0 || s.is_stage_ready);
+    if (firstWithProgress) return firstWithProgress.id;
 
     return displaySkills[0]?.id || '';
   });
@@ -169,7 +229,7 @@ export function GroupedSongCard({
       let prevInst = '';
       let prevPart = 1;
 
-      if (activeSlotId.startsWith('mock::')) {
+      if (activeSlotId.startsWith('mock::') || activeSlotId.startsWith('inherited::')) {
         const parts = activeSlotId.split('::');
         prevInst = parts[2];
         prevPart = parseInt(parts[3]) || 1;
@@ -183,7 +243,7 @@ export function GroupedSongCard({
       
       if (prevInst) {
          const match = displaySkills.find((s: any) => 
-            s.instrument === prevInst && 
+            normalizeInstrument(s.instrument) === normalizeInstrument(prevInst) && 
             (s.part_number || 1) === prevPart
          );
          if (match) {
@@ -192,16 +252,17 @@ export function GroupedSongCard({
          }
       }
 
-      setActiveSlotId(displaySkills[0]?.id || '');
+      const firstWithProgress = displaySkills.find((s: any) => s.progress > 0 || s.is_stage_ready);
+      setActiveSlotId(firstWithProgress?.id || displaySkills[0]?.id || '');
     }
   }, [activeDifficulty, displaySkills]);
 
   const activeSkill = displaySkills.find((s: any) => s?.id === activeSlotId) || (() => {
-    if (activeSlotId && activeSlotId.startsWith('mock::')) {
+    if (activeSlotId && (activeSlotId.startsWith('mock::') || activeSlotId.startsWith('inherited::'))) {
       const parts = activeSlotId.split('::');
       const inst = parts[2];
       const partNum = parseInt(parts[3]) || 1;
-      return displaySkills.find((s: any) => s.instrument === inst && (s.part_number || 1) === partNum);
+      return displaySkills.find((s: any) => normalizeInstrument(s.instrument) === normalizeInstrument(inst) && (s.part_number || 1) === partNum);
     }
     return null;
   })() || displaySkills[0] || { progress: 0 };
@@ -301,48 +362,82 @@ export function GroupedSongCard({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
-            {displaySkills.map((s: any) => (
-              <div 
-                key={s.id} 
-                onClick={(e) => { e.stopPropagation(); setActiveSlotId(s.id); if (!isExpanded) onToggle(); }}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  padding: s.id === activeSlotId ? '5.5px 11.5px' : '6px 12px',
-                  background: s.id === activeSlotId 
-                    ? '#ffffff' 
-                    : (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '10' : '#f8fafc'),
-                  borderRadius: '12px',
-                  border: s.id === activeSlotId 
-                    ? `1.5px solid ${APP_INSTRUMENT_COLORS[s.instrument] || brandColor}` 
-                    : '1px solid ' + (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '20' : '#f1f5f9'),
-                  opacity: s.id === activeSlotId ? 1 : (s.progress > 0 ? 0.9 : 0.35),
-                  transition: 'all 0.2s ease-in-out',
-                  cursor: 'pointer'
-                }}
-                title={getSkillLabel(s) + ' (' + s.progress + '%)'}
-              >
-                <span style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  {APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}
-                  {displaySkills.filter((x: any) => x.instrument === s.instrument).length > 1 && (
-                    <span style={{ 
-                      fontSize: '0.65rem', 
-                      fontWeight: 900, 
-                      opacity: 0.9, 
-                      color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
-                    }}>{s.part_number || 1}</span>
-                  )}
-                </span>
-                <span style={{ 
-                  fontSize: '0.75rem', 
-                  fontWeight: 900, 
-                  color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
-                }}>
-                  {s.id === activeSlotId ? localProgress : s.progress}%
-                </span>
-              </div>
-            ))}
+            {displaySkills.map((s: any) => {
+              const isMyBandSlot = Boolean(
+                songGroup.isBandSong && 
+                matchingBand && 
+                effectiveUserBandInst && 
+                normalizeInstrument(s.instrument) === normalizeInstrument(effectiveUserBandInst) && 
+                (() => {
+                  const partMatch = effectiveUserBandInst.match(/\d+/);
+                  const userPartNum = partMatch ? parseInt(partMatch[0], 10) : 1;
+                  return (s.part_number || 1) === userPartNum;
+                })()
+              );
+
+              const isSlotMastered = (s.id === activeSlotId ? localProgress : s.progress) >= 100 || s.is_stage_ready;
+
+              return (
+                <div 
+                  key={s.id} 
+                  onClick={(e) => { e.stopPropagation(); setActiveSlotId(s.id); if (!isExpanded) onToggle(); }}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    padding: s.id === activeSlotId ? '5.5px 11.5px' : '6px 12px',
+                    background: s.id === activeSlotId 
+                      ? '#ffffff' 
+                      : (isSlotMastered ? '#e6f4ea' : (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '10' : '#f8fafc')),
+                    borderRadius: '12px',
+                    border: s.id === activeSlotId 
+                      ? (isSlotMastered ? '1.5px solid #34a853' : `1.5px solid ${APP_INSTRUMENT_COLORS[s.instrument] || brandColor}`) 
+                      : (isSlotMastered ? '1px solid #ceead6' : ('1px solid ' + (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '20' : '#f1f5f9'))),
+                    opacity: s.id === activeSlotId ? 1 : (isSlotMastered ? 1 : (s.progress > 0 ? 0.9 : 0.35)),
+                    transition: 'all 0.2s ease-in-out',
+                    cursor: 'pointer'
+                  }}
+                  title={`${getSkillLabel(s)} (${s.id === activeSlotId ? localProgress : s.progress}%)${isSlotMastered ? ' • Meisterleistung 100%' : ''}${s.masteredOnDifficulty && normalizeDifficulty(s.masteredOnDifficulty) !== activeDifficulty ? ' (Auf Pro gemeistert ⭐)' : ''}${isMyBandSlot && matchingBand ? ' • Dein Part in ' + matchingBand.name : ''}`}
+                >
+                  <span style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    {APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}
+                    {displaySkills.filter((x: any) => x.instrument === s.instrument).length > 1 && (
+                      <span style={{ 
+                        fontSize: '0.65rem', 
+                        fontWeight: 900, 
+                        opacity: 0.9, 
+                        color: isSlotMastered ? '#137333' : ((s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8')
+                      }}>{s.part_number || 1}</span>
+                    )}
+                    {isMyBandSlot && (
+                      <span 
+                        title={`Dein Part in ${matchingBand?.name || 'der Band'}`} 
+                        style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px', color: '#0f172a' }}
+                      >
+                        <Users size={11} strokeWidth={2.5} />
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 900, 
+                    color: isSlotMastered ? '#137333' : ((s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }}>
+                    {isSlotMastered ? (
+                      <>
+                        <Check size={12} strokeWidth={3} />
+                        <span>100%</span>
+                      </>
+                    ) : (
+                      `${s.id === activeSlotId ? localProgress : s.progress}%`
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div style={{ 
@@ -489,17 +584,45 @@ export function GroupedSongCard({
                 </div>
               </div>
 
-              {activeSkill.is_pending_approval ? (
-                <div style={{ background: 'linear-gradient(135deg, #fefce8, #fef9c3)', color: '#ca8a04', padding: '24px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid #fde047' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <Clock size={28} />
+              {activeSkill.is_pending_approval && (
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #fefce8, #fef9c3)', 
+                  color: '#ca8a04', 
+                  padding: isMobile ? '16px 20px' : '20px 24px', 
+                  borderRadius: '20px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '16px', 
+                  border: '1px solid #fde047',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ 
+                    width: '44px', height: '44px', borderRadius: '12px', 
+                    background: 'white', display: 'flex', alignItems: 'center', 
+                    justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                    flexShrink: 0
+                  }}>
+                    <Clock size={24} color="#ca8a04" />
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>Wartet auf Bestätigung</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.8 }}>Dein Lehrer schaut sich deine Performance gerade an.</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 900, fontSize: '1rem', color: '#854d0e' }}>Wartet auf Bestätigung</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#a16207' }}>
+                      Dein Lehrer schaut sich deine Performance im nächsten Unterricht an.
+                    </div>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', alignItems: 'center', gap: '6px', 
+                    background: 'rgba(255,255,255,0.85)', padding: '6px 12px', 
+                    borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, color: '#854d0e',
+                    border: '1px solid rgba(202, 138, 4, 0.2)'
+                  }}>
+                    <Lock size={12} strokeWidth={2.5} />
+                    <span>90% Fixiert</span>
                   </div>
                 </div>
-              ) : activeSkill.is_stage_ready ? (
+              )}
+
+              {activeSkill.is_stage_ready ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                   <div style={{ 
                     width: '64px', height: '64px', borderRadius: '20px', 
@@ -516,18 +639,31 @@ export function GroupedSongCard({
                     </div>
                     <div>
                       <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>{getSkillLabel(activeSkill)} Meisterleistung!</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.8 }}>Du hast dieses Instrument zu 100% gemeistert.</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.8 }}>
+                        {activeSkill.masteredOnDifficulty && normalizeDifficulty(activeSkill.masteredOnDifficulty) !== activeDifficulty
+                          ? 'Auf Pro gemeistert ⭐ Du hast dieses Instrument zu 100% gemeistert und im Repertoire verewigt.'
+                          : 'Du hast dieses Instrument zu 100% gemeistert und im Repertoire verewigt. ⭐'}
+                      </div>
+                      {displaySkills.some((s: any) => !s.is_stage_ready && (s.id === activeSlotId ? localProgress : s.progress) < 100) && (
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, marginTop: '8px', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Zap size={14} />
+                          <span>Möchtest du ein weiteres Instrument meistern? Wähle oben einfach den nächsten Track!</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ padding: '24px 0' }}>
+                <div style={{ padding: activeSkill.is_pending_approval ? '4px 0 16px 0' : '24px 0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '0.9rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                        <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[activeSkill.instrument]}</span>
                        {getSkillLabel(activeSkill)} Training
                     </span>
-                    <span style={{ color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor }}>{localProgress}%</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: brandColor }}>
+                      {activeSkill.is_pending_approval && <Lock size={14} strokeWidth={2.5} style={{ opacity: 0.8 }} />}
+                      {localProgress}%
+                    </span>
                   </div>
                   
                   <div style={{ position: 'relative', width: '100%', height: '40px', display: 'flex', alignItems: 'center' }}>
@@ -537,22 +673,30 @@ export function GroupedSongCard({
                       position: 'absolute', 
                       height: '12px', 
                       width: `${localProgress}%`, 
-                      background: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor, 
+                      background: brandColor, 
                       borderRadius: '6px', 
-                      transition: 'width 0.2s ease-out' 
+                      transition: 'width 0.2s ease-out',
+                      opacity: activeSkill.is_pending_approval ? 0.85 : 1
                     }}></div>
                     
                     <input 
                       type="range" 
                       min="0" max="90" step="5"
                       value={localProgress} 
-                      onPointerDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                      disabled={Boolean(activeSkill.is_pending_approval)}
+                      onPointerDown={(e) => { 
+                        if (activeSkill.is_pending_approval) return;
+                        e.stopPropagation(); 
+                        setIsDragging(true); 
+                      }}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
+                        if (activeSkill.is_pending_approval) return;
                         const val = parseInt(e.target.value);
                         setLocalProgress(val);
                       }}
                       onPointerUp={(e) => {
+                        if (activeSkill.is_pending_approval) return;
                         setIsDragging(false);
                         const finalVal = parseInt(e.currentTarget.value);
                         setLocalProgress(finalVal);
@@ -564,6 +708,7 @@ export function GroupedSongCard({
                         });
                       }}
                       onPointerCancel={(e) => {
+                        if (activeSkill.is_pending_approval) return;
                         setIsDragging(false);
                         const finalVal = parseInt(e.currentTarget.value);
                         setLocalProgress(finalVal);
@@ -579,20 +724,43 @@ export function GroupedSongCard({
                         height: '40px', 
                         appearance: 'none', 
                         background: 'transparent', 
-                        cursor: 'pointer', 
+                        cursor: activeSkill.is_pending_approval ? 'not-allowed' : 'pointer', 
                         position: 'relative', 
                         zIndex: 10,
                         margin: 0,
-                        color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor
+                        color: brandColor,
+                        opacity: activeSkill.is_pending_approval ? 0.6 : 1
                       }} 
                       className="custom-range-slider"
                     />
                   </div>
+                  {activeSkill.is_pending_approval && (
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Lock size={12} strokeWidth={2.5} />
+                      <span>Challenge aktiv eingereicht – Slider bis zur Lehrer-Abnahme gesperrt.</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '200px', paddingTop: isMobile ? '12px' : '40px' }}>
+              {activeSkill.is_pending_approval && (
+                <div style={{ 
+                  padding: '16px 20px', borderRadius: '18px', 
+                  background: '#fefce8', border: '1.5px solid #fef08a', 
+                  display: 'flex', alignItems: 'center', gap: '12px', 
+                  color: '#854d0e', fontSize: '0.88rem', fontWeight: 800,
+                  boxShadow: '0 4px 12px rgba(202, 138, 4, 0.08)'
+                }}>
+                  <Clock size={20} color="#ca8a04" />
+                  <div>
+                    <div>Challenge aktiv</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.8 }}>Wartet auf Lehrer-Abnahme</div>
+                  </div>
+                </div>
+              )}
+
               {!activeSkill.is_pending_approval && !activeSkill.is_stage_ready && localProgress >= 90 && (
                 <button 
                   onMouseEnter={() => setIsChallengeHovered(true)}

@@ -22,7 +22,8 @@ export function calculateWeeklyStreakState(
   currentStudentId: string | null | undefined,
   currentStudentUser: any,
   isSessionActive: boolean,
-  currentSecondsElapsed: number
+  currentSecondsElapsed: number,
+  authoritativeStreak?: number
 ): WeeklyStreakMetrics {
   const currentDay = now.getDay();
   const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
@@ -48,37 +49,46 @@ export function calculateWeeklyStreakState(
   });
 
   // Check streak entering this week (before Monday)
+  // 🛡️ 0,1% Goldstandard Invariante: Wenn streak = 0 ist, ist initialStreak strikt 0 (keine Geister-Schilde)
   let initialStreak = 0;
-  let checkPriorDate = new Date(monday);
-  checkPriorDate.setDate(checkPriorDate.getDate() - 1);
-  const priorSundayStr = toLocalYYYYMMDD(checkPriorDate);
-  
-  let priorShieldDatesArr: string[] = [];
-  try {
-    priorShieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${currentStudentId}`) || '[]');
-    if (!Array.isArray(priorShieldDatesArr)) priorShieldDatesArr = [];
-  } catch (e) {
-    priorShieldDatesArr = [];
-  }
-  const priorShieldDatesSet = new Set(priorShieldDatesArr);
-  if (currentStudentUser?.joker_used_at) {
-    priorShieldDatesSet.add(toLocalYYYYMMDD(new Date(currentStudentUser.joker_used_at)));
-  }
+  if (authoritativeStreak === 0 || (authoritativeStreak === undefined && currentStudentUser?.streak_flame === 0)) {
+    initialStreak = 0;
+  } else {
+    let checkPriorDate = new Date(monday);
+    checkPriorDate.setDate(checkPriorDate.getDate() - 1);
+    const priorSundayStr = toLocalYYYYMMDD(checkPriorDate);
 
-  if (masteredDates.has(priorSundayStr) || priorShieldDatesSet.has(priorSundayStr)) {
-    if (masteredDates.has(priorSundayStr)) {
-      initialStreak = 1;
+    let priorShieldDatesArr: string[] = [];
+    try {
+      priorShieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${currentStudentId}`) || '[]');
+      if (!Array.isArray(priorShieldDatesArr)) priorShieldDatesArr = [];
+    } catch (e) {
+      priorShieldDatesArr = [];
     }
-    while (true) {
-      checkPriorDate.setDate(checkPriorDate.getDate() - 1);
-      const prevStr = toLocalYYYYMMDD(checkPriorDate);
-      if (masteredDates.has(prevStr)) {
-        initialStreak += 1;
-      } else if (priorShieldDatesSet.has(prevStr)) {
-        continue;
-      } else {
-        break;
+    const priorShieldDatesSet = new Set(priorShieldDatesArr);
+    if (currentStudentUser?.joker_used_at) {
+      priorShieldDatesSet.add(toLocalYYYYMMDD(new Date(currentStudentUser.joker_used_at)));
+    }
+
+    if (masteredDates.has(priorSundayStr) || priorShieldDatesSet.has(priorSundayStr)) {
+      if (masteredDates.has(priorSundayStr)) {
+        initialStreak = 1;
       }
+      while (true) {
+        checkPriorDate.setDate(checkPriorDate.getDate() - 1);
+        const prevStr = toLocalYYYYMMDD(checkPriorDate);
+        if (masteredDates.has(prevStr)) {
+          initialStreak += 1;
+        } else if (priorShieldDatesSet.has(prevStr)) {
+          continue;
+        } else {
+          break;
+        }
+      }
+    } else if (typeof authoritativeStreak === 'number' && authoritativeStreak > 0) {
+      initialStreak = authoritativeStreak;
+    } else if (typeof currentStudentUser?.streak_flame === 'number' && currentStudentUser.streak_flame > 0) {
+      initialStreak = currentStudentUser.streak_flame;
     }
   }
 

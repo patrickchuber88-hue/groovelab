@@ -44,7 +44,18 @@ import {
   Trash2,
   Sliders,
   MessageCircle,
-  Flag
+  Flag,
+  Disc,
+  Volume2,
+  Speaker,
+  Zap,
+  Repeat,
+  BookOpen,
+  Medal,
+  FolderGit2,
+  Archive,
+  Activity,
+  Award
 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
@@ -65,21 +76,326 @@ import { primeDecryptedCache } from '../lib/security/messageCrypto';
 
 export const getGroupIconComponent = (iconId: string) => {
   switch (iconId) {
-    case 'users': return Users;
+    // 1. Instrumente
     case 'guitar': return Guitar;
+    case 'acoustic_guitar': return Music;
+    case 'piano': return Layers;
+    case 'drums': return Disc;
     case 'mic': return Mic;
-    case 'headphones': return Headphones;
-    case 'radio': return Radio;
-    case 'sparkles': return Sparkles;
-    case 'trophy': return Trophy;
+    case 'violin': return Activity;
+    case 'brass': return Radio;
+    case 'bass': return Volume2;
+    // 2. Bands & Ensembles
+    case 'rockband':
     case 'flame': return Flame;
-    case 'layers': return Layers;
+    case 'bigband': return Speaker;
+    case 'orchestra':
     case 'compass': return Compass;
-    case 'award': return Trophy;
+    case 'choir':
+    case 'users': return Users;
+    case 'ensemble':
+    case 'sparkles': return Sparkles;
+    case 'jam': return Zap;
+    case 'duo':
+    case 'headphones': return Headphones;
+    case 'percussion': return Repeat;
+    // 3. Klasse & Events
+    case 'klassenchat': return GraduationCap;
+    case 'concert':
+    case 'award': return Award;
+    case 'theory': return BookOpen;
+    case 'masterclass':
+    case 'trophy': return Trophy;
+    case 'competition': return Medal;
+    case 'project': return FolderGit2;
+    case 'parents': return ShieldCheck;
+    case 'archive': return Archive;
+    // Fallbacks
+    case 'radio': return Radio;
+    case 'layers': return Layers;
     case 'music':
     default:
       return Music;
   }
+};
+
+export const resolveGroupIconAndColor = (group: any) => {
+  let iconKey = group?.icon || group?.avatar_icon;
+  let colorKey = group?.color || group?.color_accent;
+
+  const nameLower = (group?.name || '').toLowerCase();
+  
+  // Intelligent Auto-Enhancement for default/unspecific icons:
+  if (!iconKey || iconKey === 'music' || iconKey === 'users') {
+    if (nameLower.includes('rockband') || nameLower.includes('rock') || nameLower.includes('metal')) {
+      iconKey = 'rockband';
+      if (!colorKey) colorKey = '#ea580c'; // Sunset Orange
+    } else if (nameLower.includes('band') || nameLower.includes('combo')) {
+      iconKey = 'guitar';
+      if (!colorKey) colorKey = '#2563eb'; // Studio Blau
+    } else if (nameLower.includes('klasse') || nameLower.includes('unterricht') || nameLower.includes('kurs')) {
+      iconKey = 'klassenchat';
+      if (!colorKey) colorKey = '#15803d'; // Campus Grün
+    } else if (nameLower.includes('chor') || nameLower.includes('vocal') || nameLower.includes('stimme')) {
+      iconKey = 'choir';
+      if (!colorKey) colorKey = '#7c3aed'; // Jazz Violett
+    } else if (nameLower.includes('orchester') || nameLower.includes('streicher')) {
+      iconKey = 'orchestra';
+      if (!colorKey) colorKey = '#0891b2'; // Ocean Cyan
+    } else if (nameLower.includes('theorie') || nameLower.includes('gehör')) {
+      iconKey = 'theory';
+      if (!colorKey) colorKey = '#475569'; // Slate
+    }
+  }
+
+  return {
+    iconKey: iconKey || 'music',
+    colorKey: colorKey || '#15803d'
+  };
+};
+
+export const APPLE_AVATAR_GRADIENTS = [
+  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', text: '#ffffff' }, // Emerald
+  { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', text: '#ffffff' }, // Royal Blue
+  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', text: '#ffffff' }, // Violet / Amethyst
+  { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', text: '#ffffff' }, // Amber / Gold
+  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', text: '#ffffff' }, // Rose / Pink
+  { bg: 'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)', text: '#ffffff' }, // Cyan / Ocean
+  { bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', text: '#ffffff' }, // Sunset Orange
+  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', text: '#ffffff' }, // Teal
+  { bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', text: '#ffffff' }, // Studio Indigo
+  { bg: 'linear-gradient(135deg, #e11d48 0%, #9f1239 100%)', text: '#ffffff' }, // Crimson
+  { bg: 'linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)', text: '#ffffff' }, // Lime / Olive
+  { bg: 'linear-gradient(135deg, #64748b 0%, #334155 100%)', text: '#ffffff' }  // Slate / Graphit
+];
+
+export const getDeterministicAvatarGradient = (idOrName: string) => {
+  if (!idOrName) return APPLE_AVATAR_GRADIENTS[0];
+  let hash = 0;
+  for (let i = 0; i < idOrName.length; i++) {
+    hash = (hash << 5) - hash + idOrName.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % APPLE_AVATAR_GRADIENTS.length;
+  return APPLE_AVATAR_GRADIENTS[index];
+};
+
+export const getContactInitials = (u: any): string => {
+  if (!u) return '?';
+  const first = (u.first_name || u.name || '').trim();
+  const last = (u.full_last_name || u.last_name || '').trim();
+  if (first && last) {
+    return `${first[0]}${last[0]}`.toUpperCase();
+  }
+  if (first.length >= 2) {
+    return first.slice(0, 2).toUpperCase();
+  }
+  if (first.length === 1) {
+    return first.toUpperCase();
+  }
+  return '?';
+};
+
+interface CampusDynamicAvatarProps {
+  user: any;
+  size?: number;
+  showPresence?: boolean;
+  isQuietHours?: boolean;
+  style?: React.CSSProperties;
+  variant?: 'default' | 'on-dark';
+}
+
+export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
+  user,
+  size = 42,
+  showPresence = false,
+  isQuietHours = false,
+  style = {},
+  variant = 'default'
+}) => {
+  // 1. Group avatar: Apple Squircle Badge with resolved icon and color
+  if (user?.is_group) {
+    const { iconKey, colorKey } = resolveGroupIconAndColor(user);
+    const GroupIcon = getGroupIconComponent(iconKey);
+    const radius = Math.round(size * 0.33);
+    const iconSize = Math.round(size * 0.52);
+
+    return (
+      <div style={{ position: 'relative', flexShrink: 0, ...style }}>
+        <div style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: `${radius}px`,
+          background: variant === 'on-dark' ? 'rgba(255, 255, 255, 0.22)' : `${colorKey}16`,
+          border: variant === 'on-dark' ? '1.5px solid rgba(255, 255, 255, 0.38)' : `1.5px solid ${colorKey}38`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.15)' : `0 2px 8px ${colorKey}18`,
+          boxSizing: 'border-box'
+        }}>
+          <GroupIcon size={iconSize} color={variant === 'on-dark' ? '#ffffff' : colorKey} strokeWidth={2.4} />
+        </div>
+        {(user.unreadCount || 0) > 0 && (
+          <div style={{
+            position: 'absolute',
+            bottom: '-2px',
+            right: '-2px',
+            background: '#ea4335',
+            color: 'white',
+            borderRadius: '50%',
+            width: '18px',
+            height: '18px',
+            fontSize: '0.65rem',
+            fontWeight: 900,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px solid white',
+            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)',
+            zIndex: 2
+          }}>
+            {user.unreadCount}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 2. Individual User: 100% Apple Dynamic Monogram Standard (Zero Avatar Blindness)
+  const role = (user?.role || '').toLowerCase();
+  const roles = Array.isArray(user?.roles) ? user.roles.map((r: any) => String(r).toLowerCase()) : [];
+  const isTeacher = role === 'teacher' || roles.includes('teacher');
+  const isParent = role === 'parent' || user?.sender_role === 'parent';
+  const isSecretary = role === 'secretary' || role === 'admin' || roles.includes('secretary') || roles.includes('admin');
+
+  const initials = getContactInitials(user);
+  const identifier = user?.id || user?.name || user?.first_name || 'contact';
+  
+  // Teachers get signature academic emerald palette; Admins get slate/indigo; Parents blue; Students get deterministic studio palettes
+  const gradient = isTeacher 
+    ? (variant === 'on-dark' 
+        ? { bg: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)', text: '#ffffff' }
+        : { bg: 'linear-gradient(135deg, #15803d 0%, #047857 100%)', text: '#ffffff' })
+    : isSecretary
+    ? { bg: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)', text: '#ffffff' }
+    : isParent
+    ? { bg: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)', text: '#ffffff' }
+    : getDeterministicAvatarGradient(identifier);
+
+  const fontSize = size >= 44 ? '0.98rem' : size >= 36 ? '0.85rem' : '0.72rem';
+  const cornerBadgeSize = Math.max(14, Math.round(size * 0.38));
+
+  return (
+    <div style={{ position: 'relative', flexShrink: 0, ...style }}>
+      <div 
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: '50%',
+          background: gradient.bg,
+          border: '2px solid #ffffff',
+          boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: gradient.text,
+          fontWeight: 850,
+          fontSize: fontSize,
+          letterSpacing: '-0.02em',
+          userSelect: 'none',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span>{initials}</span>
+      </div>
+
+      {/* Teacher / Parent Verified Signature Corner Pin */}
+      {isTeacher ? (
+        <div 
+          title="Verifizierte Lehrkraft"
+          style={{
+            position: 'absolute',
+            bottom: '-2px',
+            right: '-2px',
+            width: `${cornerBadgeSize}px`,
+            height: `${cornerBadgeSize}px`,
+            borderRadius: '50%',
+            background: '#15803d',
+            border: '1.5px solid #ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+            zIndex: 2
+          }}
+        >
+          <GraduationCap size={Math.round(cornerBadgeSize * 0.65)} color="#ffffff" strokeWidth={2.4} />
+        </div>
+      ) : isParent ? (
+        <div 
+          title="Erziehungsberechtigte"
+          style={{
+            position: 'absolute',
+            bottom: '-2px',
+            right: '-2px',
+            width: `${cornerBadgeSize}px`,
+            height: `${cornerBadgeSize}px`,
+            borderRadius: '50%',
+            background: '#1d4ed8',
+            border: '1.5px solid #ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+            zIndex: 2
+          }}
+        >
+          <ShieldCheck size={Math.round(cornerBadgeSize * 0.65)} color="#ffffff" strokeWidth={2.4} />
+        </div>
+      ) : showPresence ? (
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: '0px',
+            right: '0px',
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            background: isQuietHours ? '#f59e0b' : '#22c55e',
+            border: '2px solid #ffffff',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+            zIndex: 2
+          }} 
+          title={isQuietHours ? 'Im Feierabend' : 'Aktiv'}
+        />
+      ) : null}
+
+      {/* Unread badge on avatar if present and not group */}
+      {(user?.unreadCount || 0) > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '-2px',
+          right: '-2px',
+          background: '#ea4335',
+          color: 'white',
+          borderRadius: '50%',
+          width: '18px',
+          height: '18px',
+          fontSize: '0.65rem',
+          fontWeight: 900,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '2px solid white',
+          boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)',
+          zIndex: 3
+        }}>
+          {user.unreadCount}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const resolveCampusAvatar = (u: any): string => {
@@ -145,12 +461,38 @@ const parseLocalDate = (dateStr: string): Date => {
   return new Date(dateStr);
 };
 
+// Helper to extract date from message content if occurrence_id is missing or legacy
+const extractOccurrenceDateFromMessage = (msg: any): string | null => {
+  if (!msg) return null;
+  if (msg.occurrence_id) {
+    const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
+    if (matchVirtual) return matchVirtual[0];
+  }
+  const text = String(msg.content || '');
+  // 1. ISO format: 2026-07-20
+  const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (matchIso) {
+    return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+  }
+  // 2. German format: 20.07.26 or 20.07.2026
+  const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (matchFullYear) {
+    const day = matchFullYear[1].padStart(2, '0');
+    const month = matchFullYear[2].padStart(2, '0');
+    let year = matchFullYear[3];
+    if (year.length === 2) year = `20${year}`;
+    return `${year}-${month}-${day}`;
+  }
+  return null;
+};
+
 interface AppleSystemNotificationCardProps {
   msg: any;
   selectedRecipient?: any;
   onSendMessage?: (recipientId: string, content: string) => Promise<void>;
   isSuperseded?: boolean;
   currentOcc?: any;
+  onNavigateToSchedule?: (dateStr?: string) => void;
 }
 
 const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = ({ 
@@ -158,114 +500,339 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
   selectedRecipient, 
   onSendMessage,
   isSuperseded = false,
-  currentOcc
+  currentOcc,
+  onNavigateToSchedule
 }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDoneStatus, setActionDoneStatus] = useState<'confirmed' | 'rejected' | null>(null);
 
   const content: string = msg.content || '';
   const cleanContent = String(content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
+  const lowerContent = cleanContent.toLowerCase();
 
   const isReactivation = msg.message_type === 'cancellation_reset' ||
-    (content && (content.includes('🔄') || content.includes('zurückgesetzt') || content.includes('wiederhergestellt') || content.includes('reaktiviert') || content.includes('zurückgenommen') || content.includes('regulär statt')));
+    content.includes('🔄') || lowerContent.includes('reaktiviert') || lowerContent.includes('zurückgesetzt') || lowerContent.includes('wiederhergestellt') || lowerContent.includes('regulär statt') || lowerContent.includes('entwarnung') || lowerContent.includes('einsatzbereit');
 
-  const isCancellation = msg.message_type === 'reschedule_notification' ||
-    (content && (content.includes('❌') || content.includes('Termin abgesagt') || content.includes('fällt aus') || content.includes('abgesagt') || content.includes('storniert') || content.includes('wurde abgesagt')));
+  const isCancellation = (msg.message_type === 'reschedule_notification' && (content.includes('❌') || lowerContent.includes('abgesagt'))) ||
+    content.includes('❌') || lowerContent.includes('termin abgesagt') || lowerContent.includes('fällt aus') || lowerContent.includes('abgesagt') || lowerContent.includes('storniert') || lowerContent.includes('wurde abgesagt');
 
-  // 1. Reaktivierungs-Eventkarte (Audit-Proof, 100% identisch mit Shoutbox-Modal)
-  // 1. Reaktivierungs-Eventkarte (Audit-Proof & Monochrom)
+  const dateMatch = extractOccurrenceDateFromMessage(msg);
+  const occDateStr = currentOcc?.date || dateMatch;
+  let parsedDate: Date | null = null;
+  if (occDateStr) {
+    try {
+      const p = parseLocalDate(occDateStr);
+      if (!isNaN(p.getTime())) parsedDate = p;
+    } catch (e) {}
+  }
+
+  const handleNavigate = () => {
+    if (typeof window === 'undefined') return;
+    const targetDate = occDateStr;
+    if (targetDate) {
+      localStorage.setItem('campus_calendar_target_date', targetDate);
+      localStorage.setItem('groovelab_selected_schedule_date', targetDate);
+      window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: targetDate } }));
+    }
+    localStorage.setItem('campus_active_tab', 'schedule');
+    localStorage.setItem('groovelab_active_tab', 'schedule');
+    if (onNavigateToSchedule && targetDate) {
+      onNavigateToSchedule(targetDate);
+    } else {
+      window.location.reload();
+    }
+  };
+
+  const stampTimeStr = new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+  const stampDateStr = new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  // 1. Reaktivierungs-Eventkarte (0.1% Goldstandard Apple Tear-Off Calendar Card)
   if (isReactivation) {
     const lines = cleanContent
       .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
       .split('\n')
       .map((l: string) => l.trim())
       .filter(Boolean);
-    const mainMsg = lines[0] || 'Termin reaktiviert: Der Unterricht findet planmäßig statt.';
-    const timeLine = lines.find((l: string) => l.toLowerCase().includes('reaktiviert am')) ||
-      `Reaktiviert am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+    const teacherName = formatStudentDisplayName(selectedRecipient);
+    const cleanHeaderMsg = lines.find(l => l.includes('einsatzbereit') || l.includes('reaktiviert') || l.includes('findet statt')) ||
+      `Lehrkraft ${teacherName} ist wieder einsatzbereit. Der Unterricht findet planmäßig statt.`;
 
     return (
-      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
+      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '6px 0' }}>
         <div style={{
-          background: '#f0fdf4',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 244, 0.95) 100%)',
           border: '1.5px solid #86efac',
-          borderRadius: '18px',
-          padding: '12px 18px',
-          boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
+          borderRadius: '20px',
+          padding: '14px 18px',
+          boxShadow: '0 4px 16px rgba(34, 197, 94, 0.08), 0 1px 3px rgba(0,0,0,0.02)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <RotateCcw size={14} color="#15803d" strokeWidth={2.5} />
+          {/* Left: Apple Calendar Tear-Off Block + Details */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '220px' }}>
+            {parsedDate ? (
+              <div style={{
+                width: '48px',
+                height: '52px',
+                borderRadius: '12px',
+                background: '#ffffff',
+                border: '1.5px solid #bbf7d0',
+                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                flexShrink: 0,
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  fontSize: '0.60rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  padding: '1.5px 0'
+                }}>
+                  {parsedDate.toLocaleDateString('de-DE', { month: 'short' })}
+                </div>
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.15rem',
+                  fontWeight: 900,
+                  color: '#15803d',
+                  lineHeight: 1
+                }}>
+                  {parsedDate.getDate()}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: '#dcfce7',
+                border: '1.5px solid #86efac',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <RotateCcw size={18} color="#15803d" strokeWidth={2.4} />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  fontWeight: 850,
+                  border: '1px solid #86efac',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <Check size={11} strokeWidth={3} />
+                  <span>Planmäßiger Unterricht</span>
+                </span>
+                <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                  {stampDateStr}, {stampTimeStr}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.86rem', fontWeight: 750, color: '#166534', lineHeight: 1.35, marginTop: '2px' }}>
+                {cleanHeaderMsg}
+              </div>
+              {parsedDate && (
+                <div style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Calendar size={12} color="#16a34a" />
+                  <span>{parsedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                </div>
+              )}
             </div>
-            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
-              Termin reaktiviert
-            </span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
-              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
-            </span>
           </div>
-          <div style={{ fontSize: '0.90rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-              <RotateCcw size={13} color="#15803d" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
-              <span>{mainMsg}</span>
-            </div>
-            <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Clock size={12} color="#166534" style={{ flexShrink: 0 }} />
-              <span>{timeLine}</span>
-            </div>
-          </div>
+
+          {/* Right Action: Apple Pill Button */}
+          {parsedDate && (
+            <button
+              type="button"
+              onClick={handleNavigate}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '100px',
+                border: 'none',
+                background: '#16a34a',
+                color: '#ffffff',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.22)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0
+              }}
+              className="hover-scale"
+            >
+              <Calendar size={13} color="#ffffff" />
+              <span>Im Stundenplan</span>
+              <ArrowRight size={12} color="#ffffff" strokeWidth={2.4} />
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
-  // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof & Monochrom)
+  // 2. Stornierungs-/Absage-Eventkarte (0.1% Goldstandard Apple Tear-Off Calendar Card)
   if (isCancellation) {
     const lines = cleanContent
       .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
       .split('\n')
       .map((l: string) => l.trim())
       .filter(Boolean);
-    const mainMsg = lines[0] || 'Dieser Termin wurde abgesagt.';
-    const timeLine = lines.find((l: string) => l.toLowerCase().includes('abgemeldet am') || l.toLowerCase().includes('abgesagt am')) ||
-      `Abgemeldet am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+    const mainMsg = lines[0] || 'Dieser Unterrichtstermin wurde abgesagt.';
 
     return (
-      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
+      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '6px 0' }}>
         <div style={{
-          background: '#fef2f2',
-          border: '1.5px dashed #fca5a5',
-          borderRadius: '18px',
-          padding: '12px 18px',
-          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(254, 242, 242, 0.95) 100%)',
+          border: '1.5px solid #fca5a5',
+          borderRadius: '20px',
+          padding: '14px 18px',
+          boxShadow: '0 4px 16px rgba(239, 68, 68, 0.06), 0 1px 3px rgba(0,0,0,0.02)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <X size={14} color="#dc2626" strokeWidth={2.5} />
+          {/* Left: Apple Calendar Tear-Off Block (Red) + Details */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '220px' }}>
+            {parsedDate ? (
+              <div style={{
+                width: '48px',
+                height: '52px',
+                borderRadius: '12px',
+                background: '#ffffff',
+                border: '1.5px solid #fecaca',
+                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                flexShrink: 0,
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '0.60rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  padding: '1.5px 0'
+                }}>
+                  {parsedDate.toLocaleDateString('de-DE', { month: 'short' })}
+                </div>
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.15rem',
+                  fontWeight: 900,
+                  color: '#991b1b',
+                  lineHeight: 1
+                }}>
+                  {parsedDate.getDate()}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: '#fee2e2',
+                border: '1.5px solid #fca5a5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <X size={18} color="#dc2626" strokeWidth={2.4} />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  background: '#fee2e2',
+                  color: '#991b1b',
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  fontWeight: 850,
+                  border: '1px solid #fca5a5',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <X size={11} strokeWidth={3} />
+                  <span>Unterricht abgesagt</span>
+                </span>
+                <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                  {stampDateStr}, {stampTimeStr}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.86rem', fontWeight: 750, color: '#991b1b', lineHeight: 1.35, marginTop: '2px' }}>
+                {mainMsg}
+              </div>
+              {parsedDate && (
+                <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Calendar size={12} color="#dc2626" />
+                  <span>{parsedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                </div>
+              )}
             </div>
-            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
-              Termin abgesagt
-            </span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
-              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
-            </span>
           </div>
-          <div style={{ fontSize: '0.90rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-              <X size={13} color="#dc2626" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
-              <span>{mainMsg}</span>
-            </div>
-            <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Clock size={12} color="#b91c1c" style={{ flexShrink: 0 }} />
-              <span>{timeLine}</span>
-            </div>
-          </div>
+
+          {/* Right Action: Apple Pill Button */}
+          {parsedDate && (
+            <button
+              type="button"
+              onClick={handleNavigate}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '100px',
+                border: 'none',
+                background: '#dc2626',
+                color: '#ffffff',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.22)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0
+              }}
+              className="hover-scale"
+            >
+              <Calendar size={13} color="#ffffff" />
+              <span>Im Stundenplan</span>
+              <ArrowRight size={12} color="#ffffff" strokeWidth={2.4} />
+            </button>
+          )}
         </div>
       </div>
     );
@@ -410,9 +977,9 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
     <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
       <div style={{
         background: '#ffffff',
-        borderRadius: '16px',
+        borderRadius: '18px',
         padding: '14px 18px',
-        maxWidth: '500px',
+        maxWidth: '520px',
         width: '100%',
         boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
         border: '1px solid #f1f5f9',
@@ -473,7 +1040,7 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
           </p>
         )}
 
-        {/* Status Line */}
+        {/* Status Line & Action */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
           <span style={{
             fontSize: '0.68rem',
@@ -491,11 +1058,37 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
             <span>{badgeText}</span>
           </span>
 
-          {note && isShift && (
-            <span style={{ fontSize: '0.70rem', fontWeight: 500, color: '#94a3b8' }}>
-              {note}
-            </span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {parsedDate && (
+              <button
+                type="button"
+                onClick={handleNavigate}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#15803d',
+                  fontSize: '0.74rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 6px'
+                }}
+                className="hover-scale"
+              >
+                <Calendar size={12} color="#15803d" />
+                <span>Im Plan</span>
+                <ArrowRight size={11} color="#15803d" />
+              </button>
+            )}
+
+            {note && isShift && (
+              <span style={{ fontSize: '0.70rem', fontWeight: 500, color: '#94a3b8' }}>
+                {note}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Interactive Apple Action Buttons (If Confirmation Pending) */}
@@ -1775,10 +2368,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
     const rawContent = cleanChatMessageContent(lastMsg.content);
     const isSys = isSystemMessage(lastMsg);
+    const isSelf = lastMsg.sender_id === (effectiveUid || user?.id);
 
     if (isSys) {
       const isReactivation = lastMsg.message_type === 'cancellation_reset' ||
-        rawContent.includes('🔄') || rawContent.toLowerCase().includes('reaktiviert') || rawContent.toLowerCase().includes('zurückgesetzt') || rawContent.toLowerCase().includes('regulär statt');
+        rawContent.includes('🔄') || rawContent.toLowerCase().includes('reaktiviert') || rawContent.toLowerCase().includes('zurückgesetzt') || rawContent.toLowerCase().includes('regulär statt') || rawContent.toLowerCase().includes('entwarnung') || rawContent.toLowerCase().includes('einsatzbereit');
       const isCancellation = lastMsg.message_type === 'reschedule_notification' ||
         rawContent.includes('❌') || rawContent.toLowerCase().includes('abgesagt') || rawContent.toLowerCase().includes('fällt aus');
 
@@ -1803,8 +2397,16 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     // Regular human message: strip out any stray emoji markers and display cleanly
     const cleanedText = rawContent.replace(/[❌🔄]/gu, '').trim();
     return (
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {cleanedText}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {isSelf && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#16a34a', fontWeight: 700 }}>
+            <span>Du:</span>
+            <CheckCheck size={12} color={lastMsg.is_read ? '#16a34a' : '#94a3b8'} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+          </span>
+        )}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {cleanedText}
+        </span>
       </span>
     );
   };
@@ -2383,30 +2985,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     fetchOccurrencesForStudent();
   }, [selectedRecipient?.id]);
 
-  // 1. Helper to extract date from message content if occurrence_id is missing or legacy
-  const extractOccurrenceDateFromMessage = (msg: any): string | null => {
-    if (!msg) return null;
-    if (msg.occurrence_id) {
-      const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
-      if (matchVirtual) return matchVirtual[0];
-    }
-    const text = String(msg.content || '');
-    // 1. ISO format: 2026-07-20
-    const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (matchIso) {
-      return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
-    }
-    // 2. German format: 20.07.26 or 20.07.2026
-    const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
-    if (matchFullYear) {
-      const day = matchFullYear[1].padStart(2, '0');
-      const month = matchFullYear[2].padStart(2, '0');
-      let year = matchFullYear[3];
-      if (year.length === 2) year = `20${year}`;
-      return `${year}-${month}-${day}`;
-    }
-    return null;
-  };
 
   // Helper to get occurrence context label for a message (date, day of week, time)
   const getMessageOccurrenceContext = (msg: any): { date: string; label: string; occurrence?: any } | null => {
@@ -2627,12 +3205,62 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
   // 5. Messages displayed in the chat area for currently active sub-tab (Unified Timeline)
   const displayedMessages = useMemo(() => {
-    if (selectedRecipient?.is_group) {
-      return activeThreadMessages;
+    const rawList = selectedRecipient?.is_group ? activeThreadMessages : unifiedTimelineMessages;
+    
+    // Canonical Coalescing & Deduplication of System Event Cards (0.1% Goldstandard)
+    // Coalesces duplicate system broadcasts (e.g. absence reset notification + cancellation_reset)
+    // for the same event date/occurrence within a 15-minute window into a single authoritative card.
+    const result: any[] = [];
+    for (let i = 0; i < rawList.length; i++) {
+      const msg = rawList[i];
+      if (!isSystemMessage(msg)) {
+        result.push(msg);
+        continue;
+      }
+
+      const content = String(msg.content || '');
+      const lower = content.toLowerCase();
+      const isReactivation = msg.message_type === 'cancellation_reset' ||
+        content.includes('🔄') || lower.includes('reaktiviert') || lower.includes('zurückgesetzt') || lower.includes('wiederhergestellt') || lower.includes('regulär statt') || lower.includes('entwarnung') || lower.includes('einsatzbereit');
+      const isCancellation = (msg.message_type === 'reschedule_notification' && (content.includes('❌') || lower.includes('abgesagt'))) ||
+        content.includes('❌') || lower.includes('termin abgesagt') || lower.includes('fällt aus') || lower.includes('abgesagt') || lower.includes('storniert');
+
+      const occDate = extractOccurrenceDateFromMessage(msg) || (msg.occurrence_id ? String(msg.occurrence_id) : null);
+      const msgTime = new Date(msg.created_at).getTime();
+
+      // Check if already represented by an earlier message in result within 15 minutes
+      const hasTwinInResult = result.some((prev: any) => {
+        if (!isSystemMessage(prev)) return false;
+        const prevContent = String(prev.content || '');
+        const prevLower = prevContent.toLowerCase();
+        const prevIsReactivation = prev.message_type === 'cancellation_reset' ||
+          prevContent.includes('🔄') || prevLower.includes('reaktiviert') || prevLower.includes('zurückgesetzt') || prevLower.includes('wiederhergestellt') || prevLower.includes('regulär statt') || prevLower.includes('entwarnung') || prevLower.includes('einsatzbereit');
+        const prevIsCancellation = (prev.message_type === 'reschedule_notification' && (prevContent.includes('❌') || prevLower.includes('abgesagt'))) ||
+          prevContent.includes('❌') || prevLower.includes('termin abgesagt') || prevLower.includes('fällt aus') || prevLower.includes('abgesagt') || prevLower.includes('storniert');
+
+        const prevOccDate = extractOccurrenceDateFromMessage(prev) || (prev.occurrence_id ? String(prev.occurrence_id) : null);
+        const prevTime = new Date(prev.created_at).getTime();
+
+        const timeDiff = Math.abs(msgTime - prevTime);
+        if (timeDiff > 15 * 60 * 1000) return false;
+
+        if (isReactivation && prevIsReactivation) {
+          if (occDate && prevOccDate && occDate === prevOccDate) return true;
+          if (!occDate || !prevOccDate) return true;
+        }
+        if (isCancellation && prevIsCancellation) {
+          if (occDate && prevOccDate && occDate === prevOccDate) return true;
+          if (!occDate || !prevOccDate) return true;
+        }
+        return false;
+      });
+
+      if (hasTwinInResult) {
+        continue;
+      }
+      result.push(msg);
     }
-    // Tab "Alle" (Unified Timeline for 1:1 chat):
-    // Chronological feed of human messages and system notifications (excluding replies inside topics and excluding structured topics)
-    return unifiedTimelineMessages;
+    return result;
   }, [activeThreadMessages, selectedRecipient?.is_group, unifiedTimelineMessages]);
 
   const activeRootTopics = useMemo(() => {
@@ -3083,8 +3711,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         width: '100%',
                         padding: isMobile ? '12px 14px' : '14px 16px',
                         borderRadius: '16px',
-                        background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
-                        border: '1px solid transparent',
+                        background: isSelected ? '#f0fdf4' : 'transparent',
+                        border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                        boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
                         transition: 'all 0.2s',
@@ -3095,45 +3724,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '14px',
-                          background: `${groupColorKey}18`,
-                          border: `1.5px solid ${groupColorKey}40`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <GroupIcon size={22} color={groupColorKey} strokeWidth={2.4} />
-                        </div>
-                        {(group.unreadCount || 0) > 0 && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '-2px',
-                            right: '-2px',
-                            background: '#ea4335',
-                            color: 'white',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '2px solid white',
-                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.45)'
-                          }}>
-                            {group.unreadCount}
-                          </div>
-                        )}
-                      </div>
+                      <CampusDynamicAvatar user={group} size={42} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#15803d' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {group.name}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
@@ -3235,8 +3830,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           width: '100%',
                           padding: isMobile ? '12px 14px' : '14px 16px',
                           borderRadius: '16px',
-                          background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
-                          border: '1px solid transparent',
+                          background: isSelected ? '#f0fdf4' : 'transparent',
+                          border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                          boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
                           cursor: 'pointer',
                           marginBottom: '6px',
                           transition: 'all 0.2s',
@@ -3247,46 +3843,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           boxSizing: 'border-box'
                         }}
                       >
-                        <div style={{ position: 'relative', flexShrink: 0 }}>
-                          <div style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '14px',
-                            background: `${groupColorKey}18`,
-                            border: `1.5px solid ${groupColorKey}40`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <GroupIcon size={22} color={groupColorKey} strokeWidth={2.4} />
-                          </div>
-                          {(item.unreadCount || 0) > 0 && (
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '-2px',
-                              right: '-2px',
-                              background: '#ea4335',
-                              color: 'white',
-                              borderRadius: '50%',
-                              width: '18px',
-                              height: '18px',
-                              fontSize: '0.65rem',
-                              fontWeight: 900,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '2px solid white',
-                              boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
-                            }}>
-                              {item.unreadCount}
-                            </div>
-                          )}
-                        </div>
+                        <CampusDynamicAvatar user={item} size={42} />
 
                         <div style={{ flex: 1, overflow: 'hidden' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                              <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#15803d' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {item.name}
                               </span>
                               <span style={{
@@ -3351,8 +3913,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         width: '100%',
                         padding: isMobile ? '12px 14px' : '14px 16px',
                         borderRadius: '16px',
-                        background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
-                        border: '1px solid transparent',
+                        background: isSelected ? '#f0fdf4' : 'transparent',
+                        border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                        boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
                         transition: 'all 0.2s',
@@ -3363,38 +3926,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <img 
-                          src={resolveCampusAvatar(item)} 
-                          alt="" 
-                          style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
-                        />
-                        {(item.unreadCount || 0) > 0 && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '-2px',
-                            right: '-2px',
-                            background: '#ea4335',
-                            color: 'white',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '2px solid white',
-                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
-                          }}>
-                            {item.unreadCount}
-                          </div>
-                        )}
-                      </div>
+                      <CampusDynamicAvatar user={item} size={42} showPresence isQuietHours={isRecipientInQuietHours} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#15803d' : '#0f172a' }}>
                             {formatStudentDisplayName(item)}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
@@ -3461,8 +3997,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         width: '100%',
                         padding: isMobile ? '12px 14px' : '14px 16px',
                         borderRadius: '16px',
-                        background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
-                        border: '1px solid transparent',
+                        background: isSelected ? '#f0fdf4' : 'transparent',
+                        border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                        boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
                         transition: 'all 0.2s',
@@ -3473,38 +4010,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <img 
-                          src={resolveCampusAvatar(partner)} 
-                          alt="" 
-                          style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
-                        />
-                        {partner.unreadCount > 0 && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '-2px',
-                            right: '-2px',
-                            background: '#ea4335',
-                            color: 'white',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '2px solid white',
-                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
-                          }}>
-                            {partner.unreadCount}
-                          </div>
-                        )}
-                      </div>
+                      <CampusDynamicAvatar user={partner} size={42} showPresence isQuietHours={isRecipientInQuietHours} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#15803d' : '#0f172a' }}>
                             {formatStudentDisplayName(partner)}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
@@ -3573,18 +4083,21 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       }}>
         {selectedRecipient ? (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
-            {/* Header: Green Hero Header matching Termin-Shoutbox */}
+            {/* Header: WhatsApp-Inspired Campus-Green Header (0.1% Goldstandard) */}
             <div style={{ 
-              padding: isMobile ? '12px 16px' : '16px 24px', 
-              background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)', 
+              padding: isMobile ? '12px 16px' : '14px 22px', 
+              background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)', 
               color: '#ffffff',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between', 
               flexWrap: 'wrap',
               gap: '12px',
-              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
-              borderRadius: isMobile ? '16px 16px 0 0' : '24px 24px 0 0'
+              borderRadius: isMobile ? '16px 16px 0 0' : '24px 24px 0 0',
+              position: 'relative',
+              zIndex: 30,
+              boxShadow: '0 4px 16px rgba(21, 128, 61, 0.16)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 {isMobile && (
@@ -3593,48 +4106,29 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     onClick={() => setSelectedRecipient(null)}
                     aria-label="Zurück zur Nachrichtenübersicht"
                     style={{
-                      background: 'rgba(255, 255, 255, 0.25)',
+                      background: 'rgba(255, 255, 255, 0.2)',
                       border: 'none',
                       borderRadius: '12px',
                       cursor: 'pointer',
                       color: '#ffffff',
-                      width: '44px',
-                      height: '44px',
-                      minWidth: '44px',
-                      minHeight: '44px',
+                      width: '40px',
+                      height: '40px',
+                      minWidth: '40px',
+                      minHeight: '40px',
                       padding: '0',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backdropFilter: 'blur(4px)',
                       flexShrink: 0,
                       touchAction: 'manipulation'
                     }}
                   >
-                    <ArrowLeft size={20} />
+                    <ArrowLeft size={18} />
                   </button>
                 )}
                 {selectedRecipient.is_group ? (
                   <>
-                    {(() => {
-                      const GroupIcon = getGroupIconComponent(selectedRecipient.icon || selectedRecipient.avatar_icon);
-                      return (
-                        <div style={{
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '16px',
-                          background: 'rgba(255, 255, 255, 0.25)',
-                          border: '2px solid rgba(255, 255, 255, 0.85)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                          flexShrink: 0
-                        }}>
-                          <GroupIcon size={24} color="#ffffff" strokeWidth={2.4} />
-                        </div>
-                      );
-                    })()}
+                    <CampusDynamicAvatar user={selectedRecipient} size={44} variant="on-dark" />
                     <div>
                       <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{selectedRecipient.name}</span>
@@ -3642,15 +4136,16 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           <span style={{
                             fontSize: '0.62rem',
                             fontWeight: 900,
-                            background: '#fef3c7',
-                            color: '#92400e',
+                            background: 'rgba(255, 255, 255, 0.22)',
+                            color: '#ffffff',
+                            border: '1px solid rgba(255, 255, 255, 0.35)',
                             padding: '2px 8px',
                             borderRadius: '6px',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px'
                           }}>
-                            <Lock size={10} color="#92400e" />
+                            <Lock size={10} color="#ffffff" />
                             Ankündigungskanal
                           </span>
                         )}
@@ -3661,48 +4156,50 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         style={{
                           background: 'none',
                           border: 'none',
-                          padding: '3px 0 0 0',
+                          padding: '2px 0 0 0',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '5px',
-                          color: 'rgba(255, 255, 255, 0.9)',
-                          fontSize: '0.75rem',
-                          fontWeight: 750
+                          color: 'rgba(255, 255, 255, 0.88)',
+                          fontSize: '0.74rem',
+                          fontWeight: 700
                         }}
                       >
-                        <Users size={13} color="#ffffff" />
+                        <Users size={12} color="#ffffff" />
                         <span>{selectedRecipient.members_count || selectedRecipient.members?.length || 0} Teilnehmer • Details &amp; Mitglieder</span>
-                        <Info size={12} color="#ffffff" style={{ opacity: 0.85 }} />
+                        <Info size={11} color="rgba(255, 255, 255, 0.75)" />
                       </button>
                     </div>
                   </>
                 ) : (
                   <>
-                    <img 
-                      src={resolveCampusAvatar(selectedRecipient)} 
-                      alt="" 
-                      style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255, 255, 255, 0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }} 
+                    <CampusDynamicAvatar 
+                      user={selectedRecipient} 
+                      size={44} 
+                      variant="on-dark" 
+                      showPresence 
+                      isQuietHours={isRecipientInQuietHours} 
                     />
                     <div>
                       <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{formatStudentDisplayName(selectedRecipient)}</span>
                         <span style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
+                          fontSize: '0.64rem',
+                          fontWeight: 800,
                           textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          background: 'rgba(255, 255, 255, 0.25)',
+                          letterSpacing: '0.04em',
+                          background: 'rgba(255, 255, 255, 0.22)',
                           color: '#ffffff',
+                          border: '1px solid rgba(255, 255, 255, 0.35)',
                           padding: '2px 8px',
                           borderRadius: '6px',
-                          display: 'inline-block',
-                          backdropFilter: 'blur(4px)'
+                          display: 'inline-block'
                         }}>
                           {selectedRecipient.role === 'student' ? 'Schüler' : 'Lehrer'}
                         </span>
                       </h4>
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <MessageSquare size={12} color="#ffffff" />
                         <span>Direktnachrichten mit {formatStudentDisplayName(selectedRecipient)}</span>
                       </p>
@@ -3716,19 +4213,18 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 <span 
                   title="DSGVO-konform: Transportverschlüsselung via TLS 1.3, Datenbank im Ruhezustand AES-256 geschützt (Art. 32 DSGVO)"
                   style={{
-                    padding: isMobile ? '4px 10px' : '6px 14px',
-                    borderRadius: '10px',
-                    background: 'rgba(255, 255, 255, 0.22)',
+                    padding: isMobile ? '4px 10px' : '5px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.18)',
                     color: '#ffffff',
-                    fontSize: isMobile ? '0.64rem' : '0.72rem',
-                    fontWeight: 800,
-                    border: '1px solid rgba(255, 255, 255, 0.38)',
+                    fontSize: isMobile ? '0.65rem' : '0.72rem',
+                    fontWeight: 750,
+                    border: '1px solid rgba(255, 255, 255, 0.28)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    backdropFilter: 'blur(4px)',
                     whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     cursor: 'help'
                   }}
                 >
@@ -4711,6 +5207,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           onSendMessage={onSendMessage}
                           isSuperseded={isSuperseded}
                           currentOcc={matchedOcc}
+                          onNavigateToSchedule={onNavigateToSchedule}
                         />
                       </React.Fragment>
                     );
@@ -4761,19 +5258,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         {/* Avatar on the left for incoming messages (only on initial message of cluster) */}
                         {!isSelf && (
                           !isContinuation ? (
-                            <img
-                              src={resolveCampusAvatar(senderUser)}
-                              alt=""
-                              style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                objectFit: 'cover',
-                                border: '1.5px solid white',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                                flexShrink: 0,
-                                marginBottom: '2px'
-                              }}
+                            <CampusDynamicAvatar
+                              user={{ ...senderUser, sender_role: msg.sender_role }}
+                              size={32}
+                              style={{ marginBottom: '2px' }}
                             />
                           ) : (
                             <div style={{ width: '32px', flexShrink: 0 }} />
@@ -5056,7 +5544,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 </button>
               </div>
             ) : (
-              <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px max(12px, env(safe-area-inset-bottom)) 12px' : '12px 24px' }}>
+              <div style={{ 
+                borderTop: '1px solid #f1f5f9', 
+                background: '#ffffff', 
+                padding: isMobile ? '8px 12px max(12px, env(safe-area-inset-bottom)) 12px' : '10px 20px',
+                boxShadow: '0 -2px 10px rgba(0,0,0,0.015)'
+              }}>
                 {/* Quick Replies Pill Bar: Vetted Micro-Chips Suite (100% Harmonized & Monochrome) */}
                 {(() => {
                   const isUserTeacher = user?.role?.toLowerCase() === 'teacher' || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'secretary';
@@ -5078,7 +5571,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       alignItems: 'center',
                       gap: '8px',
                       overflowX: 'auto',
-                      paddingBottom: '8px',
+                      paddingBottom: '6px',
                       scrollbarWidth: 'none',
                       msOverflowStyle: 'none'
                     }}>
@@ -5100,27 +5593,37 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             }
                           }}
                           style={{
-                            padding: '6px 14px',
+                            padding: '5px 12px',
                             borderRadius: '100px',
                             background: '#ffffff',
-                            border: '1px solid #bbf7d0',
-                            color: '#15803d',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
+                            border: '1px solid #e2e8f0',
+                            color: '#334155',
+                            fontSize: '0.75rem',
+                            fontWeight: 650,
                             whiteSpace: 'nowrap',
                             cursor: 'pointer',
-                            boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                             flexShrink: 0,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            minHeight: isMobile ? '38px' : '32px',
+                            gap: '5px',
+                            minHeight: isMobile ? '36px' : '30px',
                             touchAction: 'manipulation',
                             transition: 'all 0.15s ease'
                           }}
                           className="hover-scale"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#86efac';
+                            e.currentTarget.style.background = '#f0fdf4';
+                            e.currentTarget.style.color = '#15803d';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.color = '#334155';
+                          }}
                         >
-                          <chip.icon size={13} strokeWidth={2.4} color="#15803d" style={{ flexShrink: 0 }} />
+                          <chip.icon size={12} strokeWidth={2.4} color="#15803d" style={{ flexShrink: 0 }} />
                           <span>{chip.label}</span>
                         </button>
                       ))}
@@ -5128,55 +5631,25 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   );
                 })()}
 
-                {/* 🌙 Geschützte Ruhezeit & Feierabend */}
-                {(() => {
-                  if (isRecipientInQuietHours && isStudent) {
-                    const teacherName = formatTeacherFullName(selectedRecipient);
-                    return (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '7px 12px',
-                        marginBottom: '6px',
-                        fontSize: '0.74rem',
-                        color: '#475569',
-                        fontWeight: 600,
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}>
-                        <Moon size={14} color="#64748b" style={{ flexShrink: 0 }} />
-                        <span>🌙 {teacherName} hat Feierabend • Deine Nachricht wird zugestellt und am nächsten Schultag beantwortet.</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* 🛡️ Institutional Child Protection & Four-Eyes Banner (§ 8a SGB VIII / BKiSchG) */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '12px',
-                  padding: '6px 12px',
-                  marginBottom: '6px',
-                  fontSize: '0.71rem',
-                  color: '#166534',
-                  fontWeight: 650,
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-                  <span style={{ flex: 1, lineHeight: 1.35 }}>
-                    <strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
-                  </span>
-                </div>
+                {/* 🌙 Ambient Quiet Hours Status Pill (0.1% Goldstandard) */}
+                {isRecipientInQuietHours && isStudent && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#fffbeb',
+                    border: '1px solid #fef3c7',
+                    borderRadius: '100px',
+                    padding: '3px 10px',
+                    marginBottom: '6px',
+                    fontSize: '0.72rem',
+                    color: '#92400e',
+                    fontWeight: 650
+                  }}>
+                    <Moon size={12} color="#d97706" style={{ flexShrink: 0 }} />
+                    <span>{formatTeacherFullName(selectedRecipient)} hat Feierabend • Nachricht wird zugestellt und am nächsten Schultag beantwortet</span>
+                  </div>
+                )}
 
                 {/* 🚨 Pre-Flight Respect Guard Warning & Crisis Intervention Card */}
                 {respectWarning && (
@@ -5240,9 +5713,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       borderRadius: '100px',
                       border: '1.5px solid #e2e8f0',
                       background: '#ffffff',
-                      fontSize: '0.90rem',
+                      fontSize: '0.88rem',
                       outline: 'none',
-                      fontWeight: 550,
+                      fontWeight: 500,
                       color: '#0f172a',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                       transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -5250,7 +5723,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     }}
                     onFocus={e => {
                       e.target.style.borderColor = '#15803d';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(21, 128, 61, 0.15)';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(21, 128, 61, 0.12)';
                     }}
                     onBlur={e => {
                       e.target.style.borderColor = '#e2e8f0';
@@ -5277,29 +5750,37 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       justifyContent: 'center',
                       cursor: !typedMessage.trim() ? 'not-allowed' : 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: !typedMessage.trim() ? 'none' : '0 2px 6px rgba(21, 128, 61, 0.25)',
+                      boxShadow: !typedMessage.trim() ? 'none' : '0 2px 8px rgba(21, 128, 61, 0.28)',
                       flexShrink: 0,
                       touchAction: 'manipulation'
                     }}
                     className={typedMessage.trim() ? 'hover-scale' : ''}
                   >
-                    <Send size={16} strokeWidth={2.4} />
+                    <Send size={15} strokeWidth={2.4} />
                   </button>
                 </form>
 
-                {/* 🛡️ Enterprise Data Privacy & Cryptographic Vault Notice */}
+                {/* 🛡️ Unified Trust & Compliance Sub-Footer (1-Line Elegance: § 8a SGB VIII & Art. 32 DSGVO) */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
+                  justifyContent: 'space-between',
+                  gap: '12px',
                   marginTop: '6px',
-                  fontSize: '0.66rem',
+                  padding: '0 4px',
+                  fontSize: '0.67rem',
                   color: '#94a3b8',
-                  lineHeight: 1.2
+                  fontWeight: 550,
+                  flexWrap: 'wrap'
                 }}>
-                  <Lock size={10} color="#94a3b8" style={{ flexShrink: 0 }} />
-                  <span>AES-256 Datenbankverschlüsselung • Bitte keine Diagnosen oder Gesundheitsdaten senden</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#166534' }}>
+                    <ShieldCheck size={12} color="#16a34a" style={{ flexShrink: 0 }} />
+                    <span>Didaktischer Schul-Chat • Für Erziehungsberechtigte transparent einsehbar (Jugendschutz-Standard)</span>
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#94a3b8' }}>
+                    <Lock size={10} color="#94a3b8" style={{ flexShrink: 0 }} />
+                    <span>AES-256 Datenbankverschlüsselung</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -5441,10 +5922,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         transition: 'all 0.2s'
                       }}
                     >
-                      <img 
-                        src={resolveCampusAvatar(partner)} 
-                        alt=""
-                        style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e6f4ea', flexShrink: 0 }}
+                      <CampusDynamicAvatar 
+                        user={partner} 
+                        size={40} 
                       />
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -5770,20 +6250,26 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '18px',
-                  background: '#ffffff',
-                  color: selectedRecipient.color || selectedRecipient.color_accent || '#15803d',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
-                  flexShrink: 0
-                }}>
-                  {React.createElement(getGroupIconComponent(selectedRecipient.icon || selectedRecipient.avatar_icon), { size: 30, strokeWidth: 2.3 })}
-                </div>
+                {(() => {
+                  const { iconKey, colorKey } = resolveGroupIconAndColor(selectedRecipient);
+                  const GroupIcon = getGroupIconComponent(iconKey);
+                  return (
+                    <div style={{
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '18px',
+                      background: '#ffffff',
+                      color: colorKey,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+                      flexShrink: 0
+                    }}>
+                      <GroupIcon size={30} strokeWidth={2.3} color={colorKey} />
+                    </div>
+                  );
+                })()}
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
                     {selectedRecipient.name}
@@ -5875,18 +6361,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                          <img
-                            src={resolveCampusAvatar(m)}
-                            alt=""
-                            style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: '1.5px solid #e2e8f0',
-                              flexShrink: 0
-                            }}
-                          />
+                          <CampusDynamicAvatar user={m} size={36} />
                           <div style={{ minWidth: 0 }}>
                             <div style={{
                               fontSize: '0.88rem',

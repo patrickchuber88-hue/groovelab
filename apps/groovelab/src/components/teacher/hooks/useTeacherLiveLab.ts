@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { invalidateActiveSessionsCache } from '../../../repositories/scheduleRepository';
 
@@ -49,8 +49,25 @@ export function useTeacherLiveLab({
 
   const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
   const isUserCheckedIn = localCheckedIn || 
-    (!!session && !session.check_out_time && (session.user_id === userId || !!session.station_id)) || 
-    (activeSessions && activeSessions.some((s: any) => s && s.user_id === userId && !s.check_out_time));
+    (!!session && !session.check_out_time && !!session.station_id && (session.user_id === userId || isTeacher)) || 
+    (activeSessions && activeSessions.some((s: any) => s && s.user_id === userId && !s.check_out_time && !!s.station_id));
+
+  // ⚡ Multi-Device Realtime Remote-Checkout Listener (0,1% Goldstandard)
+  useEffect(() => {
+    const handleRemoteCheckout = (e: any) => {
+      const remoteSessionId = e?.detail?.sessionId;
+      const isTarget = !remoteSessionId || remoteSessionId === session?.id || (activeSessions && activeSessions.some((s: any) => s && s.id === remoteSessionId && s.user_id === userId));
+      if (isTarget) {
+        if (onSessionChange) onSessionChange(null);
+        setLocalCheckedIn(false);
+        localCheckedInRef.current = false;
+        if (onLocationModeChange) onLocationModeChange('home');
+        sessionStorage.setItem('groovelab_location_mode', 'home');
+      }
+    };
+    window.addEventListener('groovelab_remote_checkout', handleRemoteCheckout);
+    return () => window.removeEventListener('groovelab_remote_checkout', handleRemoteCheckout);
+  }, [session, activeSessions, userId, onSessionChange, onLocationModeChange]);
 
   const performDirectTeacherCheckin = useCallback(async () => {
     setCheckInErrorMsg('');
@@ -131,15 +148,82 @@ export function useTeacherLiveLab({
     }
   }, [userId, stations, selectedRoomId, teacher, setCoaches, onSessionChange, onLocationModeChange, fetchData]);
 
+  // ⚡ 0,1% Goldstandard: 1-Tap Re-Check-in für fest an Stationen gekoppelte Schul-iPads
+  const performCoupledStationCheckin = useCallback(async (stationId: string) => {
+    if (!userId) return;
+    setCheckingInStatus('verifying');
+    setCheckInErrorMsg('');
+    const now = new Date().toISOString();
+
+    try {
+      // 1. Offene Sessions für diesen User oder an dieser Station schließen
+      await Promise.all([
+        supabase.from('sessions').update({ 
+          check_out_time: now,
+          metadata: { is_switching_station: true }
+        }).eq('user_id', userId).is('check_out_time', null),
+        supabase.from('sessions').update({ check_out_time: now }).eq('station_id', stationId).is('check_out_time', null)
+      ]);
+
+      // 2. Neue Session an dieser fest gekoppelten Station einfügen
+      const { data: sessData, error: sessErr } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: userId,
+          station_id: stationId,
+          gps_verified: true,
+          check_in_time: now
+        })
+        .select('*, stations(name, room_id)')
+        .single();
+
+      if (sessErr) {
+        if (sessErr.message?.includes('DATABASE_CIRCUIT_OPEN') || sessErr.message?.includes('Failed to fetch') || sessErr.message?.includes('NetworkError')) {
+          if (onLocationModeChange) onLocationModeChange('lab');
+          localCheckedInRef.current = true;
+          setLocalCheckedIn(true);
+          setShowKioskView(false);
+          setCheckingInStatus('idle');
+        } else {
+          setCheckInErrorMsg('Fehler beim Einchecken: ' + sessErr.message);
+          setCheckingInStatus('error');
+        }
+        return;
+      }
+
+      localCheckedInRef.current = true;
+      setLocalCheckedIn(true);
+      if (onSessionChange) onSessionChange(sessData);
+      if (onLocationModeChange) onLocationModeChange('lab');
+      sessionStorage.setItem('groovelab_location_mode', 'lab');
+
+      invalidateActiveSessionsCache(teacher?.school_id);
+      await fetchData();
+      setShowKioskView(false);
+      setCheckingInStatus('idle');
+    } catch (err: any) {
+      console.error('[Coupled Station Check-in] Catch error:', err);
+      setCheckInErrorMsg('Fehler beim Einchecken: ' + (err?.message || String(err)));
+      setCheckingInStatus('error');
+    }
+  }, [userId, teacher?.school_id, onSessionChange, onLocationModeChange, fetchData, setShowKioskView]);
+
   const handleLiveLabCheckIn = useCallback(() => {
     setCheckInErrorMsg('');
     if (isTeacher) {
       performDirectTeacherCheckin();
     } else {
-      setCheckingInStatus('success');
-      setShowKioskView(true);
+      const coupledStationId = typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null;
+      if (coupledStationId && coupledStationId !== 'skip') {
+        performCoupledStationCheckin(coupledStationId);
+      } else {
+        // 0,1% Goldstandard: Schüler können sich nur vor Ort am Schul-iPad einchecken
+        setCheckInErrorMsg('Bitte logge dich vor Ort am Schul-iPad ein.');
+        setShakeLock(true);
+        setTimeout(() => setShakeLock(false), 600);
+      }
     }
-  }, [isTeacher, performDirectTeacherCheckin]);
+  }, [isTeacher, performDirectTeacherCheckin, performCoupledStationCheckin]);
 
   const handleKioskStationSelect = useCallback(async (station: any) => {
     if (!userId) return;
@@ -235,20 +319,33 @@ export function useTeacherLiveLab({
   }, [fetchData, teacher?.school_id]);
 
   const handleLogoutStudent = useCallback(async (sessionId: string) => {
-    if (!window.confirm('Ausloggen?')) return;
+    // ⚡ 0,1% Goldstandard: 1-Klick-Abmeldung ohne störenden window.confirm-Dialog
     try {
+      // ⚡ Säule 4: Optimistic instant Frame-1 removal
+      setActiveSessions(prev => prev.filter(s => s && s.id !== sessionId));
+
+      const isMySession = sessionId === session?.id || (activeSessions && activeSessions.some((s: any) => s && s.id === sessionId && s.user_id === userId));
+      if (isMySession) {
+        if (onSessionChange) onSessionChange(null);
+        setLocalCheckedIn(false);
+        localCheckedInRef.current = false;
+        if (onLocationModeChange) onLocationModeChange('home');
+        sessionStorage.setItem('groovelab_location_mode', 'home');
+      }
+
       const { error } = await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
       if (error) {
-        alert('Fehler beim Ausloggen: ' + error.message);
+        console.error('Fehler beim Ausloggen:', error);
+        invalidateActiveSessionsCache(teacher?.school_id);
+        await fetchData();
         return;
       }
       invalidateActiveSessionsCache(teacher?.school_id);
-      await fetchData();
     } catch (err: any) {
       console.error('Failed to logout student:', err);
-      alert('Fehler beim Ausloggen: ' + (err?.message || 'Unbekannter Fehler'));
+      await fetchData();
     }
-  }, [fetchData, teacher?.school_id]);
+  }, [fetchData, teacher?.school_id, setActiveSessions, session, activeSessions, userId, onSessionChange, onLocationModeChange]);
 
   const handleResolveHelp = useCallback(async (requestId: string) => {
     try {

@@ -22,7 +22,7 @@ export interface ContinentDefinition {
 export interface TraditionalInstrumentInfo {
   name: string;
   nativeName?: string;
-  family: 'percussion' | 'strings' | 'wind' | 'brass' | 'keyboard' | 'idiophone';
+  family: 'percussion' | 'strings' | 'wind' | 'brass' | 'keyboard' | 'idiophone' | 'woodwinds' | 'aerophone' | 'orchestra';
   material: string;
   description: string;
 }
@@ -40,6 +40,12 @@ export interface WorldTourNote {
   isAnacrusis?: boolean;  // True if note belongs to pickup bar (Takt 0)
 }
 
+export interface WorldTourRepeatSection {
+  startBar: number;     // 1-based measure index (e.g. 1)
+  endBar: number;       // 1-based measure index (e.g. 4, 6 or 8)
+  repeatCount?: number; // Standard: 2
+}
+
 export interface WorldTourMasterScore {
   timeSignature: '4/4' | '3/4' | '2/4' | '7/8' | '9/8' | '12/8' | '6/8';
   subdivisions?: number[];  // e.g. [2, 2, 3] for 7/8 or [3, 3, 3] for 9/8
@@ -47,6 +53,7 @@ export interface WorldTourMasterScore {
   defaultBpm: number;
   barsCount: number;
   anacrusisBeats?: number;  // Pickup measure duration in beats (e.g. 1 for 3/4 or 4/4)
+  repeatSections?: WorldTourRepeatSection[]; // Authentic Henle/Bärenreiter repetition sections
   chords?: string[];        // Chord progression per bar for Pro Lead-Sheet view
   improvisationScale?: string[]; // Recommended scale pitches for free jamming
   notes: WorldTourNote[];
@@ -78,6 +85,8 @@ export interface WorldTourCountry {
     lat: number;
     lon: number;
   };
+  audioJingleFrequencies?: number[]; // Audio jingle chord frequencies on map station click
+  sources?: [string, string]; // Dual-source verification for Urtext scores
   score: WorldTourMasterScore;
 }
 

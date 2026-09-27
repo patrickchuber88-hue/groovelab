@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   AlertCircle, Bell, Check, ChevronLeft, ChevronRight, Clock,
   Hourglass, Key, Lock, Monitor, Music, TrendingUp, User, X,
@@ -292,15 +292,15 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         }}
         style={{ 
           width: '100%',
-          background: 'white', 
+          background: isActive ? 'white' : 'rgba(255, 255, 255, 0.65)', 
           padding: '10px 12px', 
           minHeight: '150px', 
-          aspectRatio: '1',
+          aspectRatio: '1', 
           display: 'flex', 
           flexDirection: 'column', 
           position: 'relative', 
-          border: isActive ? `2.5px solid ${color}` : `1.5px solid ${color}40`,
-          boxShadow: isActive ? `0 12px 30px rgba(0,0,0,0.03), 0 2px 8px ${color}10` : `0 4px 12px ${color}08`,
+          border: isActive ? `2px solid ${color}` : `1.5px solid rgba(226, 232, 240, 0.9)`,
+          boxShadow: isActive ? `0 10px 25px rgba(0,0,0,0.03), 0 2px 8px ${color}15` : `0 2px 8px rgba(0,0,0,0.01)`,
           borderRadius: '24px',
           cursor: isActive ? 'pointer' : 'default',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -313,24 +313,28 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
             {sess && <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>}
           </div>
           {hasHelpRequest && (
-            <div style={{ 
-              position: 'absolute', 
-              top: '40px', 
-              right: '12px', 
-              background: '#ef4444', 
-              color: 'white', 
-              padding: '4px 10px', 
-              borderRadius: '10px', 
-              fontSize: '0.65rem', 
-              fontWeight: 900, 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '4px',
-              animation: 'pulse-red 1s infinite',
-              boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)',
-              zIndex: 10
-            }}>
-              <AlertCircle size={10} fill="white" /> HELP
+            <div 
+              style={{ 
+                position: 'absolute', 
+                top: '40px', 
+                right: '12px', 
+                background: isMe ? '#f43f5e' : '#ef4444', 
+                color: 'white', 
+                padding: '4px 10px', 
+                borderRadius: '10px', 
+                fontSize: '0.65rem', 
+                fontWeight: 900, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                animation: 'pulse-red 1s infinite',
+                boxShadow: isMe ? '0 4px 10px rgba(244, 63, 94, 0.3)' : '0 4px 10px rgba(239, 68, 68, 0.3)',
+                zIndex: 10
+              }}
+              title={isMe ? 'Dein Coach wurde benachrichtigt und kommt zu dir.' : 'Hilferuf aktiv: Schüler benötigt Unterstützung'}
+              aria-label={isMe ? 'Hilfe gerufen: Coach wurde benachrichtigt' : 'Hilferuf aktiv'}
+            >
+              <AlertCircle size={10} fill="white" /> {isMe ? 'HILFE GERUFEN' : 'HILFE'}
             </div>
           )}
           {isActive && (viewMode === 'admin' || isMe) && (
@@ -636,6 +640,7 @@ export interface TeacherLiveViewProps {
   isMobile?: boolean;
   isDesktop?: boolean;
   isSyncing?: boolean;
+  onLogout?: () => void;
 }
 
 export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
@@ -661,6 +666,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   coaches,
   setSelectedCoachProfile,
   setSelectedStudentProfile,
+  onLogout,
   helpRequests,
   unreadShouts,
   submissions,
@@ -708,6 +714,22 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
 }) => {
   const effectiveCheckInHandler = handleLiveLabCheckIn || handleGeofenceCheck;
   const effectiveErrorMsg = checkInErrorMsg || geoErrorMsg;
+
+  // ⚡ 0,1% Goldstandard: Rollen- & Kiosk-Gating für Einloggen-Button
+  // Lehrkräfte sehen Einloggen immer; Schüler loggen sich nur am fest gekoppelten Schul-iPad ein (Zero Remote Spoofing)
+  const isTeacherRole = viewMode !== 'student' && (teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin' || viewMode === 'admin');
+  const coupledStationId = typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null;
+  const isCoupledSchoolIpad = Boolean(coupledStationId && coupledStationId !== 'skip');
+  const canCheckIn = isTeacherRole || isCoupledSchoolIpad;
+
+  // ⚡ 0,1% Goldstandard: Automatisches Einklappen der Sidebar beim Auschecken eines Schülers
+  const handleStudentCheckout = useCallback((sessionId: string) => {
+    if (viewMode === 'student' && setIsSidebarCollapsed) {
+      setIsSidebarCollapsed(true);
+    }
+    handleLogoutStudent(sessionId);
+  }, [viewMode, setIsSidebarCollapsed, handleLogoutStudent]);
+
   // Auto-align selectedRoomId if unset, invalid, or currently pointing to a room with 0 stations while other rooms have stations
   useEffect(() => {
     if (!rooms || rooms.length === 0) return;
@@ -728,9 +750,73 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
     return adjustPositions(kiosk, 586);
   }, [stations, selectedRoomId]);
 
+  // ⚡ 0,1% Goldstandard: Sidebar Content Deferred Rendering (Animations-Schutz & Zero-Phantom-DOM)
+  const [renderSidebarContent, setRenderSidebarContent] = useState(!isSidebarCollapsed);
+
+  useEffect(() => {
+    if (!isSidebarCollapsed) {
+      setRenderSidebarContent(true);
+    } else {
+      const timer = setTimeout(() => {
+        setRenderSidebarContent(false);
+      }, 400); // Exakt nach Abschluss der 0.38s Animation entlasten
+      return () => clearTimeout(timer);
+    }
+  }, [isSidebarCollapsed]);
+
+  // ⚡ 0,1% Goldstandard Geometrie-Engine: Memoized Blueprint Bounding Boxes & Compression Factor
+  const layoutGeometry = useMemo(() => {
+    const activeRoom = rooms.find(r => r.id === selectedRoomId) || (rooms.length > 0 ? rooms[0] : null);
+    let effectiveSelectedRoomId = selectedRoomId || (rooms.length > 0 ? rooms[0]?.id : null);
+
+    let rawRoomStations = stations.filter(s => s.room_id === effectiveSelectedRoomId);
+    if (rawRoomStations.length === 0 && stations.length > 0) {
+      const roomWithStations = rooms.find(r => stations.some(s => s.room_id === r.id));
+      if (roomWithStations) {
+        effectiveSelectedRoomId = roomWithStations.id;
+        rawRoomStations = stations.filter(s => s.room_id === roomWithStations.id);
+      } else {
+        rawRoomStations = stations;
+      }
+    }
+    const roomStations = normalizeStationsForBlueprint(rawRoomStations);
+
+    const effectiveRoomWidth = (activeRoom && activeRoom.room_width) || 1000;
+    const effectiveRoomHeight = (activeRoom && activeRoom.room_height) || 700;
+    const hasCustomLayout = roomStations.length > 0 && roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
+
+    const rawRoomAspectRatio = effectiveRoomWidth / effectiveRoomHeight;
+    const compressedActiveLayout = getCompressedRoomCoordinates(roomStations, rawRoomAspectRatio);
+
+    const minBoundX = compressedActiveLayout.minX;
+    const maxBoundX = compressedActiveLayout.maxX;
+    const minBoundY = compressedActiveLayout.minY;
+    const maxBoundY = compressedActiveLayout.maxY;
+
+    const boundWidth = Math.max(100, maxBoundX - minBoundX);
+    const boundHeight = Math.max(100, maxBoundY - minBoundY);
+
+    return {
+      activeRoom,
+      effectiveSelectedRoomId,
+      roomStations,
+      effectiveRoomWidth,
+      effectiveRoomHeight,
+      hasCustomLayout,
+      rawRoomAspectRatio,
+      compressedActiveLayout,
+      minBoundX,
+      maxBoundX,
+      minBoundY,
+      maxBoundY,
+      boundWidth,
+      boundHeight
+    };
+  }, [rooms, stations, selectedRoomId]);
+
   // Memoize matching band formations to support both song collections (with formations array) and flat formation objects
   const displayedFormations = useMemo(() => {
-    if (!Array.isArray(wallSongs) || wallSongs.length === 0) return [];
+    if (!renderSidebarContent || !Array.isArray(wallSongs) || wallSongs.length === 0) return [];
 
     const list: any[] = [];
     wallSongs.forEach((item: any, songIdx: number) => {
@@ -750,7 +836,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
             },
             members: Array.isArray(f.members) ? f.members : [],
             level: f.level || item.level || 'original',
-            isComplete: f.isComplete
+            isComplete: f.isComplete,
+            formation_index: f.formation_index || (fIdx + 1)
           });
         });
       } else {
@@ -812,20 +899,19 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
 
           {(() => {
             const isMobileView = windowWidth < 768 || containerWidth < 768 || windowHeight < 500;
-            const activeRoom = rooms.find(r => r.id === selectedRoomId) || (rooms.length > 0 ? rooms[0] : null);
-            let effectiveSelectedRoomId = selectedRoomId || (rooms.length > 0 ? rooms[0]?.id : null);
-
-            let rawRoomStations = stations.filter(s => s.room_id === effectiveSelectedRoomId);
-            if (rawRoomStations.length === 0 && stations.length > 0) {
-              const roomWithStations = rooms.find(r => stations.some(s => s.room_id === r.id));
-              if (roomWithStations) {
-                effectiveSelectedRoomId = roomWithStations.id;
-                rawRoomStations = stations.filter(s => s.room_id === roomWithStations.id);
-              } else {
-                rawRoomStations = stations;
-              }
-            }
-            const roomStations = normalizeStationsForBlueprint(rawRoomStations);
+            const {
+              activeRoom,
+              effectiveSelectedRoomId,
+              roomStations,
+              hasCustomLayout,
+              compressedActiveLayout,
+              minBoundX,
+              maxBoundX,
+              minBoundY,
+              maxBoundY,
+              boundWidth,
+              boundHeight
+            } = layoutGeometry;
 
             const unassignedStudentSessions = activeSessions.filter(se => {
               if (!se || !se.user_id) return false;
@@ -980,27 +1066,58 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               Verbinde mit Live Lab...
                             </span>
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={effectiveCheckInHandler}
-                            className="pulse-btn-checkin"
-                            aria-label="Am Live Lab Board einloggen"
-                            style={{
-                              padding: '12px 24px',
-                              borderRadius: '12px',
-                              background: '#fbbc05',
-                              border: 'none',
-                              color: '#0f172a',
-                              fontSize: '14px',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 10px rgba(251, 188, 5, 0.2)'
-                            }}
-                          >
-                            Einloggen
-                          </button>
-                        )}
+                        ) : canCheckIn ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+                            <button
+                              type="button"
+                              onClick={effectiveCheckInHandler}
+                              className="pulse-btn-checkin"
+                              aria-label={isTeacherRole ? "Am Live Lab Board einloggen" : "Wieder an iPad-Station einchecken"}
+                              style={{
+                                padding: '12px 24px',
+                                borderRadius: '12px',
+                                background: '#fbbc05',
+                                border: 'none',
+                                color: '#0f172a',
+                                fontSize: '14px',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 10px rgba(251, 188, 5, 0.2)',
+                                touchAction: 'manipulation'
+                              }}
+                            >
+                              {isTeacherRole ? 'Einloggen' : 'Wieder einchecken'}
+                            </button>
+
+                            {isCoupledSchoolIpad && !isTeacherRole && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onLogout) {
+                                    onLogout();
+                                  } else {
+                                    window.dispatchEvent(new CustomEvent('campus_app_logout'));
+                                  }
+                                }}
+                                aria-label="Schüler wechseln und abmelden"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  textDecoration: 'underline',
+                                  touchAction: 'manipulation'
+                                }}
+                              >
+                                Schüler wechseln / Abmelden
+                              </button>
+                            )}
+                          </div>
+                        ) : null}
                         {checkingInStatus === 'error' && effectiveErrorMsg && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '10px', color: '#ef4444', fontSize: '12px' }}>
                             <AlertCircle size={14} style={{ flexShrink: 0 }} />
@@ -1108,8 +1225,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           const sName = station.name || '';
                           const instColor = getStationColor(sName, station.color);
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
-                          const hasHelp = helpRequests.some(r => r.station_id === station.id);
                           const isMe = sess?.user_id === userId;
+                          const hasHelp = (viewMode !== 'student' || isMe) && helpRequests.some(r => r.station_id === station.id);
                           const effectiveSessUser = isMe && teacher ? { ...sess?.users, ...teacher, photo_url: teacher.photo_url || sess?.users?.photo_url, avatar_url: teacher.avatar_url || sess?.users?.avatar_url } : sess?.users;
                           const studentName = effectiveSessUser ? `${effectiveSessUser.first_name} ${maskLastName(effectiveSessUser.last_name, showRealNames)}` : '';
 
@@ -1187,21 +1304,25 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
 
                               {/* Help Request badge */}
                               {hasHelp && (
-                                <div style={{
-                                  background: '#ef4444',
-                                  color: 'white',
-                                  padding: '4px 8px',
-                                  borderRadius: '8px',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 900,
-                                  animation: 'pulse-red 1s infinite',
-                                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px',
-                                  marginRight: (viewMode === 'admin' || isMe) ? '4px' : '0px'
-                                }}>
-                                  <AlertCircle size={10} fill="white" /> HILFE
+                                <div 
+                                  style={{
+                                    background: isMe ? '#f43f5e' : '#ef4444',
+                                    color: 'white',
+                                    padding: '4px 8px',
+                                    borderRadius: '8px',
+                                    fontSize: '0.6rem',
+                                    fontWeight: 900,
+                                    animation: 'pulse-red 1s infinite',
+                                    boxShadow: isMe ? '0 2px 6px rgba(244, 63, 94, 0.2)' : '0 2px 6px rgba(239, 68, 68, 0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    marginRight: (viewMode === 'admin' || isMe) ? '4px' : '0px'
+                                  }}
+                                  title={isMe ? 'Dein Coach wurde benachrichtigt und kommt zu dir.' : 'Hilferuf aktiv: Schüler benötigt Unterstützung'}
+                                  aria-label={isMe ? 'Hilfe gerufen: Coach wurde benachrichtigt' : 'Hilferuf aktiv'}
+                                >
+                                  <AlertCircle size={10} fill="white" /> {isMe ? 'HILFE GERUFEN' : 'HILFE'}
                                 </div>
                               )}
 
@@ -1210,7 +1331,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleLogoutStudent(sess.id);
+                                    handleStudentCheckout(sess.id);
                                   }}
                                   style={{
                                     background: '#fef2f2',
@@ -1240,8 +1361,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           const customName = sess.stations?.name || `Station (App ${uIdx + 1})`;
                           const instColor = getStationColor(customName, sess.stations?.color || '#eab308');
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
-                          const hasHelp = helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id);
                           const isMe = sess?.user_id === userId;
+                          const hasHelp = (viewMode !== 'student' || isMe) && helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id);
                           const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
 
                           return (
@@ -1285,8 +1406,12 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                     {customName}
                                   </span>
                                   {hasHelp && (
-                                    <span style={{ background: '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800 }}>
-                                      Hilfe
+                                    <span 
+                                      style={{ background: isMe ? '#f43f5e' : '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800 }}
+                                      title={isMe ? 'Dein Coach wurde benachrichtigt und kommt zu dir.' : 'Hilferuf aktiv: Schüler benötigt Unterstützung'}
+                                      aria-label={isMe ? 'Hilfe gerufen: Coach wurde benachrichtigt' : 'Hilferuf aktiv'}
+                                    >
+                                      {isMe ? 'Hilfe gerufen' : 'Hilfe'}
                                     </span>
                                   )}
                                 </div>
@@ -1300,7 +1425,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleLogoutStudent(sess.id);
+                                    handleStudentCheckout(sess.id);
                                   }}
                                   style={{
                                     background: '#fef2f2',
@@ -1333,51 +1458,18 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               );
             }
 
-            const effectiveRoomWidth = (activeRoom && activeRoom.room_width) || 1000;
-            const effectiveRoomHeight = (activeRoom && activeRoom.room_height) || 700;
-            const hasCustomLayout = roomStations.length > 0 && roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
-
             if (hasCustomLayout) {
               // Account for the parent dashboard header height
-              const parentHeaderHeight = viewMode === 'student' ? 80 : 90;
+              const parentHeaderHeight = hideHeader ? 40 : (viewMode === 'student' ? 80 : 90);
               const verticalOffset = parentHeaderHeight + (!hideHeader && rooms.length > 1 ? 54 : 0);
-              const maxH = Math.max(300, windowHeight - verticalOffset - 24);
+              const maxH = Math.max(340, windowHeight - verticalOffset - (hideHeader ? 16 : 24));
 
-              // 1. Calculate fitting scale for all custom rooms to find the minimum scale (largest layout space required)
-              // This ensures that the scale (and thus iPad card size) is completely uniform across all custom layout rooms,
-              // while guaranteeing that even the largest room fits completely within the screen boundaries without overflow.
-              let unifiedScale = 1.0;
-              const customLayoutScales = rooms.map(r => {
-                const rRawStations = stations.filter(s => s.room_id === r.id);
-                const rStations = normalizeStationsForBlueprint(rRawStations);
-                const rWidth = r.room_width || 1000;
-                const rHeight = r.room_height || 700;
-                const aspect = rWidth / rHeight;
-                const { minX, maxX, minY, maxY } = getCompressedRoomCoordinates(rStations, aspect);
-
-                const bW = Math.max(100, maxX - minX);
-                const bH = Math.max(100, maxY - minY);
-                return Math.min(containerWidth / bW, maxH / bH);
-              }).filter((s): s is number => s !== null);
-
-              if (customLayoutScales.length > 0) {
-                unifiedScale = Math.min(1.0, ...customLayoutScales);
-              }
-
-              const rawRoomAspectRatio = effectiveRoomWidth / effectiveRoomHeight;
-
-              // Calculate bounding box and compressed coordinates of all nodes for active room
-              const compressedActiveLayout = getCompressedRoomCoordinates(roomStations, rawRoomAspectRatio);
-              const minBoundX = compressedActiveLayout.minX;
-              const maxBoundX = compressedActiveLayout.maxX;
-              const minBoundY = compressedActiveLayout.minY;
-              const maxBoundY = compressedActiveLayout.maxY;
-
-              const boundWidth = Math.max(100, maxBoundX - minBoundX);
-              const boundHeight = Math.max(100, maxBoundY - minBoundY);
-
-              // Use the original size scaled by manual zoomFactor
-              const scale = 1.0 * zoomFactor;
+              // Responsive Blueprint Auto-Scaling (0.1% Goldstandard):
+              // When right sidebar is expanded (!isSidebarCollapsed), scale down to 0.82 automatically
+              // so all 8 stations + center coach remain completely visible without horizontal clipping.
+              // When collapsed (isSidebarCollapsed), scale is 1.0 (100%).
+              const autoBaseScale = !isSidebarCollapsed ? 0.82 : 1.0;
+              const scale = autoBaseScale * zoomFactor;
 
               return (
                 <div 
@@ -1391,50 +1483,34 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       width: '100%',
-                      marginBottom: '16px',
-                      gap: '16px',
-                      flexWrap: 'wrap'
+                      marginBottom: '10px',
+                      gap: '12px',
+                      flexWrap: 'nowrap'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <h1 style={{ fontSize: '26px', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
                             Live Lab
                           </h1>
                           
-                          {/* Live Sync Status Pill */}
-                          <div 
+                          {/* Live Status Pulse Dot */}
+                          <span 
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '4px 10px',
-                              borderRadius: '999px',
-                              background: isSyncing ? 'rgba(234, 179, 8, 0.12)' : 'rgba(16, 185, 129, 0.10)',
-                              border: `1px solid ${isSyncing ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              color: isSyncing ? '#b45309' : '#047857',
-                              transition: 'all 0.3s ease'
-                            }}
-                            title={isSyncing ? 'Synchronisiere Live-Sessions...' : 'Live-Sessions aktuell'}
-                          >
-                            <span 
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: isSyncing ? '#eab308' : '#10b981',
-                                boxShadow: isSyncing ? '0 0 6px #eab308' : '0 0 6px #10b981',
-                                animation: isSyncing ? 'pulse 1s infinite' : 'none'
-                              }} 
-                            />
-                            {isSyncing ? 'Synchronisiere...' : 'Live verbunden'}
-                          </div>
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                              boxShadow: isSyncing ? '0 0 8px #eab308' : '0 0 8px #10b981',
+                              animation: isSyncing ? 'pulse 1s infinite' : 'none',
+                              display: 'inline-block'
+                            }} 
+                            title={isSyncing ? 'Synchronisiere Live-Sessions...' : 'Live verbunden'}
+                          />
                         </div>
                         
-                        {/* Room Switcher inline next to title */}
+                        {/* Room Switcher inline next to title (Apple Segmented Pill) */}
                         {rooms.length > 1 && (
-                          <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
+                          <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '12px', flexShrink: 0 }}>
                             {rooms.map((room, idx) => {
                               const isSelected = room.id === selectedRoomId;
                               return (
@@ -1448,13 +1524,14 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                     border: 'none',
                                     background: isSelected ? 'white' : 'transparent',
                                     color: isSelected ? '#1e293b' : '#64748b',
-                                    padding: '6px 12px',
-                                    borderRadius: '10px',
-                                    fontSize: '0.8rem',
+                                    padding: '5px 10px',
+                                    borderRadius: '8px',
+                                    fontSize: '0.78rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
-                                    transition: 'all 0.2s'
+                                    boxShadow: isSelected ? '0 2px 5px rgba(0,0,0,0.04)' : 'none',
+                                    transition: 'all 0.2s',
+                                    whiteSpace: 'nowrap'
                                   }}
                                   className="hover-scale-mini"
                                 >
@@ -1468,60 +1545,106 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           </div>
                         )}
 
-                        {/* Magnifier Zoom Panel inline */}
+                        {/* Magnifier Zoom Panel inline (Compact, Accessible, Persistent) */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          gap: '4px',
                           background: '#f1f5f9',
-                          padding: '5px',
-                          borderRadius: '14px'
+                          padding: '3px 6px',
+                          borderRadius: '10px',
+                          flexShrink: 0
                         }}>
                           <button 
                             onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
                             style={{
                               background: 'white',
                               border: '1px solid rgba(0, 0, 0, 0.05)',
-                              borderRadius: '10px',
-                              width: '30px',
-                              height: '30px',
+                              borderRadius: '8px',
+                              width: '28px',
+                              height: '28px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               color: '#64748b',
                               cursor: 'pointer',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                               transition: 'all 0.2s'
                             }}
                             className="hover-scale-mini"
                             title="Verkleinern"
+                            aria-label="Live Lab Verkleinern"
                           >
-                            <ZoomOut size={15} />
+                            <ZoomOut size={14} />
                           </button>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', padding: '0 6px', minWidth: '40px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleZoomChange(1.0)}
+                            style={{ 
+                              fontSize: '0.78rem', 
+                              fontWeight: 900, 
+                              color: zoomFactor === 1 ? '#64748b' : '#2563eb', 
+                              padding: '2px 6px', 
+                              minWidth: '40px', 
+                              textAlign: 'center',
+                              background: zoomFactor === 1 ? 'transparent' : 'rgba(37, 99, 235, 0.08)',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: zoomFactor === 1 ? 'default' : 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className={zoomFactor === 1 ? '' : 'hover-scale-mini'}
+                            title={zoomFactor === 1 ? 'Standardgröße (100%)' : 'Auf 100% zurücksetzen'}
+                            aria-label="Zoom auf 100% zurücksetzen"
+                          >
                             {Math.round(zoomFactor * 100)}%
-                          </span>
+                          </button>
                           <button 
                             onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
                             style={{
                               background: 'white',
                               border: '1px solid rgba(0, 0, 0, 0.05)',
-                              borderRadius: '10px',
-                              width: '30px',
-                              height: '30px',
+                              borderRadius: '8px',
+                              width: '28px',
+                              height: '28px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               color: '#64748b',
                               cursor: 'pointer',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                               transition: 'all 0.2s'
                             }}
                             className="hover-scale-mini"
                             title="Vergrößern"
+                            aria-label="Live Lab Vergrößern"
                           >
-                            <ZoomIn size={15} />
+                            <ZoomIn size={14} />
                           </button>
+                        </div>
+
+                        {/* Room Occupancy Telemetry Pill (0.1% Goldstandard: "2/8 belegt") */}
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          padding: '5px 10px',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          color: '#334155',
+                          flexShrink: 0
+                        }}>
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: activeSessions.filter(s => !s.check_out_time).length > 0 ? '#10b981' : '#94a3b8',
+                            boxShadow: activeSessions.filter(s => !s.check_out_time).length > 0 ? '0 0 6px #10b981' : 'none'
+                          }} />
+                          <span>{activeSessions.filter(s => !s.check_out_time).length}/{roomStations.filter(s => !(s.name || '').toLowerCase().includes('lehrer') && !(s.name || '').toLowerCase().includes('teacher')).length} belegt</span>
                         </div>
                       </div>
 
@@ -1532,37 +1655,39 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           style={{
                             background: 'white',
                             border: '1.5px solid #e2e8f0',
-                            padding: '8px 16px',
-                            borderRadius: '12px',
-                            fontSize: '0.85rem',
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            fontSize: '0.8rem',
                             fontWeight: 800,
                             color: '#475569',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                            gap: '6px',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                            transition: 'all 0.15s'
+                            transition: 'all 0.15s',
+                            flexShrink: 0
                           }}
                           className="hover-scale"
+                          aria-label={isSidebarCollapsed ? "Sidebar einblenden" : "Sidebar ausblenden"}
                         >
                           {isSidebarCollapsed ? (
                             <>
-                              <ChevronLeft size={16} /> Sidebar einblenden
+                              <ChevronLeft size={15} /> Sidebar einblenden
                               {viewMode === 'student' && sidebarNotificationsCount > 0 && (
                                 <span style={{
                                   background: '#ef4444',
                                   color: 'white',
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.65rem',
                                   fontWeight: 900,
-                                  borderRadius: '10px',
-                                  padding: '2px 6px',
-                                  minWidth: '16px',
-                                  height: '16px',
+                                  borderRadius: '8px',
+                                  padding: '1px 5px',
+                                  minWidth: '15px',
+                                  height: '15px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
                                   animation: 'pulse 1.5s infinite',
                                   marginLeft: '4px'
                                 }}>
@@ -1572,7 +1697,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             </>
                           ) : (
                             <>
-                              Sidebar ausblenden <ChevronRight size={16} />
+                              Sidebar ausblenden <ChevronRight size={15} />
                             </>
                           )}
                         </button>
@@ -1651,55 +1776,76 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '4px',
                         background: '#f1f5f9',
-                        padding: '6px',
-                        borderRadius: '16px'
+                        padding: '3px 6px',
+                        borderRadius: '10px'
                       }}>
                         <button 
                           onClick={() => handleZoomChange(Math.max(0.4, zoomFactor - 0.1))}
                           style={{
                             background: 'white',
                             border: '1px solid rgba(0, 0, 0, 0.05)',
-                            borderRadius: '12px',
-                            width: '36px',
-                            height: '36px',
+                            borderRadius: '8px',
+                            width: '28px',
+                            height: '28px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#64748b',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                             transition: 'all 0.2s'
                           }}
                           className="hover-scale-mini"
                           title="Verkleinern"
+                          aria-label="Live Lab Verkleinern"
                         >
-                          <ZoomOut size={18} />
+                          <ZoomOut size={14} />
                         </button>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b', padding: '0 8px', minWidth: '48px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleZoomChange(1.0)}
+                          style={{ 
+                            fontSize: '0.78rem', 
+                            fontWeight: 900, 
+                            color: zoomFactor === 1 ? '#64748b' : '#2563eb', 
+                            padding: '2px 6px', 
+                            minWidth: '40px', 
+                            textAlign: 'center',
+                            background: zoomFactor === 1 ? 'transparent' : 'rgba(37, 99, 235, 0.08)',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: zoomFactor === 1 ? 'default' : 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className={zoomFactor === 1 ? '' : 'hover-scale-mini'}
+                          title={zoomFactor === 1 ? 'Standardgröße (100%)' : 'Auf 100% zurücksetzen'}
+                          aria-label="Zoom auf 100% zurücksetzen"
+                        >
                           {Math.round(zoomFactor * 100)}%
-                        </span>
+                        </button>
                         <button 
                           onClick={() => handleZoomChange(Math.min(2.5, zoomFactor + 0.1))}
                           style={{
                             background: 'white',
                             border: '1px solid rgba(0, 0, 0, 0.05)',
-                            borderRadius: '12px',
-                            width: '36px',
-                            height: '36px',
+                            borderRadius: '8px',
+                            width: '28px',
+                            height: '28px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#64748b',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                             transition: 'all 0.2s'
                           }}
                           className="hover-scale-mini"
                           title="Vergrößern"
+                          aria-label="Live Lab Vergrößern"
                         >
-                          <ZoomIn size={18} />
+                          <ZoomIn size={14} />
                         </button>
                       </div>
                     </div>
@@ -1750,89 +1896,140 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           right: 0,
                           bottom: 0,
                           borderRadius: '24px',
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          backdropFilter: 'blur(0.2px)',
-                          WebkitBackdropFilter: 'blur(0.2px)',
+                          background: 'rgba(248, 250, 252, 0.65)',
+                          backdropFilter: 'blur(10px)',
+                          WebkitBackdropFilter: 'blur(10px)',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
                           zIndex: 1000,
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
+                          border: '1px solid rgba(226, 232, 240, 0.8)',
+                          boxShadow: '0 8px 32px 0 rgba(15, 23, 42, 0.06)',
                           padding: '24px',
                           textAlign: 'center'
                         }}>
-                          {/* Light diagonal stripes overlay (5% opacity) */}
+                          {/* Light diagonal stripes overlay */}
                           <div style={{
                             position: 'absolute',
                             inset: 0,
-                            backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.05) 10px, rgba(15, 23, 42, 0.05) 11px)',
+                            backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.03) 10px, rgba(15, 23, 42, 0.03) 11px)',
                             pointerEvents: 'none',
                             borderRadius: 'inherit',
-                            zIndex: -1
+                            zIndex: 0
                           }} />
-                          <div 
-                            className={shakeLock ? 'shake-lock-active' : ''}
-                            style={{
-                              width: '64px',
-                              height: '64px',
-                              borderRadius: '50%',
-                              background: 'rgba(251, 188, 5, 0.08)',
-                              border: '1px solid rgba(251, 188, 5, 0.15)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#eab308',
-                              marginBottom: '16px'
-                            }}
-                          >
-                            <Lock size={28} />
-                          </div>
-                          
-                          <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#1e293b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                            GrooveLab Live-Plattform
-                          </h4>
-                          <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.4 }}>
-                            Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
-                          </p>
 
-                          {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                              <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#eab308' }}>
-                                Verbinde mit Live Lab...
-                              </span>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={effectiveCheckInHandler}
-                              className="pulse-btn-checkin"
-                              aria-label="Am Live Lab Board einloggen"
+                          {/* 0,1% Goldstandard Apple Glass Card */}
+                          <div style={{
+                            background: 'rgba(255, 255, 255, 0.94)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            border: '1.5px solid rgba(251, 188, 5, 0.35)',
+                            boxShadow: '0 20px 48px rgba(15, 23, 42, 0.12), 0 4px 16px rgba(251, 188, 5, 0.1)',
+                            borderRadius: '24px',
+                            padding: '36px 32px',
+                            maxWidth: '440px',
+                            width: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            position: 'relative',
+                            zIndex: 10
+                          }}>
+                            <div 
+                              className={shakeLock ? 'shake-lock-active' : ''}
                               style={{
-                                padding: '14px 28px',
-                                borderRadius: '16px',
-                                background: '#fbbc05',
-                                border: 'none',
-                                color: '#0f172a',
-                                fontSize: '15px',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)'
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                background: 'rgba(251, 188, 5, 0.12)',
+                                border: '1.5px solid rgba(251, 188, 5, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#d97706',
+                                marginBottom: '16px'
                               }}
                             >
-                              Einloggen
-                            </button>
-                          )}
-
-                          {checkingInStatus === 'error' && effectiveErrorMsg && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
-                              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                              <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
+                              <Lock size={28} />
                             </div>
-                          )}
+                            
+                            <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                              GrooveLab Live-Plattform
+                            </h4>
+                            <p style={{ fontSize: '14px', color: '#475569', maxWidth: '340px', margin: '0 0 24px 0', lineHeight: 1.5, fontWeight: 500 }}>
+                              Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
+                            </p>
+
+                            {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#d97706' }}>
+                                  Verbinde mit Live Lab...
+                                </span>
+                              </div>
+                            ) : canCheckIn ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                <button
+                                  type="button"
+                                  onClick={effectiveCheckInHandler}
+                                  className="pulse-btn-checkin"
+                                  aria-label={isTeacherRole ? "Am Live Lab Board einloggen" : "Wieder an iPad-Station einchecken"}
+                                  style={{
+                                    padding: '14px 28px',
+                                    borderRadius: '16px',
+                                    background: '#fbbc05',
+                                    border: 'none',
+                                    color: '#0f172a',
+                                    fontSize: '15px',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)',
+                                    touchAction: 'manipulation'
+                                  }}
+                                >
+                                  {isTeacherRole ? 'Einloggen' : 'Wieder einchecken'}
+                                </button>
+
+                                {isCoupledSchoolIpad && !isTeacherRole && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (onLogout) {
+                                        onLogout();
+                                      } else {
+                                        window.dispatchEvent(new CustomEvent('campus_app_logout'));
+                                      }
+                                    }}
+                                    aria-label="Schüler wechseln und abmelden"
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#64748b',
+                                      fontSize: '13px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      textDecoration: 'underline',
+                                      touchAction: 'manipulation'
+                                    }}
+                                  >
+                                    Schüler wechseln / Abmelden
+                                  </button>
+                                )}
+                              </div>
+                            ) : null}
+
+                            {checkingInStatus === 'error' && effectiveErrorMsg && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
+                                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                                <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -1844,40 +2041,38 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         minWidth: 0,
                         maxWidth: '100%', 
                         height: `${maxH}px`, 
-                        overflow: 'auto', 
-                        background: 'transparent', 
-                        border: '1.5px dashed rgba(99, 102, 241, 0.15)', 
+                        overflow: 'hidden', 
+                        background: 'rgba(255, 255, 255, 0.45)', 
+                        border: '1px solid rgba(226, 232, 240, 0.85)', 
                         borderRadius: '24px', 
-                        display: 'block', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         boxSizing: 'border-box', 
                         padding: '16px',
+                        boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.03)',
                         filter: 'none',
-                        pointerEvents: !isUserCheckedIn ? 'none' : 'auto'
+                        pointerEvents: !isUserCheckedIn ? 'none' : 'auto',
+                        position: 'relative'
                       }}
                     >
-                      <div 
-                        style={{ 
-                          width: `${boundWidth * scale}px`,
-                          height: `${boundHeight * scale}px`,
-                          position: 'relative', 
-                          overflow: 'hidden',
-                          margin: '0 auto'
-                        }}
-                      >
-                        {/* Visual Blueprint Canvas */}
-                        <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
+                      {/* Visual Blueprint Canvas: Pure GPU Compositor Scaling with Center-Anchor (0.1% Goldstandard) */}
+                      <div style={{
                         width: `${boundWidth}px`,
                         height: `${boundHeight}px`,
-                        transform: `scale(${scale})`,
-                        transformOrigin: 'top left',
+                        position: 'relative',
+                        flexShrink: 0,
+                        transform: `scale(${scale}) translateZ(0)`,
+                        transformOrigin: 'center center',
                         background: 'transparent',
                         border: 'none',
                         borderRadius: '0px',
                         boxShadow: 'none',
-                        overflow: 'visible'
+                        overflow: 'visible',
+                        transition: 'transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+                        willChange: 'transform',
+                        backfaceVisibility: 'hidden',
+                        WebkitFontSmoothing: 'subpixel-antialiased'
                       }}>
 
                         {compressedActiveLayout.stations.map(station => {
@@ -1930,8 +2125,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 isMe={sess?.user_id === userId}
                                 viewMode={viewMode}
                                 onProfileSelect={setSelectedStudentProfile}
-                                onLogout={handleLogoutStudent}
-                                hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                                onLogout={handleStudentCheckout}
+                                hasHelpRequest={(viewMode !== 'student' || sess?.user_id === userId) && helpRequests.some(r => r.station_id === station.id)}
                                 activePlatform={activePlatform}
                                 currentUser={teacher}
                               />
@@ -1939,7 +2134,6 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           );
                         })}
                       </div>
-                    </div>
                     </div>
 
                   </div>
@@ -1994,89 +2188,140 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       right: 0,
                       bottom: 0,
                       borderRadius: '32px',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      backdropFilter: 'blur(0.2px)',
-                      WebkitBackdropFilter: 'blur(0.2px)',
+                      background: 'rgba(248, 250, 252, 0.65)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
                       zIndex: 1000,
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
+                      border: '1px solid rgba(226, 232, 240, 0.8)',
+                      boxShadow: '0 8px 32px 0 rgba(15, 23, 42, 0.06)',
                       padding: '24px',
                       textAlign: 'center'
                     }}>
-                      {/* Light diagonal stripes overlay (5% opacity) */}
+                      {/* Light diagonal stripes overlay */}
                       <div style={{
                         position: 'absolute',
                         inset: 0,
-                        backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.05) 10px, rgba(15, 23, 42, 0.05) 11px)',
+                        backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.03) 10px, rgba(15, 23, 42, 0.03) 11px)',
                         pointerEvents: 'none',
                         borderRadius: 'inherit',
-                        zIndex: -1
+                        zIndex: 0
                       }} />
-                      <div 
-                        className={shakeLock ? 'shake-lock-active' : ''}
-                        style={{
-                          width: '64px',
-                          height: '64px',
-                          borderRadius: '50%',
-                          background: 'rgba(251, 188, 5, 0.08)',
-                          border: '1px solid rgba(251, 188, 5, 0.15)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#eab308',
-                          marginBottom: '16px'
-                        }}
-                      >
-                        <Lock size={28} />
-                      </div>
-                      
-                      <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#1e293b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                        GrooveLab Live-Plattform
-                      </h4>
-                      <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.4 }}>
-                        Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
-                      </p>
 
-                      {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                          <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#eab308' }}>
-                            Verbinde mit Live Lab...
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={effectiveCheckInHandler}
-                          className="pulse-btn-checkin"
-                          aria-label="Am Live Lab Board einloggen"
+                      {/* 0,1% Goldstandard Apple Glass Card */}
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.94)',
+                        backdropFilter: 'blur(20px)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        border: '1.5px solid rgba(251, 188, 5, 0.35)',
+                        boxShadow: '0 20px 48px rgba(15, 23, 42, 0.12), 0 4px 16px rgba(251, 188, 5, 0.1)',
+                        borderRadius: '24px',
+                        padding: '32px 24px',
+                        maxWidth: '400px',
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        textAlign: 'center',
+                        position: 'relative',
+                        zIndex: 10
+                      }}>
+                        <div 
+                          className={shakeLock ? 'shake-lock-active' : ''}
                           style={{
-                            padding: '14px 28px',
-                            borderRadius: '16px',
-                            background: '#fbbc05',
-                            border: 'none',
-                            color: '#0f172a',
-                            fontSize: '15px',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)'
+                            width: '64px',
+                            height: '64px',
+                            borderRadius: '50%',
+                            background: 'rgba(251, 188, 5, 0.12)',
+                            border: '1.5px solid rgba(251, 188, 5, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#d97706',
+                            marginBottom: '16px'
                           }}
                         >
-                          Einloggen
-                        </button>
-                      )}
-
-                      {checkingInStatus === 'error' && effectiveErrorMsg && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
-                          <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                          <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
+                          <Lock size={28} />
                         </div>
-                      )}
+                        
+                        <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                          GrooveLab Live-Plattform
+                        </h4>
+                        <p style={{ fontSize: '14px', color: '#475569', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.5, fontWeight: 500 }}>
+                          Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
+                        </p>
+
+                        {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#d97706' }}>
+                              Verbinde mit Live Lab...
+                            </span>
+                          </div>
+                        ) : canCheckIn ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                            <button
+                              type="button"
+                              onClick={effectiveCheckInHandler}
+                              className="pulse-btn-checkin"
+                              aria-label={isTeacherRole ? "Am Live Lab Board einloggen" : "Wieder an iPad-Station einchecken"}
+                              style={{
+                                padding: '14px 28px',
+                                borderRadius: '16px',
+                                background: '#fbbc05',
+                                border: 'none',
+                                color: '#0f172a',
+                                fontSize: '15px',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)',
+                                touchAction: 'manipulation'
+                              }}
+                            >
+                              {isTeacherRole ? 'Einloggen' : 'Wieder einchecken'}
+                            </button>
+
+                            {isCoupledSchoolIpad && !isTeacherRole && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onLogout) {
+                                    onLogout();
+                                  } else {
+                                    window.dispatchEvent(new CustomEvent('campus_app_logout'));
+                                  }
+                                }}
+                                aria-label="Schüler wechseln und abmelden"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  fontSize: '13px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  textDecoration: 'underline',
+                                  touchAction: 'manipulation'
+                                }}
+                              >
+                                Schüler wechseln / Abmelden
+                              </button>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {checkingInStatus === 'error' && effectiveErrorMsg && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
+                            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                            <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                   <div style={{ 
@@ -2114,8 +2359,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             isMe={sess?.user_id === userId}
                             viewMode={viewMode}
                             onProfileSelect={setSelectedStudentProfile}
-                            onLogout={handleLogoutStudent}
-                            hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                            onLogout={handleStudentCheckout}
+                            hasHelpRequest={(viewMode !== 'student' || sess?.user_id === userId) && helpRequests.some(r => r.station_id === station.id)}
                             activePlatform={activePlatform}
                             currentUser={teacher}
                           />
@@ -2138,8 +2383,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             isMe={sess.user_id === userId}
                             viewMode={viewMode}
                             onProfileSelect={setSelectedStudentProfile}
-                            onLogout={handleLogoutStudent}
-                            hasHelpRequest={helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id)}
+                            onLogout={handleStudentCheckout}
+                            hasHelpRequest={(viewMode !== 'student' || sess.user_id === userId) && helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id)}
                             activePlatform={activePlatform}
                             currentUser={teacher}
                           />
@@ -2206,10 +2451,13 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
             overflowY: isSidebarCollapsed ? 'hidden' : 'auto',
             overflowX: 'hidden',
             maxHeight: `${windowHeight - 160}px`,
-            paddingRight: '6px',
-            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            paddingRight: isSidebarCollapsed ? '0px' : '6px',
+            transition: 'width 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1), transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+            contain: 'paint layout'
           }}>
-            {/* Sidebar Header (Universal Close Button for Desktop & Mobile) */}
+            {renderSidebarContent && (
+              <>
+                {/* Sidebar Header (Universal Close Button for Desktop & Mobile) */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -2378,23 +2626,64 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 {displayedFormations.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                      {displayedFormations.map((form: any, fIdx: number) => {
-                       const instReq = form.song?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 };
+                       const rawInstReq = form.song?.instrumentation;
                        
-                       const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+                       const normalizeBandInst = (rawName: string): string => {
+                         const n = (rawName || '').toLowerCase().trim();
+                         if (n.includes('git') || n.includes('gitarre')) return 'E-Gitarre';
+                         if (n.includes('drum') || n.includes('schlagzeug')) return 'E-Drums';
+                         if (n.includes('piano') || n.includes('keys') || n.includes('klavier') || n.includes('keyboard')) return 'E-Piano';
+                         if (n.includes('bass')) return 'E-Bass';
+                         if (n.includes('voc') || n.includes('gesang') || n.includes('sing')) return 'Vocals';
+                         return rawName || 'E-Gitarre';
+                       };
+
                        const colors: Record<string, string> = {
                          'E-Gitarre': '#ef4444',
                          'E-Drums': '#3b82f6',
                          'E-Piano': '#a855f7',
-                         'E-Bass': '#f59e0b'
+                         'E-Bass': '#f59e0b',
+                         'Vocals': '#34a853'
                        };
 
                        const allRequired: { instrument: string; part: number }[] = [];
-                       order.forEach(instName => {
-                         const count = instReq[instName] || 0;
-                         for(let i=0; i < count; i++) {
-                           allRequired.push({ instrument: instName, part: i + 1 });
-                         }
-                       });
+                       if (rawInstReq && typeof rawInstReq === 'object' && !Array.isArray(rawInstReq)) {
+                         const normCounts: Record<string, number> = {};
+                         Object.entries(rawInstReq).forEach(([k, v]) => {
+                           const normKey = normalizeBandInst(k);
+                           const count = typeof v === 'number' ? v : (v ? 1 : 0);
+                           normCounts[normKey] = (normCounts[normKey] || 0) + count;
+                         });
+                         const standardOrder = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass', 'Vocals'];
+                         standardOrder.forEach(instName => {
+                           const count = normCounts[instName] || 0;
+                           for (let i = 0; i < count; i++) {
+                             allRequired.push({ instrument: instName, part: i + 1 });
+                           }
+                         });
+                         Object.keys(normCounts).forEach(instName => {
+                           if (!standardOrder.includes(instName) && (normCounts[instName] || 0) > 0) {
+                             for (let i = 0; i < normCounts[instName]; i++) {
+                               allRequired.push({ instrument: instName, part: i + 1 });
+                             }
+                           }
+                         });
+                       } else if (Array.isArray(rawInstReq) && rawInstReq.length > 0) {
+                         rawInstReq.forEach((item: any) => {
+                           const instName = typeof item === 'string' ? normalizeBandInst(item) : normalizeBandInst(item?.instrument || 'E-Gitarre');
+                           allRequired.push({ instrument: instName, part: (item?.part || 1) });
+                         });
+                       }
+
+                       // Robust fallback if empty or missing
+                       if (allRequired.length === 0) {
+                         allRequired.push(
+                           { instrument: 'E-Gitarre', part: 1 },
+                           { instrument: 'E-Drums', part: 1 },
+                           { instrument: 'E-Piano', part: 1 },
+                           { instrument: 'E-Bass', part: 1 }
+                         );
+                       }
 
                        const getIcon = (inst: string) => {
                          return renderInstrumentIcon(inst);
@@ -2406,8 +2695,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                          ? form.missingInstruments
                          : allRequired.filter(item => {
                              const isFilled = formMembers.some((m: any) => {
-                               const normM = normalizeInstrument(m?.instrument);
-                               const normTarget = normalizeInstrument(item.instrument);
+                               const normM = normalizeBandInst(m?.instrument || '');
+                               const normTarget = normalizeBandInst(item.instrument);
                                const mPart = m?.part_number || 1;
                                return normM === normTarget && mPart === item.part;
                              });
@@ -2478,7 +2767,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 textAlign: 'center',
                                 lineHeight: 1.1
                               }}>
-                                BAND<br/>#{fIdx + 1}
+                                BAND<br/>#{form.formation_index || (fIdx + 1)}
                               </div>
                             </div>
                             
@@ -2488,34 +2777,58 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 const part = item.part;
                                 
                                 // Accurate instrument-based and part-based fill check
-                                const isFilled = formMembers.some((m: any) => {
-                                  const normM = normalizeInstrument(m?.instrument);
-                                  const normTarget = normalizeInstrument(inst);
+                                const filledMember = formMembers.find((m: any) => {
+                                  const normM = normalizeBandInst(m?.instrument || '');
+                                  const normTarget = normalizeBandInst(inst);
                                   const mPart = m?.part_number || 1;
                                   return normM === normTarget && mPart === part;
                                 });
+                                const isFilled = !!filledMember;
+                                const memberName = filledMember?.users?.first_name || filledMember?.name || (filledMember?.user_id === userId ? 'Du' : null);
                                 
                                 const color = colors[inst] || '#34a853';
                                 
                                 return (
                                   <div key={idx} style={{ 
                                     width: '48px', 
-                                    height: '48px', 
-                                    borderRadius: '12px', 
-                                    border: isFilled ? `2px solid ${color}` : '2px dashed #e2e8f0',
-                                    background: isFilled ? `${color}08` : 'transparent',
+                                    height: '52px', 
+                                    borderRadius: '14px', 
+                                    border: isFilled ? `2px solid ${color}` : '1.5px dashed #cbd5e1',
+                                    background: isFilled ? `${color}12` : 'rgba(248, 250, 252, 0.6)',
                                     display: 'flex',
+                                    flexDirection: 'column',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    fontSize: '1.25rem',
-                                    position: 'relative'
-                                  }}>
-                                    <span style={{ opacity: isFilled ? 1 : 0.2 }}>{getIcon(inst)}</span>
+                                    position: 'relative',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: isFilled ? `0 2px 8px ${color}20` : 'none'
+                                  }}
+                                  title={`${inst}${memberName ? `: ${memberName}` : ' (noch frei)'}`}
+                                  >
+                                    <span style={{ fontSize: '1.2rem', opacity: isFilled ? 1 : 0.4 }}>{getIcon(inst)}</span>
+                                    {isFilled && memberName && (
+                                      <span style={{ 
+                                        fontSize: '0.58rem', 
+                                        fontWeight: 900, 
+                                        color: color, 
+                                        maxWidth: '42px', 
+                                        overflow: 'hidden', 
+                                        textOverflow: 'ellipsis', 
+                                        whiteSpace: 'nowrap',
+                                        marginTop: '1px'
+                                      }}>
+                                        {memberName}
+                                      </span>
+                                    )}
                                     {!isFilled && (
-                                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <div style={{ width: '14px', height: '1.5px', background: '#cbd5e1', transform: 'rotate(45deg)', position: 'absolute' }} />
-                                        <div style={{ width: '14px', height: '1.5px', background: '#cbd5e1', transform: 'rotate(-45deg)', position: 'absolute' }} />
-                                      </div>
+                                      <span style={{ 
+                                        fontSize: '0.55rem', 
+                                        fontWeight: 800, 
+                                        color: '#94a3b8', 
+                                        marginTop: '1px' 
+                                      }}>
+                                        Frei
+                                      </span>
                                     )}
                                   </div>
                                 );
@@ -2524,13 +2837,17 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
 
                             {uniqueMissing.length > 0 ? (
                               <div style={{ 
-                                fontSize: '0.75rem', 
-                                fontWeight: 1000, 
-                                color: '#eab308', 
+                                fontSize: '0.72rem', 
+                                fontWeight: 900, 
+                                color: '#b45309', 
                                 textTransform: 'uppercase', 
-                                letterSpacing: '0.08em'
+                                letterSpacing: '0.08em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
                               }}>
-                                GESUCHT: {uniqueMissing.join(', ').toUpperCase()}
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+                                <span>GESUCHT: {uniqueMissing.join(', ').toUpperCase()}</span>
                               </div>
                             ) : (
                              (() => {
@@ -3041,6 +3358,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 <User size={20} color="#ef4444" />
                 <span style={{ color: '#ef4444', fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Alle Ausloggen</span>
               </button>
+            )}
+              </>
             )}
           </aside>
 

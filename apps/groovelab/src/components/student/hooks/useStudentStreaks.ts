@@ -14,6 +14,7 @@ import {
   calculateWeeklyStreakState 
 } from '../utils/studentAvatarDashboardUtils';
 import { resolveCampusStudentAvatar } from '../../StudioAvatar';
+import { getEngineTargetMinutes, getEngineEffectiveLevel } from '../../../utils/studentProgressEngine';
 
 interface UseStudentStreaksProps {
   studentId: string;
@@ -191,12 +192,21 @@ export function useStudentStreaks({
   }, [studentUser]);
   const flamesActive = campusSettings.flames_active !== false;
 
+  const totalFocusMinutes = useMemo(() => {
+    return (fokusLogs || []).reduce((acc: number, log: any) => {
+      const mins = log.duration_minutes || (log.duration_seconds ? Math.floor(log.duration_seconds / 60) : 0) || 0;
+      return acc + mins;
+    }, 0);
+  }, [fokusLogs]);
+
+  const effectiveEvolutionLevel = useMemo(() => {
+    const rawDbLevel = avatar?.evolution_level ?? studentUser?.evolution_level ?? 1;
+    return getEngineEffectiveLevel(rawDbLevel, totalFocusMinutes, streakFlamesCount);
+  }, [avatar?.evolution_level, studentUser?.evolution_level, totalFocusMinutes, streakFlamesCount]);
+
   const getTargetMinutes = useCallback((streak: number): number => {
-    if (streak >= 14) return 20;
-    if (streak >= 7) return 15;
-    if (streak >= 3) return 10;
-    return 5;
-  }, []);
+    return getEngineTargetMinutes(effectiveEvolutionLevel, streak, campusSettings?.fokus_levels);
+  }, [effectiveEvolutionLevel, campusSettings]);
 
   const getDeterministicWeekMetrics = useCallback((): WeeklyStreakMetrics => {
     return calculateWeeklyStreakState(
@@ -205,13 +215,21 @@ export function useStudentStreaks({
       studentId,
       studentUser,
       sessionActive,
-      secondsElapsed
+      secondsElapsed,
+      avatar?.streak_flame ?? studentUser?.streak_flame ?? 0
     );
-  }, [fokusLogs, studentId, studentUser, sessionActive, secondsElapsed]);
+  }, [fokusLogs, studentId, studentUser, sessionActive, secondsElapsed, avatar?.streak_flame]);
 
   const handleUseJoker = async (dateStr: string) => {
     if (!studentId || !studentUser) return;
     
+    // 🛡️ 0,1% Goldstandard Invariante: Pause = wenn streak = 0 ist, dürfen keine Schutzschilde eingesetzt werden!
+    const currentStreak = avatar?.streak_flame || 0;
+    if (currentStreak <= 0) {
+      alert('Schutzschilde sichern aktive Serien ab. Da deine Serie aktuell auf 0 steht, bist du in der Pause und kannst kein Schutzschild einsetzen. Starte deine Serie heute mit 3 Minuten Üben!');
+      return;
+    }
+
     const nowSim = getSimulatedNow();
     const currentWeek = getISOWeek(nowSim);
     const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
@@ -223,7 +241,7 @@ export function useStudentStreaks({
       return;
     }
 
-    if (!window.confirm(`Möchtest du ein Schutzschild für den ${dateStr} einsetzen, um deinen Streak zu sichern? (Noch ${availableShields} von 3 Schilden verfügbar)`)) {
+    if (!window.confirm(`Möchtest du ein Schutzschild für den ${dateStr} einsetzen, um deinen Streak von ${currentStreak} ${currentStreak === 1 ? 'Tag' : 'Tagen'} zu sichern? (Noch ${availableShields} von 3 Schilden verfügbar)`)) {
       return;
     }
 
@@ -264,12 +282,10 @@ export function useStudentStreaks({
       studentUser.joker_used_at = jokerDate.toISOString();
       studentUser.weekly_jokers_used = newWeeklyUsed;
 
-      const currentStreak = avatar?.streak_flame || 0;
-      const newStreak = currentStreak === 0 ? 1 : currentStreak;
-      
+      // Die aktive Serie (currentStreak > 0) bleibt geschützt erhalten
       const { error: avatarErr } = await supabase
         .from('avatars')
-        .update({ streak_flame: newStreak })
+        .update({ streak_flame: currentStreak })
         .eq('user_id', studentId);
 
       if (avatarErr) throw avatarErr;

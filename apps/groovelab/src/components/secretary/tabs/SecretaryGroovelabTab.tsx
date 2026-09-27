@@ -216,7 +216,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)',
               zIndex: 10
             }}>
-              <AlertCircle size={10} fill="white" /> HELP
+              <AlertCircle size={10} fill="white" /> HILFE
             </div>
           )}
           {isActive && viewMode === 'admin' && (

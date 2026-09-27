@@ -133,6 +133,10 @@ export const useBandFormationActions = ({
       const inst = (suggestingSkill.instrument || '').toLowerCase();
       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}_${inst}`, 'true');
     }
+    if (suggestingSkill?.formation_group) {
+      ignoredFoundingIds.current.push(suggestingSkill.formation_group);
+      sessionStorage.setItem(`groovelab_dismissed_form_${user.id}_${suggestingSkill.formation_group}`, 'true');
+    }
 
     console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in dismissSuggestion');
     setSuggestingSkill(null);
@@ -143,7 +147,57 @@ export const useBandFormationActions = ({
   useEffect(() => {
     if (loading || !user || suggestingSkill || selectedBandForGateway || pendingFounding || showBandProfile || gatewayJustClosed.current) return;
 
-    // 1. Auto-trigger: If user is in a band and mastered a new skill, suggest it to their band first
+    // 1. Auto-trigger: Complete formations on Matching Board
+    if (wallSongs && wallSongs.length > 0) {
+      for (const song of wallSongs) {
+        if (!song.formations || !Array.isArray(song.formations)) continue;
+
+        for (const form of song.formations) {
+          if (!form.isComplete || form.originBand) continue;
+
+          // Check if current user is part of this formation
+          const mySlot = (form.members || []).find((m: any) => m.user_id === user.id);
+          if (!mySlot) continue;
+
+          // Check if already completed or dismissed
+          const songId = song.song_id || song.id;
+          const isDoneSong = localStorage.getItem(`groovelab_founding_done_${user.id}_${songId}`);
+          const isDoneForm = localStorage.getItem(`groovelab_form_done_${user.id}_${form.id}`);
+          const isDismissed = sessionStorage.getItem(`groovelab_dismissed_form_${user.id}_${form.id}`);
+          const isIgnoredRef = ignoredFoundingIds.current.includes(form.id);
+
+          if (isDoneSong || isDoneForm || isDismissed || isIgnoredRef) continue;
+
+          // Check if user is already in a band for this song
+          const alreadyInBand = userBands.some((b: any) =>
+            b.song_id === songId ||
+            (b.band_songs || []).some((bs: any) => bs.song_id === songId || bs.songs?.id === songId)
+          );
+          if (alreadyInBand) continue;
+
+          console.log('[AutoTrigger] Complete formation found on matching board! Triggering founding modal for:', song.title, form.id);
+          setSuggestingSkill({
+            ...mySlot,
+            isLeader: true,
+            leaderName: 'Du',
+            song_id: songId,
+            title: song.title,
+            artist: song.artist,
+            instrumentation: song.instrumentation,
+            songs: { id: songId, title: song.title, instrumentation: song.instrumentation },
+            formation_group: form.id,
+            members: form.members
+          });
+
+          if (!foundingName) {
+            setFoundingName(generateRandomBandName(foundingLanguage || 'de'));
+          }
+          return;
+        }
+      }
+    }
+
+    // 2. Auto-trigger: If user is in a band and mastered a new skill, suggest it to their band first
     if (userBands.length > 0) {
       const stageReadySkills = userSongs.filter((s: any) => s.is_stage_ready && s.instrument !== 'Vocals');
 
@@ -169,7 +223,7 @@ export const useBandFormationActions = ({
         }
       }
     }
-  }, [wallSongs, activeStudentTab, user, userBands, userSongs, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading]);
+  }, [wallSongs, activeStudentTab, user, userBands, userSongs, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading, foundingName, foundingLanguage]);
 
   // Safety check: If suggestingSkill is set but userBands loads and indicates
   // that the song is already suggested or active in their band, dismiss the popup immediately.

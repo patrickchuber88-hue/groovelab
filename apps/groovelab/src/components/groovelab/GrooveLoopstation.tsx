@@ -43,6 +43,12 @@ import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard
 import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
 import { FocusAbortedModal } from '../focus/FocusAbortedModal';
 import { getEffectiveNetworkProfile } from '../../services/networkAwarenessService';
+import {
+  RelationalHarmonicEngine,
+  FourBarProgression,
+  DidacticUiLevel,
+  playTonePreview
+} from '../../services/audio/RelationalHarmonicEngine';
 
 export interface Track {
   id: number;
@@ -234,6 +240,89 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [countInBeats, setCountInBeats] = useState<number | string | null>(null);
   const [isAutoSequenceActive, setIsAutoSequenceActive] = useState(false);
   const [autoSequenceStatus, setAutoSequenceStatus] = useState<string>('');
+
+  // 🎹 Relational Didactic Harmonic Intelligence (4-Bar Progression & Age-Differentiated Scales)
+  const [harmonicProgression, setHarmonicProgression] = useState<FourBarProgression | null>(null);
+  const harmonicProgressionRef = useRef<FourBarProgression | null>(null);
+  useEffect(() => {
+    harmonicProgressionRef.current = harmonicProgression;
+  }, [harmonicProgression]);
+  const [didacticLevel, setDidacticLevel] = useState<DidacticUiLevel>(() => {
+    const lvl = student?.campus_ui_level;
+    if (lvl === 'teen' || lvl === 'pro') return lvl;
+    return 'junior';
+  });
+
+  // Synchronize didactic level with student profile
+  useEffect(() => {
+    if (student?.campus_ui_level && (['junior', 'teen', 'pro'] as const).includes(student.campus_ui_level)) {
+      setDidacticLevel(student.campus_ui_level);
+    }
+  }, [student?.campus_ui_level]);
+
+  // Realtime cross-module & parent-control UI level synchronization
+  useEffect(() => {
+    const handleLevelChangeEvt = (e: any) => {
+      const newLvl = e?.detail?.uiLevel || e?.detail;
+      if (newLvl === 'junior' || newLvl === 'teen' || newLvl === 'pro') {
+        setDidacticLevel(newLvl);
+      }
+    };
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    return () => window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+  }, []);
+
+  const handleLevelSelect = (lvl: DidacticUiLevel) => {
+    setDidacticLevel(lvl);
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: student?.id, uiLevel: lvl } }));
+        window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: lvl }));
+      }
+    } catch (_) {}
+  };
+
+  const triggerHarmonicAnalysis = (buffer: AudioBuffer) => {
+    try {
+      if (!buffer) return;
+      const progression = RelationalHarmonicEngine.analyzeFourBarAudio(buffer, bpm);
+      harmonicProgressionRef.current = progression;
+      setHarmonicProgression((prev) => {
+        // Guard: Do not let unpitched percussion overwrite an already recognized pitched progression
+        if (prev && !prev.isAcousticOrJamPreset && progression.isAcousticOrJamPreset) {
+          harmonicProgressionRef.current = prev;
+          return prev;
+        }
+        return progression;
+      });
+    } catch (err) {
+      console.warn('[GrooveLoopstation] Harmonic analysis error:', err);
+    }
+  };
+
+  const playPreviewNote = (note: string) => {
+    try {
+      let ctx = audioContextRef.current;
+      if (!ctx || ctx.state === 'closed') {
+        ctx = SharedAudioEngine.getContext();
+        audioContextRef.current = ctx;
+      }
+      if (ctx) {
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+        RelationalHarmonicEngine.playTonePreview(ctx, note);
+      } else {
+        initAudio().then(() => {
+          if (audioContextRef.current) {
+            RelationalHarmonicEngine.playTonePreview(audioContextRef.current, note);
+          }
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[GrooveLoopstation] Preview tone error:', err);
+    }
+  };
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(() => {
     return UniversalLatencyEngine.getLatencyMs();
   });
@@ -1032,6 +1121,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const uiEventsQueueRef = useRef<{ time: number, type: string, data?: any }[]>([]);
   const audioEventsQueueRef = useRef<{ time: number, type: string, data?: any }[]>([]);
   const isAutoSequenceActiveRef = useRef<boolean>(false);
+  const isCapturingContinuousAudioRef = useRef<boolean>(false);
   const continuousRecordStartTimeRef = useRef<number>(0);
   const isComponentMountedRef = useRef<boolean>(true);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -1042,11 +1132,26 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     tracksRef.current = tracks;
   }, [tracks]);
 
+  // If track 1 or 2 is present with audio, analyze it automatically (favoring pitched chords over unpitched percussion)
+  // Guard: NEVER perform synchronous harmonic analysis during live recording or auto-sequence transitions to ensure 100% stutter-free audio
+  useEffect(() => {
+    if (isAutoSequenceActiveRef.current || isCapturingContinuousAudioRef.current) return;
+    if (!harmonicProgression && audioBuffersRef.current[1]) {
+      triggerHarmonicAnalysis(audioBuffersRef.current[1]);
+    } else if (
+      (!harmonicProgression || harmonicProgression.isAcousticOrJamPreset) &&
+      audioBuffersRef.current[2]
+    ) {
+      triggerHarmonicAnalysis(audioBuffersRef.current[2]);
+    }
+  }, [tracks, bpm, harmonicProgression]);
+
   // Hardware Audio & Microphone Safety Guard (Art. 201 StGB / TDDDG & DSGVO Compliance)
   useEffect(() => {
     isComponentMountedRef.current = true;
 
     const stopAllMicrophoneTracks = () => {
+      isCapturingContinuousAudioRef.current = false;
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
@@ -1113,6 +1218,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
         if (ctx && ctx.state !== 'suspended') {
           try {
+            if (typeof (gainNode.gain as any).cancelAndHoldAtTime === 'function') {
+              (gainNode.gain as any).cancelAndHoldAtTime(ctx.currentTime);
+            } else {
+              gainNode.gain.cancelScheduledValues(ctx.currentTime);
+              gainNode.gain.setValueAtTime(gainNode.gain.value, ctx.currentTime);
+            }
             gainNode.gain.linearRampToValueAtTime(targetVolume, ctx.currentTime + 0.05);
           } catch (e) {
             gainNode.gain.setValueAtTime(targetVolume, ctx.currentTime);
@@ -1666,14 +1777,17 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     setTimeout(doScroll, 80);
     setTimeout(doScroll, 250);
   };
-
   const startAutoSequence = async () => {
-    // 🛡️ Lehrkräfte und didaktische Übungen im Aufgabenheft sind stets freigegeben (§ 73 UrhG / Art. 6 DSGVO)
-    if (!isTeacherSession && readOnly) {
-      const isStudentAudioDenied = student?.parent_allow_audio === false || 
-        ((student as any)?.parent_permissions?.allow_student_audio === false);
-      if (isStudentAudioDenied) {
-        alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil pausiert. Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
+    // 🛡️ DSGVO Art. 8 & 25 Privacy by Default: Lehrkräfte und volljährige Schüler sind stets freigegeben.
+    // Bei minderjährigen Schülern ist die Aufnahme standardmäßig gesperrt (Opt-In durch Eltern erforderlich).
+    const isAdultStudent = Boolean((student?.age && student.age >= 18) || ((student as any)?.birth_date && new Date((student as any).birth_date).getFullYear() <= new Date().getFullYear() - 18));
+    if (!isTeacherSession && !isAdultStudent) {
+      const isParentAudioAllowed = (student?.parent_allow_audio === true) || 
+        ((student as any)?.parent_permissions?.allow_student_audio === true) ||
+        (student?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${student.id}`) === 'true');
+
+      if (!isParentAudioAllowed) {
+        alert("Audioaufnahmen sind standardmäßig deaktiviert (Kinderschutz & Art. 8 DSGVO). Bitte wende dich an deine Eltern, um die Tonaufnahme im Elternbereich zu aktivieren.");
         return;
       }
     }
@@ -1699,6 +1813,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     setIsAutoSequenceActive(true);
     scrollToTracksSection();
     isAutoSequenceActiveRef.current = true;
+    isCapturingContinuousAudioRef.current = true;
     setAutoSequenceStatus('WARTE AUF MIKROFON...');
     try {
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
@@ -1769,7 +1884,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       if (processorNode instanceof AudioWorkletNode) {
         processorNode.port.onmessage = (e) => {
-          if (!isAutoSequenceActiveRef.current) return;
+          if (!isCapturingContinuousAudioRef.current) return;
           if (isFirstBlock) {
             continuousRecordStartTimeRef.current = e.data.time;
             isFirstBlock = false;
@@ -1780,7 +1895,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         };
       } else {
         (processorNode as ScriptProcessorNode).onaudioprocess = (e) => {
-          if (!isAutoSequenceActiveRef.current) return;
+          if (!isCapturingContinuousAudioRef.current) return;
           if (isFirstBlock) {
             const bufferDuration = e.inputBuffer.length / e.inputBuffer.sampleRate;
             continuousRecordStartTimeRef.current = ctx.currentTime - bufferDuration;
@@ -1858,80 +1973,134 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         return aligned;
       };
 
+      const cleanupContinuousRecording = () => {
+        isCapturingContinuousAudioRef.current = false;
+        try { processorNode.disconnect(); } catch (e) {}
+        try { sourceNode.disconnect(); } catch (e) {}
+        try { muteNode.disconnect(); } catch (e) {}
+        processorNodeRef.current = null;
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+          mediaStreamRef.current = null;
+        }
+      };
+
       const finalizeTrackBuffer = (trackId: number, tStartTicks: number, tEndTicks: number) => {
         const fullBuffer = getFullPCMBuffer();
-        if (!fullBuffer) return;
+        if (!fullBuffer) {
+          if (trackId === maxAllowedTracks) {
+            cleanupContinuousRecording();
+          }
+          return;
+        }
         const beatSecs = 60.0 / bpm;
         const sliced = sliceContinuousBuffer(fullBuffer, tStartTicks, tEndTicks, beatSecs, trackDurationMs);
-        if (sliced) {
-          audioBuffersRef.current[trackId] = sliced;
-          setTracks((prev) =>
-            prev.map((t) => (t.id === trackId ? { ...t, isWaiting: false } : t))
-          );
+        if (!sliced) {
+          if (trackId === maxAllowedTracks) {
+            cleanupContinuousRecording();
+          }
+          return;
+        }
+        audioBuffersRef.current[trackId] = sliced;
+        tracksRef.current = tracksRef.current.map((t) =>
+          t.id === trackId ? { ...t, isWaiting: false } : t
+        );
+        setTracks((prev) =>
+          prev.map((t) => (t.id === trackId ? { ...t, isWaiting: false } : t))
+        );
 
-          setTimeout(() => {
-            if (!isComponentMountedRef.current) return;
-            try {
-              const freshFull = getFullPCMBuffer();
-              if (freshFull) {
-                const completeSliced = sliceContinuousBuffer(freshFull, tStartTicks, tEndTicks, beatSecs, trackDurationMs);
-                if (completeSliced) {
-                  audioBuffersRef.current[trackId] = completeSliced;
-                  const currentSource = activeSourcesRef.current[trackId];
-                  if (currentSource && isAutoSequenceActiveRef.current) {
-                    const playTime = ctx.currentTime;
-                    const elapsed = playTime - (sequenceStartTimeRef.current + (tStartTicks + 16) * beatSecs);
-                    const trackDurationSec = trackDurationMs / 1000;
-                    const playOffset = Math.max(0, elapsed % trackDurationSec);
+        setTimeout(() => {
+          if (!isComponentMountedRef.current) return;
+          try {
+            const freshFull = getFullPCMBuffer();
+            if (freshFull) {
+              const completeSliced = sliceContinuousBuffer(freshFull, tStartTicks, tEndTicks, beatSecs, trackDurationMs);
+              if (completeSliced) {
+                audioBuffersRef.current[trackId] = completeSliced;
+                const currentSource = activeSourcesRef.current[trackId];
+                if (currentSource && (isAutoSequenceActiveRef.current || isPlayingRef.current)) {
+                  const playTime = ctx.currentTime + 0.030;
+                  const elapsed = playTime - (sequenceStartTimeRef.current + (tStartTicks + 16) * beatSecs);
+                  const trackDurationSec = trackDurationMs / 1000;
+                  const playOffset = Math.max(0, elapsed % trackDurationSec);
 
-                    const newSource = ctx.createBufferSource();
-                    newSource.buffer = completeSliced;
-                    newSource.loop = true;
+                  const newSource = ctx.createBufferSource();
+                  newSource.buffer = completeSliced;
+                  newSource.loop = true;
 
-                    const gainNode = ctx.createGain();
-                    const trackInfo = tracksRef.current.find(tr => tr.id === trackId);
-                    const volume = trackInfo ? trackInfo.volume : 80;
-                    const activeTrack = tracksRef.current.find(t => t.isRecording || t.isWaiting);
-                    const activeTrackId = activeTrack ? activeTrack.id : null;
-                    let multiplier = 1.0;
-                    if (activeTrackId !== null && trackId < activeTrackId) {
-                      const age = activeTrackId - trackId;
-                      if (useHeadphonesRef.current) {
-                        multiplier = 1.0;
-                      } else {
-                        multiplier = Math.max(0.05, 1.0 - 0.55 * age);
-                      }
+                  const gainNode = ctx.createGain();
+                  const trackInfo = tracksRef.current.find(tr => tr.id === trackId);
+                  const volume = trackInfo ? trackInfo.volume : 80;
+                  const hasAnySolo = tracksRef.current.some(tr => tr.isSoloed);
+                  const isActive = (hasAnySolo ? (trackInfo ? trackInfo.isSoloed : false) : true) && (trackInfo ? !trackInfo.isMuted : true);
+                  const baseVolume = isActive ? (volume / 100) : 0;
+                  const activeTrack = tracksRef.current.find(t => t.isRecording || t.isWaiting);
+                  const activeTrackId = activeTrack ? activeTrack.id : null;
+                  let multiplier = 1.0;
+                  if (activeTrackId !== null && trackId < activeTrackId) {
+                    const age = activeTrackId - trackId;
+                    if (useHeadphonesRef.current) {
+                      multiplier = 1.0;
+                    } else {
+                      multiplier = Math.max(0.05, 1.0 - 0.55 * age);
                     }
-                    const targetVolume = (volume / 100) * multiplier;
-                    gainNode.gain.setValueAtTime(targetVolume, playTime);
-                    newSource.connect(gainNode);
-                    connectTrackNode(trackId, gainNode, ctx);
-
-                    const oldGain = gainNodesRef.current[trackId];
-                    if (oldGain) {
-                      try {
-                        oldGain.gain.setValueAtTime(oldGain.gain.value, playTime);
-                        oldGain.gain.exponentialRampToValueAtTime(0.0001, playTime + 0.005);
-                        currentSource.stop(playTime + 0.005);
-                      } catch (e) {}
-                    }
-
-                    newSource.start(playTime, playOffset);
-                    activeSourcesRef.current[trackId] = newSource;
-                    gainNodesRef.current[trackId] = gainNode;
                   }
+                  const targetVolume = baseVolume * multiplier;
+                  gainNode.gain.setValueAtTime(0, playTime);
+                  gainNode.gain.linearRampToValueAtTime(targetVolume, playTime + 0.005);
+                  newSource.connect(gainNode);
+                  connectTrackNode(trackId, gainNode, ctx);
 
-                  const wavBlob = bufferToWav(completeSliced);
-                  const url = URL.createObjectURL(wavBlob);
-                  setTracks((prev) =>
-                    prev.map((t) => (t.id === trackId ? { ...t, url, blob: wavBlob } : t))
-                  );
+                  const oldGain = gainNodesRef.current[trackId];
+                  if (oldGain) {
+                    try {
+                      if (typeof (oldGain.gain as any).cancelAndHoldAtTime === 'function') {
+                        (oldGain.gain as any).cancelAndHoldAtTime(playTime);
+                      } else {
+                        oldGain.gain.cancelScheduledValues(playTime);
+                        oldGain.gain.setValueAtTime(targetVolume, playTime);
+                      }
+                      oldGain.gain.linearRampToValueAtTime(0, playTime + 0.005);
+                      currentSource.stop(playTime + 0.005);
+                    } catch (e) {}
+                  }
+                  currentSource.onended = () => {
+                    try { oldGain?.disconnect(); } catch (e) {}
+                  };
+
+                  newSource.start(playTime, playOffset);
+                  activeSourcesRef.current[trackId] = newSource;
+                  gainNodesRef.current[trackId] = gainNode;
                 }
+
+                setTimeout(() => {
+                  if (!isComponentMountedRef.current) return;
+                  try {
+                    if (trackId === 1 || (trackId === 2 && (!harmonicProgressionRef.current || harmonicProgressionRef.current.isAcousticOrJamPreset))) {
+                      triggerHarmonicAnalysis(completeSliced);
+                    }
+                    const wavBlob = bufferToWav(completeSliced);
+                    const url = URL.createObjectURL(wavBlob);
+                    tracksRef.current = tracksRef.current.map((t) =>
+                      t.id === trackId ? { ...t, url, blob: wavBlob } : t
+                    );
+                    setTracks((prev) =>
+                      prev.map((t) => (t.id === trackId ? { ...t, url, blob: wavBlob } : t))
+                    );
+                  } catch (err) {
+                    console.error("Deferred WAV encoding / harmonic analysis failed:", err);
+                  }
+                }, 80);
               }
-            } catch (e) {
-              console.error("Deferred WAV encoding/buffer swap failed:", e);
             }
-          }, 150);
+          } catch (e) {
+            console.error("Deferred WAV encoding/buffer swap failed:", e);
+          } finally {
+            if (trackId === maxAllowedTracks) {
+              cleanupContinuousRecording();
+            }
+          }
+        }, 150);
 
           if (trackId === 1) {
             setMasterLoopDuration(trackDurationMs);
@@ -1960,10 +2129,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             const activeTrackId = activeTrack ? activeTrack.id : null;
             let multiplier = 1.0;
             if (activeTrackId !== null && trackId < activeTrackId) {
+              const age = activeTrackId - trackId;
               if (useHeadphonesRef.current) {
                 multiplier = 1.0;
               } else {
-                multiplier = 0.65; // Cubase sweet spot: mild -3.7dB ducking during active speaker recording
+                multiplier = Math.max(0.05, 1.0 - 0.55 * age);
               }
             }
             const targetVolume = (volume / 100) * multiplier;
@@ -1974,7 +2144,6 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             gainNodesRef.current[trackId] = gainNode;
             source.start(playTime, playOffset);
           }
-        }
       };
 
       if (useHeadphonesRef.current) {
@@ -1999,12 +2168,18 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       const highlightTrackRecording = (trackId: number) => {
         setAutoSequenceStatus(`AUFNAHME SPUR ${trackId}...`);
+        tracksRef.current = tracksRef.current.map((t) =>
+          t.id === trackId ? { ...t, isRecording: true, isWaiting: false } : t
+        );
         setTracks((prev) =>
           prev.map((t) => (t.id === trackId ? { ...t, isRecording: true, isWaiting: false } : t))
         );
       };
 
       const unhighlightTrackRecording = (trackId: number) => {
+        tracksRef.current = tracksRef.current.map((t) =>
+          t.id === trackId ? { ...t, isRecording: false, isWaiting: true } : t
+        );
         setTracks((prev) =>
           prev.map((t) => (t.id === trackId ? { ...t, isRecording: false, isWaiting: true } : t))
         );
@@ -2064,10 +2239,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const activeTrackId = activeTrack ? activeTrack.id : null;
         let multiplier = 1.0;
         if (activeTrackId !== null && trackId < activeTrackId) {
+          const age = activeTrackId - trackId;
           if (useHeadphonesRef.current) {
             multiplier = 1.0;
           } else {
-            multiplier = 0.65; // Cubase sweet spot: mild -3.7dB ducking during active speaker recording
+            multiplier = Math.max(0.05, 1.0 - 0.55 * age);
           }
         }
         const baseVolume = active ? (volume / 100) : 0;
@@ -2153,7 +2329,6 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               highlightTrackRecording(trackId);
               matchedBoundaryEvent = true;
             } else if (tickIndex === boundary.end) {
-              unhighlightTrackRecording(trackId);
               matchedBoundaryEvent = true;
 
               if (trackId === maxAllowedTracks) {
@@ -2163,19 +2338,48 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 isAutoSequenceActiveRef.current = false;
                 setIsMetronomeActive(false);
                 setAutoSequenceStatus('FERTIG!');
+                setIsPlaying(true);
+                isPlayingRef.current = true;
 
+                // 1. Immediately update tracksRef and React state so no tracks are marked recording/waiting
+                tracksRef.current = tracksRef.current.map((t) => ({ ...t, isRecording: false, isWaiting: false }));
+                setTracks((prev) =>
+                  prev.map((t) => ({ ...t, isRecording: false, isWaiting: false }))
+                );
+
+                // 2. Smoothly release ducking on previous tracks over 50ms (0.45 -> 1.0)
+                const ctx = audioContextRef.current;
+                tracksRef.current.forEach((t) => {
+                  const gNode = gainNodesRef.current[t.id];
+                  if (gNode && ctx) {
+                    const trackInfo = tracksRef.current.find(x => x.id === t.id);
+                    const hasAnySolo = tracksRef.current.some(x => x.isSoloed);
+                    const isActive = (hasAnySolo ? (trackInfo ? trackInfo.isSoloed : false) : true) && (trackInfo ? !trackInfo.isMuted : true);
+                    const baseVolume = isActive ? ((trackInfo ? trackInfo.volume : 80) / 100) : 0;
+                    try {
+                      if (typeof (gNode.gain as any).cancelAndHoldAtTime === 'function') {
+                        (gNode.gain as any).cancelAndHoldAtTime(ctx.currentTime);
+                      } else {
+                        gNode.gain.cancelScheduledValues(ctx.currentTime);
+                        gNode.gain.setValueAtTime(gNode.gain.value, ctx.currentTime);
+                      }
+                      gNode.gain.linearRampToValueAtTime(baseVolume, ctx.currentTime + 0.05);
+                    } catch (e) {
+                      try { gNode.gain.setValueAtTime(baseVolume, ctx.currentTime); } catch (err) {}
+                    }
+                  }
+                });
+
+                // 3. Finalize Track 2 (starts playing immediately in phase without dead-air)
                 finalizeTrackBuffer(trackId, boundary.start, boundary.end);
 
-                try { processorNode.disconnect(); } catch (e) {}
-                try { sourceNode.disconnect(); } catch (e) {}
-                try { muteNode.disconnect(); } catch (e) {}
-                if (mediaStreamRef.current) {
-                  mediaStreamRef.current.getTracks().forEach(track => track.stop());
-                  mediaStreamRef.current = null;
-                }
-
-                playAll();
+                // 4. Start UI progress loop in phase with Web Audio clock
+                const cycleAudioTime = sequenceStartTimeRef.current + boundary.end * beatSecs;
+                const cycleWallTime = Date.now() - Math.max(0, ((ctx ? ctx.currentTime : 0) - cycleAudioTime) * 1000);
+                startProgressLoop(cycleWallTime, cycleAudioTime);
+                return;
               } else {
+                unhighlightTrackRecording(trackId);
                 setTimeout(() => finalizeTrackBuffer(trackId, boundary.start, boundary.end), 0);
               }
             }
@@ -2292,7 +2496,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     if (activeTrackId !== null && trackId < activeTrackId) {
       const age = activeTrackId - trackId;
       if (useHeadphonesRef.current) {
-        multiplier = Math.max(0.20, 1.0 - 0.30 * age);
+        multiplier = 1.0;
       } else {
         multiplier = Math.max(0.05, 1.0 - 0.55 * age);
       }
@@ -2374,6 +2578,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     isPlayingRef.current = false;
     setPlaybackProgress(0);
     isAutoSequenceActiveRef.current = false;
+    isCapturingContinuousAudioRef.current = false;
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       cancelAnimationFrame(progressIntervalRef.current);
@@ -2416,6 +2621,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const handleReset = () => {
     isAutoSequenceActiveRef.current = false;
+    isCapturingContinuousAudioRef.current = false;
     setIsAutoSequenceActive(false);
     stopAll();
     if (savedLoopSourceRef.current) {
@@ -2449,6 +2655,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
     setTracks(resetTracks);
     setMasterLoopDuration(null);
+    setHarmonicProgression(null);
+    harmonicProgressionRef.current = null;
     audioBuffersRef.current = {};
     activeSourcesRef.current = {};
     gainNodesRef.current = {};
@@ -2493,12 +2701,16 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const startRecording = async (trackId: number) => {
-    // 🛡️ Lehrkräfte und didaktische Übungen im Aufgabenheft sind stets freigegeben (§ 73 UrhG / Art. 6 DSGVO)
-    if (!isTeacherSession && readOnly) {
-      const isStudentAudioDenied = student?.parent_allow_audio === false || 
-        ((student as any)?.parent_permissions?.allow_student_audio === false);
-      if (isStudentAudioDenied) {
-        alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil pausiert. Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
+    // 🛡️ DSGVO Art. 8 & 25 Privacy by Default: Lehrkräfte und volljährige Schüler sind stets freigegeben.
+    // Bei minderjährigen Schülern ist die Aufnahme standardmäßig gesperrt (Opt-In durch Eltern erforderlich).
+    const isAdultStudent = Boolean((student?.age && student.age >= 18) || ((student as any)?.birth_date && new Date((student as any).birth_date).getFullYear() <= new Date().getFullYear() - 18));
+    if (!isTeacherSession && !isAdultStudent) {
+      const isParentAudioAllowed = (student?.parent_allow_audio === true) || 
+        ((student as any)?.parent_permissions?.allow_student_audio === true) ||
+        (student?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${student.id}`) === 'true');
+
+      if (!isParentAudioAllowed) {
+        alert("Audioaufnahmen sind standardmäßig deaktiviert (Kinderschutz & Art. 8 DSGVO). Bitte wende dich an deine Eltern, um die Tonaufnahme im Elternbereich zu aktivieren.");
         return;
       }
     }
@@ -2584,6 +2796,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               preserveDynamics: true
             });
             audioBuffersRef.current[trackId] = normalized;
+            if (trackId === 1 || (trackId === 2 && (!harmonicProgression || harmonicProgression.isAcousticOrJamPreset))) {
+              triggerHarmonicAnalysis(normalized);
+            }
           }
         } catch (decodeErr) {
           console.error("Decoding error:", decodeErr);
@@ -2774,6 +2989,18 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     if (trackId === 1) {
       stopAll();
       setMasterLoopDuration(null);
+    }
+
+    // 🎹 Relational Didactic Reconciliation: Update or reset harmonic progression on track deletion
+    if (trackId === 1 || trackId === 2) {
+      const remainingTrackId = trackId === 1 ? 2 : 1;
+      const remainingBuf = audioBuffersRef.current[remainingTrackId];
+      if (remainingBuf) {
+        triggerHarmonicAnalysis(remainingBuf);
+      } else if (!audioBuffersRef.current[1] && !audioBuffersRef.current[2]) {
+        setHarmonicProgression(null);
+        harmonicProgressionRef.current = null;
+      }
     }
   };
 
@@ -4502,7 +4729,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     const arrayBuffer = await response.arrayBuffer();
 
                     btn.innerText = "DECODIERE...";
-                    const ctx = audioContextRef.current || new AudioContext();
+                    const ctx = audioContextRef.current || SharedAudioEngine.getContext();
                     const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
                     const repsPrompt = prompt("Wie oft soll der Loop im exportierten Song hintereinander wiederholt werden?", "4");
@@ -5484,6 +5711,171 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           )}
         </div>
 
+        {/* ✨ Kompakte Apple-Schlichtheits-Leiste: Didaktischer Harmonischer Begleiter & Solo-Skala */}
+        {harmonicProgression && (() => {
+          const visibleScaleNotes = harmonicProgression.scales[didacticLevel] || harmonicProgression.scales.junior;
+
+          return (
+            <div
+              role="region"
+              aria-label="Harmonischer Begleiter und Solo-Skala"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                minHeight: '36px',
+                height: '36px',
+                padding: '0 12px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(226, 232, 240, 0.85)',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                boxSizing: 'border-box',
+                gap: '8px',
+                overflowX: 'auto',
+                userSelect: 'none',
+                marginBottom: tracks.length > 2 ? '4px' : '8px'
+              }}
+            >
+              {/* Linke Seite: Tonart-Badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  letterSpacing: '-0.01em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  <span style={{ color: '#d97706' }}>✨</span>
+                  <span>Tonart: <strong style={{ fontWeight: 800 }}>{harmonicProgression.key}</strong></span>
+                </span>
+              </div>
+
+              {/* Mitte: Passende Töne Noten-Pills im ruhigen Apple-Design */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                flexShrink: 0
+              }}>
+                <span style={{
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  marginRight: '2px'
+                }}>
+                  Passende Töne:
+                </span>
+                {visibleScaleNotes.map((note) => {
+                  const toneProfile = harmonicProgression.toneMatrix?.[note];
+                  const noteTooltip = toneProfile?.overallCharacter
+                    ? `Ton ${note} in ${harmonicProgression.key} – ${toneProfile.overallCharacter}`
+                    : `Ton ${note} (Harmonischer Ton in ${harmonicProgression.key})`;
+
+                  return (
+                    <button
+                      key={note}
+                      type="button"
+                      onClick={() => playPreviewNote(note)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          playPreviewNote(note);
+                        }
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.boxShadow = '0 0 0 2px #3b82f6';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                      title={noteTooltip}
+                      aria-label={`Ton ${note} in ${harmonicProgression.key} anhören`}
+                      style={{
+                        minWidth: '24px',
+                        height: '24px',
+                        padding: '0 6px',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        fontFamily: 'SF Mono, Monaco, monospace',
+                        background: '#f1f5f9',
+                        color: '#0f172a',
+                        border: '1px solid #cbd5e1',
+                        boxShadow: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        outline: 'none',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      {note}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Rechte Seite: Didaktik-Level Switcher */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                background: 'rgba(241, 245, 249, 0.85)',
+                padding: '2px',
+                borderRadius: '8px',
+                border: '1px solid rgba(203, 213, 225, 0.7)',
+                flexShrink: 0
+              }}>
+                {(['junior', 'teen', 'pro'] as const).map((lvl) => {
+                  const isSelected = didacticLevel === lvl;
+                  const label = lvl === 'junior' ? 'Junior ★' : lvl === 'teen' ? 'Teen ★★' : 'Pro ★★★';
+                  return (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => handleLevelSelect(lvl)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleLevelSelect(lvl);
+                        }
+                      }}
+                      aria-pressed={isSelected}
+                      aria-label={`Didaktik-Stufe ${label}`}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.62rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        borderRadius: '6px',
+                        background: isSelected ? '#ffffff' : 'transparent',
+                        color: isSelected ? '#0f172a' : '#64748b',
+                        boxShadow: isSelected ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
+                        border: isSelected ? '1px solid rgba(203, 213, 225, 0.5)' : '1px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.12s ease',
+                        outline: 'none',
+                        touchAction: 'manipulation',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Dynamic Multi-Track DAW Channel Strip Scroll Container */}
         <div 
           style={{
@@ -5829,7 +6221,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                                 borderRadius: '3px',
                                 transition: 'all 0.15s ease'
                               }}>
-                                TAKT {barNum}
+                                TAKT {barNum}{harmonicProgression?.bars?.[barIdx]?.chord ? ` · ${harmonicProgression.bars[barIdx].chord}` : ''}
                               </div>
                             </div>
                             {/* 8-Step Waveform Visualizer Section */}

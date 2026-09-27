@@ -45,8 +45,9 @@ export function useStudentSchedule({
   // Crisis Notifications
   const [unreadCrisisNotifs, setUnreadCrisisNotifs] = useState<any[]>([]);
 
-  const isStudentAbsenceAllowed = Boolean(studentUser?.parent_allow_absences ?? (studentUiLevel === 'pro'));
-  const isStudentRescheduleAllowed = Boolean(studentUser?.parent_allow_reschedule_confirm ?? (studentUiLevel === 'pro'));
+  const isJuniorLevel = studentUiLevel === 'junior' || studentUser?.campus_ui_level === 'junior';
+  const isStudentAbsenceAllowed = isJuniorLevel ? false : Boolean(studentUser?.parent_allow_absences ?? (studentUiLevel === 'pro'));
+  const isStudentRescheduleAllowed = isJuniorLevel ? false : Boolean(studentUser?.parent_allow_reschedule_confirm ?? (studentUiLevel === 'pro'));
 
   const fetchSchedule = useCallback(async () => {
     if (!studentId) return;

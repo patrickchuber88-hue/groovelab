@@ -23,11 +23,11 @@ import {
   HomeworkBookErrorBoundary, 
   HomeworkBookLoadingFallback 
 } from './student/meisterwerk/HomeworkBookErrorBoundary';
+import { getEngineTargetMinutes } from '../utils/studentProgressEngine';
 
 // 🚀 High-Performance Lazy Loaded Tabs
 const StudentBriefingTab = lazy(() => import('./student/tabs/StudentBriefingTab').then(m => ({ default: m.StudentBriefingTab })));
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
-const StudentSongsTab = lazy(() => import('./student/tabs/StudentSongsTab').then(m => ({ default: m.StudentSongsTab })));
 const StudentProfileTab = lazy(() => import('./student/tabs/StudentProfileTab').then(m => ({ default: m.StudentProfileTab })));
 const StudentSettingsTab = lazy(() => import('./student/tabs/StudentSettingsTab').then(m => ({ default: m.StudentSettingsTab })));
 const StudentCampusCupTab = lazy(() => import('./student/tabs/StudentCampusCupTab').then(m => ({ default: m.StudentCampusCupTab })));
@@ -66,7 +66,7 @@ export function StudentAvatarDashboard({
     avatar: null,
     studentUiLevel: profile.studentUiLevel,
     isTeacherSession: profile.isTeacherSession,
-    getTargetMinutes: (streak: number) => (streak >= 14 ? 20 : streak >= 7 ? 15 : streak >= 3 ? 10 : 5)
+    getTargetMinutes: (streak: number) => getEngineTargetMinutes(profile.studentUser?.evolution_level || 1, streak)
   });
 
   // 3. Streaks & Flame Engine Domain Hook
@@ -132,8 +132,6 @@ export function StudentAvatarDashboard({
     window.addEventListener('campus_reset_homework_board', handleReset);
     return () => window.removeEventListener('campus_reset_homework_board', handleReset);
   }, []);
-  const [songSearch, setSongSearch] = useState('');
-  const [juniorMediathekFilter, setJuniorMediathekFilter] = useState<'all' | 'songs' | 'lehrwerke' | 'homework'>('all');
 
   // 🚀 Junior Space Mission & Sticker Engine Hook (Isomorphic Extraction)
   const {
@@ -317,7 +315,7 @@ export function StudentAvatarDashboard({
         margin: '0 auto', 
         width: '100%', 
         overflowX: 'clip',
-        padding: profile.isMobile ? '0 0 var(--mobile-scroll-clearance-bottom, 140px) 0' : '0 0 40px 0', 
+        padding: profile.isMobile ? '0' : '0 0 40px 0', 
         boxSizing: 'border-box'
       }}
     >
@@ -383,35 +381,7 @@ export function StudentAvatarDashboard({
         </Suspense>
       )}
 
-      {/* 2. Songs Tab */}
-      {(profile.visitedTabs.has('songs') || profile.visitedTabs.has('mediathek')) && (
-        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Songs &amp; Repertoire...</div>}>
-          <StudentSongsTab
-            activeTab={profile.activeTab}
-            progressLoading={progressLoading}
-            assignedCampusSongs={assignedCampusSongs}
-            lehrwerke={lehrwerke}
-            isMobile={profile.isMobile}
-            studentUser={profile.studentUser}
-            studentId={studentId}
-            juniorMediathekFilter={juniorMediathekFilter}
-            setJuniorMediathekFilter={setJuniorMediathekFilter}
-            songSearch={songSearch}
-            setSongSearch={setSongSearch}
-            songSearchDebounced={songSearch}
-            progressItems={progressItems}
-            setSelectedTopic={setSelectedTopic}
-            handleTabChangeLocal={profile.handleTabChangeLocal}
-            setSelectedSongForDetail={setSelectedSongForDetail}
-            setCertificateSong={profile.setCertificateSong}
-            setSelectedLehrwerkForDetail={setSelectedLehrwerkForDetail}
-            isSongMastered={isSongMastered}
-            localProgress={localProgress}
-            activeSongSkills={activeSongSkills}
-            isMusicStandMode={profile.isMusicStandMode}
-          />
-        </Suspense>
-      )}
+
 
       {/* 3. Campus Cup Tab */}
       {profile.activeTab === 'campus_cup' && (

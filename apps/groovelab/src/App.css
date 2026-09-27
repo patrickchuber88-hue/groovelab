@@ -686,8 +686,45 @@ div:hover > .photo-overlay {
   display: none; /* Chrome/Safari */
 }
 
-/* Smartphone Bottom Nav Grid (<= 768px) */
+/* Smartphone Bottom Nav Grid & Apple Native App-Shell (<= 768px) */
 @media (max-width: 768px) {
+  html, body, #root {
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-layout {
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .main-wrapper {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .cg-mobile-top-header {
+    flex-shrink: 0 !important;
+  }
+
   .mobile-nav-grid {
     display: grid !important;
     grid-template-columns: repeat(5, 1fr) !important;
@@ -778,7 +815,8 @@ div:hover > .photo-overlay {
   }
 }
 
-@media (max-width: 1023px) {
+/* Tablet Layout (769px - 1023px) - Retained for tablet only */
+@media (min-width: 769px) and (max-width: 1023px) {
   .sidebar-nav {
     display: none;
   }
@@ -787,6 +825,16 @@ div:hover > .photo-overlay {
   }
   .main-content, .dashboard-container, .sim-viewport-mobile, .sim-viewport-portrait, .board-page-container {
     padding-bottom: 140px !important;
+  }
+}
+
+/* Smartphone Layout (<= 768px) - Sidebar hide without padding pollution */
+@media (max-width: 768px) {
+  .sidebar-nav {
+    display: none !important;
+  }
+  .mobile-nav {
+    display: none !important;
   }
 }
 

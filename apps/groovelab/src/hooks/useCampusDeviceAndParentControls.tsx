@@ -361,6 +361,50 @@ export function useCampusDeviceAndParentControls({
           window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
         }
       })
+      .on('broadcast', { event: 'parent-controls-changed' }, (payload: any) => {
+        const data = payload?.payload;
+        if (!data) return;
+        console.log('[Realtime-Root] Full parent-controls-changed broadcast received:', data);
+        if (data.uiLevel && (data.uiLevel === 'junior' || data.uiLevel === 'teen' || data.uiLevel === 'pro')) {
+          setCampusStudentUiLevel(data.uiLevel);
+          try {
+            localStorage.setItem(`campus_student_ui_level_${user.id}`, data.uiLevel);
+            localStorage.setItem('campus_student_ui_level', data.uiLevel);
+          } catch {}
+          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: data.uiLevel }));
+        }
+        setUser((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            campus_ui_level: data.uiLevel ?? prev.campus_ui_level,
+            parent_allow_absences: data.allowAbsences ?? prev.parent_allow_absences,
+            parent_allow_reschedule_confirm: data.allowRescheduleConfirm ?? prev.parent_allow_reschedule_confirm,
+            parent_allow_chat: data.allowChat ?? prev.parent_allow_chat,
+            parent_allow_timer: data.allowTimer ?? prev.parent_allow_timer,
+            parent_allow_leaderboard: data.allowLeaderboard ?? prev.parent_allow_leaderboard,
+            parent_allow_proposals: data.allowProposals ?? prev.parent_allow_proposals,
+            parent_allow_audio: data.allowAudio ?? prev.parent_allow_audio,
+            parent_permissions: data.parentPermissions ?? prev.parent_permissions,
+          };
+        });
+        if (data.allowChat !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_chat_${user.id}`, String(data.allowChat)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'messages', allowed: data.allowChat } }));
+        }
+        if (data.allowTimer !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_timer_${user.id}`, String(data.allowTimer)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'practice_board', allowed: data.allowTimer } }));
+        }
+        if (data.allowLeaderboard !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_leaderboard_${user.id}`, String(data.allowLeaderboard)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'campus_cup', allowed: data.allowLeaderboard } }));
+        }
+        if (data.allowAudio !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_audio_${user.id}`, String(data.allowAudio)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'recordings', allowed: data.allowAudio } }));
+        }
+      })
       .subscribe();
 
     return () => {

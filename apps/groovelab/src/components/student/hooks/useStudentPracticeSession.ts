@@ -36,6 +36,13 @@ export function useStudentPracticeSession({
     secondsElapsedRef.current = secondsElapsed;
   }, [secondsElapsed]);
 
+  // Session Pause State (0,1% Goldstandard: Timer stoppt exakt bei Pause)
+  const [isSessionPaused, setIsSessionPaused] = useState(false);
+  const isSessionPausedRef = useRef(false);
+  useEffect(() => {
+    isSessionPausedRef.current = isSessionPaused;
+  }, [isSessionPaused]);
+
   // Gyro Detox & flat orientation states
   const [isPhoneFlat, setIsPhoneFlat] = useState(false);
   const isPhoneFlatRef = useRef(isPhoneFlat);
@@ -57,10 +64,10 @@ export function useStudentPracticeSession({
   // WakeLock ref for active practice sessions
   const wakeLockRef = useRef<any>(null);
 
-  // Active Timer Loop
+  // Active Timer Loop (Stoppt zuverlässig, wenn pausiert)
   useEffect(() => {
     let timer: any = null;
-    if (sessionActive) {
+    if (sessionActive && !isSessionPaused) {
       timer = setInterval(() => {
         setSecondsElapsed(prev => prev + 1);
       }, 1000);
@@ -83,7 +90,7 @@ export function useStudentPracticeSession({
         wakeLockRef.current = null;
       }
     };
-  }, [sessionActive]);
+  }, [sessionActive, isSessionPaused]);
 
   // Fetch Fokus Logs
   const fetchFokusLogs = useCallback(async () => {
@@ -118,6 +125,8 @@ export function useStudentPracticeSession({
 
   // Finish Practice Session
   const finishPracticeSession = async (customXp?: number) => {
+    setIsSessionPaused(false);
+    isSessionPausedRef.current = false;
     const elapsed = secondsElapsedRef.current;
     if (elapsed <= 0) {
       setSessionActive(false);
@@ -417,6 +426,9 @@ export function useStudentPracticeSession({
     setSessionActive,
     secondsElapsed,
     setSecondsElapsed,
+    isSessionPaused,
+    setIsSessionPaused,
+    isSessionPausedRef,
     isPhoneFlat,
     flatType,
     graceSecondsLeft,

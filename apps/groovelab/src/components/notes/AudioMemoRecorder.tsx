@@ -71,11 +71,16 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   const startRecording = async () => {
     const isStudent = user?.role?.toLowerCase() === 'student';
     if (isStudent) {
-      const isDenied = user?.parent_allow_audio === false || 
-        ((user as any)?.parent_permissions?.allow_student_audio === false);
-      if (isDenied) {
-        setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten pausiert.');
-        return;
+      const isAdultStudent = Boolean((user?.age && user.age >= 18) || ((user as any)?.birth_date && new Date((user as any).birth_date).getFullYear() <= new Date().getFullYear() - 18));
+      if (!isAdultStudent) {
+        const isParentAudioAllowed = (user?.parent_allow_audio === true) || 
+          ((user as any)?.parent_permissions?.allow_student_audio === true) ||
+          (user?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${user.id}`) === 'true');
+
+        if (!isParentAudioAllowed) {
+          setErrorMsg('Tonaufnahmen sind für dieses Schülerprofil standardmäßig deaktiviert (Kinderschutz & Art. 8 DSGVO). Bitte wende dich an deine Eltern.');
+          return;
+        }
       }
     }
     if (!hasTresor) return;

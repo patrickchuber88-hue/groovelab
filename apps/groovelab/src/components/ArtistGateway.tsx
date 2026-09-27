@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { X, Clock, Sparkles, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getDefaultMusicianAvatarUrl } from './StudioAvatar';
 
 export interface ArtistGatewayProps {
   show: boolean;
@@ -156,7 +157,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
         userObj: userObj,
         userId: m.user_id || userObj?.id || m.id,
         firstName: m.first_name || userObj?.first_name || 'Musiker',
-        photoUrl: m.photo_url || userObj?.photo_url || '/avatar_ghost.jpg',
+        photoUrl: m.photo_url || userObj?.photo_url || getDefaultMusicianAvatarUrl(m.instrument || 'Gitarre', 'student'),
         instrument: m.instrument || 'Instrument',
         role: m.role || (m.user_id === user?.id ? 'leader' : 'member')
       };
@@ -369,10 +370,10 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                 >
                   {isFilled ? (
                     <img 
-                      src={card.photoUrl || '/avatar_ghost.jpg'} 
+                      src={card.photoUrl && card.photoUrl !== '/avatar_ghost.jpg' ? card.photoUrl : getDefaultMusicianAvatarUrl(card.instrument, 'student')} 
                       alt={card.firstName}
                       onError={(e) => {
-                        e.currentTarget.src = '/avatar_ghost.jpg';
+                        e.currentTarget.src = getDefaultMusicianAvatarUrl(card.instrument, 'student');
                       }}
                     />
                   ) : (

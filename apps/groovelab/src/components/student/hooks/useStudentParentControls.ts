@@ -723,34 +723,60 @@ export function useStudentParentControls({
             console.warn('[ParentControls] Cache sync notice:', cErr);
           }
 
-          if (updates.uiLevel !== undefined) {
-            const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };
-            console.log(`[ParentControls] Alters-UI erfolgreich auf „${labels[updates.uiLevel] || updates.uiLevel}“ gespeichert 🛡️`);
-            try {
-              const topicName = `realtime_ui_level_${targetStudentId}`;
-              const existingCh = supabase.getChannels().find((c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName);
-              if (existingCh && (existingCh.state === 'joined' || existingCh.state === 'joining')) {
-                existingCh.send({
+          // 🛡️ REVISIONSSICHERE CROSS-ORIGIN ECHTZEIT-SYNCHRONISATION (Dual-Event Architektur)
+          try {
+            const topicName = `realtime_ui_level_${targetStudentId}`;
+            const existingCh = supabase.getChannels().find((c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName);
+
+            const fullPermissionsPayload = {
+              studentId: targetStudentId,
+              uiLevel: nextUiLevel,
+              allowAbsences: payload.parent_allow_absences,
+              allowRescheduleConfirm: payload.parent_allow_reschedule_confirm,
+              allowChat: payload.parent_allow_chat,
+              allowTimer: payload.parent_allow_timer,
+              allowLeaderboard: payload.parent_allow_leaderboard,
+              allowProposals: payload.parent_allow_proposals,
+              allowAudio: payload.parent_allow_audio,
+              parentPermissions: payload.parent_permissions,
+              updatedAt: new Date().toISOString()
+            };
+
+            const sendBroadcasts = (ch: any) => {
+              // 1. Dual-Event: Vollständiges Berechtigungspaket bei JEDER Änderung
+              ch.send({
+                type: 'broadcast',
+                event: 'parent-controls-changed',
+                payload: fullPermissionsPayload
+              });
+              // 2. Rückwärtskompatibles ui-level-changed Event bei Stufenwechsel
+              if (updates.uiLevel !== undefined) {
+                ch.send({
                   type: 'broadcast',
                   event: 'ui-level-changed',
                   payload: { uiLevel: updates.uiLevel }
                 });
-              } else {
-                const tempCh = supabase.channel(topicName);
-                tempCh.subscribe((status) => {
-                  if (status === 'SUBSCRIBED') {
-                    tempCh.send({
-                      type: 'broadcast',
-                      event: 'ui-level-changed',
-                      payload: { uiLevel: updates.uiLevel }
-                    });
-                    setTimeout(() => supabase.removeChannel(tempCh), 1500);
-                  }
-                });
               }
-            } catch (bcErr) {
-              console.warn('[ParentControls] Error broadcasting ui-level-changed:', bcErr);
+            };
+
+            if (existingCh && (existingCh.state === 'joined' || existingCh.state === 'joining')) {
+              sendBroadcasts(existingCh);
+            } else {
+              const tempCh = supabase.channel(topicName);
+              tempCh.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                  sendBroadcasts(tempCh);
+                  setTimeout(() => supabase.removeChannel(tempCh), 1500);
+                }
+              });
             }
+
+            if (updates.uiLevel !== undefined) {
+              const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };
+              console.log(`[ParentControls] Alters-UI erfolgreich auf „${labels[updates.uiLevel] || updates.uiLevel}“ gespeichert 🛡️`);
+            }
+          } catch (bcErr) {
+            console.warn('[ParentControls] Error broadcasting realtime permissions update:', bcErr);
           }
         }
       }

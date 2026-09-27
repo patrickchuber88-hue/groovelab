@@ -79,12 +79,83 @@ export function useCampusDashboardMetrics({
 
   const totalPracticeMins = totalPresenceMins + liveSessionMins;
 
-  // Group userSongs by song_id
-  const songIdsInPractice = useMemo(() => Array.from(new Set(
-    (userSongs || [])
-      .filter((s: any) => s.progress < 100 || s.is_pending_approval)
-      .map((s: any) => s.song_id)
-  )), [userSongs]);
+  // 0,1% Goldstandard Dual Presence & Practice Retention (GRV-39):
+  // Group userSongs by song_id. A song belongs in "Üben" if:
+  // 1. It has open practice progress (< 100% or is_pending_approval), OR
+  // 2. It has at least one mastered track (100%), but NOT ALL available instruments are mastered yet,
+  //    AND it has NOT been explicitly dismissed by the user via the trash icon (is_practice_dismissed !== true).
+  // Once ALL available instruments of the song are 100% mastered, the song automatically retires from "Üben" to "Repertoire".
+  const songIdsInPractice = useMemo(() => {
+    const songIdToSkills: Record<string, any[]> = {};
+    (userSongs || []).forEach((s: any) => {
+      if (!s?.song_id) return;
+      if (!songIdToSkills[s.song_id]) songIdToSkills[s.song_id] = [];
+      songIdToSkills[s.song_id].push(s);
+    });
+
+    const activeSongIds: string[] = [];
+
+    Object.entries(songIdToSkills).forEach(([songId, skills]) => {
+      // Check if user has explicitly dismissed this song from practice board
+      const isDismissed = skills.some((s: any) => s.is_practice_dismissed === true);
+
+      // Check if there is an active skill in progress
+      const hasActivePractice = skills.some((s: any) => 
+        (s.progress < 100 && (s.progress > 0 || !isDismissed)) || s.is_pending_approval
+      );
+
+      if (hasActivePractice && !isDismissed) {
+        activeSongIds.push(songId);
+        return;
+      }
+
+      // If dismissed, skip unless user actively touched or submitted another part
+      if (isDismissed && !skills.some((s: any) => s.is_pending_approval || (s.progress > 0 && s.progress < 100))) {
+        return;
+      }
+
+      // Determine available instruments for this song
+      const sample = skills[0] || {};
+      const rawInst = sample.instrumentation || {};
+      const normalizedInst: Record<string, number> = {};
+      Object.entries(rawInst).forEach(([inst, count]) => {
+        let key = inst;
+        const lower = inst.toLowerCase();
+        if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
+        else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
+        else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
+        else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
+        else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
+        normalizedInst[key] = Math.max(normalizedInst[key] || 0, Number(count) || 0);
+      });
+
+      const activeInstruments = Object.keys(normalizedInst).filter(k => !k.toLowerCase().includes('vocal') && normalizedInst[k] > 0);
+      const availableInstruments = activeInstruments.length > 0 ? activeInstruments : ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
+
+      // Check which instruments the user has mastered (100% and is_stage_ready)
+      const masteredInstruments = new Set(
+        skills
+          .filter((s: any) => (s.progress === 100 || s.is_stage_ready) && !s.is_pending_approval)
+          .map((s: any) => {
+            const l = (s.instrument || '').toLowerCase();
+            if (l.includes('guitar') || l.includes('gitarre')) return 'E-Gitarre';
+            if (l.includes('drum') || l.includes('schlagzeug')) return 'E-Drums';
+            if (l.includes('bass')) return 'E-Bass';
+            if (l.includes('piano') || l.includes('keys') || l.includes('tasten')) return 'E-Piano';
+            return s.instrument;
+          })
+      );
+
+      const allInstrumentsMastered = availableInstruments.length > 0 && availableInstruments.every(inst => masteredInstruments.has(inst));
+
+      // Dual presence: keep in practice if not all instruments are mastered and not dismissed!
+      if (!allInstrumentsMastered && !isDismissed) {
+        activeSongIds.push(songId);
+      }
+    });
+
+    return Array.from(new Set(activeSongIds));
+  }, [userSongs]);
 
   const practiceSongs = useMemo(() => (userSongs || []).filter((s: any) => songIdsInPractice.includes(s.song_id)), [userSongs, songIdsInPractice]);
   

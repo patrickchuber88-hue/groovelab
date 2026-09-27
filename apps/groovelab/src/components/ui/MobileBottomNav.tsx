@@ -153,18 +153,38 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const getMenuItems = (): MenuItem[] => {
     if (userRole === 'student') {
       if (activePlatform === 'campus') {
+        const isAdultStudent = (() => {
+          try {
+            const raw = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user');
+            if (raw) {
+              const u = JSON.parse(raw);
+              if (u?.is_adult === true) return true;
+              const rawBd = u?.birthdate || u?.birth_date;
+              if (rawBd) {
+                const bd = new Date(rawBd);
+                if (!isNaN(bd.getTime())) {
+                  const age = Math.abs(new Date(Date.now() - bd.getTime()).getUTCFullYear() - 1970);
+                  if (age >= 18) return true;
+                }
+              }
+            }
+          } catch {}
+          return false;
+        })();
+        const isMinorStudent = !isAdultStudent;
+        const isParentProtected = isMinorStudent && !parentUnlocked;
+
         const allItems: MenuItem[] = [
           { id: 'briefing', label: 'Briefing', icon: Monitor },
           { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
           { id: 'practice_board', label: 'Übe-Pfad', icon: Zap },
-          { id: 'mediathek', label: 'Mediathek', icon: Library },
           { id: 'events', label: 'Termine', icon: Calendar },
           { id: 'campus_cup', label: 'Performance', icon: Trophy },
           { id: 'messages', label: 'Nachrichten', icon: Mail, badge: unreadCount },
           { 
             id: 'settings', 
-            label: (campusStudentUiLevel === 'junior' || campusStudentUiLevel === 'teen') && !parentUnlocked ? 'Elternbereich' : 'Einstellungen', 
-            icon: (campusStudentUiLevel === 'junior' || campusStudentUiLevel === 'teen') && !parentUnlocked ? ShieldCheck : Settings 
+            label: isParentProtected ? 'Elternbereich' : 'Einstellungen', 
+            icon: isParentProtected ? ShieldCheck : Settings 
           },
         ];
         return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked));
@@ -609,8 +629,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             (item.id === 'briefing' && activePlatform === 'campus' && (activeTab === 'live' || activeTab === 'compass')) ||
             (item.id === 'homework_book' && (activeTab === 'tasks' || activeTab === 'homework')) ||
             (item.id === 'practice_board' && (activeTab === 'practice' || activeTab === 'focus_timer' || activeTab === 'loopstation')) ||
-            (item.id === 'mediathek' && (activeTab === 'songs' || activeTab === 'library')) ||
-            (item.id === 'songs' && activeTab === 'mediathek') ||
             (item.id === 'events' && (activeTab === 'termine' || activeTab === 'all_appointments')) ||
             (item.id === 'campus_cup' && (activeTab === 'ranking' || activeTab === 'performance'));
           return (

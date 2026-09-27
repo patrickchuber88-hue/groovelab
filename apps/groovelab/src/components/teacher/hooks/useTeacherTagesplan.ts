@@ -10,6 +10,9 @@ export interface UseTeacherTagesplanProps {
   schoolData: any;
   rooms: any[];
   allStudents: any[];
+  viewMode?: 'admin' | 'student';
+  activeTab?: string;
+  hideHeader?: boolean;
   onRefresh?: () => Promise<void> | void;
   onToast?: (msg: string) => void;
 }
@@ -295,6 +298,9 @@ export function useTeacherTagesplan({
   schoolData,
   rooms,
   allStudents,
+  viewMode = 'admin',
+  activeTab = 'briefing',
+  hideHeader = false,
   onRefresh,
   onToast
 }: UseTeacherTagesplanProps) {
@@ -349,8 +355,9 @@ export function useTeacherTagesplan({
 
   // 🏛️ Authoritative Supabase Hydration for Teacher Tagesplan & Briefing Timeline
   const loadBriefingTimeline = useCallback(async () => {
-    if (teacher?.role?.toLowerCase() === 'student') {
-      setBriefingData([]);
+    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
+    if (isStudent || activeTab === 'live') {
+      if (isStudent) setBriefingData({ timeline: [] });
       return;
     }
     const effectiveTeacherId = userId || teacher?.id;
@@ -592,7 +599,7 @@ export function useTeacherTagesplan({
     } catch (err) {
       console.error('[useTeacherTagesplan] Failed to load briefing timeline:', err);
     }
-  }, [effectiveTeacherId, teacher, allStudents, rooms]);
+  }, [effectiveTeacherId, teacher, allStudents, rooms, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
     loadBriefingTimeline();
@@ -614,19 +621,26 @@ export function useTeacherTagesplan({
     };
   }, [loadBriefingTimeline]);
 
-  // Zoom
+  // Zoom (Persistent & Validated)
   const [zoomFactor, setZoomFactor] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`groovelab_zoom_${userId}`);
-      if (saved) return parseFloat(saved);
+      const saved = (userId ? localStorage.getItem(`groovelab_zoom_${userId}`) : null) || localStorage.getItem('groovelab_zoom_factor');
+      if (saved) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= 0.4 && val <= 2.5) return val;
+      }
     }
     return 1;
   });
 
   const handleZoomChange = useCallback((value: number) => {
-    setZoomFactor(value);
-    if (userId) {
-      localStorage.setItem(`groovelab_zoom_${userId}`, value.toString());
+    const clamped = Math.round(Math.min(2.5, Math.max(0.4, value)) * 100) / 100;
+    setZoomFactor(clamped);
+    if (typeof window !== 'undefined') {
+      if (userId) {
+        localStorage.setItem(`groovelab_zoom_${userId}`, clamped.toString());
+      }
+      localStorage.setItem('groovelab_zoom_factor', clamped.toString());
     }
   }, [userId]);
 

@@ -59,9 +59,10 @@
   --mobile-breakpoint: 768px;
   --mobile-vh: 100dvh;
   --mobile-header-h: calc(56px + env(safe-area-inset-top, 0px));
-  --mobile-bottom-nav-h: calc(64px + env(safe-area-inset-bottom, 0px));
+  --mobile-bottom-nav-bar-h: 64px;
+  --mobile-bottom-nav-h: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 0px));
   --mini-player-h: 0px;
-  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-h) + var(--mini-player-h) + 32px);
+  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px);
   --mobile-scroll-clearance-top: var(--mobile-header-h);
   --mobile-sheet-radius: 28px;
 
@@ -957,42 +958,42 @@ body {
   border: none;
 }
 
-/* Custom Large, highly touchable thumb handles */
+/* Custom Large, highly touchable thumb handles - 100% unifarben */
 .custom-range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 5px solid currentColor; /* Dynamic coloring matching current instrument color! */
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.08);
+  background: currentColor;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: grab;
-  margin-top: 4px; /* Center the 32px thumb vertically within the 40px track */
+  margin-top: 6px; /* Center the 28px thumb vertically within the 40px track ((40 - 28) / 2) */
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
 }
 
 .custom-range-slider:active::-webkit-slider-thumb {
-  transform: scale(1.25);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.12);
+  transform: scale(1.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28), 0 3px 8px rgba(0, 0, 0, 0.14);
   cursor: grabbing;
 }
 
-/* Firefox Thumb styles */
+/* Firefox Thumb styles - 100% unifarben */
 .custom-range-slider::-moz-range-thumb {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 5px solid currentColor;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.08);
+  background: currentColor;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: grab;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
 }
 
 .custom-range-slider:active::-moz-range-thumb {
-  transform: scale(1.25);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 4px 10px rgba(0, 0, 0, 0.12);
+  transform: scale(1.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28), 0 3px 8px rgba(0, 0, 0, 0.14);
   cursor: grabbing;
 }
 
@@ -1121,7 +1122,7 @@ body {
   gap: 32px;
   align-items: start;
   width: 100%;
-  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: grid-template-columns 0.38s cubic-bezier(0.16, 1, 0.3, 1), gap 0.38s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .live-lab-grid.collapsed {
@@ -1862,12 +1863,31 @@ select option {
 
 /* Smartphone Grid Viewport (<= 768px) - Fluid Horizontal Scroll & Global Ergonomics */
 @media (max-width: 768px) {
-  /* Axiom 2: Zero Content Occlusion & Scroll Clearance */
-  .main-wrapper,
+  /* Axiom 1, 2 & 3: Single Source of Scroll, Dynamic Viewport Clamping & Single-Point Bottom Clearance */
+  .main-wrapper {
+    padding-bottom: 0 !important;
+  }
+
   .cg-full-height-board,
   .fluid-board-scroll-container,
   .board-page-container {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Single Source of Scroll: Exclusively #main-content receives the bottom clearance */
+  #main-content,
+  .main-content {
     padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
+  }
+
+  /* Live Lab Exception: Fullscreen Interactive Canvas (No Scroll, No Clearance) */
+  .main-wrapper.live-tab-active #main-content,
+  .main-wrapper.live-tab-active .main-content {
+    overflow-y: hidden !important;
+    padding-bottom: 0 !important;
   }
 
   /* Axiom 4: Apple / Material Touch-Targets & Native-Feel Tap */
@@ -2624,10 +2644,52 @@ a:focus-visible,
 
 
 /* ─────────────────────────────────────────────────────────────
-   Apple Style Invisible Vertical Scrollbar across ALL Boards & Views
+   Apple HIG Subtle 3px Pill Scrollbar for Primary Shell (<main id="main-content">)
+   ───────────────────────────────────────────────────────────── */
+#main-content {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+#main-content::-webkit-scrollbar {
+  display: block !important;
+  width: 3px !important;
+  height: 3px !important;
+}
+
+#main-content::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+#main-content::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35) !important;
+  border-radius: 9999px !important;
+}
+
+#main-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6) !important;
+}
+
+@media (max-width: 768px) {
+  #main-content {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+    touch-action: pan-y !important;
+  }
+
+  .main-wrapper.live-tab-active #main-content {
+    overflow-y: hidden !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Secondary & Nested Containers: Invisible Scrollbars (Zero-Trap)
    ───────────────────────────────────────────────────────────── */
 html, body, #root,
-.main-wrapper, .main-content, .dashboard-container,
+.main-wrapper, .dashboard-container,
 .sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, .sim-viewport-landscape,
 .fluid-board-scroll-container, .board-page-container, #tour-day-boards,
 div[style*="overflow"], div[style*="maxHeight"], div[style*="max-height"] {
@@ -2636,7 +2698,7 @@ div[style*="overflow"], div[style*="maxHeight"], div[style*="max-height"] {
 }
 
 html::-webkit-scrollbar, body::-webkit-scrollbar, #root::-webkit-scrollbar,
-.main-wrapper::-webkit-scrollbar, .main-content::-webkit-scrollbar, .dashboard-container::-webkit-scrollbar,
+.main-wrapper::-webkit-scrollbar, .dashboard-container::-webkit-scrollbar,
 .sim-viewport-mobile::-webkit-scrollbar, .sim-viewport-portrait::-webkit-scrollbar, .sim-viewport-tablet::-webkit-scrollbar, .sim-viewport-landscape::-webkit-scrollbar,
 .fluid-board-scroll-container::-webkit-scrollbar, .board-page-container::-webkit-scrollbar, #tour-day-boards::-webkit-scrollbar,
 div[style*="overflow"]::-webkit-scrollbar, div[style*="maxHeight"]::-webkit-scrollbar, div[style*="max-height"]::-webkit-scrollbar {

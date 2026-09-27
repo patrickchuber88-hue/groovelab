@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1790457224490';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1790457224490';
+const CACHE_NAME = 'groovelab-static-v1790546089815';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1790546089815';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -120,9 +120,7 @@ self.addEventListener('push', function(event) {
         ],
         data: {
           url: safeUrl,
-          notificationId: payload.notificationId || null,
-          supabaseUrl: (payload.supabaseUrl && isValidPushHost(payload.supabaseUrl)) ? payload.supabaseUrl : null,
-          supabaseKey: payload.supabaseKey || null
+          notificationId: payload.notificationId || null
         }
       };
       // 🛡️ Enterprise Push Goldstandard: Update native app badge count if supported
@@ -158,40 +156,14 @@ self.addEventListener('notificationclick', function(event) {
     });
   }
 
-  const notificationId = event.notification.data?.notificationId;
-  const supabaseUrl = event.notification.data?.supabaseUrl;
-  const supabaseKey = event.notification.data?.supabaseKey;
   const rawUrl = event.notification.data?.url || '/';
   const url = isValidPushHost(rawUrl) ? rawUrl : '/';
 
   // 1. Immediately focus or open the window
   const navigationPromise = focusOrOpenWindow(url);
 
-  // 2. Perform DB update in parallel without blocking client response
-  let dbUpdatePromise = Promise.resolve();
-  if (notificationId && supabaseUrl && supabaseKey && isValidPushHost(supabaseUrl)) {
-    dbUpdatePromise = fetch(`${supabaseUrl}/rest/v1/notifications?id=eq.${notificationId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`
-      },
-      body: JSON.stringify({ is_read: true })
-    })
-    .then(function(res) {
-      if (!res.ok) throw new Error('PATCH status: ' + res.status);
-      return res;
-    })
-    .catch(function(err) {
-      console.error('Error marking notification as read in sw:', err);
-    });
-  }
-
-  // 3. Keep SW active until settled, but do not block UI opening on db latency
-  event.waitUntil(
-    Promise.allSettled([navigationPromise, dbUpdatePromise])
-  );
+  // 2. Keep SW active until window navigation settles
+  event.waitUntil(navigationPromise);
 });
 
 function focusOrOpenWindow(targetUrl) {

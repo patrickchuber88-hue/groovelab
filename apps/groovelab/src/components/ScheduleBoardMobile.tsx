@@ -6227,7 +6227,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         boxSizing: 'border-box',
                         background: 'transparent', 
                         borderRight: index < arr.length - 1 ? '1px solid #e2e8f0' : 'none', 
-                        padding: isMobilePortrait ? '0 6px 140px 6px' : '0 10px', 
+                        padding: isMobilePortrait ? '0 6px 0 6px' : '0 10px', 
                         display: 'flex', 
                         flexDirection: 'column', 
                         gap: '8px',
