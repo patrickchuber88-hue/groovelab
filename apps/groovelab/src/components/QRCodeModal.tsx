@@ -822,3 +822,5 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     </div>
   );
 }
+
+export default QRCodeModal;

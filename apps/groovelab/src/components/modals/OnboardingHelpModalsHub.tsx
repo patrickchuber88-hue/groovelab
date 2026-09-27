@@ -1,11 +1,13 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 import type { HelpUserRole, HelpPlatform } from '../help/HelpCenterModal';
 
-// Hermetic lazy imports for optimal Core Web Vitals (LCP/INP)
-const QRCodeModal = lazy(() => import('../QRCodeModal').then(m => ({ default: m.QRCodeModal })));
-const HelpCenterModal = lazy(() => import('../help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
-const TrialInfoModal = lazy(() => import('../TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
-const SchoolSelfOnboardingModal = lazy(() => import('../SchoolSelfOnboardingModal').then(m => ({ default: m.SchoolSelfOnboardingModal })));
+// Hermetic resilient lazy imports for optimal Core Web Vitals (LCP/INP) & Deployment Recovery
+const QRCodeModal = lazyWithRetry(() => import('../QRCodeModal'), 'QRCodeModal');
+const HelpCenterModal = lazyWithRetry(() => import('../help/HelpCenterModal'), 'HelpCenterModal');
+const TrialInfoModal = lazyWithRetry(() => import('../TrialInfoModal'), 'TrialInfoModal');
+const SchoolSelfOnboardingModal = lazyWithRetry(() => import('../SchoolSelfOnboardingModal'), 'SchoolSelfOnboardingModal');
 
 export interface OnboardingHelpModalsHubProps {
   user: any;
@@ -95,50 +97,58 @@ export const OnboardingHelpModalsHub: React.FC<OnboardingHelpModalsHubProps> = (
     <>
       {/* 1. Modal: QR-Code / Campus- & GrooveLab-Pass */}
       {showQR && (user?.qr_token || user?.teacher_qr_token) && onCloseQR && (
-        <Suspense fallback={null}>
-          <QRCodeModal
-            user={user}
-            activePlatform={activePlatform}
-            onClose={onCloseQR}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <QRCodeModal
+              user={user}
+              activePlatform={activePlatform}
+              onClose={onCloseQR}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* 2. Modal: Globales Leitfäden- & Akademie-Center */}
       {isHelpCenterOpen && onCloseHelpCenter && (
-        <Suspense fallback={null}>
-          <HelpCenterModal
-            isOpen={isHelpCenterOpen}
-            onClose={onCloseHelpCenter}
-            userRole={resolveHelpUserRole(user)}
-            activePlatform={activePlatform as HelpPlatform}
-            schoolName={school?.name || 'Meine Musikschule'}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <HelpCenterModal
+              isOpen={isHelpCenterOpen}
+              onClose={onCloseHelpCenter}
+              userRole={resolveHelpUserRole(user)}
+              activePlatform={activePlatform as HelpPlatform}
+              schoolName={school?.name || 'Meine Musikschule'}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* 3. Modal: 30-Tage-Probezeit Status & Lizenz-Upgrade */}
       {showTrialInfo && onCloseTrialInfo && (
-        <Suspense fallback={null}>
-          <TrialInfoModal
-            isOpen={showTrialInfo}
-            onClose={onCloseTrialInfo}
-            school={school}
-            userRole={user?.role}
-            trialDaysLeft={trialDaysLeft}
-            onNavigateToBilling={onNavigateToBilling}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <TrialInfoModal
+              isOpen={showTrialInfo}
+              onClose={onCloseTrialInfo}
+              school={school}
+              userRole={user?.role}
+              trialDaysLeft={trialDaysLeft}
+              onNavigateToBilling={onNavigateToBilling}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* 4. Modal: Musikschul-Selbstonboarding */}
       {showSchoolOnboardingModal && onCloseSchoolOnboarding && onSchoolOnboardingSuccess && (
-        <Suspense fallback={null}>
-          <SchoolSelfOnboardingModal
-            onClose={onCloseSchoolOnboarding}
-            onSuccess={onSchoolOnboardingSuccess}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <SchoolSelfOnboardingModal
+              onClose={onCloseSchoolOnboarding}
+              onSuccess={onSchoolOnboardingSuccess}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* 5. Mobile Info Overlay Modal für konsolidierte Status-Pills */}

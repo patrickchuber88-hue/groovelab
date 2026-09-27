@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
-const QRCodeModal = lazy(() => import('../QRCodeModal').then(m => ({ default: m.QRCodeModal })));
+const QRCodeModal = lazyWithRetry(() => import('../QRCodeModal'), 'QRCodeModal');
 const AVVModal = lazy(() => import('../AVVModal').then(m => ({ default: m.AVVModal })));
 const DpoIdCardModal = lazy(() => import('../DpoIdCardModal').then(m => ({ default: m.DpoIdCardModal })));
 const DpoAuditPortal = lazy(() => import('../DpoAuditPortal').then(m => ({ default: m.DpoAuditPortal })));

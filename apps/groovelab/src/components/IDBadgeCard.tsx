@@ -118,12 +118,12 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
 }) => {
   const currentPlatform = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab') || 'groovelab';
 
-  const userRolesList = user.roles || (user.role ? [user.role] : []);
-  const hasVerwaltung = userRolesList.includes('admin') || userRolesList.includes('secretary') || user.role === 'admin' || user.role === 'secretary';
+  const userRolesList = user?.roles || (user?.role ? [user.role] : []);
+  const hasVerwaltung = userRolesList.includes('admin') || userRolesList.includes('secretary') || user?.role === 'admin' || user?.role === 'secretary';
   
   // Modules depend on actual profile activation flags (is_campus_active, is_groovelab_active).
-  const hasCampus = Boolean(user.is_campus_active);
-  const hasGrooveLab = Boolean(user.is_groovelab_active);
+  const hasCampus = Boolean(user?.is_campus_active);
+  const hasGrooveLab = Boolean(user?.is_groovelab_active);
 
   // Real-Time Multi-Color Spectrum Stripe & Dashed Border Logic
   let spectrumGradient = 'repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 16px)'; // Gestrichelter grüner Balken bei 0 Modulen
@@ -143,11 +143,11 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
     spectrumGradient = '#eab308'; // Gelber Balken
   }
 
-  const tokenToUse = user.qr_token || user.teacher_qr_token || user.ausweis_nummer || '';
-  const effectiveQrValue = qrValue || getCanonicalQrLandingUrl(tokenToUse);
+  const tokenToUse = user?.qr_token || user?.teacher_qr_token || user?.ausweis_nummer || '';
+  const effectiveQrValue = qrValue || getCanonicalQrLandingUrl(tokenToUse) || 'https://campus-groovelab.de';
   
-  const isTeacherRole = user.role === 'teacher' || userRolesList.includes('teacher') || user.role === 'admin' || userRolesList.includes('admin') || user.role === 'secretary' || userRolesList.includes('secretary');
-  const isStudentRole = (user.role === 'student' || userRolesList.includes('student')) && !isTeacherRole;
+  const isTeacherRole = user?.role === 'teacher' || userRolesList.includes('teacher') || user?.role === 'admin' || userRolesList.includes('admin') || user?.role === 'secretary' || userRolesList.includes('secretary');
+  const isStudentRole = (user?.role === 'student' || userRolesList.includes('student')) && !isTeacherRole;
 
   let displayFirstName = 'Member';
   let displayLastName = 'Member';
@@ -156,14 +156,14 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
     // 🛡️ 1% Goldstandard Student Privacy Invariant (OWASP ASVS Level 3 / DSGVO Art. 25):
     // Student badges are ALWAYS strictly anonymized to "Vorname" (line 1) and "N." (line 2).
     // Even if first_name contains full names (e.g. "Amelia Huber"), we cleanly extract the pure first name and mask the last name.
-    const rawFirst = (user.first_name || '').trim();
-    const rawLast = (user.last_name || '').trim();
+    const rawFirst = (user?.first_name || '').trim();
+    const rawLast = (user?.last_name || '').trim();
 
     if (rawFirst || rawLast) {
       const anonymizedFull = formatSingleStudentAnonymized(
         rawFirst || rawLast,
         rawFirst ? rawLast : null,
-        user.id,
+        user?.id,
         true // strictly enforce privacyMode = true
       );
       const nameParts = anonymizedFull.split(' ');
@@ -173,17 +173,17 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
       } else if (rawLast) {
         displayLastName = maskLastName(rawLast, true);
       } else {
-        displayLastName = user.instrument || 'Schüler';
+        displayLastName = user?.instrument || 'Schüler';
       }
     } else {
       displayFirstName = 'Schüler';
-      displayLastName = user.instrument || 'Campus';
+      displayLastName = user?.instrument || 'Campus';
     }
   } else if (isTeacherRole || !isStudentRole) {
-    const fullTeacher = formatTeacherFullName(user.first_name, user.last_name);
+    const fullTeacher = formatTeacherFullName(user?.first_name, user?.last_name);
     const parts = fullTeacher.split(' ');
-    displayFirstName = parts[0] || user.first_name || 'Lehrkraft';
-    displayLastName = parts.slice(1).join(' ') || (user.last_name && user.last_name !== 'L.' ? user.last_name : 'Landenberger');
+    displayFirstName = parts[0] || user?.first_name || 'Lehrkraft';
+    displayLastName = parts.slice(1).join(' ') || (user?.last_name && user?.last_name !== 'L.' ? user?.last_name : 'Landenberger');
   }
 
   const finalQrSize = qrSize || (isPrintVersion ? 74 : 135);

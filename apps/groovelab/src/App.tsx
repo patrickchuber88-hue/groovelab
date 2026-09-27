@@ -9,11 +9,13 @@ import { initKioskUrlBootstrap } from './utils/kioskBootstrap';
 
 import { LegalConsentGate } from './components/LegalConsentGate';
 import { SecurityHoneyTrap } from './components/ui/SecurityHoneyTrap';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { CampusSystemBannersOverlay } from './components/layout/CampusSystemBannersOverlay';
 import { CampusAppLayout } from './components/layout/CampusAppLayout';
 import { useCampusAppOrchestrator } from './hooks/useCampusAppOrchestrator';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-const CampusAppModalsHub = lazy(() => import('./components/layout/CampusAppModalsHub').then(m => ({ default: m.CampusAppModalsHub })));
+const CampusAppModalsHub = lazyWithRetry(() => import('./components/layout/CampusAppModalsHub'), 'CampusAppModalsHub');
 
 import './App.css';
 
@@ -43,7 +45,9 @@ function App() {
         <DeviceSimulator>
           <CampusSystemBannersOverlay {...orchestrator.bannersOverlayProps} />
           <CampusAppLayout {...orchestrator.layoutProps} />
-          <CampusAppModalsHub {...orchestrator.modalsHubProps} />
+          <ErrorBoundary fallback={null}>
+            <CampusAppModalsHub {...orchestrator.modalsHubProps} />
+          </ErrorBoundary>
         </DeviceSimulator>
       </Suspense>
     </LegalConsentGate>

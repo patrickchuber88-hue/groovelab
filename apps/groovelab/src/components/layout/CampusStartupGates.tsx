@@ -3,10 +3,11 @@ import { Navigate } from 'react-router-dom';
 import { Music, Clock } from 'lucide-react';
 import { ErrorBoundary, DashboardLoader } from '../ui/ErrorBoundary';
 import { LegalConsentGate } from '../LegalConsentGate';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 // Lazy-loaded routes & gate views
 const BandProfileContent = lazy(() => import('../BandProfileContent'));
-const QRCodeModal = lazy(() => import('../QRCodeModal').then(m => ({ default: m.QRCodeModal })));
+const QRCodeModal = lazyWithRetry(() => import('../QRCodeModal'), 'QRCodeModal');
 const DeviceSetupScreen = lazy(() => import('../DeviceSetupScreen').then(m => ({ default: m.DeviceSetupScreen })));
 const StudentOnboardingPage = lazy(() => import('../StudentOnboardingPage').then(m => ({ default: m.StudentOnboardingPage })));
 const DeviceOnboardingPage = lazy(() => import('../DeviceOnboardingPage').then(m => ({ default: m.DeviceOnboardingPage })));

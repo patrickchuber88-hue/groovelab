@@ -82,6 +82,7 @@ export default defineConfig({
             dep.includes('vendor-jspdf') ||
             dep.includes('vendor-canvas') ||
             dep.includes('vendor-qr') ||
+            dep.includes('id-badge-') ||
             dep.includes('StudentAvatarDashboard') ||
             dep.includes('student-') ||
             dep.includes('campus-app-modals') ||
@@ -126,8 +127,8 @@ export default defineConfig({
           if (id.includes('domain/stickersAndTresor')) {
             return 'shared-stickers-tresor';
           }
-          if (id.includes('components/IDBadgeCard')) {
-            return 'id-badge-card';
+          if (id.includes('components/IDBadgeCard') || id.includes('components/QRCodeModal')) {
+            return 'id-badge-suite';
           }
           if (id.includes('CampusEventsBoard')) {
             return 'campus-events-suite';

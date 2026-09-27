@@ -3215,7 +3215,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
 
         const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
-        const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
+        const isPinActivated = user.role === 'student' 
+          ? Boolean(user.is_pin_activated || user.has_personal_pin || !!studentBirthDay) 
+          : Boolean(user.is_pin_activated || user.has_personal_pin);
 
         if (!isPinActivated) {
           setPinSetupUser(user);
@@ -3471,7 +3473,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
-      const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
+      const isPinActivated = user.role === 'student' 
+        ? Boolean(user.is_pin_activated || user.has_personal_pin || !!studentBirthDay) 
+        : Boolean(user.is_pin_activated || user.has_personal_pin);
 
       if (!isPinActivated) {
         setPinSetupUser(user);
@@ -8488,7 +8492,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN einrichten</h3>
             <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-              Erster Login für <strong>{pinSetupUser.first_name} {pinSetupUser.last_name}</strong> ({pinSetupUser.ausweis_nummer}).<br/>
+              Erster Login für <strong>{pinSetupUser.first_name} {pinSetupUser.last_name || ''}</strong>{pinSetupUser.ausweis_nummer ? ` (${pinSetupUser.ausweis_nummer})` : ''}.<br/>
               Bitte lege eine geheime 4-stellige PIN fest.
             </p>
 
@@ -8534,7 +8538,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       p_qr_token: authQrToken,
                       p_pin: pinSetupInput
                     });
-                    if (!rpcErr && rpcRes === true) {
+                    if (!rpcErr && (rpcRes === true || (rpcRes as any)?.success === true)) {
                       rpcSuccess = true;
                     } else if (rpcErr) {
                       rpcErrorMsg = rpcErr.message;
