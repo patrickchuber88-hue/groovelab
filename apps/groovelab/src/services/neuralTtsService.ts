@@ -395,6 +395,7 @@ export function formatBookTitleForSpeech(rawTitle: string): string {
  */
 export function cleanTeacherNoteForSpeech(note: string): string {
   if (!note) return '';
+  if (note.includes('WORLDTOUR_MASTERY:') || note.toLowerCase().includes('worldtour_mastery:')) return '';
   return note
     // Formale Präfixe entfernen
     .replace(/^(?:Aufgabe|Fahrplan|Hinweis|Notiz|Übe-Tipp|Tipp)\s*:\s*/gi, '')

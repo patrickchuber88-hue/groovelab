@@ -190,7 +190,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
     engineRef.current.seek(0);
   }, []);
 
-  const speeds = [0.5, 0.7, 0.85, 1.0, 1.2];
+  const speeds = [0.5, 0.75, 0.85, 1.0];
 
   return (
     <div 

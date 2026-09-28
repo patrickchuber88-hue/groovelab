@@ -582,7 +582,7 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
       try {
         const p = JSON.parse(clean);
         if (Array.isArray(p)) {
-          clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+          clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:') && !x.startsWith('TASK_REFL:') && !x.startsWith('WORLDTOUR_MASTERY:') && !x.startsWith('LEHRER_NOTIZ:') && !x.startsWith('PRIVATE_NOTE:')).join(' ');
         } else if (typeof p === 'string') {
           clean = p;
         }
@@ -591,15 +591,19 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
     return clean
       .replace(/\["AUDIO:[^"]*"\]/g, '')
       .replace(/AUDIO:[^\s,|]+/g, '')
-      .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+      .replace(/WORLDTOUR_MASTERY:[^\s,|]+/g, '')
+      .replace(/EARLAB_SCORE:[^\s,|]+/g, '')
+      .replace(/TASK_REFL:[^\s,|]+/g, '')
+      .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION|TASK_REFL):[^|]*\|/, '')
       .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
+      .replace(/^TASK_REFL:[^|]*\|?/i, '')
       .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
       .trim();
   };
 
   let isPastNoteCarriedOver = false;
   let carriedOverWeekLabel = '';
-  const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+  const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('TASK_REFL:') && !n.startsWith('❓ Frage für den Unterricht:') && !n.startsWith('WORLDTOUR_MASTERY:') && !n.startsWith('LEHRER_NOTIZ:') && !n.startsWith('PRIVATE_NOTE:') && !n.startsWith('EARLAB_SCORE:');
 
   let allTeacherNotes: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(n => !isPlaceholderNote(n));
 

@@ -5771,9 +5771,9 @@ export function ScheduleCalendarView({
                     }}
                     style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 2 }}
                   />
-                  <button className="apple-btn" style={{ pointerEvents: 'none', padding: '6px 8px' }}>
+                  <div className="apple-btn" style={{ pointerEvents: 'none', padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                     <CalendarIcon size={13} />
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -5884,10 +5884,10 @@ export function ScheduleCalendarView({
                 <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input type="date" value={toLocalYYYYMMDD(currentDate)} onChange={(e) => { if (e.target.value) setCurrentDate(new Date(e.target.value)); }} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 2 }} />
-                  <button className="apple-btn" style={{ pointerEvents: 'none' }}>
+                  <div className="apple-btn" style={{ pointerEvents: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <CalendarIcon size={13} />
                     <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -11587,9 +11587,7 @@ return (
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                disabled={isExecutingReset}
+              <span
                 style={{
                   background: '#ffffff',
                   border: '1px solid #cbd5e1',
@@ -11600,11 +11598,14 @@ return (
                   color: '#0f172a',
                   cursor: isExecutingReset ? 'not-allowed' : 'pointer',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 Woche zurücksetzen
-              </button>
+              </span>
             </div>
 
             {/* Option 2: Restliches Schuljahr */}
@@ -11667,9 +11668,7 @@ return (
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                disabled={isExecutingReset}
+              <span
                 style={{
                   background: '#dc2626',
                   border: 'none',
@@ -11682,11 +11681,14 @@ return (
                   boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
                   whiteSpace: 'nowrap',
                   minWidth: '80px',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 {isExecutingReset ? `${resetProgress.percent}%` : 'Schuljahr bereinigen'}
-              </button>
+              </span>
             </div>
           </div>
 

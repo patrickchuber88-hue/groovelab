@@ -145,7 +145,7 @@ export const PwaModalShell: React.FC<PwaModalShellProps> = ({
             ? 'slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)'
             : 'scaleUpDialog 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
-        className="pwa-modal-card"
+        className="pwa-modal-card pwa-modal-drawer"
       >
         {/* Apple Sheet Pull-Indicator on Mobile */}
         {isMobile && (
@@ -263,6 +263,7 @@ export const PwaModalShell: React.FC<PwaModalShellProps> = ({
             boxSizing: 'border-box'
           }}
           className="pwa-scroll-container"
+          data-modal-scroll="true"
         >
           {children}
         </main>

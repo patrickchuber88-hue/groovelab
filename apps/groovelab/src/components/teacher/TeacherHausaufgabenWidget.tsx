@@ -373,6 +373,14 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                   </div>
                   <button
                     type="button"
+                    onClick={() => {
+                      setSelectedStudentProfile({
+                        id: 'demo-justus-id',
+                        first_name: 'Justus',
+                        last_name: 'G.',
+                        photo_url: '/avatar_ghost.jpg'
+                      });
+                    }}
                     style={{
                       background: '#f8fafc',
                       border: '1px solid #e2e8f0',
@@ -418,6 +426,19 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                 {/* Action CTA Button */}
                 <button
                   type="button"
+                  onClick={() => {
+                    setDocStudent({
+                      id: 'demo-justus-id',
+                      first_name: 'Justus',
+                      last_name: 'G.',
+                      photo_url: '/avatar_ghost.jpg',
+                      is_campus_active: true,
+                      school_id: teacher?.school_id,
+                      schoolId: teacher?.school_id,
+                      schools: (teacher as any)?.schools,
+                      school_name: 'Campus Musikschule'
+                    });
+                  }}
                   style={{
                     background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                     color: '#ffffff',

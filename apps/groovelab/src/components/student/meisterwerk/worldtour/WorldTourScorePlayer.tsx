@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Play, Square, Headphones, Mic, RotateCcw, Radio, Award, AlertCircle, Search, Timer, Sparkles, X } from 'lucide-react';
 import { WorldTourCountry } from '../../../../types/worldTour';
-import { projectScoreForInstrument, TransposedScoreResult } from '../../../../domain/worldTourTransposer';
+import { projectScoreForInstrument, TransposedScoreResult, isTablatureEligible } from '../../../../domain/worldTourTransposer';
 import { worldTourAudio, AudioNoteEvent } from '../../../../utils/worldTourAudioEngine';
 import { WorldTourService } from '../../../../services/worldTourService';
 import { playTriumphantXpChime } from '../../../../utils/campusXpEffects';
@@ -61,10 +61,29 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
   const playModeRef = useRef<'listen' | 'practice' | 'challenge'>('listen');
   const [practiceCompletedToast, setPracticeCompletedToast] = useState<string | null>(null);
 
-  // Derive transposed score for student instrument
+  // 🎸/🎻 Saiten-Tabs & Griffschrift State (Default: false = Reine Standard-Notation für alle Instrumente)
+  const [showTabs, setShowTabs] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && localStorage.getItem('cg_worldtour_show_tabs') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleTabs = useCallback(() => {
+    setShowTabs(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('cg_worldtour_show_tabs', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  // Derive transposed score for student instrument (standard notation by default, tabs opt-in for strings/plucked)
   const transposed: TransposedScoreResult = useMemo(() => {
-    return projectScoreForInstrument(country.score, studentInstrument);
-  }, [country.score, studentInstrument]);
+    return projectScoreForInstrument(country.score, studentInstrument, showTabs);
+  }, [country.score, studentInstrument, showTabs]);
 
   // Reset state when country changes
   useEffect(() => {
@@ -724,6 +743,33 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
             <Timer size={14} color={isMetronomeActive ? '#16a34a' : '#64748b'} />
             <span>Metronom {isMetronomeActive ? 'AN' : 'AUS'}</span>
           </button>
+
+          {/* 🎸/🎻 Saiten-Tabs / Griffschrift Umschalter (Exklusiv für Zupfer & Streicher) */}
+          {isTablatureEligible(studentInstrument) && (
+            <button
+              onClick={handleToggleTabs}
+              aria-label={showTabs ? 'Tabs ausblenden (Nur Noten)' : 'Tabs einblenden (Noten + Tabs)'}
+              title="Zwischen 'Nur Noten' und 'Noten + Tabs' umschalten"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '10px',
+                background: showTabs ? '#fef3c7' : '#f8fafc',
+                border: `1px solid ${showTabs ? '#f59e0b' : '#cbd5e1'}`,
+                color: showTabs ? '#b45309' : '#475569',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                minHeight: '44px'
+              }}
+            >
+              <Sparkles size={14} color={showTabs ? '#d97706' : '#64748b'} />
+              <span>Tabs {showTabs ? 'AN' : 'AUS'}</span>
+            </button>
+          )}
         </div>
 
         {/* Rechts: Kompakte Tempo-Steuerung (BPM) */}

@@ -1,4 +1,5 @@
 import { isInternalMetadataNote } from '../../domain/stickersAndTresor';
+import { WORLD_TOUR_COUNTRIES } from '../../domain/worldTourCatalog';
 
 export interface Student {
   id: string;
@@ -39,6 +40,8 @@ export interface MeisterwerkDocumentationModalProps {
   onTriggerSoftLock?: () => void;
   initialLehrwerke?: any[];
   initialSongs?: any[];
+  assignedCampusSongs?: any[];
+  activeSongSkills?: any[];
   initialProgressItems?: any[];
   initialLocalProgress?: any[];
   onSongsUpdated?: (updatedSkills: any[]) => void;
@@ -320,4 +323,73 @@ export const getHomeworkNoteItems = (notesText: string): string[] => {
     .split('\n')
     .map(s => s.replace(/^[•\-\*\s]+/, '').trim())
     .filter(s => s.length > 0 && !isInternalMetadataNote(s));
+};
+
+export interface ParsedWorldTourMastery {
+  countryCode: string;
+  countryName: string;
+  anthemTitle: string;
+  flagEmoji: string;
+  stars: number;
+  score: number;
+  xp: number;
+  isAcknowledged: boolean;
+  timestamp?: string;
+  rawTag: string;
+}
+
+export const parseWorldTourMasteries = (notesList: any[]): ParsedWorldTourMastery[] => {
+  if (!Array.isArray(notesList)) return [];
+  const results: ParsedWorldTourMastery[] = [];
+
+  for (const item of notesList) {
+    if (typeof item !== 'string' || !item.includes('WORLDTOUR_MASTERY:')) continue;
+    const match = item.match(/WORLDTOUR_MASTERY:([A-Za-z0-9_-]+)(?:\|([^]+))?/);
+    if (!match) continue;
+
+    const countryCode = match[1];
+    const rest = match[2] || '';
+    const parts = rest.split('|');
+
+    let stars = 1;
+    let score = 60;
+    let xp = 50;
+    let isAcknowledged = false;
+    let timestamp: string | undefined = undefined;
+
+    for (const p of parts) {
+      const trimmed = p.trim();
+      if (trimmed.endsWith('STARS')) {
+        stars = parseInt(trimmed.replace('STARS', ''), 10) || 1;
+      } else if (trimmed.endsWith('%')) {
+        score = parseInt(trimmed.replace('%', ''), 10) || 60;
+      } else if (trimmed.startsWith('+') && trimmed.endsWith('XP')) {
+        xp = parseInt(trimmed.replace('+', '').replace('XP', ''), 10) || 50;
+      } else if (trimmed.startsWith('ACK:')) {
+        isAcknowledged = trimmed.replace('ACK:', '') === '1';
+      } else if (trimmed.startsWith('TS:')) {
+        timestamp = trimmed.replace('TS:', '');
+      }
+    }
+
+    const countryDef = WORLD_TOUR_COUNTRIES.find(c => c.code === countryCode);
+    const countryName = countryDef?.name || countryCode.replace(/_/g, ' ');
+    const anthemTitle = countryDef?.anthemTitle || countryDef?.pieceTitle || 'Hymne';
+    const flagEmoji = countryDef?.flagEmoji || '🌍';
+
+    results.push({
+      countryCode,
+      countryName,
+      anthemTitle,
+      flagEmoji,
+      stars,
+      score,
+      xp,
+      isAcknowledged,
+      timestamp,
+      rawTag: item
+    });
+  }
+
+  return results;
 };

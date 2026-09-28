@@ -373,12 +373,31 @@ export const WorldTourStaffNotation: React.FC<WorldTourStaffNotationProps> = ({
                 {/* Tabulatur-Linien (falls Instrument Tab hat) */}
                 {transposed.hasTablature && (
                   <g>
-                    {/* TAB Label */}
-                    <text x="24" y={tabTopY + 12} fontSize="11" fontWeight="900" fill="#64748b" fontFamily="sans-serif">T</text>
-                    <text x="24" y={tabTopY + 24} fontSize="11" fontWeight="900" fill="#64748b" fontFamily="sans-serif">A</text>
-                    <text x="24" y={tabTopY + 36} fontSize="11" fontWeight="900" fill="#64748b" fontFamily="sans-serif">B</text>
+                    {/* TAB Label oder Saiten-Bezeichnungen */}
+                    {transposed.tabStringLabels ? (
+                      transposed.tabStringLabels.map((sLabel, sIdx) => (
+                        <text
+                          key={`s-label-${sIdx}`}
+                          x="25"
+                          y={tabTopY + sIdx * 8 + 3.5}
+                          fontSize="8.5"
+                          fontWeight="900"
+                          fill="#64748b"
+                          fontFamily="sans-serif"
+                          textAnchor="middle"
+                        >
+                          {sLabel}
+                        </text>
+                      ))
+                    ) : (
+                      <>
+                        <text x="24" y={tabTopY + 12} fontSize="11" fontWeight="900" fill="#64748b" fontFamily="sans-serif">T</text>
+                        <text x="24" y={tabTopY + 24} fontSize="11" fontWeight="900" fill="#64748b" fontFamily="sans-serif">A</text>
+                        <text x="24" y={tabTopY + 36} fontSize="11" fontWeight="900" fill="#64748b" fontFamily="sans-serif">B</text>
+                      </>
+                    )}
 
-                    {/* Tab Strings (Gitarre = 6 Linien, Bass/Ukulele = 4 Linien) */}
+                    {/* Tab Strings (Gitarre = 6 Linien, Bass/Ukulele/Streicher = 4 Linien) */}
                     {Array.from({ length: transposed.stringsCount || 6 }).map((_, sIdx) => (
                       <line
                         key={`tab-${sIdx}`}
@@ -920,12 +939,20 @@ export const WorldTourStaffNotation: React.FC<WorldTourStaffNotationProps> = ({
                               </text>
                             )}
 
-                            {/* Tabulatur Fret-Zahl */}
+                            {/* Tabulatur Fret- / Finger-Zahl */}
                             {transposed.hasTablature && note.displayFret !== undefined && (
                               <g>
+                                <rect
+                                  x={noteX - 6}
+                                  y={tabTopY + (note.displayString ?? 0) * 8 - 4.5}
+                                  width={12}
+                                  height={9}
+                                  fill="#ffffff"
+                                  rx={2}
+                                />
                                 <text
                                   x={noteX}
-                                  y={tabTopY + (note.displayString ?? 0) * 8 + 4}
+                                  y={tabTopY + (note.displayString ?? 0) * 8 + 3.2}
                                   fontSize="10"
                                   fontWeight="900"
                                   textAnchor="middle"

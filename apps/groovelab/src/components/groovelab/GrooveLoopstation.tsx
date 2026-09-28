@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
   Square,
@@ -484,6 +484,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   useEffect(() => {
     loopstationMetronomeVolumeRef.current = loopstationMetronomeVolume;
   }, [loopstationMetronomeVolume]);
+  const bpmRef = useRef(bpm);
+  useEffect(() => { bpmRef.current = bpm; }, [bpm]);
+  const isMetronomeActiveRef = useRef(isMetronomeActive);
+  useEffect(() => { isMetronomeActiveRef.current = isMetronomeActive; }, [isMetronomeActive]);
+  const playbackBeatTimerRef = useRef<any>(null);
+  const nextPlaybackBeatTimeRef = useRef<number>(0);
+  const playbackBeatIndexRef = useRef<number>(0);
   const [activeBeatPulse, setActiveBeatPulse] = useState<'downbeat' | 'upbeat' | null>(null);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [showCalibrationHelp, setShowCalibrationHelp] = useState(false);
@@ -1385,13 +1392,20 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const playTime = time !== undefined ? time : ctx.currentTime;
       const soundType = overrideSound || metronomeSoundRef.current || 'wood';
 
+      const isCurrentlyRecording = isAutoSequenceActiveRef.current || tracksRef.current.some(t => t.isRecording);
       const hasTrack1 = !!tracksRef.current[0]?.url;
       const baseMetronomeGain = (loopstationMetronomeVolumeRef.current / 100) * 0.45;
-      const targetMetronomeGain = (time === undefined)
-        ? 0.45
-        : ((hasTrack1 && !useHeadphonesRef.current) ? 0 : baseMetronomeGain);
+      
+      // 🛡️ Akustischer Übersprechschutz: Mute greift AUSSCHLIESSLICH während einer aktiven Mikrofonaufnahme
+      // von Folgespuren, wenn keine Kopfhörer verwendet werden (Feedback-Schutz).
+      // Während des Loop-Playbacks, des Metronom-Vorhörens oder bei Nutzung von Kopfhörern
+      // erklingt der Beat stets in voller didaktischer Lautstärke.
+      const shouldDuckAcousticBleed = isCurrentlyRecording && hasTrack1 && !useHeadphonesRef.current;
+      const targetMetronomeGain = shouldDuckAcousticBleed
+        ? 0
+        : (time === undefined ? (baseMetronomeGain || 0.45) : baseMetronomeGain);
 
-      if (targetMetronomeGain === 0) return;
+      if (targetMetronomeGain <= 0) return;
 
       // Determine exact 4/4 beat index (0 = 1st beat, 1 = 2nd beat, 2 = 3rd beat, 3 = 4th beat)
       let beatNum = 0;
@@ -1721,22 +1735,123 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
+  // 🥁 Time-Stamp Synchronisierter Playback-Beat Scheduler (0,1% Goldstandard)
+  const schedulePlaybackBeats = useCallback(() => {
+    if (!isPlayingRef.current || !isMetronomeActiveRef.current || isAutoSequenceActiveRef.current) return;
+    const ctx = audioContextRef.current;
+    if (!ctx) return;
 
-    if (isMetronomeActive && isPlaying && !isAutoSequenceActive) {
-      const intervalMs = (60 / bpm) * 1000;
-      let beatCount = 0;
-      clickIntervalRef.current = setInterval(() => {
-        playClickSound(beatCount % 4 === 0, undefined, undefined, beatCount % 4);
-        beatCount++;
-      }, intervalMs);
+    const beatSec = 60.0 / bpmRef.current;
+    const beatsPerBar = timeSignatureRef.current === '3/4' ? 3 : 4;
+    const totalBeats = (barLengthRef.current || 4) * beatsPerBar;
+    const lookahead = 0.120; // 120ms Lookahead-Puffer für jitterfreie Audio-Hardware-Ausführung
+
+    while (nextPlaybackBeatTimeRef.current < ctx.currentTime + lookahead) {
+      const beatNum = playbackBeatIndexRef.current % beatsPerBar;
+      const isDownbeat = beatNum === 0;
+      playClickSound(isDownbeat, nextPlaybackBeatTimeRef.current, undefined, beatNum);
+
+      nextPlaybackBeatTimeRef.current += beatSec;
+      playbackBeatIndexRef.current = (playbackBeatIndexRef.current + 1) % totalBeats;
+    }
+
+    playbackBeatTimerRef.current = setTimeout(schedulePlaybackBeats, 25);
+  }, []);
+
+  const togglePlaybackBeatSync = useCallback(() => {
+    initAudio();
+    setIsMetronomeActive((prev) => {
+      const nextState = !prev;
+      isMetronomeActiveRef.current = nextState;
+
+      if (!nextState) {
+        if (playbackBeatTimerRef.current) {
+          clearTimeout(playbackBeatTimerRef.current);
+          playbackBeatTimerRef.current = null;
+        }
+        announceA11y('Playback-Beat stummgeschaltet');
+      } else {
+        const ctx = audioContextRef.current;
+        if (ctx && isPlayingRef.current && audioContextStartTimeRef.current > 0) {
+          const beatSec = 60.0 / bpmRef.current;
+          const beatsPerBar = timeSignatureRef.current === '3/4' ? 3 : 4;
+          const totalBeats = (barLengthRef.current || 4) * beatsPerBar;
+          const loopDurationSec = (masterLoopDurationRef.current || (totalBeats * beatSec * 1000)) / 1000;
+          const loopStartTime = audioContextStartTimeRef.current;
+
+          const elapsed = Math.max(0, ctx.currentTime - loopStartTime);
+          const currentLoopCycle = Math.floor(elapsed / loopDurationSec);
+          const elapsedInCycle = elapsed - (currentLoopCycle * loopDurationSec);
+
+          let nextBeatInCycle = Math.ceil(elapsedInCycle / beatSec);
+          let scheduledTime = loopStartTime + (currentLoopCycle * loopDurationSec) + (nextBeatInCycle * beatSec);
+
+          // Mindestens 15ms Puffer vor dem aktuellen Audio-Clock-Tick
+          if (scheduledTime < ctx.currentTime + 0.015) {
+            nextBeatInCycle += 1;
+            scheduledTime += beatSec;
+          }
+
+          playbackBeatIndexRef.current = nextBeatInCycle % totalBeats;
+          nextPlaybackBeatTimeRef.current = scheduledTime;
+
+          if (playbackBeatTimerRef.current) clearTimeout(playbackBeatTimerRef.current);
+          schedulePlaybackBeats();
+        }
+        announceA11y('Playback-Beat synchron gestartet');
+      }
+      return nextState;
+    });
+  }, [schedulePlaybackBeats]);
+
+  useEffect(() => {
+    if (!isPlaying || !isMetronomeActive || isAutoSequenceActive) {
+      if (playbackBeatTimerRef.current) {
+        clearTimeout(playbackBeatTimerRef.current);
+        playbackBeatTimerRef.current = null;
+      }
+      return;
+    }
+
+    // 🛡️ DSP-Idempotenz: Wenn playAll() den Beat bereits für playTime vorprogrammiert hat,
+    // verhindern wir eine doppelte AudioContext-Triggerung
+    if (playbackBeatTimerRef.current) {
+      return;
+    }
+
+    const ctx = audioContextRef.current;
+    if (ctx) {
+      const beatSec = 60.0 / bpm;
+      const beatsPerBar = timeSignature === '3/4' ? 3 : 4;
+      const totalBeats = barLength * beatsPerBar;
+      const loopDurationSec = (masterLoopDurationRef.current || (totalBeats * beatSec * 1000)) / 1000;
+      const loopStartTime = audioContextStartTimeRef.current > 0 ? audioContextStartTimeRef.current : ctx.currentTime;
+
+      const elapsed = Math.max(0, ctx.currentTime - loopStartTime);
+      const currentLoopCycle = Math.floor(elapsed / loopDurationSec);
+      const elapsedInCycle = elapsed - (currentLoopCycle * loopDurationSec);
+
+      let nextBeatInCycle = Math.ceil(elapsedInCycle / beatSec);
+      let scheduledTime = loopStartTime + (currentLoopCycle * loopDurationSec) + (nextBeatInCycle * beatSec);
+
+      if (scheduledTime < ctx.currentTime + 0.015) {
+        nextBeatInCycle += 1;
+        scheduledTime += beatSec;
+      }
+
+      playbackBeatIndexRef.current = nextBeatInCycle % totalBeats;
+      nextPlaybackBeatTimeRef.current = scheduledTime;
+
+      schedulePlaybackBeats();
     }
 
     return () => {
-      if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
+      if (playbackBeatTimerRef.current) {
+        clearTimeout(playbackBeatTimerRef.current);
+        playbackBeatTimerRef.current = null;
+      }
     };
-  }, [isMetronomeActive, isPlaying, bpm, isAutoSequenceActive]);
+  }, [isMetronomeActive, isPlaying, bpm, barLength, timeSignature, isAutoSequenceActive, schedulePlaybackBeats]);
 
   const handleTapTempo = () => {
     const now = Date.now();
@@ -2570,6 +2685,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       }
     });
 
+    if (isMetronomeActiveRef.current) {
+      if (playbackBeatTimerRef.current) clearTimeout(playbackBeatTimerRef.current);
+      playbackBeatIndexRef.current = 0;
+      nextPlaybackBeatTimeRef.current = playTime;
+      schedulePlaybackBeats();
+    }
+
     startProgressLoop(Date.now() + 50, playTime);
   };
 
@@ -2579,6 +2701,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     setPlaybackProgress(0);
     isAutoSequenceActiveRef.current = false;
     isCapturingContinuousAudioRef.current = false;
+    if (playbackBeatTimerRef.current) {
+      clearTimeout(playbackBeatTimerRef.current);
+      playbackBeatTimerRef.current = null;
+    }
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       cancelAnimationFrame(progressIntervalRef.current);
@@ -2693,12 +2819,15 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           stopAll();
           announceA11y('Wiedergabe gestoppt');
         }
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        togglePlaybackBeatSync();
       }
     };
 
     window.addEventListener('keydown', handleLoopKeyDown);
     return () => window.removeEventListener('keydown', handleLoopKeyDown);
-  }, []);
+  }, [togglePlaybackBeatSync]);
 
   const startRecording = async (trackId: number) => {
     // 🛡️ DSGVO Art. 8 & 25 Privacy by Default: Lehrkräfte und volljährige Schüler sind stets freigegeben.
@@ -3494,6 +3623,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       }
       if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
       if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
+      if (playbackBeatTimerRef.current) clearTimeout(playbackBeatTimerRef.current);
       if (lookaheadTimerRef.current) clearTimeout(lookaheadTimerRef.current);
       if (uiSyncFrameRef.current) cancelAnimationFrame(uiSyncFrameRef.current);
 
@@ -5064,33 +5194,72 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             </div>
 
             <div
-              onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
               style={{
                 flex: isMobileView ? '1 1 100%' : 1.5,
                 width: isMobileView ? '100%' : 'auto',
                 boxSizing: 'border-box',
-                background: showAdvancedSettings ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : '#ffffff',
-                border: showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)',
+                background: isMetronomeActive ? 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)' : '#ffffff',
+                border: isMetronomeActive ? '1.5px solid #facc15' : (showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)'),
                 borderRadius: '12px',
-                padding: '8px 12px',
-                cursor: 'pointer',
+                padding: '6px 10px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '8px',
-                transition: 'all 0.25s ease'
+                transition: 'all 0.25s ease',
+                boxShadow: isMetronomeActive ? '0 2px 8px rgba(234, 179, 8, 0.15)' : 'none'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={13} style={{ color: showAdvancedSettings ? '#1565c0' : '#86868b' }} />
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: showAdvancedSettings ? '#1565c0' : '#1d1d1f' }}>
-                    Metronom
-                  </span>
-                  <span style={{ fontSize: '0.50rem', color: '#616161', fontWeight: 500 }}>
-                    Click {isMetronomeActive ? 'AN' : 'AUS'}
-                  </span>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={togglePlaybackBeatSync}
+                  className="tactile-btn hover-scale-mini"
+                  style={{
+                    background: isMetronomeActive ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : 'rgba(0, 0, 0, 0.05)',
+                    border: isMetronomeActive ? '1.5px solid #ca8a04' : '1px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '8px',
+                    padding: '4px 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    boxShadow: isMetronomeActive ? '0 2px 6px rgba(234, 179, 8, 0.25)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title={isMetronomeActive ? 'Playback-Beat stummschalten (Taste M)' : 'Playback-Beat synchron zuschalten (Taste M)'}
+                  aria-label={`Playback-Beat ${isMetronomeActive ? 'aktiviert' : 'deaktiviert'}. Klicken zum Umschalten.`}
+                >
+                  <span style={{ fontSize: '0.85rem' }}>{metronomeSound.includes('beat') ? '🥁' : '🔔'}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isMetronomeActive ? '#854d0e' : '#1d1d1f' }}>
+                      {metronomeSound.includes('beat') ? 'Beat' : 'Metronom'}
+                    </span>
+                    <span style={{ fontSize: '0.48rem', fontWeight: 700, color: isMetronomeActive ? '#713f12' : '#64748b' }}>
+                      {isMetronomeActive ? 'SYNC AN' : 'AUS'}
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                  className="tactile-btn hover-scale-mini"
+                  style={{
+                    background: showAdvancedSettings ? '#e0f2fe' : 'transparent',
+                    border: showAdvancedSettings ? '1px solid #0284c7' : '1px solid transparent',
+                    borderRadius: '6px',
+                    padding: '5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Beat-Sound & Lautstärke einstellen"
+                  aria-label="Metronom- und Beat-Einstellungen öffnen"
+                >
+                  <Sliders size={13} style={{ color: showAdvancedSettings ? '#0284c7' : '#86868b' }} />
+                </button>
               </div>
 
               <div
@@ -5351,7 +5520,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={() => setIsMetronomeActive(!isMetronomeActive)}
+                    onClick={togglePlaybackBeatSync}
                     className="tactile-btn"
                     style={{
                       background: isMetronomeActive ? '#eab308' : '#e5e5ea',
@@ -5367,10 +5536,14 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                       letterSpacing: '0.04em',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: '5px'
                     }}
+                    title={isMetronomeActive ? 'Playback-Beat stummschalten' : 'Playback-Beat synchron starten'}
+                    aria-label={`Playback-Beat ${isMetronomeActive ? 'aktiviert' : 'deaktiviert'}. Klicken zum Umschalten.`}
                   >
-                    {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
+                    <span>{metronomeSound.includes('beat') ? '🥁' : '🔔'}</span>
+                    <span>{isMetronomeActive ? 'BEAT SYNC: AN' : 'BEAT SYNC: AUS'}</span>
                   </button>
 
                   <button

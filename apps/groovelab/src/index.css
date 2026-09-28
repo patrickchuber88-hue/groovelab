@@ -2132,10 +2132,11 @@ select option {
 }
 
 /* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars across ALL boards on smartphones */
-.sim-viewport-mobile div[style*="maxHeight"]:not(.pwa-modal-drawer),
-.sim-viewport-mobile div[style*="max-height"]:not(.pwa-modal-drawer),
-.sim-viewport-mobile div[style*="overflowY"]:not(.pwa-modal-drawer),
-.sim-viewport-mobile div[style*="overflow-y"]:not(.pwa-modal-drawer) {
+/* 🛡️ Modal Scroll Immunity: Dialogs, sheets, modals and dedicated scroll containers are 100% exempt */
+.sim-viewport-mobile div[style*="maxHeight"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+.sim-viewport-mobile div[style*="max-height"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+.sim-viewport-mobile div[style*="overflowY"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+.sim-viewport-mobile div[style*="overflow-y"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *) {
   max-height: none !important;
   height: auto !important;
   overflow-y: visible !important;
@@ -2143,10 +2144,10 @@ select option {
 }
 
 @media (max-width: 768px) {
-  div[style*="maxHeight"]:not(.pwa-modal-drawer),
-  div[style*="max-height"]:not(.pwa-modal-drawer),
-  div[style*="overflowY"]:not(.pwa-modal-drawer),
-  div[style*="overflow-y"]:not(.pwa-modal-drawer) {
+  div[style*="maxHeight"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+  div[style*="max-height"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+  div[style*="overflowY"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+  div[style*="overflow-y"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *) {
     max-height: none !important;
     height: auto !important;
     overflow-y: visible !important;
@@ -2156,6 +2157,22 @@ select option {
   .google-timeline-card {
     padding: 10px 12px !important;
   }
+}
+
+/* 🛡️ Tier-1 PWA Modal & Scroll-Container Authority (Correct-by-Construction) */
+.pwa-scroll-container,
+[data-modal-scroll="true"],
+.pwa-modal-drawer [style*="overflowY"],
+.pwa-modal-drawer [style*="overflow-y"],
+.pwa-modal-card [style*="overflowY"],
+.pwa-modal-card [style*="overflow-y"],
+[role="dialog"] [style*="overflowY"],
+[role="dialog"] [style*="overflow-y"],
+[role="dialog"] .pwa-scroll-container {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  touch-action: pan-y !important;
 }
 
 .cg-bottom-nav-item {

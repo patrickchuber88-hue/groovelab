@@ -23,6 +23,9 @@ interface WorldTourMapSpreadProps {
   uiLevel?: 'junior' | 'teen' | 'pro';
   isMobileView?: boolean;
   onMasteryAchieved?: (stars: number, score: number, xp: number, countryCode: string) => void;
+  initialCountryCode?: string;
+  initialView?: 'map' | 'score';
+  isTeacherMode?: boolean;
 }
 
 /**
@@ -562,12 +565,25 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   studentAvatarUrl,
   uiLevel = 'teen',
   isMobileView = false,
-  onMasteryAchieved
+  onMasteryAchieved,
+  initialCountryCode,
+  initialView,
+  isTeacherMode = false
 }) => {
-  const [activeView, setActiveView] = useState<'map' | 'score'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'score'>(initialView || 'map');
   const [selectedContinent, setSelectedContinent] = useState<ContinentId | 'all'>('all');
-  const [selectedCountryCode, setSelectedCountryCode] = useState<string>('DE');
-  const [currentLandedCountryCode, setCurrentLandedCountryCode] = useState<string>('DE');
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>(initialCountryCode || 'DE');
+  const [currentLandedCountryCode, setCurrentLandedCountryCode] = useState<string>(initialCountryCode || 'DE');
+
+  useEffect(() => {
+    if (initialCountryCode) {
+      setSelectedCountryCode(initialCountryCode);
+      setCurrentLandedCountryCode(initialCountryCode);
+      if (initialView) {
+        setActiveView(initialView);
+      }
+    }
+  }, [initialCountryCode, initialView]);
   const [isFlying, setIsFlying] = useState(false);
   const [flightState, setFlightState] = useState<{
     fromCode: string;
@@ -586,6 +602,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   } | null>(null);
   const [touchdownCountryCode, setTouchdownCountryCode] = useState<string | null>(null);
   const flightAnimRef = useRef<number | null>(null);
+  const landingAutoOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 🎥 Kontinent-Kamera ViewBox (Butterweicher 60 FPS Zoom)
   const [viewBox, setViewBox] = useState<{ x: number; y: number; w: number; h: number }>(CONTINENT_VIEWBOXES.all);
@@ -963,12 +980,17 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   }, [pins2D, animateViewBoxTo]);
 
   // Klick auf ein Land: Wählt das Land aus, fokussiert die Region und spielt den Jingle ab!
+  // Steht das Flugzeug bereits in diesem Land, öffnet sich direkt das Notenpult (1-Klick-Direktzugriff)
   const handleCountryPinClick = useCallback((country: WorldTourCountry) => {
+    if (country.code === currentLandedCountryCode) {
+      setActiveView('score');
+      return;
+    }
     setSelectedCountryCode(country.code);
     focusCountry(country.code);
     const frequencies = country.audioJingleFrequencies || [261.63, 329.63, 392.00];
     playCultureJingle(frequencies);
-  }, [focusCountry, playCultureJingle]);
+  }, [currentLandedCountryCode, focusCountry, playCultureJingle]);
 
   // 🛫 Web Audio Flugzeug-Sound (Zero-Server, synthetisierter Turbine-/Wind-Effekt)
   const playTakeoffSound = useCallback(() => {
@@ -1009,6 +1031,11 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   const startFlight = useCallback((targetCountryCode: string) => {
     if (isFlying || targetCountryCode === currentLandedCountryCode) return;
 
+    if (landingAutoOpenTimerRef.current) {
+      clearTimeout(landingAutoOpenTimerRef.current);
+      landingAutoOpenTimerRef.current = null;
+    }
+
     const fromPin = pins2D.find(p => p.country.code === currentLandedCountryCode);
     const toPin = pins2D.find(p => p.country.code === targetCountryCode);
     if (!fromPin || !toPin) {
@@ -1033,6 +1060,11 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
         playCultureJingle(targetCountry.audioJingleFrequencies);
       }
       setTimeout(() => setTouchdownCountryCode(null), 1200);
+
+      // 🎼 AUTOMATISCHES ÖFFNEN DES NOTENPULTS NACH LANDUNG
+      landingAutoOpenTimerRef.current = setTimeout(() => {
+        setActiveView('score');
+      }, 650);
       return;
     }
 
@@ -1098,6 +1130,11 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
         setTimeout(() => {
           setTouchdownCountryCode(null);
         }, 1200);
+
+        // 🎼 AUTOMATISCHES ÖFFNEN DES NOTENPULTS NACH LANDUNG (~650ms Zäsur für Willkommens-Moment)
+        landingAutoOpenTimerRef.current = setTimeout(() => {
+          setActiveView('score');
+        }, 650);
       }
     };
 
@@ -1109,6 +1146,9 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
     return () => {
       if (flightAnimRef.current) {
         cancelAnimationFrame(flightAnimRef.current);
+      }
+      if (landingAutoOpenTimerRef.current) {
+        clearTimeout(landingAutoOpenTimerRef.current);
       }
     };
   }, []);
@@ -1926,8 +1966,10 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
               const progress = progressMap[country.code];
               const stars = progress?.stars ?? 0;
               const isMastered = stars > 0;
-              const isAccessible = WorldTourFlightEngine.isCountryAccessible(country.code, progressMap);
-              const canFlyHere = WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap);
+              const isAccessible = isTeacherMode || WorldTourFlightEngine.isCountryAccessible(country.code, progressMap);
+              const canFlyHere = isTeacherMode
+                ? country.code !== currentLandedCountryCode
+                : WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap);
               const isContinentMatch = selectedContinent === 'all' || country.continent === selectedContinent;
 
               const pinOpacity = !isContinentMatch ? 0.22 : !isAccessible ? 0.42 : 1;
@@ -2088,8 +2130,10 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
           {/* ========================================================================= */}
           {(() => {
             const isLanded = activeCountry.code === currentLandedCountryCode;
-            const isAccessible = WorldTourFlightEngine.isCountryAccessible(activeCountry.code, progressMap);
-            const canFlyDirectly = WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, activeCountry.code, progressMap);
+            const isAccessible = isTeacherMode || WorldTourFlightEngine.isCountryAccessible(activeCountry.code, progressMap);
+            const canFlyDirectly = isTeacherMode
+              ? activeCountry.code !== currentLandedCountryCode
+              : WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, activeCountry.code, progressMap);
             const routeInfo = WorldTourFlightEngine.getRouteInfo(currentLandedCountryCode, activeCountry.code);
             const availableConnections = WorldTourFlightEngine.getConnectionsFrom(activeCountry.code, progressMap);
             const accessRoutesTo = WorldTourFlightEngine.getAccessRoutesTo(activeCountry.code, progressMap);
@@ -2349,8 +2393,9 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                         <ChevronRight size={15} strokeWidth={2.8} />
                       </button>
                     ) : (
-                      <button
-                        disabled
+                      <span
+                        role="status"
+                        aria-disabled="true"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -2369,7 +2414,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                       >
                         <Lock size={13} />
                         <span>Gesperrt</span>
-                      </button>
+                      </span>
                     )}
 
                     {/* Einklapp-Pill / Minimieren */}
@@ -2799,6 +2844,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
           uiLevel={uiLevel}
           progressMap={progressMap}
           currentLandedCountryCode={currentLandedCountryCode}
+          isTeacherMode={isTeacherMode}
           onNavigateToCountry={(countryCode) => {
             setSelectedCountryCode(countryCode);
             setIsPassportOpen(false);

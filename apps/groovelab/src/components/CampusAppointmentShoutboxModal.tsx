@@ -12,11 +12,14 @@ import {
   Music,
   FileText,
   ShieldCheck,
-  Lock
+  Lock,
+  User,
+  Fingerprint
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
+import { isWebAuthnSupported, getSanitizedRpId } from '../utils/webauthn';
 
 export interface CampusAppointmentShoutboxModalProps {
   isOpen: boolean;
@@ -26,6 +29,8 @@ export interface CampusAppointmentShoutboxModalProps {
   currentUserRole: 'student' | 'teacher' | 'admin' | 'secretary';
   currentUserProfile?: any;
   isParentUnlocked?: boolean;
+  isChatAllowed?: boolean;
+  isAbsenceAllowed?: boolean;
   onRequestPinGate?: (action: () => Promise<void>) => void;
   onStatusChange?: (newStatus: 'scheduled' | 'cancelled' | 'canceled_by_student', updatedOcc?: any) => void;
   initialDraftMessage?: string;
@@ -39,16 +44,61 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   currentUserRole,
   currentUserProfile,
   isParentUnlocked = false,
+  isChatAllowed: propIsChatAllowed,
+  isAbsenceAllowed: propIsAbsenceAllowed,
   onRequestPinGate,
   onStatusChange,
   initialDraftMessage
 }) => {
+  const isChatAllowed = useMemo(() => {
+    if (currentUserRole !== 'student') return true;
+    if (propIsChatAllowed !== undefined) return propIsChatAllowed;
+    const profile = currentUserProfile || occurrence?.student || occurrence?.student_user;
+    if (profile?.parent_permissions?.allow_chat !== undefined) return Boolean(profile.parent_permissions.allow_chat);
+    if (profile?.parent_allow_chat !== undefined) return Boolean(profile.parent_allow_chat);
+    return true;
+  }, [currentUserRole, propIsChatAllowed, currentUserProfile, occurrence]);
+
+  const isAbsenceAllowed = useMemo(() => {
+    if (currentUserRole !== 'student') return true;
+    if (propIsAbsenceAllowed !== undefined) return propIsAbsenceAllowed;
+    const profile = currentUserProfile || occurrence?.student || occurrence?.student_user;
+    if (profile?.parent_permissions?.allow_absences !== undefined) return Boolean(profile.parent_permissions.allow_absences);
+    if (profile?.parent_allow_absences !== undefined) return Boolean(profile.parent_allow_absences);
+    return true;
+  }, [currentUserRole, propIsAbsenceAllowed, currentUserProfile, occurrence]);
+
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState(initialDraftMessage || '');
   const [isSending, setIsSending] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Local Parent Opt-In & PIN Verification
+  const [localParentUnlocked, setLocalParentUnlocked] = useState<boolean>(isParentUnlocked);
+  useEffect(() => {
+    setLocalParentUnlocked(isParentUnlocked);
+  }, [isParentUnlocked]);
+
+  const effectiveIsParentUnlocked = Boolean(isParentUnlocked || localParentUnlocked);
+
+  const [showPinDialog, setShowPinDialog] = useState<boolean>(false);
+  const [pinInput, setPinInput] = useState<string>('');
+  const [pinError, setPinError] = useState<string>('');
+  const [isVerifyingPin, setIsVerifyingPin] = useState<boolean>(false);
+  const [pinShake, setPinShake] = useState<boolean>(false);
+  const [failedPinAttempts, setFailedPinAttempts] = useState<number>(0);
+  const [pinCooldownSeconds, setPinCooldownSeconds] = useState<number>(0);
+
+  // Anti-Brute-Force Cooldown Timer
+  useEffect(() => {
+    if (pinCooldownSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setPinCooldownSeconds(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [pinCooldownSeconds]);
 
   useEffect(() => {
     if (isOpen && initialDraftMessage) {
@@ -377,17 +427,219 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       : (currentUserRole === 'student' ? `durch ${teacherDisplayName}` : 'durch dich');
   }
 
+  // Server-Side Parent PIN Verification for In-Chat Opt-In (6-stellige Eltern-Master-PIN)
+  const handleVerifyParentPin = async (inputPin: string) => {
+    if (pinCooldownSeconds > 0 || isVerifyingPin) return;
+    const cleanPin = inputPin.trim();
+    if (cleanPin.length !== 6) return;
+
+    const targetStudentId = studentId || occurrence?.student_id || currentUserId;
+    if (!targetStudentId) {
+      setPinError('Kein Schülerprofil zugeordnet.');
+      return;
+    }
+
+    setIsVerifyingPin(true);
+    setPinError('');
+
+    try {
+      let isOk = false;
+
+      // 1. Primary: Server-side lease verification
+      try {
+        const { data: leaseData, error: leaseErr } = await supabase.rpc('verify_parent_pin_with_lease', {
+          p_student_id: targetStudentId,
+          p_input_pin: cleanPin,
+          p_device_key: `shoutbox-optin-${Date.now()}`
+        });
+        if (!leaseErr && leaseData?.success === true) {
+          isOk = true;
+          if (leaseData?.lease_token) {
+            try {
+              sessionStorage.setItem('gl_parent_session_lease', String(leaseData.lease_token));
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fallback: Standard server-side verification
+      if (!isOk) {
+        try {
+          const { data: parentOk, error: pinErr } = await supabase.rpc('verify_parent_pin', {
+            student_id: targetStudentId,
+            input_pin: cleanPin
+          });
+          if (!pinErr && parentOk === true) {
+            isOk = true;
+          }
+        } catch (e) {}
+      }
+
+      if (isOk) {
+        setLocalParentUnlocked(true);
+        setShowPinDialog(false);
+        setPinInput('');
+        setPinError('');
+        setFailedPinAttempts(0);
+        try {
+          sessionStorage.setItem(`groovelab_parent_unlocked_${targetStudentId}`, 'true');
+          sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+          window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+        } catch (e) {}
+      } else {
+        setPinShake(true);
+        setTimeout(() => setPinShake(false), 420);
+        const nextCount = failedPinAttempts + 1;
+        setFailedPinAttempts(nextCount);
+        if (nextCount >= 5) {
+          setPinCooldownSeconds(30);
+          setPinError('Zu viele Fehlversuche. Bitte 30 Sekunden warten.');
+        } else {
+          setPinError(`Falsche PIN (${5 - nextCount} Versuche verbleibend).`);
+        }
+        setPinInput('');
+      }
+    } catch (err: any) {
+      setPinError(err.message || 'Verbindung fehlgeschlagen.');
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  // Biometric Face ID / Touch ID Unlock (WebAuthn Passkey)
+  const handleBiometricUnlock = async () => {
+    if (isVerifyingPin || pinCooldownSeconds > 0) return;
+    const targetStudentId = studentId || occurrence?.student_id || currentUserId;
+    if (!targetStudentId) {
+      setPinError('Kein Schülerprofil zugeordnet.');
+      return;
+    }
+
+    setIsVerifyingPin(true);
+    setPinError('');
+
+    try {
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: targetStudentId,
+        p_type: 'login'
+      });
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge nicht verfügbar.');
+      }
+
+      const challengeBuffer = new Uint8Array(
+        chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+      ).buffer;
+
+      const rpId = getSanitizedRpId();
+      const assertion = (await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBuffer,
+          userVerification: 'required',
+          timeout: 60000,
+          ...(rpId ? { rpId } : {})
+        }
+      })) as PublicKeyCredential;
+
+      if (!assertion) {
+        throw new Error('Biometrie abgebrochen.');
+      }
+
+      const effectiveSchoolId = currentUserProfile?.school_id || 
+        (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
+        occurrence?.school_id;
+
+      const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
+        p_credential_id: assertion.id,
+        p_challenge: chalData.challenge,
+        p_school_id: effectiveSchoolId || null
+      });
+
+      if (authErr || !authResult?.success) {
+        throw new Error(authResult?.error || authErr?.message || 'Passkey nicht erkannt.');
+      }
+
+      setLocalParentUnlocked(true);
+      setShowPinDialog(false);
+      setPinInput('');
+      setPinError('');
+      setFailedPinAttempts(0);
+      try {
+        sessionStorage.setItem(`groovelab_parent_unlocked_${targetStudentId}`, 'true');
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+      } catch (e) {}
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        setPinError(err.message || 'FaceID/TouchID Entsperrung fehlgeschlagen.');
+      }
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  // Physical Keyboard Listener for In-Modal PIN Dialog (BFSG 2025 / WCAG 2.1.1)
+  useEffect(() => {
+    if (!showPinDialog) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowPinDialog(false);
+        setPinInput('');
+        setPinError('');
+        return;
+      }
+
+      if (isVerifyingPin || pinCooldownSeconds > 0) return;
+
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        setPinError('');
+        setPinInput(prev => {
+          if (prev.length < 6) {
+            const next = prev + e.key;
+            if (next.length === 6) {
+              handleVerifyParentPin(next);
+            }
+            return next;
+          }
+          return prev;
+        });
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setPinError('');
+        setPinInput(prev => prev.slice(0, -1));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPinDialog, isVerifyingPin, pinCooldownSeconds]);
+
   // Handle Send Message
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || chatTypedMessage).trim();
     if (!text || !studentId || !teacherId || isSending) return;
+
+    if (currentUserRole === 'student' && !isChatAllowed && !effectiveIsParentUnlocked) {
+      if (onRequestPinGate) {
+        onRequestPinGate(async () => {
+          setLocalParentUnlocked(true);
+          await handleSendMessage(textToSend);
+        });
+      } else {
+        setShowPinDialog(true);
+      }
+      return;
+    }
 
     setIsSending(true);
     const recipientId = currentUserRole === 'student' ? teacherId : studentId;
     const occRefId = targetOccId || (targetScheduleId ? `virtual-${targetScheduleId}-${targetDate}` : null);
 
     // Optimistic message
-    const isParentSender = Boolean(isParentUnlocked);
+    const isParentSender = Boolean(effectiveIsParentUnlocked);
     const optimisticMessage = {
       id: `temp-${Date.now()}`,
       sender_id: currentUserId,
@@ -441,7 +693,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
 
         const actorName = currentUserRole === 'student'
-          ? `${studentDisplayName}${isParentUnlocked ? ' (Eltern-PIN autorisiert)' : ''}`
+          ? `${studentDisplayName}${effectiveIsParentUnlocked ? ' (Eltern-PIN autorisiert)' : ''}`
           : `${teacherDisplayName} (Lehrkraft)`;
 
         const recipientId = currentUserRole === 'student' ? teacherId : studentId;
@@ -524,8 +776,12 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       }
     };
 
-    if (currentUserRole === 'student' && !isParentUnlocked && onRequestPinGate) {
-      onRequestPinGate(executeCancelAction);
+    if (currentUserRole === 'student' && !isAbsenceAllowed && !effectiveIsParentUnlocked) {
+      if (onRequestPinGate) {
+        onRequestPinGate(executeCancelAction);
+      } else {
+        setShowPinDialog(true);
+      }
       return;
     }
 
@@ -561,7 +817,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
 
         const actorName = currentUserRole === 'student'
-          ? `${studentDisplayName}${isParentUnlocked ? ' (Eltern-PIN autorisiert)' : ''}`
+          ? `${studentDisplayName}${effectiveIsParentUnlocked ? ' (Eltern-PIN autorisiert)' : ''}`
           : `${teacherDisplayName} (Lehrkraft)`;
 
         const recipientId = currentUserRole === 'student' ? teacherId : studentId;
@@ -643,8 +899,12 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       }
     };
 
-    if (currentUserRole === 'student' && !isParentUnlocked && onRequestPinGate) {
-      onRequestPinGate(executeReactivateAction);
+    if (currentUserRole === 'student' && !effectiveIsParentUnlocked) {
+      if (onRequestPinGate) {
+        onRequestPinGate(executeReactivateAction);
+      } else {
+        setShowPinDialog(true);
+      }
       return;
     }
 
@@ -708,12 +968,12 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         className="pwa-modal-drawer"
         style={{
           background: '#ffffff',
-          borderRadius: isMobile ? 0 : '28px',
+          borderRadius: isMobile ? 0 : '26px',
           width: '100%',
-          maxWidth: isMobile ? '100%' : '500px',
+          maxWidth: isMobile ? '100%' : '680px',
           height: isMobile ? '100%' : 'auto',
-          maxHeight: isMobile ? '100%' : '85vh',
-          boxShadow: isMobile ? 'none' : '0 32px 80px rgba(0,0,0,0.25)',
+          maxHeight: isMobile ? '100%' : 'min(820px, 88vh)',
+          boxShadow: isMobile ? 'none' : '0 32px 84px -12px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.1)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -741,11 +1001,11 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
           padding: isMobile
             ? 'calc(12px + env(safe-area-inset-top, 0px)) 16px 13px 16px'
-            : '24px 22px 18px 22px',
+            : '22px 26px 18px 26px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '12px',
+          gap: '14px',
           color: '#ffffff',
           boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(0,0,0,0.06)',
           transition: 'background 0.3s ease',
@@ -754,9 +1014,9 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '14px', minWidth: 0, flex: 1 }}>
             {/* Apple Glas-Squircle */}
             <div style={{
-              width: isMobile ? '38px' : '44px',
-              height: isMobile ? '38px' : '44px',
-              borderRadius: '13px',
+              width: isMobile ? '38px' : '50px',
+              height: isMobile ? '38px' : '50px',
+              borderRadius: isMobile ? '13px' : '15px',
               background: 'rgba(255, 255, 255, 0.18)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
@@ -768,13 +1028,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               flexShrink: 0,
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
             }}>
-              <MessageSquare size={isMobile ? 19 : 22} strokeWidth={2.2} />
+              <MessageSquare size={isMobile ? 19 : 25} strokeWidth={2.2} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
                 <h3 style={{
                   margin: 0,
-                  fontSize: isMobile ? '1.08rem' : '1.18rem',
+                  fontSize: isMobile ? '1.08rem' : '1.30rem',
                   fontWeight: 900,
                   letterSpacing: '-0.02em',
                   color: '#ffffff',
@@ -786,34 +1046,34 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 </h3>
                 {/* Translucent Status Badge */}
                 <span style={{
-                  padding: '2.5px 8px',
+                  padding: isMobile ? '2.5px 8px' : '4px 10px',
                   borderRadius: '100px',
                   background: isCanceled ? 'rgba(220, 38, 38, 0.35)' : 'rgba(255, 255, 255, 0.22)',
                   backdropFilter: 'blur(6px)',
                   WebkitBackdropFilter: 'blur(6px)',
                   color: '#ffffff',
                   border: isCanceled ? '1px solid rgba(254, 202, 202, 0.4)' : '1px solid rgba(255, 255, 255, 0.3)',
-                  fontSize: isMobile ? '0.68rem' : '0.74rem',
+                  fontSize: isMobile ? '0.68rem' : '0.80rem',
                   fontWeight: 800,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  gap: '5px',
                   whiteSpace: 'nowrap',
                   flexShrink: 0
                 }}>
-                  {isCanceled ? <X size={10} strokeWidth={3} /> : (isReactivated ? <RotateCcw size={10} strokeWidth={2.5} /> : (isRescheduled ? <Clock size={10} strokeWidth={2.5} /> : <Check size={10} strokeWidth={3} />))}
+                  {isCanceled ? <X size={11} strokeWidth={3} /> : (isReactivated ? <RotateCcw size={11} strokeWidth={2.5} /> : (isRescheduled ? <Clock size={11} strokeWidth={2.5} /> : <Check size={11} strokeWidth={3} />))}
                   <span>{isCanceled ? 'Termin abgesagt' : (isReactivated ? 'Regulär (Reaktiviert)' : (isRescheduled ? 'Verschoben' : 'Regulär'))}</span>
                 </span>
               </div>
 
               <p style={{
-                margin: '2px 0 0 0',
-                color: 'rgba(255, 255, 255, 0.90)',
-                fontSize: isMobile ? '0.76rem' : '0.84rem',
+                margin: '3px 0 0 0',
+                color: 'rgba(255, 255, 255, 0.92)',
+                fontSize: isMobile ? '0.76rem' : '0.92rem',
                 fontWeight: 650,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '7px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
@@ -849,8 +1109,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               WebkitBackdropFilter: 'blur(8px)',
               color: '#ffffff',
               borderRadius: '50%',
-              width: isMobile ? '34px' : '32px',
-              height: isMobile ? '34px' : '32px',
+              width: isMobile ? '34px' : '38px',
+              height: isMobile ? '34px' : '38px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -867,7 +1127,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <X size={16} strokeWidth={2.5} />
+            <X size={isMobile ? 16 : 19} strokeWidth={2.5} />
           </button>
         </div>
 
@@ -876,18 +1136,18 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           <div style={{
             background: '#f8fafc',
             borderBottom: '1px solid #e2e8f0',
-            padding: '7px 20px',
+            padding: '9px 26px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            fontSize: '0.69rem',
+            gap: '10px',
+            fontSize: '0.80rem',
             color: '#64748b',
-            lineHeight: '1.35',
+            lineHeight: '1.4',
             flexShrink: 0
           }}>
-            <ShieldCheck size={13} color="#15803d" style={{ flexShrink: 0 }} />
+            <ShieldCheck size={16} color="#15803d" style={{ flexShrink: 0 }} />
             <span>
-              <strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
+              <strong style={{ color: '#0f172a' }}>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
             </span>
           </div>
         )}
@@ -967,13 +1227,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: isMobile ? '12px 14px' : '20px 24px',
+          padding: isMobile ? '12px 14px' : '22px 28px',
           background: '#fafbfc',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          minHeight: isMobile ? '160px' : '260px',
-          maxHeight: isMobile ? 'none' : '440px'
+          gap: isMobile ? '12px' : '16px',
+          minHeight: isMobile ? '160px' : '280px',
+          maxHeight: isMobile ? 'none' : '520px'
         }} className="custom-scrollbar">
           {/* Centered Child Protection Whisper Badge (Mobile Only) */}
           {isMobile && (
@@ -998,20 +1258,20 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </div>
           )}
           {isFrozen && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-              <Lock size={14} /> <span>Shoutbox eingefroren (Schreibschutz nach 48h aktiv)</span>
+            <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
+              <Lock size={16} /> <span>Shoutbox eingefroren (Schreibschutz nach 48h aktiv)</span>
             </div>
           )}
 
           {reconciledMessages.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                <Calendar size={20} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.88rem', textAlign: 'center', padding: '32px 20px', gap: '10px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '20px', margin: 'auto 0' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                <Calendar size={24} />
               </div>
-              <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+              <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
                 Termingekoppelter Schulchat
               </h5>
-              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
+              <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.45, maxWidth: '280px' }}>
                 Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
               </p>
             </div>
@@ -1037,18 +1297,18 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     <div style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '7px',
+                      gap: '8px',
                       background: '#f0fdf4',
                       border: '1px solid #bbf7d0',
                       borderRadius: '100px',
-                      padding: '5px 14px',
+                      padding: isMobile ? '5px 14px' : '7px 18px',
                       boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)'
                     }}>
-                      <RotateCcw size={12} color="#15803d" strokeWidth={2.6} style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>
+                      <RotateCcw size={isMobile ? 12 : 14} color="#15803d" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 800, color: '#15803d' }}>
                         Termin reaktiviert
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 650 }}>
+                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.80rem', color: '#16a34a', fontWeight: 650 }}>
                         • {dateFormatted}, {timeFormatted} Uhr
                       </span>
                     </div>
@@ -1067,18 +1327,18 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     <div style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '7px',
+                      gap: '8px',
                       background: '#fef2f2',
                       border: '1px solid #fecaca',
                       borderRadius: '100px',
-                      padding: '5px 14px',
+                      padding: isMobile ? '5px 14px' : '7px 18px',
                       boxShadow: '0 1px 3px rgba(239, 68, 68, 0.06)'
                     }}>
-                      <X size={12} color="#dc2626" strokeWidth={2.8} style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#991b1b' }}>
+                      <X size={isMobile ? 12 : 14} color="#dc2626" strokeWidth={2.8} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 800, color: '#991b1b' }}>
                         Termin abgesagt
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 650 }}>
+                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.80rem', color: '#b91c1c', fontWeight: 650 }}>
                         • {dateFormatted}, {timeFormatted} Uhr
                       </span>
                     </div>
@@ -1098,19 +1358,19 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
                   maxWidth: '82%',
                   alignItems: isMe ? 'flex-end' : 'flex-start',
-                  gap: '2px'
+                  gap: '3px'
                 }}>
                   {(!isMe || msg.sender_role === 'parent') && (
                     <span style={{
-                      fontSize: '0.80rem',
+                      fontSize: isMobile ? '0.80rem' : '0.88rem',
                       fontWeight: 800,
                       color: msg.sender_role === 'parent' ? '#1d4ed8' : (currentUserRole === 'student' ? '#15803d' : '#2563eb'),
                       marginBottom: '2px',
-                      marginLeft: isMe ? '0px' : '6px',
-                      marginRight: isMe ? '6px' : '0px',
+                      marginLeft: isMe ? '0px' : '8px',
+                      marginRight: isMe ? '8px' : '0px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '6px'
                     }}>
                       <span>{senderDisplayName}</span>
                       {msg.sender_role === 'parent' && (
@@ -1118,16 +1378,16 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '3px',
-                          padding: '1px 6px',
+                          padding: '2px 7px',
                           borderRadius: '6px',
                           background: '#eff6ff',
                           border: '1px solid #dbeafe',
                           color: '#1d4ed8',
-                          fontSize: '0.65rem',
+                          fontSize: '0.70rem',
                           fontWeight: 800,
                           lineHeight: 1
                         }}>
-                          <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
+                          <ShieldCheck size={12} color="#1d4ed8" strokeWidth={2.5} />
                           <span>Eltern</span>
                         </span>
                       )}
@@ -1136,23 +1396,23 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   <div style={{
                     background: isMe ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' : '#ffffff',
                     color: isMe ? '#ffffff' : '#0f172a',
-                    padding: '12px 16px',
-                    borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                    fontSize: '0.96rem',
-                    lineHeight: 1.45,
+                    padding: isMobile ? '12px 16px' : '15px 22px',
+                    borderRadius: isMe ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                    fontSize: isMobile ? '0.96rem' : '1.08rem',
+                    lineHeight: 1.5,
                     wordBreak: 'break-word',
                     border: isMe ? 'none' : '1px solid #e2e8f0',
-                    boxShadow: isMe ? '0 2px 8px rgba(21, 128, 61, 0.22)' : '0 2px 6px rgba(0,0,0,0.04)'
+                    boxShadow: isMe ? '0 2px 10px rgba(21, 128, 61, 0.22)' : '0 2px 8px rgba(0,0,0,0.04)'
                   }}>
                     {cleanContent}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '6px' }}>
-                      <span style={{ fontSize: '0.74rem', color: isMe ? 'rgba(255, 255, 255, 0.85)' : '#64748b', fontWeight: 650 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: isMobile ? '0.74rem' : '0.82rem', color: isMe ? 'rgba(255, 255, 255, 0.88)' : '#64748b', fontWeight: 650 }}>
                         {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {isMe && (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginLeft: '4px' }}>
-                          <CheckCheck size={14} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
-                          <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.85)' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                          <CheckCheck size={isMobile ? 14 : 16} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
+                          <span style={{ fontSize: isMobile ? '0.68rem' : '0.76rem', color: 'rgba(255, 255, 255, 0.88)' }}>
                             {msg.is_read ? 'Gelesen' : 'Zugestellt'}
                           </span>
                         </div>
@@ -1174,10 +1434,10 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           borderTop: '1px solid #f1f5f9',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
+          gap: isMobile ? '8px' : '10px',
           padding: isMobile
             ? '10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px'
-            : '10px 20px 14px 20px',
+            : '12px 24px 16px 24px',
           flexShrink: 0
         }}>
           {/* Music Pedagogical Quick Reply Chips */}
@@ -1185,7 +1445,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: isMobile ? '8px' : '10px',
               overflowX: 'auto',
               padding: '2px 0 4px 0',
               scrollbarWidth: 'none',
@@ -1199,13 +1459,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   disabled={isLessonPast || isActionLoading}
                   onClick={handleReactivate}
                   style={{
-                    padding: '7px 13px',
-                    minHeight: '34px',
+                    padding: isMobile ? '7px 13px' : '9px 16px',
+                    minHeight: isMobile ? '34px' : '40px',
                     borderRadius: '100px',
                     background: isLessonPast ? '#f1f5f9' : '#f0fdf4',
                     border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #86efac',
                     color: isLessonPast ? '#94a3b8' : '#15803d',
-                    fontSize: '0.80rem',
+                    fontSize: isMobile ? '0.80rem' : '0.88rem',
                     fontWeight: 850,
                     whiteSpace: 'nowrap',
                     cursor: isLessonPast ? 'not-allowed' : 'pointer',
@@ -1214,11 +1474,11 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     flexShrink: 0,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px'
+                    gap: '6px'
                   }}
                   className={isLessonPast ? '' : 'hover-scale'}
                 >
-                  <RotateCcw size={12} strokeWidth={2.6} />
+                  <RotateCcw size={isMobile ? 12 : 14} strokeWidth={2.6} />
                   <span>Termin reaktivieren</span>
                 </button>
               ) : (
@@ -1227,13 +1487,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   disabled={isLessonPast || isActionLoading}
                   onClick={handleCancel}
                   style={{
-                    padding: '7px 13px',
-                    minHeight: '34px',
+                    padding: isMobile ? '7px 13px' : '9px 16px',
+                    minHeight: isMobile ? '34px' : '40px',
                     borderRadius: '100px',
                     background: isLessonPast ? '#f1f5f9' : '#fff5f5',
                     border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #fca5a5',
                     color: isLessonPast ? '#94a3b8' : '#dc2626',
-                    fontSize: '0.80rem',
+                    fontSize: isMobile ? '0.80rem' : '0.88rem',
                     fontWeight: 850,
                     whiteSpace: 'nowrap',
                     cursor: isLessonPast ? 'not-allowed' : 'pointer',
@@ -1242,16 +1502,20 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     flexShrink: 0,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px'
+                    gap: '6px'
                   }}
                   className={isLessonPast ? '' : 'hover-scale'}
                 >
-                  <X size={12} strokeWidth={2.6} />
-                  <span>Termin absagen</span>
+                  {currentUserRole === 'student' && !isAbsenceAllowed && !effectiveIsParentUnlocked ? (
+                    <Lock size={isMobile ? 12 : 14} strokeWidth={2.4} color="#dc2626" />
+                  ) : (
+                    <X size={isMobile ? 12 : 14} strokeWidth={2.6} />
+                  )}
+                  <span>Termin absagen{currentUserRole === 'student' && !isAbsenceAllowed && !effectiveIsParentUnlocked ? ' (Eltern-PIN)' : ''}</span>
                 </button>
               )}
 
-              {phrases.map((phrase, pIdx) => {
+              {!(currentUserRole === 'student' && !isChatAllowed && !effectiveIsParentUnlocked) && phrases.map((phrase, pIdx) => {
                 const IconComp = phrase.icon;
                 return (
                   <button
@@ -1259,13 +1523,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     type="button"
                     onClick={() => setChatTypedMessage(phrase.text)}
                     style={{
-                      padding: '7px 13px',
-                      minHeight: '34px',
+                      padding: isMobile ? '7px 13px' : '9px 16px',
+                      minHeight: isMobile ? '34px' : '40px',
                       borderRadius: '100px',
                       background: '#ffffff',
                       border: '1px solid #e2e8f0',
                       color: '#334155',
-                      fontSize: '0.80rem',
+                      fontSize: isMobile ? '0.80rem' : '0.88rem',
                       fontWeight: 750,
                       whiteSpace: 'nowrap',
                       cursor: 'pointer',
@@ -1273,7 +1537,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       flexShrink: 0,
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '7px',
                       transition: 'all 0.15s ease'
                     }}
                     onMouseEnter={e => {
@@ -1287,7 +1551,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       e.currentTarget.style.color = '#334155';
                     }}
                   >
-                    <IconComp size={12} color="#15803d" strokeWidth={2.4} />
+                    <IconComp size={isMobile ? 12 : 14} color="#15803d" strokeWidth={2.4} />
                     <span>{phrase.label}</span>
                   </button>
                 );
@@ -1295,82 +1559,242 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </div>
           )}
 
-          {/* Input Row - Full Width Text Field & Clean Send Button */}
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            style={{
+          {/* Input Row - Full Width Text Field or Protected Notice */}
+          {currentUserRole === 'student' && !isChatAllowed && !effectiveIsParentUnlocked ? (
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              width: '100%'
-            }}
-          >
-            <input
-              type="text"
-              placeholder={isFrozen ? 'Shoutbox ist schreibgeschützt...' : 'Nachricht schreiben...'}
-              disabled={isFrozen || isSending}
-              value={chatTypedMessage}
-              onChange={e => setChatTypedMessage(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: '11px 18px',
-                minHeight: '44px',
-                borderRadius: '100px',
-                border: '1.5px solid #e2e8f0',
-                background: isFrozen ? '#f1f5f9' : '#ffffff',
-                fontSize: '0.90rem',
-                fontWeight: 550,
-                outline: 'none',
-                color: '#0f172a',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                transition: 'border-color 0.15s, box-shadow 0.15s'
-              }}
-              onFocus={e => {
-                if (!isFrozen) {
-                  e.target.style.borderColor = '#15803d';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(21, 128, 61, 0.15)';
-                }
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = '#e2e8f0';
-                e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
-              }}
-            />
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: isMobile ? '10px 16px' : '14px 20px',
+              borderRadius: '16px',
+              background: '#eff6ff',
+              border: '1.5px solid #bfdbfe',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', color: '#1e40af', fontSize: isMobile ? '0.82rem' : '0.94rem', fontWeight: 750 }}>
+                <Lock size={isMobile ? 16 : 18} color="#2563eb" style={{ flexShrink: 0 }} />
+                <span>Antworten durch Eltern geschützt (Lesen frei)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPinError('');
+                  setPinInput('');
+                  setShowPinDialog(true);
+                  if (onRequestPinGate) {
+                    onRequestPinGate(async () => setLocalParentUnlocked(true));
+                  }
+                }}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: isMobile ? '7px 14px' : '9px 18px',
+                  minHeight: isMobile ? '38px' : '42px',
+                  fontSize: isMobile ? '0.80rem' : '0.88rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <ShieldCheck size={15} color="#ffffff" strokeWidth={2.4} />
+                <span>Mit PIN freischalten</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Sender Role Status & Opt-In Bar for Students & Parents */}
+              {currentUserRole === 'student' && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  padding: '2px 4px'
+                }}>
+                  {effectiveIsParentUnlocked ? (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '7px',
+                      color: '#1d4ed8',
+                      fontSize: isMobile ? '0.78rem' : '0.84rem',
+                      fontWeight: 800,
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      padding: '4px 12px',
+                      borderRadius: '100px'
+                    }}>
+                      <ShieldCheck size={14} color="#1d4ed8" strokeWidth={2.5} />
+                      <span>Antwort wird als Erziehungsberechtigte/r signiert</span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      color: '#64748b',
+                      fontSize: isMobile ? '0.74rem' : '0.80rem',
+                      fontWeight: 750
+                    }}>
+                      <User size={13} color="#94a3b8" />
+                      <span>Antwort als Schüler:in</span>
+                    </div>
+                  )}
 
-            {/* Send Message Button */}
-            <button
-              type="submit"
-              disabled={isFrozen || isSending || !chatTypedMessage.trim()}
-              aria-label="Nachricht senden"
-              style={{
-                background: isFrozen || !chatTypedMessage.trim() ? '#f1f5f9' : '#15803d',
-                color: isFrozen || !chatTypedMessage.trim() ? '#94a3b8' : '#ffffff',
-                border: 'none',
-                borderRadius: '50%',
-                width: '42px',
-                height: '42px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
-                boxShadow: isFrozen || !chatTypedMessage.trim() ? 'none' : '0 2px 8px rgba(21, 128, 61, 0.25)',
-                transition: 'all 0.15s ease',
-                flexShrink: 0
-              }}
-              onMouseEnter={e => {
-                if (!isFrozen && chatTypedMessage.trim()) e.currentTarget.style.background = '#166534';
-              }}
-              onMouseLeave={e => {
-                if (!isFrozen && chatTypedMessage.trim()) e.currentTarget.style.background = '#15803d';
-              }}
-            >
-              <Send size={16} />
-            </button>
-          </form>
+                  {effectiveIsParentUnlocked ? (
+                    <button
+                      type="button"
+                      onClick={() => setLocalParentUnlocked(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        fontSize: isMobile ? '0.72rem' : '0.78rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        padding: '4px 8px'
+                      }}
+                      title="Zum Schüler-Modus wechseln"
+                    >
+                      Als Schüler:in wechseln
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPinError('');
+                        setPinInput('');
+                        setShowPinDialog(true);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: isMobile ? '5px 11px' : '6px 14px',
+                        minHeight: isMobile ? '34px' : '36px',
+                        borderRadius: '100px',
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        color: '#1d4ed8',
+                        fontSize: isMobile ? '0.74rem' : '0.80rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = '#eff6ff';
+                        e.currentTarget.style.borderColor = '#93c5fd';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                      }}
+                      title="Mit Eltern-PIN freischalten, um die Nachricht als Elternteil zu signieren"
+                    >
+                      <ShieldCheck size={14} color="#1d4ed8" strokeWidth={2.4} />
+                      <span>Als Elternteil antworten (PIN)</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: isMobile ? '10px' : '12px',
+                  width: '100%'
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder={
+                    isFrozen
+                      ? 'Shoutbox ist schreibgeschützt...'
+                      : (effectiveIsParentUnlocked
+                          ? 'Nachricht als Erziehungsberechtigte/r schreiben...'
+                          : 'Nachricht schreiben...')
+                  }
+                  disabled={isFrozen || isSending}
+                  value={chatTypedMessage}
+                  onChange={e => setChatTypedMessage(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: isMobile ? '11px 18px' : '13px 22px',
+                    minHeight: isMobile ? '44px' : '50px',
+                    borderRadius: '100px',
+                    border: effectiveIsParentUnlocked ? '1.5px solid #93c5fd' : '1.5px solid #e2e8f0',
+                    background: isFrozen ? '#f1f5f9' : (effectiveIsParentUnlocked ? '#fbfdff' : '#ffffff'),
+                    fontSize: isMobile ? '0.90rem' : '1.02rem',
+                    fontWeight: 550,
+                    outline: 'none',
+                    color: '#0f172a',
+                    boxShadow: effectiveIsParentUnlocked ? '0 0 0 1px #bfdbfe' : '0 1px 3px rgba(0,0,0,0.02)',
+                    transition: 'border-color 0.15s, box-shadow 0.15s'
+                  }}
+                  onFocus={e => {
+                    if (!isFrozen) {
+                      e.target.style.borderColor = effectiveIsParentUnlocked ? '#2563eb' : '#15803d';
+                      e.target.style.boxShadow = effectiveIsParentUnlocked ? '0 0 0 3px rgba(37, 99, 235, 0.18)' : '0 0 0 3px rgba(21, 128, 61, 0.15)';
+                    }
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = effectiveIsParentUnlocked ? '#93c5fd' : '#e2e8f0';
+                    e.target.style.boxShadow = effectiveIsParentUnlocked ? '0 0 0 1px #bfdbfe' : '0 1px 3px rgba(0,0,0,0.02)';
+                  }}
+                />
+
+                {/* Send Message Button */}
+                <button
+                  type="submit"
+                  disabled={isFrozen || isSending || !chatTypedMessage.trim()}
+                  aria-label="Nachricht senden"
+                  style={{
+                    background: isFrozen || !chatTypedMessage.trim() ? '#f1f5f9' : (effectiveIsParentUnlocked ? '#2563eb' : '#15803d'),
+                    color: isFrozen || !chatTypedMessage.trim() ? '#94a3b8' : '#ffffff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: isMobile ? '42px' : '50px',
+                    height: isMobile ? '42px' : '50px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                    boxShadow: isFrozen || !chatTypedMessage.trim() ? 'none' : (effectiveIsParentUnlocked ? '0 2px 8px rgba(37, 99, 235, 0.28)' : '0 2px 8px rgba(21, 128, 61, 0.25)'),
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={e => {
+                    if (!isFrozen && chatTypedMessage.trim()) {
+                      e.currentTarget.style.background = effectiveIsParentUnlocked ? '#1d4ed8' : '#166534';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isFrozen && chatTypedMessage.trim()) {
+                      e.currentTarget.style.background = effectiveIsParentUnlocked ? '#2563eb' : '#15803d';
+                    }
+                  }}
+                >
+                  <Send size={isMobile ? 18 : 22} strokeWidth={2.4} />
+                </button>
+              </form>
+            </div>
+          )}
 
           {/* Discreet 1-Line Legal Whisper Notice */}
           <div style={{
@@ -1379,14 +1803,341 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             justifyContent: 'center',
             gap: '6px',
             textAlign: 'center',
-            fontSize: '0.64rem',
-            color: '#94a3b8',
+            fontSize: isMobile ? '0.64rem' : '0.74rem',
+            color: '#64748b',
             lineHeight: 1.3
           }}>
-            <Lock size={11} color="#94a3b8" style={{ flexShrink: 0 }} />
+            <Lock size={isMobile ? 11 : 12} color="#64748b" style={{ flexShrink: 0 }} />
             <span>Elektronischer Bote • Bitte keine Diagnosen oder Gesundheitsdaten senden • 60-Tage-Auto-Purge</span>
           </div>
         </div>
+        {/* IN-MODAL PARENT PIN VERIFICATION DIALOG (0,1% GOLDSTANDARD APPLE NUMPAD) */}
+        {showPinDialog && (
+          <div
+            onClick={() => {
+              setShowPinDialog(false);
+              setPinInput('');
+              setPinError('');
+            }}
+            role="presentation"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100,
+              padding: '20px',
+              animation: 'fadeIn 0.15s ease'
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Eltern-Autorisierung"
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#ffffff',
+                borderRadius: '28px',
+                padding: '26px 22px 20px 22px',
+                maxWidth: '340px',
+                width: '100%',
+                boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                position: 'relative'
+              }}
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPinDialog(false);
+                  setPinInput('');
+                  setPinError('');
+                }}
+                disabled={isVerifyingPin}
+                aria-label="Abbrechen"
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748b',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+
+              {/* Icon Squircle */}
+              <div style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '16px',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#2563eb',
+                marginBottom: '10px'
+              }}>
+                <ShieldCheck size={26} strokeWidth={2.4} />
+              </div>
+
+              <h4 style={{
+                margin: '0 0 4px 0',
+                fontSize: '1.18rem',
+                fontWeight: 900,
+                color: '#0f172a',
+                fontFamily: "'Plus Jakarta Sans', sans-serif"
+              }}>
+                Eltern-Autorisierung
+              </h4>
+
+              <p style={{
+                margin: '0 0 14px 0',
+                fontSize: '0.82rem',
+                color: '#64748b',
+                lineHeight: 1.45
+              }}>
+                Gib deine 6-stellige Eltern-Master-PIN ein, um deine Antwort als Erziehungsberechtigte/r zu signieren.
+              </p>
+
+              {/* Error Message */}
+              {pinError && (
+                <div 
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    color: '#dc2626',
+                    fontSize: '0.80rem',
+                    fontWeight: 750,
+                    marginBottom: '10px',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  {pinError}
+                </div>
+              )}
+
+              {/* Cooldown Warning */}
+              {pinCooldownSeconds > 0 && (
+                <div style={{
+                  color: '#ea580c',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  marginBottom: '10px'
+                }}>
+                  Sicherheits-Sperre: Noch {pinCooldownSeconds} Sekunden
+                </div>
+              )}
+
+              {/* Haptische Apple PIN-Dots (6-stellig) mit Shake-Animation */}
+              <div style={{
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'center',
+                alignItems: 'center',
+                margin: '2px 0 14px 0',
+                animation: pinShake ? 'pinModalShake 0.35s ease' : 'none'
+              }}>
+                {[0, 1, 2, 3, 4, 5].map(idx => {
+                  const isFilled = pinInput.length > idx;
+                  return (
+                    <div
+                      key={`pin-dot-${idx}`}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        background: isFilled ? '#2563eb' : '#f1f5f9',
+                        border: isFilled ? '2px solid #2563eb' : '2px solid #cbd5e1',
+                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transform: isFilled ? 'scale(1.15)' : 'scale(1)',
+                        boxShadow: isFilled ? '0 0 10px rgba(37, 99, 235, 0.35)' : 'none'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Touch Numpad (3x4 Grid) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                width: '100%',
+                maxWidth: '280px',
+                marginTop: '2px'
+              }}>
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map(key => {
+                  const isClear = key === 'C';
+                  const isBack = key === '⌫';
+                  return (
+                    <button
+                      key={`keypad-${key}`}
+                      type="button"
+                      disabled={isVerifyingPin || pinCooldownSeconds > 0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isVerifyingPin || pinCooldownSeconds > 0) return;
+                        setPinError('');
+                        if (isClear) {
+                          setPinInput('');
+                        } else if (isBack) {
+                          setPinInput(prev => prev.slice(0, -1));
+                        } else {
+                          setPinInput(prev => {
+                            if (prev.length < 6) {
+                              const next = prev + key;
+                              if (next.length === 6) {
+                                handleVerifyParentPin(next);
+                              }
+                              return next;
+                            }
+                            return prev;
+                          });
+                        }
+                      }}
+                      style={{
+                        padding: '12px',
+                        minHeight: '48px',
+                        borderRadius: '16px',
+                        border: '1.5px solid #f1f5f9',
+                        background: isClear || isBack ? '#f8fafc' : '#ffffff',
+                        color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
+                        fontSize: isBack ? '1.15rem' : '1.25rem',
+                        fontWeight: 800,
+                        cursor: isVerifyingPin || pinCooldownSeconds > 0 ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                        transition: 'all 0.12s ease',
+                        touchAction: 'manipulation',
+                        userSelect: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      className="hover-scale"
+                    >
+                      {key}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Status Indicator during verification */}
+              {isVerifyingPin && (
+                <div style={{
+                  marginTop: '10px',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <div style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#2563eb',
+                    animation: 'pulse 1s infinite'
+                  }} />
+                  <span>PIN wird geprüft...</span>
+                </div>
+              )}
+
+              {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+              {isWebAuthnSupported() && (
+                <button
+                  type="button"
+                  disabled={isVerifyingPin || pinCooldownSeconds > 0}
+                  onClick={handleBiometricUnlock}
+                  style={{
+                    marginTop: '10px',
+                    width: '100%',
+                    maxWidth: '280px',
+                    padding: '10px 14px',
+                    minHeight: '44px',
+                    borderRadius: '14px',
+                    border: '1px solid #bfdbfe',
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    color: '#1d4ed8',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    cursor: isVerifyingPin || pinCooldownSeconds > 0 ? 'not-allowed' : 'pointer',
+                    opacity: isVerifyingPin ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.08)',
+                    transition: 'all 0.15s ease',
+                    touchAction: 'manipulation'
+                  }}
+                  className="hover-scale"
+                >
+                  <Fingerprint size={18} />
+                  <span>Mit Face ID / Touch ID entsperren</span>
+                </button>
+              )}
+
+              {/* Abbrechen Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPinDialog(false);
+                  setPinInput('');
+                  setPinError('');
+                }}
+                disabled={isVerifyingPin}
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 16px',
+                  borderRadius: '100px',
+                  background: 'transparent',
+                  color: '#64748b',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+                className="hover-opacity"
+              >
+                Abbrechen
+              </button>
+
+              {/* Embedded CSS Shake Animation */}
+              <style>{`
+                @keyframes pinModalShake {
+                  0%, 100% { transform: translateX(0); }
+                  20%, 60% { transform: translateX(-8px); }
+                  40%, 80% { transform: translateX(8px); }
+                }
+              `}</style>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

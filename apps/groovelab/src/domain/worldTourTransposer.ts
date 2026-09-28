@@ -16,8 +16,11 @@ export type InstrumentFamily =
   | 'drums' 
   | 'brass_bb' 
   | 'brass_eb' 
+  | 'brass_bass'
   | 'strings_treble' 
   | 'strings_bass' 
+  | 'woodwinds_c'
+  | 'vocals'
   | 'general';
 
 export interface TransposedScoreResult {
@@ -27,6 +30,8 @@ export interface TransposedScoreResult {
   transpositionLabel: string;
   hasTablature: boolean;
   stringsCount?: number;
+  tabLabel?: string;
+  tabStringLabels?: string[];
   notes: Array<WorldTourNote & {
     displayPitch: string;
     displayFret?: number;
@@ -170,51 +175,215 @@ export function calculateUkuleleFretAndString(pitch: string): { fret: number; st
 }
 
 /**
+ * Resolves Violin (Geige) string and 1st-position fingering (0-4).
+ * Strings: 0=E5 (64), 1=A4 (57), 2=D4 (50), 3=G3 (43).
+ */
+export function calculateViolinStringAndFinger(pitch: string): { finger: number; stringIndex: number } {
+  if (pitch === 'REST') return { finger: 0, stringIndex: 0 };
+
+  const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
+  if (!match) return { finger: 0, stringIndex: 0 };
+  const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
+  const octave = parseInt(match[2], 10);
+  const targetSemi = octave * 12 + noteVal;
+
+  let stringIndex = 3; // Default G3
+  let stringBase = 43;
+
+  if (targetSemi >= 64) {
+    stringIndex = 0; // E5 string
+    stringBase = 64;
+  } else if (targetSemi >= 57) {
+    stringIndex = 1; // A4 string
+    stringBase = 57;
+  } else if (targetSemi >= 50) {
+    stringIndex = 2; // D4 string
+    stringBase = 50;
+  } else {
+    stringIndex = 3; // G3 string
+    stringBase = 43;
+  }
+
+  const diff = targetSemi - stringBase;
+  let finger = 0;
+  if (diff <= 0) finger = 0;
+  else if (diff <= 2) finger = 1;
+  else if (diff <= 4) finger = 2;
+  else if (diff <= 6) finger = 3;
+  else finger = 4;
+
+  return { finger, stringIndex };
+}
+
+/**
+ * Resolves Viola / Cello string and 1st-position fingering (0-4).
+ * Viola: 0=A4 (57), 1=D4 (50), 2=G3 (43), 3=C3 (36).
+ * Cello: 0=A3 (45), 1=D3 (38), 2=G2 (31), 3=C2 (24).
+ */
+export function calculateViolaCelloStringAndFinger(pitch: string, isCello: boolean = false): { finger: number; stringIndex: number } {
+  if (pitch === 'REST') return { finger: 0, stringIndex: 0 };
+
+  const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
+  if (!match) return { finger: 0, stringIndex: 0 };
+  const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
+  const octave = parseInt(match[2], 10);
+  const targetSemi = octave * 12 + noteVal;
+
+  const bases = isCello ? [45, 38, 31, 24] : [57, 50, 43, 36];
+  let stringIndex = 3;
+  let stringBase = bases[3];
+
+  if (targetSemi >= bases[0]) {
+    stringIndex = 0;
+    stringBase = bases[0];
+  } else if (targetSemi >= bases[1]) {
+    stringIndex = 1;
+    stringBase = bases[1];
+  } else if (targetSemi >= bases[2]) {
+    stringIndex = 2;
+    stringBase = bases[2];
+  } else {
+    stringIndex = 3;
+    stringBase = bases[3];
+  }
+
+  const diff = targetSemi - stringBase;
+  let finger = 0;
+  if (diff <= 0) finger = 0;
+  else if (diff <= 2) finger = 1;
+  else if (diff <= 4) finger = isCello ? 3 : 2;
+  else if (diff <= 6) finger = isCello ? 4 : 3;
+  else finger = 4;
+
+  return { finger, stringIndex };
+}
+
+/**
+ * Resolves Double Bass (Kontrabass) string and fingering (0, 1, 2, 4).
+ * Strings: 0=G2 (31), 1=D2 (26), 2=A1 (21), 3=E1 (16).
+ */
+export function calculateDoubleBassStringAndFinger(pitch: string): { finger: number; stringIndex: number } {
+  if (pitch === 'REST') return { finger: 0, stringIndex: 0 };
+
+  const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
+  if (!match) return { finger: 0, stringIndex: 0 };
+  const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
+  const octave = parseInt(match[2], 10);
+  const targetSemi = octave * 12 + noteVal;
+
+  const bases = [31, 26, 21, 16];
+  let stringIndex = 3;
+  let stringBase = bases[3];
+
+  if (targetSemi >= bases[0]) {
+    stringIndex = 0;
+    stringBase = bases[0];
+  } else if (targetSemi >= bases[1]) {
+    stringIndex = 1;
+    stringBase = bases[1];
+  } else if (targetSemi >= bases[2]) {
+    stringIndex = 2;
+    stringBase = bases[2];
+  } else {
+    stringIndex = 3;
+    stringBase = bases[3];
+  }
+
+  const diff = targetSemi - stringBase;
+  let finger = 0;
+  if (diff <= 0) finger = 0;
+  else if (diff <= 1) finger = 1;
+  else if (diff <= 2) finger = 2;
+  else finger = 4;
+
+  return { finger, stringIndex };
+}
+
+/**
+ * Checks whether an instrument is eligible for tablature / string-finger view (Zupfer & Streicher).
+ */
+export function isTablatureEligible(rawInstrument?: string | null): boolean {
+  if (!rawInstrument) return false;
+  const family = resolveInstrumentFamily(rawInstrument);
+  return (
+    family === 'guitar' ||
+    family === 'bass' ||
+    family === 'ukulele' ||
+    family === 'strings_treble' ||
+    family === 'strings_bass'
+  );
+}
+
+/**
  * Resolves instrument family from raw instrument string.
  */
 export function resolveInstrumentFamily(rawInstrument?: string | null): InstrumentFamily {
   if (!rawInstrument) return 'piano';
   const clean = rawInstrument.toLowerCase().trim();
 
+  // 1. Zupfinstrumente
   if (clean.includes('gitar') || clean.includes('guitar')) return 'guitar';
-  if (clean.includes('bass')) return 'bass';
   if (clean.includes('ukule')) return 'ukulele';
-  if (clean.includes('schlagzeug') || clean.includes('drum') || clean.includes('cajon') || clean.includes('percussion') || clean.includes('djembe')) return 'drums';
-  if (clean.includes('trompet') || clean.includes('klarinet') || clean.includes('tenorsax') || clean.includes('fluegelhorn')) return 'brass_bb';
-  if (clean.includes('altsax') || clean.includes('baritonsax')) return 'brass_eb';
-  if (clean.includes('cello') || clean.includes('kontrabass')) return 'strings_bass';
-  if (clean.includes('geige') || clean.includes('violine') || clean.includes('floete') || clean.includes('blockfloete')) return 'strings_treble';
-  if (clean.includes('klavier') || clean.includes('piano') || clean.includes('keyboard')) return 'piano';
+  if (clean.includes('e-bass') || (clean.includes('bass') && !clean.includes('kontrabass') && !clean.includes('double bass') && !clean.includes('fagott') && !clean.includes('posaune') && !clean.includes('tuba'))) return 'bass';
+
+  // 2. Streichinstrumente
+  if (clean.includes('cello') || clean.includes('violoncello') || clean.includes('kontrabass') || clean.includes('double bass')) return 'strings_bass';
+  if (clean.includes('geige') || clean.includes('violine') || clean.includes('bratsche') || clean.includes('viola') || clean.includes('harfe') || clean.includes('harp')) return 'strings_treble';
+
+  // 3. Schlagwerk & Percussion
+  if (clean.includes('schlagzeug') || clean.includes('drum') || clean.includes('cajon') || clean.includes('percussion') || clean.includes('perkussion') || clean.includes('djembe') || clean.includes('bongo') || clean.includes('marimba') || clean.includes('xylophon')) return 'drums';
+
+  // 4. Tiefe Blasinstrumente (Bassschlüssel)
+  if (clean.includes('posaune') || clean.includes('trombone') || clean.includes('tuba') || clean.includes('fagott') || clean.includes('bassoon') || clean.includes('euphonium') || clean.includes('bariton')) return 'brass_bass';
+
+  // 5. Bb- & Eb-Bläser
+  if (clean.includes('trompet') || clean.includes('trumpet') || clean.includes('klarinet') || clean.includes('clarinet') || clean.includes('tenorsax') || clean.includes('fluegelhorn') || clean.includes('flügelhorn') || clean.includes('kornett')) return 'brass_bb';
+  if (clean.includes('altsax') || clean.includes('baritonsax') || clean.includes('waldhorn') || clean.includes('horn')) return 'brass_eb';
+
+  // 6. C-Holzbläser
+  if (clean.includes('querfloete') || clean.includes('querflöte') || clean.includes('floete') || clean.includes('flöte') || clean.includes('flute') || clean.includes('blockfloete') || clean.includes('blockflöte') || clean.includes('recorder') || clean.includes('oboe')) return 'woodwinds_c';
+
+  // 7. Gesang / Stimme
+  if (clean.includes('gesang') || clean.includes('stimme') || clean.includes('vocal') || clean.includes('singer') || clean.includes('sing') || clean.includes('chor') || clean.includes('sopran') || clean.includes('alt') || clean.includes('tenor')) return 'vocals';
+
+  // 8. Tasteninstrumente
+  if (clean.includes('klavier') || clean.includes('piano') || clean.includes('keyboard') || clean.includes('flügel') || clean.includes('fluegel') || clean.includes('akkordeon') || clean.includes('accordion') || clean.includes('orgel') || clean.includes('synth')) return 'piano';
 
   return 'piano';
 }
 
 /**
  * Projects a master score into a clean, scoped instrument result.
+ * Default is pure standard notation (hasTablature: false) for all instruments.
+ * When showTabs is true, generates ergonomic fingerings & tablature for Zupfer & Streicher.
  */
 export function projectScoreForInstrument(
   score: WorldTourMasterScore,
-  rawInstrument?: string | null
+  rawInstrument?: string | null,
+  showTabs: boolean = false
 ): TransposedScoreResult {
   const family = resolveInstrumentFamily(rawInstrument);
   const isFlatKey = score.tonalCenter.includes('F') || score.tonalCenter.includes('b') || score.tonalCenter.includes('Es');
+  const enableTabs = Boolean(showTabs && isTablatureEligible(rawInstrument));
 
   switch (family) {
     case 'guitar': {
       return {
         family: 'guitar',
-        displayName: 'Gitarre (Noten + Tabulatur)',
+        displayName: 'Gitarre',
         clef: 'treble',
         transpositionLabel: 'Klingend C (Standard E-Tuning)',
-        hasTablature: true,
+        hasTablature: enableTabs,
         stringsCount: 6,
+        tabLabel: 'TAB',
+        tabStringLabels: ['e', 'B', 'G', 'D', 'A', 'E'],
         notes: score.notes.map(note => {
           const tab = calculateGuitarFretAndString(note.pitch);
           return {
             ...note,
             displayPitch: note.pitch,
-            displayFret: tab.fret,
-            displayString: tab.stringIndex
+            displayFret: enableTabs ? tab.fret : undefined,
+            displayString: enableTabs ? tab.stringIndex : undefined
           };
         })
       };
@@ -223,19 +392,21 @@ export function projectScoreForInstrument(
     case 'bass': {
       return {
         family: 'bass',
-        displayName: 'E-Bass (Bass-Schlüssel + Tab)',
+        displayName: 'E-Bass',
         clef: 'bass',
         transpositionLabel: '1 Oktave tiefer (E-A-D-G)',
-        hasTablature: true,
+        hasTablature: enableTabs,
         stringsCount: 4,
+        tabLabel: 'TAB',
+        tabStringLabels: ['G', 'D', 'A', 'E'],
         notes: score.notes.map(note => {
           const lowerPitch = transposePitch(note.pitch, -12, isFlatKey);
           const tab = calculateBassFretAndString(lowerPitch);
           return {
             ...note,
             displayPitch: lowerPitch,
-            displayFret: tab.fret,
-            displayString: tab.stringIndex
+            displayFret: enableTabs ? tab.fret : undefined,
+            displayString: enableTabs ? tab.stringIndex : undefined
           };
         })
       };
@@ -244,27 +415,94 @@ export function projectScoreForInstrument(
     case 'ukulele': {
       return {
         family: 'ukulele',
-        displayName: 'Ukulele (G-C-E-A Tab)',
+        displayName: 'Ukulele',
         clef: 'treble',
         transpositionLabel: 'Klingend C (G-C-E-A)',
-        hasTablature: true,
+        hasTablature: enableTabs,
         stringsCount: 4,
+        tabLabel: 'TAB',
+        tabStringLabels: ['A', 'E', 'C', 'G'],
         notes: score.notes.map(note => {
           const tab = calculateUkuleleFretAndString(note.pitch);
           return {
             ...note,
             displayPitch: note.pitch,
-            displayFret: tab.fret,
-            displayString: tab.stringIndex
+            displayFret: enableTabs ? tab.fret : undefined,
+            displayString: enableTabs ? tab.stringIndex : undefined
           };
         })
+      };
+    }
+
+    case 'strings_treble': {
+      const isViola = Boolean(rawInstrument?.toLowerCase().includes('bratsche') || rawInstrument?.toLowerCase().includes('viola'));
+      return {
+        family: 'strings_treble',
+        displayName: isViola ? 'Bratsche / Viola' : 'Violine / Geige',
+        clef: 'treble',
+        transpositionLabel: 'Klingend C (Violinschlüssel)',
+        hasTablature: enableTabs,
+        stringsCount: 4,
+        tabLabel: 'FING',
+        tabStringLabels: isViola ? ['A', 'D', 'G', 'C'] : ['E', 'A', 'D', 'G'],
+        notes: score.notes.map(note => {
+          const fingering = isViola
+            ? calculateViolaCelloStringAndFinger(note.pitch, false)
+            : calculateViolinStringAndFinger(note.pitch);
+          return {
+            ...note,
+            displayPitch: note.pitch,
+            displayFret: enableTabs ? fingering.finger : undefined,
+            displayString: enableTabs ? fingering.stringIndex : undefined
+          };
+        })
+      };
+    }
+
+    case 'strings_bass': {
+      const isDoubleBass = Boolean(rawInstrument?.toLowerCase().includes('kontrabass') || rawInstrument?.toLowerCase().includes('double bass'));
+      return {
+        family: 'strings_bass',
+        displayName: isDoubleBass ? 'Kontrabass' : 'Cello / Violoncello',
+        clef: 'bass',
+        transpositionLabel: 'Bassschlüssel (1 Oktave tiefer)',
+        hasTablature: enableTabs,
+        stringsCount: 4,
+        tabLabel: 'FING',
+        tabStringLabels: isDoubleBass ? ['G', 'D', 'A', 'E'] : ['A', 'D', 'G', 'C'],
+        notes: score.notes.map(note => {
+          const lowerPitch = transposePitch(note.pitch, -12, isFlatKey);
+          const fingering = isDoubleBass
+            ? calculateDoubleBassStringAndFinger(lowerPitch)
+            : calculateViolaCelloStringAndFinger(lowerPitch, true);
+          return {
+            ...note,
+            displayPitch: lowerPitch,
+            displayFret: enableTabs ? fingering.finger : undefined,
+            displayString: enableTabs ? fingering.stringIndex : undefined
+          };
+        })
+      };
+    }
+
+    case 'brass_bass': {
+      return {
+        family: 'brass_bass',
+        displayName: 'Tiefe Bläser (Posaune / Tuba / Bariton / Fagott)',
+        clef: 'bass',
+        transpositionLabel: 'Bassschlüssel (Klingend C)',
+        hasTablature: false,
+        notes: score.notes.map(note => ({
+          ...note,
+          displayPitch: transposePitch(note.pitch, -12, isFlatKey)
+        }))
       };
     }
 
     case 'brass_bb': {
       return {
         family: 'brass_bb',
-        displayName: 'Bb-Blasinstrument (Trompete / Klarinette)',
+        displayName: 'Bb-Blasinstrument (Trompete / Klarinette / Tenorsax)',
         clef: 'treble',
         transpositionLabel: 'Transponiert in Bb (+2 Halbtöne)',
         hasTablature: false,
@@ -278,7 +516,7 @@ export function projectScoreForInstrument(
     case 'brass_eb': {
       return {
         family: 'brass_eb',
-        displayName: 'Eb-Blasinstrument (Altsaxophon)',
+        displayName: 'Eb-Blasinstrument (Altsaxophon / Waldhorn)',
         clef: 'treble',
         transpositionLabel: 'Transponiert in Eb (+9 Halbtöne)',
         hasTablature: false,
@@ -289,18 +527,42 @@ export function projectScoreForInstrument(
       };
     }
 
+    case 'woodwinds_c': {
+      return {
+        family: 'woodwinds_c',
+        displayName: 'Querflöte / Blockflöte / Oboe',
+        clef: 'treble',
+        transpositionLabel: 'Klingend C (Violinschlüssel)',
+        hasTablature: false,
+        notes: score.notes.map(note => ({
+          ...note,
+          displayPitch: note.pitch
+        }))
+      };
+    }
+
+    case 'vocals': {
+      return {
+        family: 'vocals',
+        displayName: 'Gesang & Stimme',
+        clef: 'treble',
+        transpositionLabel: 'Klingend C (Urtext-Textierung)',
+        hasTablature: false,
+        notes: score.notes.map(note => ({
+          ...note,
+          displayPitch: note.pitch
+        }))
+      };
+    }
+
     case 'drums': {
       return {
         family: 'drums',
         displayName: 'Schlagzeug & Perkussion',
         clef: 'drums',
-        transpositionLabel: 'Rhythmischer Groove (Kick, Snare, Hi-Hat/Clap)',
+        transpositionLabel: 'Rhythmischer Groove (Kick, Snare, Hi-Hat)',
         hasTablature: false,
         notes: score.notes.map((note, index) => {
-          // Musical groove assignment:
-          // Downbeat (index % 4 === 0) -> Kick (C4)
-          // Backbeat (index % 4 === 2) -> Snare (D4)
-          // Offbeats (index % 2 !== 0) -> Hi-Hat (F#4) or Clap
           const beatInBar = index % 4;
           let drumType: 'kick' | 'snare' | 'hihat' | 'clap' = 'kick';
           let displayPitch = 'C4';
@@ -325,21 +587,6 @@ export function projectScoreForInstrument(
       };
     }
 
-    case 'strings_bass': {
-      return {
-        family: 'strings_bass',
-        displayName: 'Cello / Kontrabass',
-        clef: 'bass',
-        transpositionLabel: 'Bassschlüssel (C)',
-        hasTablature: false,
-        notes: score.notes.map(note => ({
-          ...note,
-          displayPitch: transposePitch(note.pitch, -12, isFlatKey)
-        }))
-      };
-    }
-
-    case 'strings_treble':
     case 'piano':
     default: {
       return {

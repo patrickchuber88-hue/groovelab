@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
     const allowedFilters = filterParam ? filterParam.split(',').map(s => s.trim().toLowerCase()) : ['lessons', 'campus_events']
     const shouldIncludeLessons = allowedFilters.includes('lessons')
     const shouldIncludeCampusEvents = allowedFilters.includes('campus_events')
+    const shouldIncludeHolidays = url.searchParams.get('holidays') === '1' || allowedFilters.includes('holidays')
     const isWorkSafe = url.searchParams.get('worksafe') === '1' || url.searchParams.get('privacy') === '1'
     const alarmSetting = url.searchParams.get('alarm') || '30m_morning'
 
@@ -488,9 +489,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Query and fetch school's subscribed external iCal feed if exists (skipped for teachers)
+    // 6. Query and fetch school's subscribed external iCal feed if exists
     let subscribedEvents: any[] = [];
-    if (schoolId && role !== 'teacher' && role !== 'student') {
+    if (schoolId && (role !== 'teacher' && role !== 'student' || shouldIncludeHolidays)) {
       const { data: schoolData } = await supabase
         .from('schools')
         .select('calendar_url')
@@ -538,6 +539,10 @@ Deno.serve(async (req) => {
             // Filter out external events that are outside our school year date range, or have customized overrides
             subscribedEvents = mappedEvents.filter((sub: any) => {
               if (!sub.event_date || sub.event_date < pastBoundaryStr || sub.event_date > futureBoundaryStr) {
+                return false;
+              }
+              // Students and teachers strictly receive ONLY holiday events from the external school calendar
+              if ((role === 'student' || role === 'teacher') && sub.category !== 'Ferien') {
                 return false;
               }
               const hasCustomCopy = allSchoolCampusEvents.some((c: any) => 

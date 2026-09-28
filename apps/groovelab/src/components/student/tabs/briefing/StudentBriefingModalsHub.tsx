@@ -150,254 +150,291 @@ export function StudentBriefingModalsHub({
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#ffffff',
-              borderRadius: '24px',
+              borderRadius: '26px',
               width: '100%',
-              maxWidth: '430px',
-              padding: '24px',
-              border: '1.5px solid rgba(250, 204, 21, 0.35)',
+              maxWidth: (!studentUiLevel || studentUiLevel === 'junior') ? '470px' : '430px',
+              padding: (!studentUiLevel || studentUiLevel === 'junior') ? '24px 22px' : '24px',
+              border: '1.5px solid rgba(250, 204, 21, 0.40)',
               boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(250, 204, 21, 0.25)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: (!studentUiLevel || studentUiLevel === 'junior') ? '16px' : '16px',
               position: 'relative'
             }}
           >
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '12px',
-                  background: 'rgba(250, 204, 21, 0.20)',
-                  border: '1.5px solid rgba(234, 179, 8, 0.40)',
-                  color: '#854d0e',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(250, 204, 21, 0.20)',
-                  flexShrink: 0
-                }}>
-                  <HelpCircle size={20} />
-                </div>
-                <div>
-                  <h3 id="student-question-title" style={{ margin: 0, fontSize: '1.02rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Frage für den Unterricht
-                  </h3>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                    Deine Lehrkraft sieht die Frage vor Beginn der Stunde
-                  </span>
-                </div>
-              </div>
+            {(() => {
+              const isJunior = !studentUiLevel || studentUiLevel === 'junior';
+              return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isJunior ? '12px' : '10px' }}>
+                      <div style={{
+                        width: isJunior ? '46px' : '38px',
+                        height: isJunior ? '46px' : '38px',
+                        borderRadius: isJunior ? '14px' : '12px',
+                        background: 'rgba(250, 204, 21, 0.22)',
+                        border: '1.5px solid rgba(234, 179, 8, 0.45)',
+                        color: '#854d0e',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 8px rgba(250, 204, 21, 0.20)',
+                        flexShrink: 0
+                      }}>
+                        <HelpCircle size={isJunior ? 24 : 20} strokeWidth={2.4} />
+                      </div>
+                      <div>
+                        <h3 id="student-question-title" style={{ margin: 0, fontSize: isJunior ? '1.20rem' : '1.02rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                          {isJunior ? 'Frag deine Lehrkraft! 🎤' : 'Frage für den Unterricht'}
+                        </h3>
+                        <span style={{ fontSize: isJunior ? '0.84rem' : '0.74rem', color: '#64748b', fontWeight: 650, lineHeight: 1.3 }}>
+                          {isJunior ? 'Sprich oder tippe deine Frage für die nächste Stunde' : 'Deine Lehrkraft sieht die Frage vor Beginn der Stunde'}
+                        </span>
+                      </div>
+                    </div>
 
-              <button
-                type="button"
-                onClick={() => setShowQuestionModal(false)}
-                aria-label="Schließen"
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748b'
-                }}
-                className="hover-scale-mini"
-              >
-                <X size={16} />
-              </button>
-            </div>
+                    <button
+                      type="button"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowQuestionModal(false)}
+                      aria-label="Schließen"
+                      style={{
+                        background: '#f1f5f9',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: isJunior ? '36px' : '32px',
+                        height: isJunior ? '36px' : '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#64748b',
+                        flexShrink: 0
+                      }}
+                      className="hover-scale-mini"
+                    >
+                      <X size={isJunior ? 18 : 16} />
+                    </button>
+                  </div>
 
-            {/* Textarea with integrated dictation mic */}
-            <div style={{ position: 'relative' }}>
-              <textarea
-                value={questionInput}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (handleQuestionInputChange) {
-                    handleQuestionInputChange(val);
-                  } else {
-                    setQuestionInput(val);
-                  }
-                }}
-                placeholder="Was möchtest du deinen Lehrer fragen? z. B. Takt 12 Rhythmus unklar, Fingersatz klemmt..."
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  paddingRight: '46px',
-                  borderRadius: '14px',
-                  border: isListeningSpeech ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
-                  background: isListeningSpeech ? '#fff5f5' : '#f8fafc',
-                  fontSize: '0.90rem',
-                  color: '#0f172a',
-                  fontFamily: 'inherit',
-                  resize: 'none',
-                  boxSizing: 'border-box',
-                  outline: 'none',
-                  transition: 'all 0.2s ease',
-                  lineHeight: 1.45
-                }}
-              />
+                  {/* Textarea with integrated dictation mic */}
+                  <div style={{ position: 'relative' }}>
+                    <textarea
+                      value={questionInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (handleQuestionInputChange) {
+                          handleQuestionInputChange(val);
+                        } else {
+                          setQuestionInput(val);
+                        }
+                      }}
+                      placeholder={isJunior ? "Was möchtest du fragen? (z.B. Takt 5 klemmt...)" : "Was möchtest du deinen Lehrer fragen? z. B. Takt 12 Rhythmus unklar, Fingersatz klemmt..."}
+                      rows={isJunior ? 3 : 3}
+                      style={{
+                        width: '100%',
+                        padding: isJunior ? '14px 16px' : '12px 14px',
+                        paddingRight: isJunior ? '56px' : '46px',
+                        borderRadius: isJunior ? '16px' : '14px',
+                        border: isListeningSpeech ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
+                        background: isListeningSpeech ? '#fff5f5' : '#f8fafc',
+                        fontSize: isJunior ? '1.10rem' : '0.90rem',
+                        color: '#0f172a',
+                        fontFamily: 'inherit',
+                        resize: 'none',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        lineHeight: 1.5,
+                        minHeight: isJunior ? '96px' : '80px'
+                      }}
+                    />
 
-              {/* Dictation Mic Button */}
-              <button
-                type="button"
-                role="button"
-                tabIndex={0}
-                onClick={toggleSpeechRecognition}
-                title={isListeningSpeech ? "Aufnahme stoppen" : "Frage per Sprache einsprechen"}
-                aria-label={isListeningSpeech ? "Aufnahme stoppen" : "Frage per Sprache einsprechen"}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '10px',
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: isListeningSpeech ? '#ef4444' : '#ffffff',
-                  color: isListeningSpeech ? '#ffffff' : '#854d0e',
-                  border: isListeningSpeech ? 'none' : '1.5px solid #fde047',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: isListeningSpeech ? '0 0 12px rgba(239, 68, 68, 0.5)' : '0 2px 6px rgba(250, 204, 21, 0.20)',
-                  transition: 'all 0.2s ease'
-                }}
-                className="hover-scale-mini"
-              >
-                <Mic size={16} />
-              </button>
-            </div>
+                    {/* Dictation Mic Button (Ergonomischer 0,1% Child-First Touch-Target) */}
+                    <button
+                      type="button"
+                      role="button"
+                      tabIndex={0}
+                      onClick={toggleSpeechRecognition}
+                      title={isListeningSpeech ? "Aufnahme stoppen" : "Frage per Sprache einsprechen"}
+                      aria-label={isListeningSpeech ? "Aufnahme stoppen" : "Frage per Sprache einsprechen"}
+                      style={{
+                        position: 'absolute',
+                        right: isJunior ? '10px' : '10px',
+                        top: isJunior ? '10px' : '10px',
+                        width: isJunior ? '44px' : '32px',
+                        height: isJunior ? '44px' : '32px',
+                        borderRadius: '50%',
+                        background: isListeningSpeech ? '#ef4444' : '#ffffff',
+                        color: isListeningSpeech ? '#ffffff' : '#854d0e',
+                        border: isListeningSpeech ? 'none' : '2px solid #fde047',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: isListeningSpeech ? '0 0 16px rgba(239, 68, 68, 0.6)' : '0 2px 8px rgba(250, 204, 21, 0.25)',
+                        transition: 'all 0.2s ease',
+                        touchAction: 'manipulation'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Mic size={isJunior ? 22 : 16} />
+                    </button>
+                  </div>
 
-            {/* Live speech feedback if active */}
-            {isListeningSpeech && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: '#fee2e2',
-                borderRadius: '10px',
-                padding: '6px 12px',
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                color: '#b91c1c'
-              }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626' }} />
-                <span>Hört zu... Sprich jetzt deine Frage ein</span>
-              </div>
-            )}
+                  {/* Live speech feedback if active */}
+                  {isListeningSpeech && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      background: '#fee2e2',
+                      borderRadius: '12px',
+                      padding: isJunior ? '10px 14px' : '6px 12px',
+                      fontSize: isJunior ? '0.88rem' : '0.76rem',
+                      fontWeight: 800,
+                      color: '#b91c1c'
+                    }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#dc2626' }} className="animate-pulse" />
+                      <span>Hört zu... Sprich jetzt deine Frage ein 🎙️</span>
+                    </div>
+                  )}
 
-            {/* Schnell-Chips */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Schnell-Bausteine:
-              </span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {[
-                  'Takt unklar',
-                  'Tempo zu schnell',
-                  'Fingersatz klemmt',
-                  'Aufnahme vorspielen'
-                ].map((chip, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      const trimmed = (questionInput || '').trim();
-                      const nextVal = trimmed ? `${trimmed}, ${chip}` : chip;
-                      if (handleQuestionInputChange) {
-                        handleQuestionInputChange(nextVal);
-                      } else {
-                        setQuestionInput(nextVal);
-                      }
-                    }}
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      padding: '4px 10px',
-                      fontSize: '0.74rem',
-                      fontWeight: 750,
-                      color: '#334155',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale-mini"
-                  >
-                    + {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
+                  {/* Schnell-Chips (Visuell & Groß für Junior 6-10 Jahre) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: isJunior ? '0.78rem' : '0.70rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {isJunior ? 'Schnell-Auswahl:' : 'Schnell-Bausteine:'}
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: isJunior ? '8px' : '6px' }}>
+                      {(isJunior ? [
+                        { label: 'Zu schnell', emoji: '⚡' },
+                        { label: 'Fingersatz', emoji: '🖐️' },
+                        { label: 'Takt unklar', emoji: '🎵' },
+                        { label: 'Nochmal hören', emoji: '👂' }
+                      ] : [
+                        { label: 'Takt unklar', emoji: '' },
+                        { label: 'Tempo zu schnell', emoji: '' },
+                        { label: 'Fingersatz klemmt', emoji: '' },
+                        { label: 'Aufnahme vorspielen', emoji: '' }
+                      ]).map((chipObj, idx) => {
+                        const chipText = chipObj.emoji ? `${chipObj.emoji} ${chipObj.label}` : chipObj.label;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              const trimmed = (questionInput || '').trim();
+                              const insertText = chipObj.label;
+                              const nextVal = trimmed ? `${trimmed}, ${insertText}` : insertText;
+                              if (handleQuestionInputChange) {
+                                handleQuestionInputChange(nextVal);
+                              } else {
+                                setQuestionInput(nextVal);
+                              }
+                            }}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1.5px solid #e2e8f0',
+                              borderRadius: isJunior ? '12px' : '8px',
+                              padding: isJunior ? '7px 13px' : '4px 10px',
+                              fontSize: isJunior ? '0.88rem' : '0.74rem',
+                              fontWeight: 800,
+                              color: '#1e293b',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.15s ease',
+                              touchAction: 'manipulation'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <span>+ {chipText}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
-              {questionInput.trim() ? (
-                <button
-                  type="button"
-                  onClick={() => handleSaveQuestion('')}
-                  disabled={isSavingQuestion}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#dc2626',
-                    fontSize: '0.80rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    padding: '6px 8px'
-                  }}
-                >
-                  Frage löschen
-                </button>
-              ) : <div />}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowQuestionModal(false)}
-                  style={{
-                    background: '#f1f5f9',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    fontSize: '0.84rem',
-                    fontWeight: 800,
-                    color: '#475569',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Abbrechen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSaveQuestion(questionInput)}
-                  disabled={isSavingQuestion || !questionInput.trim()}
-                  style={{
-                    background: !questionInput.trim() ? '#e2e8f0' : '#facc15',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '8px 18px',
-                    fontSize: '0.84rem',
-                    fontWeight: 950,
-                    color: !questionInput.trim() ? '#94a3b8' : '#0f172a',
-                    cursor: (!questionInput.trim() || isSavingQuestion) ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: !questionInput.trim() ? 'none' : '0 2px 8px rgba(250, 204, 21, 0.35)'
-                  }}
-                  className="hover-scale"
-                >
-                  {isSavingQuestion ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
-                  <span>Speichern</span>
-                </button>
-              </div>
-            </div>
+                  {/* Modal Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                    {questionInput.trim() ? (
+                      <button
+                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleSaveQuestion('')}
+                        disabled={isSavingQuestion}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#dc2626',
+                          fontSize: isJunior ? '0.86rem' : '0.80rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          padding: '8px 10px',
+                          minHeight: isJunior ? '44px' : 'auto'
+                        }}
+                      >
+                        Frage löschen
+                      </button>
+                    ) : <div />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isJunior ? '10px' : '8px' }}>
+                      <button
+                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setShowQuestionModal(false)}
+                        style={{
+                          background: '#f1f5f9',
+                          border: 'none',
+                          borderRadius: isJunior ? '14px' : '12px',
+                          padding: isJunior ? '10px 18px' : '8px 16px',
+                          fontSize: isJunior ? '0.90rem' : '0.84rem',
+                          fontWeight: 800,
+                          color: '#475569',
+                          cursor: 'pointer',
+                          minHeight: isJunior ? '44px' : 'auto'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleSaveQuestion(questionInput)}
+                        disabled={isSavingQuestion || !questionInput.trim()}
+                        style={{
+                          background: !questionInput.trim() ? '#e2e8f0' : '#facc15',
+                          border: 'none',
+                          borderRadius: isJunior ? '14px' : '12px',
+                          padding: isJunior ? '10px 22px' : '8px 18px',
+                          fontSize: isJunior ? '0.94rem' : '0.84rem',
+                          fontWeight: 950,
+                          color: !questionInput.trim() ? '#94a3b8' : '#0f172a',
+                          cursor: (!questionInput.trim() || isSavingQuestion) ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          minHeight: isJunior ? '44px' : 'auto',
+                          boxShadow: !questionInput.trim() ? 'none' : '0 3px 10px rgba(250, 204, 21, 0.40)'
+                        }}
+                        className="hover-scale"
+                      >
+                        {isSavingQuestion ? <RefreshCw size={15} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
+                        <span>Frage abschicken</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

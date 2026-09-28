@@ -165,6 +165,14 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'CRITICAL',
     description: '100% Zero-Password Master Admin IAM (OWASP ASVS L4 / NIST SP 800-63B AAL3): Master Admin authentication is strictly passwordless. No password state, input field, placeholder or active p_password parameter is allowed in client UI components.',
     allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-17',
+    name:        'Client-Side Monorepo Airgap Violation',
+    regex:       /(?:from\s*['"](?:@groovelab\/(?:backend-core|bff-server)|ssh2|node:child_process)['"]|require\(['"](?:@groovelab\/(?:backend-core|bff-server)|ssh2)['"]\))/g,
+    severity:    'CRITICAL',
+    description: 'Monorepo Airgap Invariant: Frontend code (apps/groovelab) must NEVER import server packages (@groovelab/backend-core, @groovelab/bff-server, ssh2). Only @groovelab/shared is permitted.',
+    allowedFiles: ['src/tests/']
   }
 ];
 
@@ -305,6 +313,20 @@ for (const filePath of migrationFiles) {
       process.stderr.write(`       File: ${relPath}\n`);
       process.stderr.write(`       Details: SQL migrations must NEVER specify hardcoded default credentials in ADD COLUMN DDL statements. Use DEFAULT NULL.\n`);
       violationsCount++;
+    }
+
+    // 1% Invariant SQL-05: Zero Destructive DDL & Zero-Downtime Migration Guard (Migrations >= 511)
+    if (migNum >= 511) {
+      const isBypassed = content.includes('-- zero-downtime-bypass:');
+      if (!isBypassed) {
+        const destructiveMatch = content.match(/\b(?:DROP\s+COLUMN|RENAME\s+COLUMN|TRUNCATE\s+(?:TABLE\s+)?(?!temp_|tmp_))\b/i);
+        if (destructiveMatch) {
+          process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Destructive DDL without Expand-Contract Pattern in Migration ${baseName}\n`);
+          process.stderr.write(`       File: ${relPath}\n`);
+          process.stderr.write(`       Details: Migrations >= 511 must adhere to Zero-Downtime Deployments (Stripe/GitHub Pattern). Dropping or renaming columns directly breaks live clients. Deprecate first in views, drop only after client migration window, or document with '-- zero-downtime-bypass: <reason>'.\n`);
+          violationsCount++;
+        }
+      }
     }
   }
 }

@@ -380,6 +380,8 @@ export const isInternalMetadataNote = (text: any): boolean => {
     clean.startsWith('rhythm_score:') ||
     clean.startsWith('earlab_score:') ||
     clean.startsWith('earlab:') ||
+    clean.startsWith('worldtour_mastery:') ||
+    lower.includes('worldtour_mastery:') ||
     clean.startsWith('snapshot_') ||
     clean.startsWith('snapshot:') ||
     clean === 'inhalte in der premium-version freischalten' ||

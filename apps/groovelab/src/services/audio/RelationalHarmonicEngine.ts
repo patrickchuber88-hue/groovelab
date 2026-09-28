@@ -341,6 +341,7 @@ export interface CandidateChordMatch {
   rootNote: string;
   isMinor: boolean;
   score: number;
+  isThirdIndeterminate?: boolean;
 }
 
 /**
@@ -354,6 +355,7 @@ function matchBestTriadChord(chroma: Float32Array): {
   rootNote: string;
   isMinor: boolean;
   score: number;
+  isThirdIndeterminate?: boolean;
   candidates: CandidateChordMatch[];
 } {
   let maxChroma = 0;
@@ -369,6 +371,7 @@ function matchBestTriadChord(chroma: Float32Array): {
       rootNote: '',
       isMinor: false,
       score: 0,
+      isThirdIndeterminate: false,
       candidates: []
     };
   }
@@ -398,14 +401,6 @@ function matchBestTriadChord(chroma: Float32Array): {
         }
       }
     }
-    const majRootName = pitchClassToNoteName(r);
-    candidates.push({
-      chord: majRootName,
-      rootIndex: r,
-      rootNote: majRootName,
-      isMinor: false,
-      score: majScore
-    });
 
     // Minor triad: [r, r+3, r+7]
     const min3 = (r + 3) % 12;
@@ -426,12 +421,34 @@ function matchBestTriadChord(chroma: Float32Array): {
         }
       }
     }
+
+    // Mathematical determination of third-indeterminacy:
+    // When playing single monophonic root notes, basslines or power chords,
+    // neither the major nor minor third was explicitly voiced by the performer.
+    // The 5th harmonic (r+4) bleeds slightly (0.15 - 0.35) into chroma, but lacks true chordal weight.
+    const maj3Val = norm[maj3];
+    const min3Val = norm[min3];
+    const isIndeterminate =
+      (maj3Val < 0.38 && min3Val < 0.38) ||
+      (Math.abs(maj3Val - min3Val) < 0.14 && Math.max(maj3Val, min3Val) < 0.52);
+
+    const majRootName = pitchClassToNoteName(r);
+    candidates.push({
+      chord: majRootName,
+      rootIndex: r,
+      rootNote: majRootName,
+      isMinor: false,
+      score: majScore,
+      isThirdIndeterminate: isIndeterminate
+    });
+
     candidates.push({
       chord: `${majRootName}m`,
       rootIndex: r,
       rootNote: majRootName,
       isMinor: true,
-      score: minScore
+      score: minScore,
+      isThirdIndeterminate: isIndeterminate
     });
   }
 
@@ -444,6 +461,7 @@ function matchBestTriadChord(chroma: Float32Array): {
     rootNote: best.rootNote,
     isMinor: best.isMinor,
     score: best.score,
+    isThirdIndeterminate: best.isThirdIndeterminate ?? false,
     candidates
   };
 }
@@ -460,7 +478,13 @@ function matchBestTriadChord(chroma: Float32Array): {
  *   - Tonic starting progressions: Am - F - C - G (A-Moll), C - G - Am - F (C-Dur)
  */
 function inferKeyAndScales(
-  matchedChords: Array<{ rootIndex: number; isMinor: boolean; chord: string; rootNote: string }>
+  matchedChords: Array<{
+    rootIndex: number;
+    isMinor: boolean;
+    chord: string;
+    rootNote: string;
+    isThirdIndeterminate?: boolean;
+  }>
 ): {
   key: string;
   rootNote: string;
@@ -496,33 +520,40 @@ function inferKeyAndScales(
       [(k + 4) % 12]: { isMinor: true, weight: 2.0 },    // iii
       [(k + 5) % 12]: { isMinor: false, weight: 3.0 },   // IV
       [(k + 7) % 12]: { isMinor: false, weight: 3.5 },   // V
-      [(k + 9) % 12]: { isMinor: true, weight: 2.5 }     // vi
+      [(k + 9) % 12]: { isMinor: true, weight: 2.5 },    // vi
+      [(k + 11) % 12]: { isMinor: true, weight: 1.5 }    // vii°
     };
 
     let majScore = 0;
     matchedChords.forEach((c, idx) => {
       if (c.rootIndex < 0) return;
       const diatonic = majDiatonicMap[c.rootIndex];
-      if (diatonic && diatonic.isMinor === c.isMinor) {
-        majScore += diatonic.weight;
+      if (diatonic) {
+        if (c.isThirdIndeterminate) {
+          majScore += diatonic.weight;
+        } else if (diatonic.isMinor === c.isMinor) {
+          majScore += diatonic.weight;
+        } else {
+          majScore -= 2.5; // Out-of-key penalty
+        }
       } else {
         majScore -= 2.5; // Out-of-key penalty
       }
 
       // Tonic start bonus: Bar 0 is major tonic I
-      if (idx === 0 && c.rootIndex === k && !c.isMinor) {
+      if (idx === 0 && c.rootIndex === k && (!c.isMinor || c.isThirdIndeterminate)) {
         majScore += 5.0;
       }
       // Tonic arrival on Bar 3 (e.g. ii-V-I cadence arriving on Bar 3: Dm - G - C - Am)
-      if (idx === 2 && c.rootIndex === k && !c.isMinor) {
+      if (idx === 2 && c.rootIndex === k && (!c.isMinor || c.isThirdIndeterminate)) {
         majScore += 3.5;
       }
       // Tonic arrival on Bar 4
-      if (idx === 3 && c.rootIndex === k && !c.isMinor) {
+      if (idx === 3 && c.rootIndex === k && (!c.isMinor || c.isThirdIndeterminate)) {
         majScore += 4.0;
       }
       // Dominant in Bar 4 (Half cadence preparing turnaround)
-      if (idx === 3 && c.rootIndex === (k + 7) % 12 && !c.isMinor) {
+      if (idx === 3 && c.rootIndex === (k + 7) % 12 && (!c.isMinor || c.isThirdIndeterminate)) {
         majScore += 2.5;
       }
     });
@@ -535,30 +566,50 @@ function inferKeyAndScales(
 
     if (c3.rootIndex >= 0 && c0.rootIndex >= 0) {
       // V -> I authentic turnaround (e.g. G -> C in C major)
-      if (c3.rootIndex === (k + 7) % 12 && !c3.isMinor && c0.rootIndex === k && !c0.isMinor) {
+      if (c3.rootIndex === (k + 7) % 12 && (!c3.isMinor || c3.isThirdIndeterminate) && c0.rootIndex === k && (!c0.isMinor || c0.isThirdIndeterminate)) {
         majScore += 5.0;
       }
       // IV -> I plagal turnaround (e.g. F -> C in C major)
-      if (c3.rootIndex === (k + 5) % 12 && !c3.isMinor && c0.rootIndex === k && !c0.isMinor) {
+      if (c3.rootIndex === (k + 5) % 12 && (!c3.isMinor || c3.isThirdIndeterminate) && c0.rootIndex === k && (!c0.isMinor || c0.isThirdIndeterminate)) {
         majScore += 3.5;
       }
     }
 
     // Sequential Cadence: ii -> V -> I (e.g. Dm -> G -> C in bars 0, 1, 2)
     if (
-      c0.rootIndex === (k + 2) % 12 && c0.isMinor &&
-      c1.rootIndex === (k + 7) % 12 && !c1.isMinor &&
-      c2.rootIndex === k && !c2.isMinor
+      c0.rootIndex === (k + 2) % 12 && (c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === (k + 7) % 12 && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === k && (!c2.isMinor || c2.isThirdIndeterminate)
     ) {
       majScore += 6.0;
     }
     // Sequential Cadence: ii -> V -> I in bars 1, 2, 3
     if (
-      c1.rootIndex === (k + 2) % 12 && c1.isMinor &&
-      c2.rootIndex === (k + 7) % 12 && !c2.isMinor &&
-      c3.rootIndex === k && !c3.isMinor
+      c1.rootIndex === (k + 2) % 12 && (c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === (k + 7) % 12 && (!c2.isMinor || c2.isThirdIndeterminate) &&
+      c3.rootIndex === k && (!c3.isMinor || c3.isThirdIndeterminate)
     ) {
       majScore += 6.0;
+    }
+
+    // Sequential Cadence: I -> V -> vi -> IV (e.g. C -> G -> Am -> F in C major)
+    if (
+      c0.rootIndex === k && (!c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === (k + 7) % 12 && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === (k + 9) % 12 && (c2.isMinor || c2.isThirdIndeterminate) &&
+      c3.rootIndex === (k + 5) % 12 && (!c3.isMinor || c3.isThirdIndeterminate)
+    ) {
+      majScore += 8.0;
+    }
+
+    // Sequential Cadence: IV -> I -> V -> vi (e.g. C -> G -> D -> Em in G major)
+    if (
+      c0.rootIndex === (k + 5) % 12 && (!c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === k && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === (k + 7) % 12 && (!c2.isMinor || c2.isThirdIndeterminate) &&
+      c3.rootIndex === (k + 9) % 12 && (c3.isMinor || c3.isThirdIndeterminate)
+    ) {
+      majScore += 7.0;
     }
 
     if (majScore > bestKeyScore) {
@@ -572,6 +623,7 @@ function inferKeyAndScales(
     // ==========================================
     const minDiatonicMap: Record<number, Array<{ isMinor: boolean; weight: number }>> = {
       [k]: [{ isMinor: true, weight: 3.5 }],                             // i
+      [(k + 2) % 12]: [{ isMinor: true, weight: 2.0 }],                 // ii°
       [(k + 3) % 12]: [{ isMinor: false, weight: 2.5 }],                 // III
       [(k + 5) % 12]: [
         { isMinor: true, weight: 2.5 },                                  // iv
@@ -589,27 +641,35 @@ function inferKeyAndScales(
     matchedChords.forEach((c, idx) => {
       if (c.rootIndex < 0) return;
       const matchEntries = minDiatonicMap[c.rootIndex];
-      const match = matchEntries?.find(e => e.isMinor === c.isMinor);
-      if (match) {
-        minScore += match.weight;
+      if (matchEntries && matchEntries.length > 0) {
+        if (c.isThirdIndeterminate) {
+          minScore += matchEntries[0].weight;
+        } else {
+          const match = matchEntries.find(e => e.isMinor === c.isMinor);
+          if (match) {
+            minScore += match.weight;
+          } else {
+            minScore -= 2.5; // Out-of-key penalty
+          }
+        }
       } else {
         minScore -= 2.5; // Out-of-key penalty
       }
 
       // Tonic start bonus: Bar 0 is minor tonic i
-      if (idx === 0 && c.rootIndex === k && c.isMinor) {
+      if (idx === 0 && c.rootIndex === k && (c.isMinor || c.isThirdIndeterminate)) {
         minScore += 5.0;
       }
       // Tonic resolution on Bar 4 (e.g. F - G - Em - Am, resolves to Am on Bar 4!)
-      if (idx === 3 && c.rootIndex === k && c.isMinor) {
+      if (idx === 3 && c.rootIndex === k && (c.isMinor || c.isThirdIndeterminate)) {
         minScore += 4.5;
       }
       // Tonic on Bar 3
-      if (idx === 2 && c.rootIndex === k && c.isMinor) {
+      if (idx === 2 && c.rootIndex === k && (c.isMinor || c.isThirdIndeterminate)) {
         minScore += 3.0;
       }
       // Subtonic VII or Dominant V on Bar 4 (prepares loop turnaround to i)
-      if (idx === 3 && (c.rootIndex === (k + 10) % 12 || c.rootIndex === (k + 7) % 12) && !c.isMinor) {
+      if (idx === 3 && (c.rootIndex === (k + 10) % 12 || c.rootIndex === (k + 7) % 12) && (!c.isMinor || c.isThirdIndeterminate)) {
         minScore += 3.0;
       }
     });
@@ -617,43 +677,63 @@ function inferKeyAndScales(
     // Cyclic Turnaround Cadence (Bar 4 -> Bar 1)
     if (c3.rootIndex >= 0 && c0.rootIndex >= 0) {
       // VII -> i Aeolian turnaround (e.g. G -> Am in A minor, quintessential loop cadence)
-      if (c3.rootIndex === (k + 10) % 12 && !c3.isMinor && c0.rootIndex === k && c0.isMinor) {
+      if (c3.rootIndex === (k + 10) % 12 && (!c3.isMinor || c3.isThirdIndeterminate) && c0.rootIndex === k && (c0.isMinor || c0.isThirdIndeterminate)) {
         minScore += 5.0;
       }
       // V / v -> i Authentic or natural minor turnaround (e.g. E -> Am or Em -> Am)
-      if (c3.rootIndex === (k + 7) % 12 && c0.rootIndex === k && c0.isMinor) {
-        minScore += c3.isMinor ? 4.0 : 5.0;
+      if (c3.rootIndex === (k + 7) % 12 && c0.rootIndex === k && (c0.isMinor || c0.isThirdIndeterminate)) {
+        minScore += (c3.isMinor || c3.isThirdIndeterminate) ? 4.0 : 5.0;
       }
       // iv / IV -> i Plagal turnaround (e.g. Dm -> Am or D -> Am in A minor)
-      if (c3.rootIndex === (k + 5) % 12 && c0.rootIndex === k && c0.isMinor) {
+      if (c3.rootIndex === (k + 5) % 12 && c0.rootIndex === k && (c0.isMinor || c0.isThirdIndeterminate)) {
         minScore += 3.5;
       }
-      // i -> VI loop restart (e.g. in F - G - Em - Am, turnaround from Bar 4 Am to Bar 1 F)
-      if (c3.rootIndex === k && c3.isMinor && c0.rootIndex === (k + 8) % 12 && !c0.isMinor) {
+      // i -> VI loop restart (e.g. in F - G - Em - Am, turnaround from Bar 4 Am to Bar 1 F, or Bar 4 Em to Bar 1 C)
+      if (c3.rootIndex === k && (c3.isMinor || c3.isThirdIndeterminate) && c0.rootIndex === (k + 8) % 12 && (!c0.isMinor || c0.isThirdIndeterminate)) {
         minScore += 3.5;
       }
+    }
+
+    // Sequential Cadence: VI -> III -> VII -> i (e.g. C -> G -> D -> Em in E minor)
+    if (
+      c0.rootIndex === (k + 8) % 12 && (!c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === (k + 3) % 12 && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === (k + 10) % 12 && (!c2.isMinor || c2.isThirdIndeterminate) &&
+      c3.rootIndex === k && (c3.isMinor || c3.isThirdIndeterminate)
+    ) {
+      minScore += 8.0;
+    }
+
+    // Sequential Cadence: i -> VI -> III -> VII (e.g. Am -> F -> C -> G in A minor)
+    if (
+      c0.rootIndex === k && (c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === (k + 8) % 12 && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === (k + 3) % 12 && (!c2.isMinor || c2.isThirdIndeterminate) &&
+      c3.rootIndex === (k + 10) % 12 && (!c3.isMinor || c3.isThirdIndeterminate)
+    ) {
+      minScore += 8.0;
     }
 
     // Sequential Cadence: VI -> VII -> i (e.g. F -> G -> Em -> Am or F -> G -> Am)
     // Resolves parallel key ambiguity firmly to minor!
     if (
-      c0.rootIndex === (k + 8) % 12 && !c0.isMinor &&
-      c1.rootIndex === (k + 10) % 12 && !c1.isMinor &&
-      c3.rootIndex === k && c3.isMinor
+      c0.rootIndex === (k + 8) % 12 && (!c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === (k + 10) % 12 && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c3.rootIndex === k && (c3.isMinor || c3.isThirdIndeterminate)
     ) {
       minScore += 6.0;
     }
     if (
-      c0.rootIndex === (k + 8) % 12 && !c0.isMinor &&
-      c1.rootIndex === (k + 10) % 12 && !c1.isMinor &&
-      c2.rootIndex === k && c2.isMinor
+      c0.rootIndex === (k + 8) % 12 && (!c0.isMinor || c0.isThirdIndeterminate) &&
+      c1.rootIndex === (k + 10) % 12 && (!c1.isMinor || c1.isThirdIndeterminate) &&
+      c2.rootIndex === k && (c2.isMinor || c2.isThirdIndeterminate)
     ) {
       minScore += 6.0;
     }
     // VII -> i, v -> i or V -> i cadential arrival on Bar 4 (e.g. G -> Am or Em/E -> Am on bars 2 and 3)
     if (
-      (c2.rootIndex === (k + 7) % 12 || (c2.rootIndex === (k + 10) % 12 && !c2.isMinor)) &&
-      c3.rootIndex === k && c3.isMinor
+      (c2.rootIndex === (k + 7) % 12 || (c2.rootIndex === (k + 10) % 12 && (!c2.isMinor || c2.isThirdIndeterminate))) &&
+      c3.rootIndex === k && (c3.isMinor || c3.isThirdIndeterminate)
     ) {
       minScore += 4.0;
     }
@@ -1164,7 +1244,7 @@ export class RelationalHarmonicEngine {
         return RelationalHarmonicEngine.getDefaultJamPreset();
       }
 
-      const effectiveBpm = bpm > 20 && bpm < 320 ? bpm : 120;
+      const _effectiveBpm = bpm > 20 && bpm < 320 ? bpm : 120;
       const sampleRate = buffer.sampleRate || 44100;
       const totalSamples = buffer.length;
 
@@ -1251,6 +1331,65 @@ export class RelationalHarmonicEngine {
               isMinor: def.minor
             };
           }
+        }
+
+        // If chord is third-indeterminate (monophonic root note, bassline or power chord):
+        // Diatonically reconcile the chord quality (Major vs Minor) to the inferred key center
+        if (m.isThirdIndeterminate) {
+          const rootK = noteNameToPitchClass(keyInfo.rootNote);
+          let resolvedMinor = m.isMinor;
+          if (keyInfo.mode === 'minor') {
+            const semitonesFromKey = ((m.rootIndex - rootK) % 12 + 12) % 12;
+            // Diatonic minor scale qualities:
+            // i (0): minor, ii (2): minor, III (3): major, iv (5): minor, v (7): minor, VI (8): major, VII (10): major
+            switch (semitonesFromKey) {
+              case 0:  // i
+              case 2:  // ii°
+              case 5:  // iv
+              case 7:  // v
+                resolvedMinor = true;
+                break;
+              case 3:  // III
+              case 8:  // VI
+              case 10: // VII
+                resolvedMinor = false;
+                break;
+              default:
+                resolvedMinor = false;
+                break;
+            }
+          } else {
+            const semitonesFromKey = ((m.rootIndex - rootK) % 12 + 12) % 12;
+            // Diatonic major scale qualities:
+            // I (0): major, ii (2): minor, iii (4): minor, IV (5): major, V (7): major, vi (9): minor, vii° (11): minor
+            switch (semitonesFromKey) {
+              case 2:  // ii
+              case 4:  // iii
+              case 9:  // vi
+              case 11: // vii°
+                resolvedMinor = true;
+                break;
+              case 0:  // I
+              case 5:  // IV
+              case 7:  // V
+                resolvedMinor = false;
+                break;
+              default:
+                resolvedMinor = false;
+                break;
+            }
+          }
+
+          const rName = pitchClassToNoteName(m.rootIndex);
+          return {
+            chord: resolvedMinor ? `${rName}m` : rName,
+            rootIndex: m.rootIndex,
+            rootNote: rName,
+            isMinor: resolvedMinor,
+            score: m.score,
+            isThirdIndeterminate: true,
+            candidates: m.candidates
+          };
         }
 
         // If top candidate is within 25% score of a diatonic alternative, favor diatonic
@@ -1350,10 +1489,31 @@ export class RelationalHarmonicEngine {
   }
 
   /**
+   * Evaluates best triad chord match from 12-pitch chromagram
+   */
+  public static matchBestTriadChord(chroma: Float32Array): {
+    chord: string;
+    rootIndex: number;
+    rootNote: string;
+    isMinor: boolean;
+    score: number;
+    isThirdIndeterminate?: boolean;
+    candidates: CandidateChordMatch[];
+  } {
+    return matchBestTriadChord(chroma);
+  }
+
+  /**
    * Evaluates key and didactic scales from matched chords
    */
   public static inferKeyAndScales(
-    matchedChords: Array<{ rootIndex: number; isMinor: boolean; chord: string; rootNote: string }>
+    matchedChords: Array<{
+      rootIndex: number;
+      isMinor: boolean;
+      chord: string;
+      rootNote: string;
+      isThirdIndeterminate?: boolean;
+    }>
   ): {
     key: string;
     rootNote: string;

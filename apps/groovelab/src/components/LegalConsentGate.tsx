@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check, RefreshCw, WifiOff, Terminal } from 'lucide-react';
 import { ACTIVE_LEGAL_VERSION, MINIMUM_ENFORCED_VERSION, LEGAL_DOCUMENTS, LEGAL_RELEASE_CONFIG, computeSha256, getLegalChangelog } from '../legal/legalContent';
@@ -110,6 +110,29 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [latestAcceptedVersion, setLatestAcceptedVersion] = useState<string | null>(null);
   const [isMajorUpdateFlow, setIsMajorUpdateFlow] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
+
+  const mandatoryCheckboxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleScrollToMandatory = () => {
+    if (mandatoryCheckboxRef.current) {
+      mandatoryCheckboxRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      mandatoryCheckboxRef.current.focus();
+    }
+  };
 
   // Determine active primary document
   const primaryDocKey = isAdmin 
@@ -434,6 +457,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         role="dialog"
         aria-modal="true"
         aria-label="Sicherheits- und Rechtsprüfung Netzwerkunterbrechung"
+        className="pwa-modal-overlay"
         style={{
           position: 'fixed',
           inset: 0,
@@ -443,7 +467,9 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '24px',
+          padding: isMobile ? '16px' : '24px',
+          overflowY: 'auto',
+          overscrollBehaviorY: 'contain',
           zIndex: 99999,
           fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
         }}
@@ -488,20 +514,25 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           </div>
         )}
 
-        <div style={{
-          background: '#ffffff',
-          width: '100%',
-          maxWidth: '480px',
-          borderRadius: '24px',
-          padding: '32px 28px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-          border: '1px solid #e2e8f0',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'fadeInUp 0.25s ease-out'
-        }}>
+        <div 
+          className="pwa-modal-card pwa-modal-drawer"
+          style={{
+            background: '#ffffff',
+            width: '100%',
+            maxWidth: '480px',
+            maxHeight: '90dvh',
+            overflowY: 'auto',
+            borderRadius: isMobile ? '20px' : '24px',
+            padding: isMobile ? '24px 20px' : '32px 28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            border: '1px solid #e2e8f0',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            animation: 'fadeInUp 0.25s ease-out'
+          }}
+        >
           <div style={{
             width: '56px',
             height: '56px',
@@ -697,24 +728,29 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const activeChangelog = getLegalChangelog(ACTIVE_LEGAL_VERSION);
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 23, 42, 0.85)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      zIndex: 99999,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-      fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
-    }}>
+    <div 
+      className="pwa-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        justifyContent: 'center',
+        padding: isMobile ? 0 : '20px',
+        overflowY: isMobile ? 'auto' : 'hidden',
+        overscrollBehaviorY: 'contain',
+        fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
+      }}
+    >
       {/* 🛠️ Localhost / Dev-Sandbox Immunity Pill */}
       {isDev && (
         <div style={{
           position: 'fixed',
-          top: '16px',
+          top: isMobile ? 'calc(10px + env(safe-area-inset-top, 0px))' : '16px',
           left: '16px',
           zIndex: 100000,
           background: '#1e293b',
@@ -754,36 +790,42 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         role="dialog"
         aria-modal="true"
         aria-label={isMajorUpdateFlow ? `Vertrags-Aktualisierung Version ${ACTIVE_LEGAL_VERSION}` : primaryDoc.title}
+        className="pwa-modal-card pwa-modal-drawer"
         style={{
           background: '#ffffff',
           width: '100%',
-          maxWidth: '680px',
-          maxHeight: '90vh',
-          borderRadius: '28px',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+          maxWidth: isMobile ? '100%' : '680px',
+          height: isMobile ? '100dvh' : 'auto',
+          maxHeight: isMobile ? '100dvh' : '90vh',
+          borderRadius: isMobile ? 0 : '28px',
+          boxShadow: isMobile ? 'none' : '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          border: `1px solid ${themeBorder}`,
-          animation: 'fadeInUp 0.25s ease-out'
+          border: isMobile ? 'none' : `1px solid ${themeBorder}`,
+          animation: isMobile ? 'fadeIn 0.2s ease-out' : 'fadeInUp 0.25s ease-out'
         }}
       >
         {/* Header Bar - ZONE 1: RECHTLICHER KONTEXT & DIFFERENZ-STATUS */}
-        <div style={{
-          padding: '24px 28px 20px 28px',
+        <header style={{
+          paddingTop: isMobile ? 'calc(14px + env(safe-area-inset-top, 0px))' : '24px',
+          paddingBottom: isMobile ? '12px' : '20px',
+          paddingLeft: isMobile ? '18px' : '28px',
+          paddingRight: isMobile ? '18px' : '28px',
           borderBottom: '1px solid #f1f5f9',
           background: themeBgLight,
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px'
+          gap: '12px',
+          flexShrink: 0
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
               <span style={{
                 background: themeColor,
                 color: '#ffffff',
-                fontSize: '0.68rem',
+                fontSize: isMobile ? '0.64rem' : '0.68rem',
                 fontWeight: 800,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
@@ -793,7 +835,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 {isMajorUpdateFlow ? 'Vertrags-Aktualisierung' : primaryDoc.badge}
               </span>
               <span style={{
-                fontSize: '0.72rem',
+                fontSize: isMobile ? '0.68rem' : '0.72rem',
                 fontWeight: 700,
                 color: '#64748b'
               }}>
@@ -802,29 +844,30 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             </div>
             <h2 style={{
               margin: 0,
-              fontSize: '1.25rem',
+              fontSize: isMobile ? '1.05rem' : '1.25rem',
               fontWeight: 800,
               color: '#0f172a',
               letterSpacing: '-0.02em',
-              lineHeight: 1.3
+              lineHeight: 1.25
             }}>
               {isMajorUpdateFlow ? `Aktualisierung: ${primaryDoc.title}` : primaryDoc.title}
             </h2>
             <p style={{
-              margin: '4px 0 0 0',
-              fontSize: '0.84rem',
+              margin: '3px 0 0 0',
+              fontSize: isMobile ? '0.76rem' : '0.84rem',
               color: '#475569',
-              fontWeight: 500
+              fontWeight: 500,
+              lineHeight: 1.3
             }}>
               {isMajorUpdateFlow 
-                ? `Wesentliche didaktische Anpassung (Bisherige Bestätigung: Version ${latestAcceptedVersion || '2026.1'})` 
+                ? `Wesentliche didaktische Anpassung (Bisher: Version ${latestAcceptedVersion || '2026.1'})` 
                 : primaryDoc.subtitle}
             </p>
           </div>
           <div style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: '14px',
+            width: isMobile ? '38px' : '44px',
+            height: isMobile ? '38px' : '44px',
+            borderRadius: isMobile ? '12px' : '14px',
             background: '#ffffff',
             display: 'flex',
             alignItems: 'center',
@@ -833,19 +876,27 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
             border: `1px solid ${themeBorder}`
           }}>
-            <ShieldCheck size={24} color={themeColor} />
+            <ShieldCheck size={isMobile ? 20 : 24} color={themeColor} />
           </div>
-        </div>
+        </header>
 
-        {/* Body Content - ZONE 2: CHANGELOG-LENS & TRANSPARENZGEBOT */}
-        <div style={{
-          padding: '24px 28px',
-          overflowY: 'auto',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '18px'
-        }}>
+        {/* Body Content - ZONE 2: ELASTISCHER SCROLL-BEREICH */}
+        <main 
+          className="pwa-scroll-container"
+          data-modal-scroll="true"
+          style={{
+            padding: isMobile ? '16px 18px 24px 18px' : '24px 28px',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehaviorY: 'contain',
+            touchAction: 'pan-y',
+            flex: '1 1 auto',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: isMobile ? '14px' : '18px'
+          }}
+        >
           {errorMsg && (
             <div style={{
               background: '#fee2e2',
@@ -869,27 +920,34 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             <div style={{
               background: themeBgLight,
               border: `1.5px solid ${themeBorder}`,
-              borderRadius: '18px',
-              padding: '16px 18px'
+              borderRadius: isMobile ? '14px' : '18px',
+              padding: isMobile ? '12px 14px' : '16px 18px'
             }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                fontSize: '0.76rem',
+                fontSize: isMobile ? '0.72rem' : '0.76rem',
                 fontWeight: 800,
                 color: themeColor,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
-                marginBottom: '10px'
+                marginBottom: isMobile ? '8px' : '10px'
               }}>
-                <Scale size={16} />
+                <Scale size={isMobile ? 15 : 16} />
                 <span>Was ist neu in Version {ACTIVE_LEGAL_VERSION}? (Wesentliche Änderungen):</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '6px' : '8px' }}>
                 {activeChangelog.highlights.map((pt, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: '#0f172a', lineHeight: 1.4 }}>
-                    <CheckCircle2 size={16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    fontSize: isMobile ? '0.78rem' : '0.82rem',
+                    color: '#0f172a',
+                    lineHeight: 1.35
+                  }}>
+                    <CheckCircle2 size={isMobile ? 15 : 16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <span style={{ fontWeight: 600 }}>{pt}</span>
                   </div>
                 ))}
@@ -900,16 +958,30 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             <div style={{
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
-              borderRadius: '18px',
-              padding: '16px 18px'
+              borderRadius: isMobile ? '14px' : '18px',
+              padding: isMobile ? '12px 14px' : '16px 18px'
             }}>
-              <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+              <div style={{
+                fontSize: isMobile ? '0.72rem' : '0.76rem',
+                fontWeight: 800,
+                color: '#334155',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginBottom: isMobile ? '8px' : '10px'
+              }}>
                 Wichtigste Kernpunkte im Überblick (Transparenz-Zusammenfassung):
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '6px' : '8px' }}>
                 {primaryDoc.summaryPoints.map((pt, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: '#334155', lineHeight: 1.4 }}>
-                    <CheckCircle2 size={16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    fontSize: isMobile ? '0.78rem' : '0.82rem',
+                    color: '#334155',
+                    lineHeight: 1.35
+                  }}>
+                    <CheckCircle2 size={isMobile ? 15 : 16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <span>{pt}</span>
                   </div>
                 ))}
@@ -927,12 +999,13 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 border: 'none',
                 color: themeColor,
                 fontWeight: 700,
-                fontSize: '0.82rem',
+                fontSize: isMobile ? '0.78rem' : '0.82rem',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: 0
+                padding: '4px 0',
+                touchAction: 'manipulation'
               }}
             >
               <span>{showFullText ? 'Vollständigen Vertragstext ausblenden' : 'Vollständigen konsolidierten Vertragstext anzeigen & prüfen'}</span>
@@ -960,6 +1033,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
 
           {/* ZONE 3: RECHTSSICHERES OPT-IN (EuGH Planet49 & BFSG 2025 Konform) */}
           <div 
+            ref={mandatoryCheckboxRef}
             role="button"
             tabIndex={0}
             aria-checked={checkedMandatory}
@@ -974,17 +1048,22 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               border: checkedMandatory ? `2px solid ${themeColor}` : '1.5px solid #cbd5e1',
               background: checkedMandatory ? themeBgLight : '#ffffff',
               borderRadius: '16px',
-              padding: '14px 16px',
+              padding: isMobile ? '12px 14px' : '14px 16px',
+              minHeight: '44px',
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px',
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              touchAction: 'manipulation',
+              userSelect: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'all 0.15s ease',
+              outline: 'none'
             }}
           >
             <div style={{
-              width: '20px',
-              height: '20px',
+              width: '22px',
+              height: '22px',
               borderRadius: '6px',
               border: checkedMandatory ? `2px solid ${themeColor}` : '2px solid #94a3b8',
               background: checkedMandatory ? themeColor : '#ffffff',
@@ -992,12 +1071,12 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              marginTop: '2px',
+              marginTop: '1px',
               transition: 'all 0.15s ease'
             }}>
-              {checkedMandatory && <Check size={14} color="#ffffff" strokeWidth={3} />}
+              {checkedMandatory && <Check size={15} color="#ffffff" strokeWidth={3} />}
             </div>
-            <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.4 }}>
+            <div style={{ flex: 1, fontSize: isMobile ? '0.80rem' : '0.82rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.35 }}>
               <span style={{ color: themeColor, fontWeight: 800 }}>[Pflicht] </span>
               {isMajorUpdateFlow ? (
                 `Ich erkenne die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht personell bei der Lehrkraft verbleibt.`
@@ -1024,17 +1103,22 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 border: checkedAudio ? '2px solid #10b981' : '1.5px solid #e2e8f0',
                 background: checkedAudio ? '#ecfdf5' : '#ffffff',
                 borderRadius: '16px',
-                padding: '14px 16px',
+                padding: isMobile ? '12px 14px' : '14px 16px',
+                minHeight: '44px',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '12px',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.15s ease',
+                outline: 'none'
               }}
             >
               <div style={{
-                width: '20px',
-                height: '20px',
+                width: '22px',
+                height: '22px',
                 borderRadius: '6px',
                 border: checkedAudio ? '2px solid #10b981' : '2px solid #94a3b8',
                 background: checkedAudio ? '#10b981' : '#ffffff',
@@ -1042,12 +1126,12 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                marginTop: '2px',
+                marginTop: '1px',
                 transition: 'all 0.15s ease'
               }}>
-                {checkedAudio && <Check size={14} color="#ffffff" strokeWidth={3} />}
+                {checkedAudio && <Check size={15} color="#ffffff" strokeWidth={3} />}
               </div>
-              <div style={{ flex: 1, fontSize: '0.80rem', fontWeight: 600, color: '#1e293b', lineHeight: 1.4 }}>
+              <div style={{ flex: 1, fontSize: isMobile ? '0.78rem' : '0.80rem', fontWeight: 600, color: '#1e293b', lineHeight: 1.35 }}>
                 <span style={{ color: '#059669', fontWeight: 800 }}>[Freiwillige Einwilligung – Art. 8 DSGVO] </span>
                 {audioDoc.checkboxLabel}
               </div>
@@ -1059,7 +1143,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            fontSize: '0.72rem',
+            fontSize: isMobile ? '0.70rem' : '0.72rem',
             color: '#64748b',
             background: '#f8fafc',
             padding: '8px 12px',
@@ -1070,38 +1154,83 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               Revisionssicherer Audit-Trail: Der Zustimmungsakt wird mit SHA-256 Checksumme, UTC-Zeitstempel und Benutzer-ID fälschungssicher protokolliert.
             </span>
           </div>
-        </div>
+        </main>
 
-        {/* Footer Bar */}
-        <div style={{
-          padding: '18px 28px',
-          borderTop: '1px solid #f1f5f9',
-          background: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
-            {checkedMandatory ? '✓ Pflichtbestätigung ausgewählt' : 'Bitte Pflichtfeld bestätigen'}
+        {/* Footer Bar - ZONE 3: FESTSTEHENDER STICKY-FOOTER */}
+        <footer 
+          className="pwa-modal-footer"
+          style={{
+            paddingTop: '12px',
+            paddingBottom: isMobile ? 'calc(14px + env(safe-area-inset-bottom, 0px))' : '18px',
+            paddingLeft: isMobile ? '18px' : '28px',
+            paddingRight: isMobile ? '18px' : '28px',
+            borderTop: '1px solid #f1f5f9',
+            background: '#ffffff',
+            boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between',
+            gap: isMobile ? '10px' : '16px',
+            flexShrink: 0,
+            position: 'relative',
+            zIndex: 10
+          }}
+        >
+          {/* Status-Text oder Tap-Trigger */}
+          <div 
+            onClick={!checkedMandatory ? handleScrollToMandatory : undefined}
+            style={{
+              fontSize: isMobile ? '0.74rem' : '0.78rem',
+              color: checkedMandatory ? '#059669' : '#d97706',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isMobile ? 'center' : 'flex-start',
+              gap: '6px',
+              cursor: !checkedMandatory ? 'pointer' : 'default',
+              userSelect: 'none'
+            }}
+          >
+            {checkedMandatory ? (
+              <>
+                <Check size={14} color="#059669" strokeWidth={3} />
+                <span>✓ Pflichtbestätigung ausgewählt</span>
+              </>
+            ) : (
+              <span style={{ textDecoration: isMobile ? 'underline' : 'none' }}>
+                ⚠️ Bitte Pflichtfeld bestätigen (Tippen zum Fokussieren)
+              </span>
+            )}
           </div>
 
           <button
             type="button"
-            disabled={!checkedMandatory || isSaving}
-            onClick={handleConfirmConsents}
+            disabled={isSaving}
+            onClick={() => {
+              if (!checkedMandatory) {
+                handleScrollToMandatory();
+                return;
+              }
+              handleConfirmConsents();
+            }}
             style={{
-              background: checkedMandatory ? themeColor : '#cbd5e1',
-              color: '#ffffff',
+              background: checkedMandatory ? themeColor : '#e2e8f0',
+              color: checkedMandatory ? '#ffffff' : '#64748b',
               border: 'none',
-              borderRadius: '16px',
-              padding: '12px 24px',
-              fontSize: '0.90rem',
+              borderRadius: isMobile ? '14px' : '16px',
+              padding: isMobile ? '14px 20px' : '12px 24px',
+              minHeight: '44px',
+              fontSize: isMobile ? '0.90rem' : '0.90rem',
               fontWeight: 800,
-              cursor: checkedMandatory && !isSaving ? 'pointer' : 'not-allowed',
+              cursor: isSaving ? 'not-allowed' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '8px',
+              touchAction: 'manipulation',
+              userSelect: 'none',
+              WebkitTapHighlightColor: 'transparent',
               boxShadow: checkedMandatory ? '0 4px 14px rgba(0,0,0,0.15)' : 'none',
               transition: 'all 0.15s ease'
             }}
@@ -1114,11 +1243,15 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             ) : (
               <>
                 <Scale size={16} />
-                <span>{isMajorUpdateFlow ? 'Änderungen verbindlich bestätigen' : 'Rechtssicher bestätigen & Weiter'}</span>
+                <span>
+                  {!checkedMandatory 
+                    ? 'Zu den Pflicht-Einwilligungen' 
+                    : (isMajorUpdateFlow ? 'Änderungen verbindlich bestätigen' : 'Rechtssicher bestätigen & Weiter')}
+                </span>
               </>
             )}
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

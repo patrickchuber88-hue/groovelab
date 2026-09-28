@@ -3531,10 +3531,12 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                 <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 700 }}>
                                   Aktiv für das laufende Schuljahr
                                 </span>
-                                <button
-                                  type="button"
-                                  disabled
+                                <span
+                                  role="status"
                                   style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     padding: '8px 14px',
                                     borderRadius: '10px',
                                     background: '#f1f5f9',
@@ -3547,7 +3549,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                   }}
                                 >
                                   Bereits freigeschaltet
-                                </button>
+                                </span>
                               </div>
                             ) : (
                               <button

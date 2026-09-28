@@ -16,14 +16,21 @@
     <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' https://supabase.campus-groovelab.de wss://supabase.campus-groovelab.de; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:* https://supabase.campus-groovelab.de wss://supabase.campus-groovelab.de; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <link rel="preconnect" href="https://supabase.campus-groovelab.de" crossorigin />
     <link rel="dns-prefetch" href="https://supabase.campus-groovelab.de" />
     <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #f8fafc;
+        color: #0f172a;
+        min-height: 100%;
+      }
       /* Zero CLS font-display fallback */
       @font-face {
         font-family: 'Plus Jakarta Sans Fallback';
@@ -61,7 +68,15 @@
   </head>
   <body>
     <a href="#main-content" class="skip-to-content-link" style="position: fixed; top: -9999px; left: 16px; opacity: 0; pointer-events: none;">Zum Hauptinhalt springen</a>
-    <div id="root"></div>
+    <div id="root">
+      <div id="pwa-preboot-stage" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; background: #f8fafc; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Plus Jakarta Sans', sans-serif;">
+        <div style="width: 36px; height: 36px; border: 3px solid rgba(15, 23, 42, 0.08); border-top-color: #34a853; border-radius: 50%; animation: pwa-boot-spin 0.8s linear infinite;"></div>
+        <div style="font-size: 13px; font-weight: 700; color: #64748b; letter-spacing: -0.01em;">Campus • Wird geladen...</div>
+      </div>
+      <style>
+        @keyframes pwa-boot-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1763,7 +1763,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             )}
 
                             {/* Lehrkraft-Tipp Zitatzeile (Dezent integriert ohne Kasten) */}
-                            {missionInfo.teacherNote && (
+                            {missionInfo.teacherNote && !missionInfo.teacherNote.includes('WORLDTOUR_MASTERY:') && (
                               <div 
                                 onClick={() => setShowJuniorCheatSheet(prev => !prev)}
                                 style={{
@@ -4200,7 +4200,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               })}
 
                               {/* Spezifische Lehrkraft-Notiz */}
-                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && (
+                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && !missionInfo.teacherNote.includes('WORLDTOUR_MASTERY:') && (
                                 <div 
                                   onClick={() => setShowJuniorCheatSheet(prev => !prev)}
                                   style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid #f1f5f9' : 'none', cursor: 'pointer' }}

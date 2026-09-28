@@ -5,6 +5,7 @@ import { getBlob, deleteBlob } from '../../../utils/blobStorage';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { Student } from '../meisterwerk.types';
 import { MasterworkAudioCapsule } from './MeisterwerkAudioPlayers';
+import { VdmShowcaseVitrine } from '../../campus/VdmBadgeMedallions';
 
 export interface MeisterwerkLogbuchTabProps {
   isMobileOrSim: boolean;
@@ -326,66 +327,16 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
 
             const masteredSongs = Array.from(masteredSongsMap.values());
 
-            const hasMastered = masteredBooksList.length > 0 || masteredSongs.length > 0;
-
-            if (!hasMastered) {
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', margin: '40px auto 0 auto', maxWidth: '600px' }}>
-                  <div style={{
-                    padding: '60px 24px',
-                    textAlign: 'center',
-                    border: useNotebookLayout ? '2px dashed #32483e' : '2px dashed #cbd5e1',
-                    borderRadius: '24px',
-                    color: useNotebookLayout ? '#8fa399' : '#475569',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'white',
-                    width: '100%'
-                  }}>
-                    Noch keine Meisterwerke eingetragen. Auf geht's! 🚀
-                  </div>
-
-                  {/* Audio-Tresor Retro-Kassette Promo Banner */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    borderRadius: '20px',
-                    padding: '18px 22px',
-                    color: 'white',
-                    width: '100%',
-                    boxShadow: '0 8px 22px rgba(16, 185, 129, 0.2)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '26px' }}>📼</span>
-                      <div>
-                        <div style={{ fontWeight: 900, fontSize: '0.92rem', letterSpacing: '-0.01em' }}>
-                          Meisterwerk Audio-Tresor (Retro-Kassette 📼)
-                        </div>
-                        <div style={{ fontSize: '0.78rem', opacity: 0.95, marginTop: '3px', lineHeight: 1.4 }}>
-                          Sobald deine Musikschule ein Tresor-Paket gebucht hat, wird jede gemeisterte Aufnahme auf einer digitalen <strong>Retro-Kassette mit Spulen-Animation, Datumsstempel &amp; Beschriftung</strong> dauerhaft für dich und deine Eltern archiviert!
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.15)', padding: '8px 14px', borderRadius: '12px', backdropFilter: 'blur(4px)' }}>
-                      <span>🔒 <strong>DSGVO-konform:</strong> Lückenlose Speicherung deiner musikalischen Meilensteine – ohne private Kamerafotos!</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
             return (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: isMobileOrSim ? '1fr' : 'minmax(0, 1.35fr) minmax(0, 0.95fr)',
                 gap: '24px',
                 width: '100%',
-                marginTop: '16px'
+                marginTop: '8px',
+                alignItems: 'start'
               }}>
-                {/* Spalte 1: Songs */}
+                {/* Spalte 1: Songs & Stücke */}
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -394,7 +345,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                   <h3 style={{
                     fontSize: '1rem',
                     fontWeight: 800,
-                    color: useNotebookLayout ? '#34a853' : '#475569',
+                    color: useNotebookLayout ? '#34a853' : '#0f172a',
                     borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
                     paddingBottom: '8px',
                     margin: 0,
@@ -402,20 +353,57 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                     alignItems: 'center',
                     gap: '8px'
                   }}>
-                    <span>🎵</span> Songs
+                    <span>🎵</span> Meisterwerk-Stücke &amp; Aufnahmen
                   </h3>
                   
                   {masteredSongs.length === 0 ? (
                     <div style={{
-                      padding: '30px 16px',
+                      padding: '36px 20px',
                       textAlign: 'center',
-                      border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
-                      borderRadius: '16px',
-                      color: useNotebookLayout ? '#8fa399' : '#64748b',
-                      fontSize: '0.82rem',
-                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : '#f8fafc'
+                      border: useNotebookLayout ? '1.5px dashed #32483e' : '1.5px solid #e2e8f0',
+                      borderRadius: '20px',
+                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '14px'
                     }}>
-                      Noch keine Meisterwerk-Songs vorhanden.
+                      <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '14px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                      }}>
+                        <Award size={24} strokeWidth={2.4} />
+                      </div>
+                      <div style={{ maxWidth: '380px' }}>
+                        <div style={{ fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em', marginBottom: '4px' }}>
+                          Dein Meisterwerk Audio-Tresor
+                        </div>
+                        <div style={{ fontSize: '0.80rem', color: '#64748b', lineHeight: 1.45 }}>
+                          Spiele ein Stück im Unterricht fehlerfrei vor. Sobald du es meisterst, schaltet deine Lehrkraft hier deine offizielle <strong>Gold-Urkunde</strong> und die <strong>Studio-Aufnahme</strong> frei!
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        color: '#166534',
+                        fontSize: '0.70rem',
+                        fontWeight: 700,
+                        padding: '5px 12px',
+                        borderRadius: '10px'
+                      }}>
+                        <span>🔒 Revisionssicheres Meilenstein-Archiv</span>
+                      </div>
                     </div>
                   ) : (
                     masteredSongs.map((skill, idx) => {
@@ -577,40 +565,57 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                   )}
                 </div>
 
-                {/* Spalte 2: Lehrwerke */}
+                {/* Spalte 2: Auszeichnungen & Lehrwerke */}
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '16px'
+                  gap: '20px'
                 }}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 800,
-                    color: useNotebookLayout ? '#34a853' : '#475569',
-                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
-                    paddingBottom: '8px',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span>📖</span> Lehrwerke
-                  </h3>
+                  {/* 🎖️ 0,1% Goldstandard: Auszeichnungs-Vitrine für Leistungsabzeichen / D-Stufen */}
+                  <VdmShowcaseVitrine
+                    studentId={student.id}
+                    studentName={student.name}
+                    instrument={student.instrument}
+                    schoolName={resolvedSchoolName}
+                    uiLevel={student.campus_ui_level || 'teen'}
+                    isMobile={isMobileOrSim}
+                    layout="grid2x2"
+                  />
 
-                  {masteredBooksList.length === 0 ? (
-                    <div style={{
-                      padding: '30px 16px',
-                      textAlign: 'center',
-                      border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
-                      borderRadius: '16px',
-                      color: useNotebookLayout ? '#8fa399' : '#64748b',
-                      fontSize: '0.82rem',
-                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : '#f8fafc'
+                  {/* 📖 Lehrwerke */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px'
+                  }}>
+                    <h3 style={{
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      color: useNotebookLayout ? '#34a853' : '#0f172a',
+                      borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
+                      paddingBottom: '8px',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}>
-                      Noch keine Meisterwerk-Lehrwerke vorhanden.
-                    </div>
-                  ) : (
-                    masteredBooksList.map((item, idx) => {
+                      <span>📖</span> Lehrwerke &amp; Etüden
+                    </h3>
+
+                    {masteredBooksList.length === 0 ? (
+                      <div style={{
+                        padding: '24px 16px',
+                        textAlign: 'center',
+                        border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
+                        borderRadius: '16px',
+                        color: useNotebookLayout ? '#8fa399' : '#64748b',
+                        fontSize: '0.82rem',
+                        background: useNotebookLayout ? 'rgba(0,0,0,0.06)' : '#f8fafc'
+                      }}>
+                        Noch keine Meisterwerk-Lehrwerke vorhanden.
+                      </div>
+                    ) : (
+                      masteredBooksList.map((item, idx) => {
                       const bookColor = getLehrwerkColor(item.title);
                       return (
                         <div key={`m-lw-${idx}`} style={{
@@ -667,8 +672,9 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                   )}
                 </div>
               </div>
-            );
-          })()}
+            </div>
+          );
+        })()}
         </div>
 
   );

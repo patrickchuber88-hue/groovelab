@@ -567,11 +567,11 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      gap: '16px',
-      maxWidth: '720px',
+      gap: '18px',
+      maxWidth: '980px',
       margin: '0 auto',
       width: '100%',
-      padding: '0 8px',
+      padding: '0 12px',
       fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
     }}>
       {/* 1. Header Bar: Zurück, Instrument, Kammerton-Kalibrierung & Notation (100% Monochrome) */}
@@ -834,14 +834,14 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               border: 'none',
               background: isListening
                 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                : 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
               color: '#ffffff',
               fontSize: '0.84rem',
               fontWeight: 900,
               cursor: 'pointer',
               boxShadow: isListening
                 ? '0 4px 14px rgba(239, 68, 68, 0.28)'
-                : '0 4px 14px rgba(34, 197, 94, 0.28)',
+                : '0 4px 14px rgba(6, 182, 212, 0.28)',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             className="hover-scale"
@@ -881,8 +881,8 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           : isListening
           ? '1.5px solid #06b6d4'
           : '1.5px solid #e2e8f0',
-        borderRadius: '24px',
-        padding: '24px 20px 20px 20px',
+        borderRadius: '28px',
+        padding: '36px 24px 28px 24px',
         boxShadow: isInTune
           ? '0 16px 48px -6px rgba(34, 197, 94, 0.30), 0 0 28px rgba(34, 197, 94, 0.20)'
           : isListening
@@ -965,51 +965,53 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
         {/* SVG Bogen-Kompass (Arc Gauge) */}
         <div style={{
           position: 'relative',
-          width: '260px',
-          height: '135px',
+          width: '100%',
+          maxWidth: '440px',
+          height: '220px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginTop: allStringsTuned ? '8px' : '0px'
         }}>
           <svg
-            viewBox="0 0 260 135"
-            width="260"
-            height="135"
-            style={{ overflow: 'visible' }}
+            viewBox="0 0 440 220"
+            width="100%"
+            height="100%"
+            style={{ overflow: 'visible', maxWidth: '440px' }}
           >
-            {/* Hintergrund-Bogen */}
+            {/* Hintergrund-Bogen (R=160, Sweep von -60° bis +60°) */}
             <path
-              d="M 47.7 72.5 A 95 95 0 0 1 212.3 72.5"
+              d="M 81.4 120 A 160 160 0 0 1 358.6 120"
               fill="none"
               stroke="#e2e8f0"
-              strokeWidth="8"
+              strokeWidth="10"
               strokeLinecap="round"
             />
 
-            {/* In-Tune Sweet-Spot Segment (-3° bis +3°) mit Smaragd-Glow */}
+            {/* In-Tune Sweet-Spot Segment (-3.6° bis +3.6°, ca. ±3 ct) mit Smaragd-Glow */}
             <path
-              d="M 125 25.1 A 95 95 0 0 1 135 25.1"
+              d="M 210 40.3 A 160 160 0 0 1 230 40.3"
               fill="none"
               stroke={isInTune ? '#16a34a' : '#22c55e'}
-              strokeWidth={isInTune ? '11' : '8'}
+              strokeWidth={isInTune ? '14' : '10'}
               strokeLinecap="round"
               style={{
                 transition: 'stroke-width 0.2s ease, stroke 0.2s ease',
-                filter: isInTune ? 'drop-shadow(0 0 8px rgba(34,197,94,0.9))' : 'none'
+                filter: isInTune ? 'drop-shadow(0 0 14px rgba(34,197,94,0.95))' : 'none'
               }}
             />
 
-            {/* Hilfs-Ticks für Skalen-Orientierung */}
-            {[-50, -25, 0, 25, 50].map((ct) => {
+            {/* Hilfs-Ticks für Skalen-Orientierung (-50, -25, -10, 0, 10, 25, 50 ct) */}
+            {[-50, -25, -10, 0, 10, 25, 50].map((ct) => {
               const rad = ((ct / 50) * 60 - 90) * (Math.PI / 180);
-              const rInner = 82;
-              const rOuter = ct === 0 ? 106 : 98;
-              const x1 = 130 + rInner * Math.cos(rad);
-              const y1 = 120 + rInner * Math.sin(rad);
-              const x2 = 130 + rOuter * Math.cos(rad);
-              const y2 = 120 + rOuter * Math.sin(rad);
               const isCenter = ct === 0;
+              const isMajor = Math.abs(ct) === 50 || Math.abs(ct) === 25 || isCenter;
+              const rInner = 142;
+              const rOuter = isCenter ? 180 : isMajor ? 172 : 166;
+              const x1 = 220 + rInner * Math.cos(rad);
+              const y1 = 200 + rInner * Math.sin(rad);
+              const x2 = 220 + rOuter * Math.cos(rad);
+              const y2 = 200 + rOuter * Math.sin(rad);
 
               return (
                 <line
@@ -1018,79 +1020,87 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke={isCenter ? (isInTune ? '#16a34a' : '#0f172a') : '#94a3b8'}
-                  strokeWidth={isCenter ? 2.5 : 1.5}
+                  stroke={isCenter ? (isInTune ? '#16a34a' : '#0f172a') : isMajor ? '#94a3b8' : '#cbd5e1'}
+                  strokeWidth={isCenter ? 3.5 : isMajor ? 2.5 : 1.5}
                   strokeLinecap="round"
                 />
               );
             })}
 
+            {/* Skalen-Labels für ♭ / 0 / ♯ */}
+            <text x="56" y="112" fill="#94a3b8" fontSize="12" fontWeight="800" textAnchor="middle">♭ -50</text>
+            <text x="220" y="16" fill={isInTune ? '#16a34a' : '#64748b'} fontSize="11" fontWeight="900" textAnchor="middle">PERFEKT (0)</text>
+            <text x="384" y="112" fill="#94a3b8" fontSize="12" fontWeight="800" textAnchor="middle">+50 ♯</text>
+
             {/* Nadel mit magnetischem Dämpfungs-Gleitverhalten */}
             {isListening && detectedPitch !== null && (
               <g
                 style={{
-                  transformOrigin: '130px 120px',
+                  transformOrigin: '220px 200px',
                   transform: `rotate(${needleAngle}deg)`,
                   transition: 'transform 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <line
-                  x1="130"
-                  y1="120"
-                  x2="130"
-                  y2="20"
+                  x1="220"
+                  y1="200"
+                  x2="220"
+                  y2="34"
                   stroke={isInTune ? '#16a34a' : isFlat ? '#d97706' : '#ea580c'}
-                  strokeWidth={isInTune ? '4.5' : '3'}
+                  strokeWidth={isInTune ? '5.5' : '4'}
                   strokeLinecap="round"
                   style={{
                     filter: isInTune
-                      ? 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.95))'
-                      : 'drop-shadow(0 1px 3px rgba(0,0,0,0.2))'
+                      ? 'drop-shadow(0 0 14px rgba(34, 197, 94, 0.95))'
+                      : 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))'
                   }}
                 />
                 <circle
-                  cx="130"
-                  cy="20"
-                  r={isInTune ? '6' : '4.5'}
+                  cx="220"
+                  cy="34"
+                  r={isInTune ? '7.5' : '6'}
                   fill={isInTune ? '#16a34a' : isFlat ? '#d97706' : '#ea580c'}
                 />
               </g>
             )}
 
-            {/* Nadel-Drehpunkt */}
-            <circle cx="130" cy="120" r="4.5" fill="#0f172a" />
+            {/* Nadel-Drehpunkt (Zentrum) */}
+            <circle cx="220" cy="200" r="7" fill="#0f172a" />
+            <circle cx="220" cy="200" r="3" fill="#94a3b8" />
           </svg>
         </div>
 
-        {/* 3. Notenständer-HUD: Riesen-Note mit Richtungs-Hilfe */}
+        {/* 3. Notenständer-HUD: Monumentale Note mit Richtungs-Hilfe */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          marginTop: '-10px'
+          marginTop: '-6px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
             <span style={{
-              fontSize: '4.4rem',
+              fontSize: 'clamp(5.2rem, 12vw, 7.2rem)',
               fontWeight: 950,
               color: isInTune
                 ? '#16a34a'
                 : isListening && detectedPitch !== null
                 ? '#0f172a'
                 : '#cbd5e1',
-              letterSpacing: '-0.04em',
+              letterSpacing: '-0.05em',
               lineHeight: 1,
-              textShadow: isInTune ? '0 0 28px rgba(34, 197, 94, 0.45)' : 'none',
+              textShadow: isInTune
+                ? '0 0 40px rgba(34, 197, 94, 0.55), 0 0 80px rgba(34, 197, 94, 0.25)'
+                : 'none',
               transition: 'color 0.2s ease, text-shadow 0.2s ease'
             }}>
               {detectedNote}
             </span>
             {detectedOctave !== null && isListening && (
               <span style={{
-                fontSize: '1.8rem',
-                fontWeight: 850,
-                color: isInTune ? '#22c55e' : '#94a3b8',
+                fontSize: '2.5rem',
+                fontWeight: 900,
+                color: isInTune ? '#22c55e' : '#64748b',
                 lineHeight: 1
               }}>
                 {detectedOctave}
@@ -1098,84 +1108,104 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             )}
           </div>
 
-          {/* Richtungs-Hinweis für Schüler (▲ FESTER / ▼ LOCKERER / ✓ PERFEKT) */}
-          <div style={{ minHeight: '32px', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Richtungs-Hinweis für Schüler (▲ FESTER / ▼ LOCKERER / ✓ PERFEKT) & Hero-CTA */}
+          <div style={{ minHeight: '52px', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isListening && detectedPitch !== null ? (
               isInTune ? (
                 <div style={{
-                  background: '#dcfce7',
-                  border: '1px solid #86efac',
+                  background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                  border: '1.5px solid #86efac',
                   color: '#15803d',
-                  padding: '3px 12px',
+                  padding: '7px 20px',
                   borderRadius: '99px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.92rem',
                   fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 2px 10px rgba(34, 197, 94, 0.20)'
+                  gap: '8px',
+                  boxShadow: '0 4px 16px rgba(34, 197, 94, 0.25)'
                 }}>
-                  <Check size={14} strokeWidth={3} />
-                  <span>Perfekt gestimmt!</span>
+                  <Check size={18} strokeWidth={3} />
+                  <span>Perfekt gestimmt! (±0 ct)</span>
                 </div>
               ) : isFlat ? (
                 <div style={{
-                  background: '#fef3c7',
-                  border: '1px solid #fde68a',
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  border: '1.5px solid #fcd34d',
                   color: '#b45309',
-                  padding: '3px 12px',
+                  padding: '7px 20px',
                   borderRadius: '99px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.92rem',
                   fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '7px',
+                  boxShadow: '0 3px 12px rgba(217, 119, 6, 0.15)'
                 }}>
-                  <ArrowUp size={13} strokeWidth={3} />
+                  <ArrowUp size={17} strokeWidth={3} />
                   <span>Fester drehen ({centsDeviation} ct)</span>
                 </div>
               ) : (
                 <div style={{
-                  background: '#ffedd5',
-                  border: '1px solid #fed7aa',
+                  background: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)',
+                  border: '1.5px solid #fdba74',
                   color: '#c2410c',
-                  padding: '3px 12px',
+                  padding: '7px 20px',
                   borderRadius: '99px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.92rem',
                   fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '7px',
+                  boxShadow: '0 3px 12px rgba(234, 88, 12, 0.15)'
                 }}>
-                  <ArrowDown size={13} strokeWidth={3} />
+                  <ArrowDown size={17} strokeWidth={3} />
                   <span>Lockerer drehen (+{centsDeviation} ct)</span>
                 </div>
               )
             ) : isListening ? (
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>
-                Spiele eine Saite an...
-              </span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 16px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '99px'
+              }}>
+                <Radio size={15} color="#06b6d4" className="animate-pulse" />
+                <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#475569' }}>
+                  Spiele eine Saite an...
+                </span>
+              </div>
             ) : (
               <button
                 type="button"
                 onClick={startListening}
                 style={{
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '10px',
-                  padding: '4px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  color: '#0f172a',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '16px',
+                  padding: '13px 28px',
+                  fontSize: '1.02rem',
+                  fontWeight: 900,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '10px',
+                  boxShadow: '0 8px 24px rgba(6, 182, 212, 0.35)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  minHeight: '52px'
                 }}
                 className="hover-scale"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') startListening(); }}
+                title="Mikrofon einschalten und Stimmen starten"
               >
-                <Mic size={13} />
-                <span>Mikrofon aktivieren</span>
+                <Mic size={20} strokeWidth={2.5} />
+                <span>Mikrofon aktivieren & Stimmen</span>
               </button>
             )}
           </div>
@@ -1183,9 +1213,9 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           {/* Frequenz-Anzeige */}
           {uiLevel !== 'junior' && detectedPitch && isListening && (
             <div style={{
-              marginTop: '4px',
-              fontSize: '0.74rem',
-              fontWeight: 750,
+              marginTop: '6px',
+              fontSize: '0.84rem',
+              fontWeight: 800,
               color: '#64748b',
               fontVariantNumeric: 'tabular-nums'
             }}>
@@ -1198,30 +1228,30 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
         {selectedPreset.strings.length > 0 && (
           <div style={{
             width: '100%',
-            maxWidth: '480px',
-            marginTop: '16px',
-            paddingTop: '14px',
-            borderTop: '1px solid #f1f5f9',
+            maxWidth: '780px',
+            marginTop: '22px',
+            paddingTop: '18px',
+            borderTop: '1.5px solid #f1f5f9',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '8px'
+            gap: '10px'
           }}>
-            {/* Status-Zeile mit Tipp */}
+            {/* Status-Zeile mit Tipp & Reset */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               width: '100%',
-              padding: '0 4px',
-              fontSize: '0.72rem',
+              padding: '0 6px',
+              fontSize: '0.78rem',
               fontWeight: 800,
               color: '#64748b'
             }}>
               <span>
                 {tunedStringsCount > 0
                   ? `${tunedStringsCount} von ${totalStringsCount} Saiten gestimmt`
-                  : 'Tipp: Klicke eine Saite an zum Feststellen (Target-Lock):'}
+                  : 'Tipp: Klicke eine Saite an zum Feststellen (Target-Lock) oder Vorhören:'}
               </span>
               {tunedStringsCount > 0 && (
                 <button
@@ -1232,27 +1262,27 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                     border: 'none',
                     color: '#64748b',
                     cursor: 'pointer',
-                    fontSize: '0.70rem',
+                    fontSize: '0.74rem',
                     fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    padding: '2px 6px',
-                    borderRadius: '6px'
+                    padding: '3px 8px',
+                    borderRadius: '8px'
                   }}
                   className="hover-scale"
                   title="Alle gestimmten Saiten zurücksetzen"
                 >
-                  <RotateCcw size={11} />
+                  <RotateCcw size={12} />
                   <span>Reset</span>
                 </button>
               )}
             </div>
 
-            {/* Horizontale Saiten-Pills */}
+            {/* Horizontale Saiten-Kacheln (78×84px Squircle Touch Tiles) */}
             <div style={{
               display: 'flex',
-              gap: '6px',
+              gap: '8px',
               width: '100%',
               justifyContent: 'center',
               flexWrap: 'wrap'
@@ -1284,17 +1314,18 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      minWidth: '64px',
-                      padding: '10px 12px',
-                      borderRadius: '14px',
+                      minWidth: '78px',
+                      minHeight: '84px',
+                      padding: '12px 14px',
+                      borderRadius: '18px',
                       border: isLocked
                         ? '2px solid #0891b2'
                         : isTuned
-                        ? '1.5px solid #10b981'
+                        ? '2px solid #10b981'
                         : isSelected
-                        ? '1.5px solid #06b6d4'
+                        ? '2px solid #06b6d4'
                         : isPegPlaying
-                        ? '1.5px solid #0891b2'
+                        ? '2px solid #0891b2'
                         : '1.5px solid #e2e8f0',
                       background: isLocked
                         ? 'rgba(6, 182, 212, 0.14)'
@@ -1311,17 +1342,18 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                         ? '#065f46'
                         : isSelected
                         ? '#0e7490'
-                        : '#334155',
+                        : '#1e293b',
                       cursor: 'pointer',
-                      transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       boxShadow: isLocked
-                        ? '0 3px 10px rgba(6, 182, 212, 0.25)'
+                        ? '0 4px 14px rgba(6, 182, 212, 0.25)'
                         : isTuned
-                        ? '0 2px 6px rgba(16, 185, 129, 0.2)'
+                        ? '0 3px 10px rgba(16, 185, 129, 0.22)'
                         : isSelected
-                        ? '0 2px 8px rgba(6, 182, 212, 0.18)'
-                        : 'none',
-                      outline: 'none'
+                        ? '0 3px 10px rgba(6, 182, 212, 0.18)'
+                        : '0 2px 5px rgba(0,0,0,0.02)',
+                      outline: 'none',
+                      touchAction: 'manipulation'
                     }}
                     className="hover-scale"
                     title={`${displayName}${str.octave} (${str.freq} Hz) • Klick: Target-Lock / Vorhören`}
@@ -1335,25 +1367,35 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                       }
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 900, letterSpacing: '-0.02em' }}>
+                    <span style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 800,
+                      color: isLocked ? '#0891b2' : isTuned ? '#059669' : '#94a3b8',
+                      marginBottom: '2px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
+                    }}>
+                      {idx + 1}. Saite
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
                         {displayName}{str.octave}
                       </span>
-                      {isTuned && <Check size={11} strokeWidth={3.5} />}
-                      {isLocked && <Lock size={10} strokeWidth={2.5} />}
+                      {isTuned && <Check size={14} strokeWidth={3.5} color="#10b981" />}
+                      {isLocked && <Lock size={12} strokeWidth={2.5} color="#0891b2" />}
                     </div>
                     <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 750,
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
                       color: isLocked ? '#0f172a' : isTuned ? '#047857' : '#64748b',
-                      marginTop: '1px',
+                      marginTop: '3px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '2px'
+                      gap: '3px'
                     }}>
                       {isPegPlaying ? (
                         <>
-                          <Volume2 size={9} />
+                          <Volume2 size={11} />
                           <span>Ton</span>
                         </>
                       ) : (

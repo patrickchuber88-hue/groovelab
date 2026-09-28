@@ -2643,7 +2643,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               </div>
               <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e2e8f0', marginTop: '8px' }}>
                 {effectiveUiLevel === 'junior'
-                  ? (bpm <= 75 ? '🐢 Leo (Gemütlich)' : bpm <= 110 ? '🐕 Bello (Spazieren)' : bpm <= 155 ? '🐇 Flitzi (Schwungvoll)' : '🐆 Gepard (Turbo)')
+                  ? (bpm <= 80 ? '🐢 Leo (Gemütlich)' : bpm <= 130 ? '🐕 Bello (Spazieren)' : '🐆 Gepard (Turbo)')
                   : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
               </span>
             </div>
@@ -3843,12 +3843,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 {/* All-in-One Tier- & Tempo-Kapsel mit direktem [TAP] Tempo Button */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {(() => {
-                    const animalInfo = bpm <= 75
+                    const animalInfo = bpm <= 80
                       ? { emoji: '🐢', name: 'Leo', desc: 'Gemütlich', bg: '#dcfce7', border: '#86efac', text: '#166534' }
-                      : bpm <= 110
+                      : bpm <= 130
                       ? { emoji: '🐕', name: 'Bello', desc: 'Spazieren', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
-                      : bpm <= 155
-                      ? { emoji: '🐇', name: 'Flitzi', desc: 'Schwungvoll', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
                       : { emoji: '🐆', name: 'Gepard', desc: 'Turbo', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
 
                     const isBeatBounce = isPlaying && (activeBeatIndex !== null);
@@ -5117,10 +5115,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             gap: '12px'
           }}>
             {[
-              { id: 'metronome', label: 'Metronom Klick', desc: 'Klassischer Klick', icon: <Timer size={19} strokeWidth={2.2} /> },
-              { id: 'rock', label: 'Rock & Pop', desc: 'Kräftiger Schlagzeug-Takt', icon: <Drum size={19} strokeWidth={2.2} /> },
-              { id: 'hiphop', label: 'Hip-Hop Pocket', desc: 'Lässiger Boom-Bap Takt', icon: <Headphones size={19} strokeWidth={2.2} /> },
-              { id: 'singersongwriter', label: 'Liedermacher', desc: 'Akustik-Drum & Shaker', icon: <Guitar size={19} strokeWidth={2.2} /> }
+              { id: 'metronome', label: 'Metronom Klick', icon: <Timer size={22} strokeWidth={2.3} /> },
+              { id: 'rock', label: 'Rock & Pop', icon: <Drum size={22} strokeWidth={2.3} /> },
+              { id: 'hiphop', label: 'Hip-Hop Pocket', icon: <Headphones size={22} strokeWidth={2.3} /> },
+              { id: 'singersongwriter', label: 'Liedermacher', icon: <Guitar size={22} strokeWidth={2.3} /> }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -5140,14 +5138,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     color: isSelected ? '#0f172a' : '#1e293b',
                     border: isSelected ? '2px solid #ca8a04' : '1.5px solid #e2e8f0',
                     borderRadius: '16px',
-                    padding: '14px 16px',
+                    padding: '16px 18px',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: '4px',
-                    minHeight: '74px',
+                    justifyContent: 'center',
+                    minHeight: '68px',
                     transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
                     boxShadow: isSelected ? '0 6px 20px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.03)',
                     textAlign: 'left',
@@ -5155,9 +5152,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}
                 >
                   <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? '#0f172a' : '#b45309' }}>{styleOpt.icon}</span>
-                      <span style={{ fontSize: '0.90rem', fontWeight: 950 }}>{styleOpt.label}</span>
+                      <span style={{ fontSize: '1.12rem', fontWeight: 950, letterSpacing: '-0.02em', color: isSelected ? '#0f172a' : '#0f172a' }}>{styleOpt.label}</span>
                     </div>
                     {isSelected && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -5169,11 +5166,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           </div>
                         )}
                         <span style={{
-                          fontSize: '0.62rem',
+                          fontSize: '0.66rem',
                           fontWeight: 900,
                           background: 'rgba(15, 23, 42, 0.14)',
                           color: '#0f172a',
-                          padding: '2px 7px',
+                          padding: '2px 8px',
                           borderRadius: '100px'
                         }}>
                           Aktiv
@@ -5181,9 +5178,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       </div>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: isSelected ? 'rgba(15, 23, 42, 0.85)' : '#64748b', fontWeight: 650, marginTop: '2px' }}>
-                    {styleOpt.desc}
-                  </span>
                 </button>
               );
             })}

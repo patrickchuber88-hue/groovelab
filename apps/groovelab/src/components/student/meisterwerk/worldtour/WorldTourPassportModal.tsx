@@ -17,6 +17,7 @@ interface WorldTourPassportModalProps {
   onSelectCountry?: (countryCode: string) => void;
   onNavigateToCountry?: (countryCode: string) => void;
   onOpenDiploma?: () => void;
+  isTeacherMode?: boolean;
 }
 
 export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
@@ -30,7 +31,8 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
   currentLandedCountryCode = 'DE',
   onSelectCountry,
   onNavigateToCountry,
-  onOpenDiploma
+  onOpenDiploma,
+  isTeacherMode = false
 }) => {
   const [selectedContinent, setSelectedContinent] = useState<ContinentId | 'all'>('all');
   const [selectedLockedCountry, setSelectedLockedCountry] = useState<WorldTourCountry | null>(null);
@@ -124,11 +126,12 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
     const isMastered = Boolean(prog && prog.stars >= 1);
     const isCurrentLanded = country.code === currentLandedCountryCode;
     const canFlyDirectly = Boolean(
-      currentLandedCountryCode &&
-      WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap)
+      isTeacherMode ||
+      (currentLandedCountryCode &&
+        WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap))
     );
 
-    if (isMastered || isCurrentLanded) {
+    if (isMastered || isCurrentLanded || isTeacherMode) {
       if (onSelectCountry) {
         onSelectCountry(country.code);
         onClose();
@@ -579,12 +582,13 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                 const isMastered = Boolean(prog && prog.stars >= 1);
                 const isCurrentLanded = country.code === currentLandedCountryCode;
                 const canFlyDirectly = Boolean(
-                  currentLandedCountryCode &&
                   !isMastered &&
                   !isCurrentLanded &&
-                  WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap)
+                  (isTeacherMode ||
+                    (currentLandedCountryCode &&
+                      WorldTourFlightEngine.canFlyDirectly(currentLandedCountryCode, country.code, progressMap)))
                 );
-                const isLocked = !isMastered && !isCurrentLanded && !canFlyDirectly;
+                const isLocked = !isTeacherMode && !isMastered && !isCurrentLanded && !canFlyDirectly;
 
                 const stars = prog?.stars || 0;
                 const ink = getContinentInkStyle(country.continent);

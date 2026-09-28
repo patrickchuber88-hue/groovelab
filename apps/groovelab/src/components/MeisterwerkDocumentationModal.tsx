@@ -112,6 +112,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   onTriggerSoftLock,
   initialLehrwerke,
   initialSongs,
+  assignedCampusSongs: propAssignedCampusSongs,
+  activeSongSkills: propActiveSongSkills,
   initialProgressItems,
   initialLocalProgress,
   onSongsUpdated,
@@ -204,6 +206,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [mobileRecordingsTab, setMobileRecordingsTab] = useState<'teacher' | 'student'>('student');
   const [showRecordingMetronomePopup, setShowRecordingMetronomePopup] = useState<boolean>(false);
   const [isRecordingPadActive, setIsRecordingPadActive] = useState<boolean>(false);
+  const [targetWorldTourCountry, setTargetWorldTourCountry] = useState<{ countryCode: string; view: 'map' | 'score' } | null>(null);
   const recordingMetronomeRef = useRef<HTMLDivElement | null>(null);
 
   const matchesAudioSearch = useCallback((aud: any, searchQuery: string): boolean => {
@@ -251,8 +254,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [progressItems, setProgressItems] = useState<ProgressItem[]>(() => initialProgressItems || []);
   const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>(() => initialLehrwerke || []);
   const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>([]);
-  const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
-  const [songs, setSongs] = useState<any[]>(() => initialSongs || []);
+  const [activeSongSkills, setActiveSongSkills] = useState<any[]>(() => propActiveSongSkills || []);
+  const [assignedCampusSongs, setAssignedCampusSongs] = useState<any[]>(() => propAssignedCampusSongs || initialSongs || []);
+  const [songs, setSongs] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (propActiveSongSkills && Array.isArray(propActiveSongSkills) && propActiveSongSkills.length > 0) {
+      setActiveSongSkills(propActiveSongSkills);
+    }
+  }, [propActiveSongSkills]);
+
+  useEffect(() => {
+    if (propAssignedCampusSongs && Array.isArray(propAssignedCampusSongs) && propAssignedCampusSongs.length > 0) {
+      setAssignedCampusSongs(propAssignedCampusSongs);
+    }
+  }, [propAssignedCampusSongs]);
   const [activeItem, setActiveItem] = useState<ProgressItem | null>(null);
   const [topicName, setTopicName] = useState('');
   const [status, setStatus] = useState<'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED'>('IN_PROGRESS');
@@ -365,7 +381,75 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         .select('*')
         .eq('student_id', student.id)
         .order('updated_at', { ascending: false });
-      if (data) setProgressItems(data);
+      if (data) {
+        const uniqueItemsMap = new Map<string, any>();
+        (data || []).forEach((item: any) => {
+          const name = (item.topic_name || '').trim().toLowerCase();
+          if (name && !uniqueItemsMap.has(name)) {
+            uniqueItemsMap.set(name, item);
+          }
+        });
+        const loadedProgress = Array.from(uniqueItemsMap.values());
+
+        // 🛡️ Cold Cache / PWA: Unpack SNAPSHOT_SONGS into loadedProgress so assigned songs are never lost
+        (data || []).forEach((item: any) => {
+          if (item.topic_name && item.topic_name.startsWith('Hausaufgabe KW ')) {
+            const raw = item.homework_notes || item.teacher_notes;
+            if (!raw) return;
+            let songList: any[] = [];
+            if (Array.isArray(raw)) {
+              const sEntry = raw.find((entry: any) => typeof entry === 'string' && entry.includes('SNAPSHOT_SONGS:'));
+              if (sEntry) {
+                try {
+                  const sIdx = sEntry.indexOf('SNAPSHOT_SONGS:');
+                  const after = sEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                  const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                  const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+                  const parsed = JSON.parse(jsonStr);
+                  if (Array.isArray(parsed)) songList = parsed;
+                } catch {}
+              }
+            } else if (typeof raw === 'string') {
+              if (raw.includes('SNAPSHOT_SONGS:')) {
+                try {
+                  const sIdx = raw.indexOf('SNAPSHOT_SONGS:');
+                  const after = raw.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                  const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                  const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+                  const parsed = JSON.parse(jsonStr);
+                  if (Array.isArray(parsed)) songList = parsed;
+                } catch {}
+              }
+            }
+
+            songList.forEach((song: any) => {
+              const sTitle = (song.title || song.topic_name || '').trim();
+              if (!sTitle) return;
+              const existing = loadedProgress.find((p: any) => (p.topic_name || p.title || '').trim().toLowerCase() === sTitle.toLowerCase());
+              if (existing) {
+                existing.is_current_homework = true;
+                if (song.homework_notes || song.notes || song.note) {
+                  existing.homework_notes = song.homework_notes || song.notes || song.note;
+                }
+              } else {
+                loadedProgress.push({
+                  id: song.id || `snapshot-song-${Date.now()}-${Math.random()}`,
+                  student_id: student.id,
+                  topic_name: sTitle,
+                  title: sTitle,
+                  is_current_homework: true,
+                  status: song.status || 'IN_PROGRESS',
+                  homework_notes: song.homework_notes || song.notes || song.note || '',
+                  teacher_notes: song.teacher_notes || '',
+                  updated_at: item.updated_at || item.created_at
+                });
+              }
+            });
+          }
+        });
+
+        setProgressItems(loadedProgress);
+      }
     } catch (err) {
       console.warn('[Meisterwerk] fetchProgress notice:', err);
     }
@@ -1083,6 +1167,40 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       console.error('Fehler beim Erledigen der Schülerfrage:', err);
     }
   }, [student?.id, homeworkNotesList, syncHomeworkNotes, notifyHomeworkChange, setHomeworkNotesList, setProgressItems]);
+
+  const handleOpenWorldTourStation = useCallback((countryCode: string) => {
+    setTargetWorldTourCountry({ countryCode, view: 'score' });
+    setActiveViewMode('worldtour');
+  }, []);
+
+  const handleAcknowledgeWorldTourMastery = useCallback(async (countryCode: string) => {
+    if (!student?.id) return;
+    const currentList = Array.isArray(homeworkNotesList) ? [...homeworkNotesList] : [];
+    let changed = false;
+    const updatedList = currentList.map((item: any) => {
+      if (typeof item === 'string' && item.startsWith(`WORLDTOUR_MASTERY:${countryCode}`)) {
+        changed = true;
+        if (!item.includes('ACK:1')) {
+          if (item.includes('ACK:0')) {
+            return item.replace('ACK:0', 'ACK:1');
+          } else {
+            return `${item}|ACK:1`;
+          }
+        }
+      }
+      return item;
+    });
+    if (changed) {
+      setHomeworkNotesList(updatedList);
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
+        await syncHomeworkNotes(updatedList);
+      } catch (e) {
+        console.warn('Error acknowledging world tour mastery:', e);
+      }
+      notifyHomeworkChange();
+    }
+  }, [student?.id, homeworkNotesList, syncHomeworkNotes, notifyHomeworkChange, setHomeworkNotesList]);
 
   const handleSaveStudentQuestion = useCallback(async (qText: string) => {
     const trimmed = qText.trim();
@@ -3159,10 +3277,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 studentAvatarUrl={resolveCampusStudentAvatar(student)}
                 uiLevel={uiLevel}
                 isMobileView={isMobileOrSim}
+                initialCountryCode={targetWorldTourCountry?.countryCode}
+                initialView={targetWorldTourCountry?.view}
+                isTeacherMode={Boolean(isTeacherTools || isTeacherSelf)}
                 onMasteryAchieved={async (stars, score, xp, countryCode) => {
                   if (stars >= 1) {
                     handleImproveSkill('klang');
-                    const scoreTag = `WORLDTOUR_MASTERY:${countryCode}|${stars}STARS|${score}%|+${xp}XP`;
+                    const isoNow = new Date().toISOString();
+                    const scoreTag = `WORLDTOUR_MASTERY:${countryCode}|${stars}STARS|${score}%|+${xp}XP|ACK:0|TS:${isoNow}`;
                     const currentList = Array.isArray(homeworkNotesList) ? [...homeworkNotesList] : [];
                     const filtered = currentList.filter((n: unknown) => typeof n !== 'string' || !n.startsWith(`WORLDTOUR_MASTERY:${countryCode}`));
                     const updatedList = [...filtered, scoreTag];
@@ -3388,6 +3510,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             activeTtsKey={activeTtsKey}
             adjustTextareaHeight={adjustTextareaHeight}
             assignedLehrwerke={assignedLehrwerke}
+            assignedCampusSongs={assignedCampusSongs}
             setAssignedLehrwerke={setAssignedLehrwerke}
             audioDuration={audioDuration}
             audioLabel={audioLabel}
@@ -3433,6 +3556,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             handleRemoveSong={handleRemoveSong}
             handleResetAllCurrentHomework={handleResetAllCurrentHomework}
             handleResolveStudentQuestion={handleResolveStudentQuestion}
+            handleAcknowledgeWorldTourMastery={handleAcknowledgeWorldTourMastery}
+            handleOpenWorldTourStation={handleOpenWorldTourStation}
             handleSave={handleSave}
             handleSaveStudentQuestion={handleSaveStudentQuestion}
             handleSetRowTag={handleSetRowTag}

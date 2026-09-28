@@ -37,8 +37,11 @@ import {
   parseStudentQuestionFromNotes,
   parseStudentAnnotation,
   parseSongArtistAndTitle,
-  SKILL_TAGS
+  SKILL_TAGS,
+  parseWorldTourMasteries,
+  ParsedWorldTourMastery
 } from '../meisterwerk.types';
+import { WorldTourMasteryNoteCard } from './worldtour/WorldTourMasteryNoteCard';
 import {
   ALL_STICKERS,
   getUnifiedStickerStatus,
@@ -131,6 +134,8 @@ export interface MeisterwerkDocumentTabProps {
   handleRemoveSong: (...args: any[]) => any;
   handleResetAllCurrentHomework: (...args: any[]) => any;
   handleResolveStudentQuestion: (...args: any[]) => any;
+  handleAcknowledgeWorldTourMastery?: (countryCode: string) => any;
+  handleOpenWorldTourStation?: (countryCode: string) => any;
   handleSave: (...args: any[]) => any;
   handleSaveStudentQuestion: (...args: any[]) => any;
   handleSetRowTag: (...args: any[]) => any;
@@ -278,6 +283,7 @@ export interface MeisterwerkDocumentTabProps {
   songProgressPercent: any;
   songSearch: any;
   songs: any[];
+  assignedCampusSongs?: any[];
   sortedAssignedLehrwerke: any[];
   status: string;
   stopRecordingAudio: (...args: any[]) => any;
@@ -366,6 +372,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     handleRemoveSong,
     handleResetAllCurrentHomework,
     handleResolveStudentQuestion,
+    handleAcknowledgeWorldTourMastery,
+    handleOpenWorldTourStation,
     handleSave,
     handleSaveStudentQuestion,
     handleSetRowTag,
@@ -513,6 +521,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     songProgressPercent,
     songSearch,
     songs,
+    assignedCampusSongs = [],
     sortedAssignedLehrwerke,
     status,
     stopRecordingAudio,
@@ -540,6 +549,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     useNotebookLayout,
     viewingWeekOffset
   } = props;
+
+  const isJunior = uiLevel === 'junior';
 
   // 🛡️ Datenschutz- & Minderjährigenschutz-Schranke (§ 201 StGB / Art. 8 DSGVO)
   const isStudentAudioForbiddenForTeacher = useMemo(() => {
@@ -2075,21 +2086,33 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           try {
                             const raw = typeof snapItem.homework_notes === 'string' ? JSON.parse(snapItem.homework_notes) : snapItem.homework_notes;
                             if (Array.isArray(raw)) {
-                              const lw = raw.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                              const lw = raw.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
                               if (lw) {
-                                const parsedLw = JSON.parse(lw.substring('SNAPSHOT_LEHRWERKE:'.length));
-                                if (Array.isArray(parsedLw)) {
-                                  parsedLw.forEach((b: any) => {
-                                    homeworkItemsCount += (Array.isArray(b.pages) && b.pages.length > 0) ? b.pages.length : 1;
-                                  });
-                                }
+                                try {
+                                  const sIdx = lw.indexOf('SNAPSHOT_LEHRWERKE:');
+                                  const after = lw.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+                                  const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                  const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+                                  const parsedLw = JSON.parse(rawJson);
+                                  if (Array.isArray(parsedLw)) {
+                                    parsedLw.forEach((b: any) => {
+                                      homeworkItemsCount += (Array.isArray(b.pages) && b.pages.length > 0) ? b.pages.length : 1;
+                                    });
+                                  }
+                                } catch {}
                               }
-                              const songs = raw.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                              const songs = raw.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
                               if (songs) {
-                                const parsedSongs = JSON.parse(songs.substring('SNAPSHOT_SONGS:'.length));
-                                if (Array.isArray(parsedSongs)) {
-                                  homeworkItemsCount += parsedSongs.length;
-                                }
+                                try {
+                                  const sIdx = songs.indexOf('SNAPSHOT_SONGS:');
+                                  const after = songs.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                                  const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                  const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+                                  const parsedSongs = JSON.parse(rawJson);
+                                  if (Array.isArray(parsedSongs)) {
+                                    homeworkItemsCount += parsedSongs.length;
+                                  }
+                                } catch {}
                               }
                             }
                           } catch {}
@@ -5224,21 +5247,30 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     {sortedAssignedLehrwerke.length === 0 && (
                       <div
                         onClick={() => toggleAssignDropdown()}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Lehrwerk hinzufügen"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleAssignDropdown();
+                          }
+                        }}
                         style={{
                           flex: '0 0 auto',
-                          width: '140px',
+                          width: '165px',
                           scrollSnapAlign: 'start',
                           background: 'rgba(248, 250, 252, 0.7)',
-                          borderRadius: '18px',
+                          borderRadius: '20px',
                           border: '1.5px dashed #cbd5e1',
-                          padding: '12px 8px',
-                          minHeight: '154px',
+                          padding: '16px 12px',
+                          minHeight: '168px',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '8px',
+                          gap: '10px',
                           textAlign: 'center',
                           transition: 'all 0.2s',
                           boxSizing: 'border-box'
@@ -5246,8 +5278,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         className="hover-scale"
                       >
                         <div style={{
-                          width: '38px',
-                          height: '38px',
+                          width: '42px',
+                          height: '42px',
                           borderRadius: '50%',
                           background: '#ffffff',
                           border: '1.5px solid #e2e8f0',
@@ -5257,11 +5289,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           color: '#34a853',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                         }}>
-                          <Plus size={18} strokeWidth={2.5} />
+                          <Plus size={20} strokeWidth={2.5} />
                         </div>
                         <div>
-                          <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a' }}>Lehrwerk</div>
-                          <div style={{ fontSize: '0.67rem', fontWeight: 700, color: '#64748b', marginTop: '1px' }}>+ Hinzufügen</div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a' }}>Lehrwerk</div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Hinzufügen</div>
                         </div>
                       </div>
                     )}
@@ -5296,124 +5328,69 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           }}
                           style={{
                             flex: '0 0 auto',
-                            width: '136px',
+                            width: '165px',
                             scrollSnapAlign: 'start',
                             background: '#ffffff',
-                            borderRadius: '18px',
+                            borderRadius: '20px',
                             border: isSelected ? '2px solid #34a853' : '1px solid #e8e8ed',
                             boxShadow: isSelected ? '0 6px 18px rgba(52, 168, 83, 0.16)' : '0 2px 8px rgba(0,0,0,0.03)',
-                            padding: '10px',
+                            padding: '12px',
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            gap: '8px',
+                            gap: '10px',
                             position: 'relative',
                             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                             boxSizing: 'border-box'
                           }}
                           className="hover-scale"
                         >
-                          {/* Book Showcase Area with realistic 3D portrait book */}
+                          {/* Book Showcase Area - Minimalistisch & Ruhig (0% Text auf dem Cover) */}
                           <div style={{
                             width: '100%',
-                            height: '96px',
+                            height: '108px',
                             background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-                            borderRadius: '12px',
+                            borderRadius: '14px',
                             position: 'relative',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             overflow: 'hidden'
                           }}>
-                            {/* Realistic Portrait Book */}
+                            {/* Apple-style Book Squircle Cover */}
                             <div style={{
-                              width: '58px',
-                              height: '78px',
+                              width: '64px',
+                              height: '84px',
                               background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
-                              borderRadius: '4px 7px 7px 4px',
-                              boxShadow: '2px 4px 12px rgba(0,0,0,0.16), inset -1.5px 0 3px rgba(0,0,0,0.08)',
-                              position: 'relative',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                               display: 'flex',
-                              flexDirection: 'column',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '5px',
-                              padding: '5px'
+                              position: 'relative'
                             }}>
-                              {/* Spine groove on left */}
+                              <BookOpen size={26} color={bookColor.text || '#ffffff'} strokeWidth={2.2} />
+                            </div>
+
+                            {/* Top-Right Pill: % gemeistert (Nur dezent sichtbar, wenn Fortschritt existiert) */}
+                            {pct > 0 && (
                               <div style={{
                                 position: 'absolute',
-                                left: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: '5px',
-                                background: 'rgba(0,0,0,0.18)',
-                                borderRight: '1px solid rgba(255,255,255,0.25)',
-                                borderRadius: '4px 0 0 4px'
-                              }} />
-
-                              {/* Realistic page edges on right */}
-                              <div style={{
-                                position: 'absolute',
-                                right: '-2.5px',
-                                top: '2.5px',
-                                bottom: '2.5px',
-                                width: '2.5px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '0 1.5px 1.5px 0'
-                              }} />
-
-                              {/* Book Icon Capsule */}
-                              <div style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '50%',
-                                background: 'rgba(255, 255, 255, 0.25)',
-                                backdropFilter: 'blur(4px)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-                              }}>
-                                <BookOpen size={13} color={bookColor.text || '#ffffff'} />
-                              </div>
-
-                              {/* Mini Book Title on Cover */}
-                              <span style={{
-                                fontSize: '0.62rem',
-                                fontWeight: 900,
+                                top: '6px',
+                                right: '6px',
+                                background: '#15803d',
                                 color: '#ffffff',
-                                textAlign: 'center',
-                                lineHeight: 1.15,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                textShadow: '0 1px 3px rgba(0,0,0,0.35)'
+                                fontSize: '0.68rem',
+                                fontWeight: 850,
+                                padding: '2px 7px',
+                                borderRadius: '100px',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                                zIndex: 5
                               }}>
-                                {book.title}
-                              </span>
-                            </div>
-
-                            {/* Top-Right Pill: % gemeistert */}
-                            <div style={{
-                              position: 'absolute',
-                              top: '5px',
-                              right: '5px',
-                              background: pct > 0 ? '#15803d' : 'rgba(15,23,42,0.65)',
-                              backdropFilter: 'blur(6px)',
-                              color: '#ffffff',
-                              fontSize: '0.68rem',
-                              fontWeight: 900,
-                              padding: '2px 7px',
-                              borderRadius: '100px',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
-                              zIndex: 5
-                            }}>
-                              {pct}%
-                            </div>
+                                {pct}%
+                              </div>
+                            )}
 
                             {/* Delete Button top left if removable */}
                             {(!readOnly || assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
@@ -5426,8 +5403,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 aria-label={`Lehrwerk ${book.title} entfernen`}
                                 style={{
                                   position: 'absolute',
-                                  top: '5px',
-                                  left: '5px',
+                                  top: '6px',
+                                  left: '6px',
                                   background: 'rgba(255, 255, 255, 0.95)',
                                   border: 'none',
                                   color: '#dc2626',
@@ -5449,31 +5426,33 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             )}
                           </div>
 
-                          {/* Card Info Below */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {/* Card Info Below - Radikal entschlackt (Weniger Text) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <h4 style={{
                               margin: 0,
-                              fontSize: '0.84rem',
-                              fontWeight: 900,
+                              fontSize: '0.96rem',
+                              fontWeight: 850,
                               color: '#0f172a',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              fontFamily: "'Plus Jakarta Sans', sans-serif"
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
+                              letterSpacing: '-0.01em'
                             }}>
                               {book.title}
                             </h4>
 
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: '#475569', fontWeight: 750 }}>
-                              <span>{total} Seiten</span>
-                              <span style={{ color: worked > 0 ? '#15803d' : '#64748b', fontWeight: 800 }}>
-                                {worked > 0 ? `${worked} gemeistert` : '0 gemeistert'}
-                              </span>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+                              {worked > 0 ? (
+                                <span><strong style={{ color: '#15803d', fontWeight: 800 }}>{worked}</strong> von {total} Seiten</span>
+                              ) : (
+                                <span>{total} Seiten</span>
+                              )}
                             </div>
 
                             {/* Subtle Progress Bar */}
-                            <div style={{ width: '100%', height: '3.5px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', marginTop: '3px' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', background: '#34a853', transition: 'width 0.3s ease' }} />
+                            <div style={{ width: '100%', height: '3.5px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden', marginTop: '2px' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: '#34a853', borderRadius: '100px', transition: 'width 0.3s ease' }} />
                             </div>
                           </div>
                         </div>
@@ -5606,7 +5585,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         <div style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '6px',
+                          gap: '10px',
                           flex: 1,
                           overflowY: 'auto',
                           paddingRight: '2px'
@@ -5633,10 +5612,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }}
                                 style={{
                                   background: isSelected ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#ffffff',
-                                  borderRadius: '14px',
+                                  borderRadius: '16px',
                                   border: isSelected ? '1.5px solid #34a853' : '1px solid #e8e8ed',
                                   boxShadow: isSelected ? '0 4px 14px rgba(52, 168, 83, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
-                                  padding: '8px 12px',
+                                  padding: '10px 14px',
+                                  minHeight: '54px',
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5647,12 +5627,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 className="hover-scale"
                               >
                                 {/* Left: Miniatur Cover & Typography */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                  {/* 34x34 Miniatur Vinyl/Album Icon */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                                  {/* 42x42 Miniatur Vinyl/Album Icon */}
                                   <div style={{
-                                    width: '34px',
-                                    height: '34px',
-                                    borderRadius: '10px',
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '12px',
                                     background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
                                     display: 'flex',
                                     alignItems: 'center',
@@ -5661,44 +5641,31 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     flexShrink: 0,
                                     boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
                                   }}>
-                                    <Music size={15} strokeWidth={2.4} />
+                                    <Music size={18} strokeWidth={2.4} />
                                   </div>
 
-                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span style={{
-                                        fontSize: '0.86rem',
-                                        fontWeight: 900,
-                                        color: '#0f172a',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                      }}>
-                                        {songTitle}
-                                      </span>
-                                      {skill.songs?.teacher_id || skill.created_by_teacher ? (
-                                        <span style={{
-                                          fontSize: '0.68rem',
-                                          fontWeight: 850,
-                                          color: '#15803d',
-                                          background: '#dcfce7',
-                                          padding: '2px 6px',
-                                          borderRadius: '6px',
-                                          flexShrink: 0
-                                        }}>
-                                          Lehrer
-                                        </span>
-                                      ) : null}
-                                    </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, gap: '2px' }}>
                                     <span style={{
-                                      fontSize: '0.74rem',
-                                      color: '#475569',
+                                      fontSize: '0.96rem',
+                                      fontWeight: 850,
+                                      color: '#0f172a',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      letterSpacing: '-0.01em'
+                                    }}>
+                                      {songTitle}
+                                    </span>
+                                    <span style={{
+                                      fontSize: '0.78rem',
+                                      color: '#64748b',
                                       fontWeight: 650,
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis'
                                     }}>
                                       {songArtist}
+                                      {(skill.songs?.teacher_id || skill.created_by_teacher) ? ' • Lehrkraft' : ''}
                                     </span>
                                   </div>
                                 </div>
@@ -5707,13 +5674,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                   {progressItems.some(item => isSongMatch(item, skill) && item.is_current_homework) && (
                                     <span style={{
-                                      fontSize: '0.70rem',
+                                      fontSize: '0.72rem',
                                       fontWeight: 850,
                                       color: '#9a3412',
                                       background: '#ffedd5',
                                       border: '1px solid #fed7aa',
-                                      padding: '2px 8px',
-                                      borderRadius: '6px',
+                                      padding: '3px 9px',
+                                      borderRadius: '8px',
                                       display: 'flex',
                                       alignItems: 'center',
                                       gap: '4px'
@@ -5727,12 +5694,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '4px',
-                                    background: progress >= 100 ? '#dcfce7' : '#f1f5f9',
-                                    color: progress >= 100 ? '#15803d' : '#475569',
-                                    padding: '3px 9px',
+                                    background: progress >= 100 ? '#dcfce7' : '#f8fafc',
+                                    color: progress >= 100 ? '#15803d' : '#64748b',
+                                    padding: '4px 10px',
                                     borderRadius: '100px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 900,
+                                    fontSize: '0.74rem',
+                                    fontWeight: 850,
                                     border: progress >= 100 ? '1px solid #bbf7d0' : '1px solid #e2e8f0'
                                   }}>
                                     <span>{progress}%</span>
@@ -5750,7 +5717,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         border: 'none',
                                         color: '#94a3b8',
                                         cursor: 'pointer',
-                                        padding: '3px',
+                                        padding: '4px',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -5760,7 +5727,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       title="Song aus aktiven Projekten entfernen"
                                       aria-label={`${songTitle} aus aktiven Projekten entfernen`}
                                     >
-                                      <X size={13} />
+                                      <X size={14} />
                                     </button>
                                   )}
                                 </div>
@@ -5986,11 +5953,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 return filtered.map((song: any) => (
                                   <div
                                     key={song.id}
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={async () => {
                                       await handleAssignSongFromCatalog(song.id);
                                       setLocalShowCreateSongModal(false);
                                       setLocalSongSearch('');
                                       setActiveSubView('hub');
+                                    }}
+                                    onKeyDown={async (e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        await handleAssignSongFromCatalog(song.id);
+                                        setLocalShowCreateSongModal(false);
+                                        setLocalSongSearch('');
+                                        setActiveSubView('hub');
+                                      }
                                     }}
                                     style={{
                                       padding: '10px 14px',
@@ -6026,8 +6004,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       </div>
                                     </div>
 
-                                    <button
-                                      type="button"
+                                    <span
                                       style={{
                                         background: '#34a853',
                                         color: 'white',
@@ -6036,11 +6013,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         borderRadius: '10px',
                                         fontSize: '0.72rem',
                                         fontWeight: 900,
-                                        cursor: 'pointer'
+                                        display: 'inline-flex',
+                                        alignItems: 'center'
                                       }}
                                     >
                                       + Hinzufügen
-                                    </button>
+                                    </span>
                                   </div>
                                 ));
                               })()}
@@ -6416,10 +6394,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   }
 
                   // 1. Lehrwerke aus SNAPSHOT_LEHRWERKE hydrieren
-                  const snapLwEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                  const snapLwEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
                   if (snapLwEntry) {
                     try {
-                      const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                      const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
+                      const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+                      const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                      const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                       const parsedLw = JSON.parse(rawJson);
                       if (Array.isArray(parsedLw)) {
                         parsedLw.forEach((lw: { title: string; pages: number[]; notes?: any }) => {
@@ -6441,10 +6422,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   }
 
                   // 2. Songs aus SNAPSHOT_SONGS hydrieren
-                  const snapSongEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                  const snapSongEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
                   if (snapSongEntry) {
                     try {
-                      const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                      const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+                      const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                      const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                      const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                       const parsedSongs = JSON.parse(rawJson);
                       if (Array.isArray(parsedSongs)) {
                         parsedSongs.forEach((song: any) => {
@@ -8866,6 +8850,38 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }
                           });
 
+                          // 🛡️ Enterprise Parity: Also check assignedCampusSongs (SSOT parity with Box 1 / juniorHomeworkResolver)
+                          (assignedCampusSongs || []).forEach((cSong: any) => {
+                            const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${cSong.id}`) === 'true' ||
+                                             (cSong.song_id && localStorage.getItem(`song_hw_${student.id}_${cSong.song_id}`) === 'true') ||
+                                             (cSong.songs?.id && localStorage.getItem(`song_hw_${student.id}_${cSong.songs.id}`) === 'true') ||
+                                             Boolean(cSong.is_current_homework) ||
+                                             Boolean(cSong.homework_notes) ||
+                                             Boolean(cSong.teacher_notes);
+                            if (isHwInLs) {
+                              const songArtist = cSong.songs?.artist || cSong.artist || '';
+                              const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
+                              if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
+                              const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
+                              const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                              const cachedNote = localStorage.getItem(`song_note_${student.id}_${cSong.id}`) ||
+                                                 (cSong.song_id ? localStorage.getItem(`song_note_${student.id}_${cSong.song_id}`) : '') ||
+                                                 (cSong.songs?.id ? localStorage.getItem(`song_note_${student.id}_${cSong.songs.id}`) : '') ||
+                                                 cSong.homework_notes ||
+                                                 cSong.teacher_notes ||
+                                                 '';
+                              addSongToOtherHWs({
+                                id: cSong.id,
+                                song_id: cSong.song_id || cSong.songs?.id,
+                                topic_name: fullTitle,
+                                is_current_homework: true,
+                                status: 'IN_PROGRESS',
+                                homework_notes: cachedNote,
+                                songs: cSong.songs
+                              });
+                            }
+                          });
+
                           lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
                             info.pages.sort((a: number, b: number) => a - b);
                             return { title, pages: info.pages, notes: info.notes };
@@ -8914,10 +8930,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               if (Array.isArray(parsedSnap)) {
                                 // 1. Lehrwerke snapshot unpacking (if lehrwerkeList is empty)
                                 if (lehrwerkeList.length === 0) {
-                                  const snapLwEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                                  const snapLwEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
                                   if (snapLwEntry) {
                                     try {
-                                      const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                      const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
+                                      const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+                                      const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                      const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                                       const parsedLw = JSON.parse(rawJson);
                                       if (Array.isArray(parsedLw) && parsedLw.length > 0) {
                                         lehrwerkeList = parsedLw;
@@ -8929,10 +8948,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }
 
                                 // 2. Songs snapshot unpacking with deduplication
-                                const snapSongEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                const snapSongEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
                                 if (snapSongEntry) {
                                   try {
-                                    const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                    const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+                                    const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                                    const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                    const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                                     const parsedSongs = JSON.parse(rawJson);
                                     if (Array.isArray(parsedSongs)) {
                                       parsedSongs.forEach((song: any) => {
@@ -8989,7 +9011,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                              !n.startsWith('LOOP:') &&
                                              !n.startsWith('SNAPSHOT_') &&
                                              !n.startsWith('FEEDBACK:') &&
-                                             !n.startsWith('STUDENT_NOTE_');
+                                             !n.startsWith('STUDENT_NOTE_') &&
+                                             !n.startsWith('WORLDTOUR_MASTERY:');
                                     })
                                     .map((s: string) => s.trim())
                                     .filter(Boolean);
@@ -9037,10 +9060,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 if (Array.isArray(parsedPastNotes)) {
                                   // 1. Lehrwerke der Vorwoche übernehmen (falls aktuell leer)
                                   if (lehrwerkeList.length === 0) {
-                                    const snapLwEntry = parsedPastNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                                    const snapLwEntry = parsedPastNotes.find((n: string) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
                                     if (snapLwEntry) {
                                       try {
-                                        const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                        const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
+                                        const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+                                        const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                        const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                                         const parsedLw = JSON.parse(rawJson);
                                         if (Array.isArray(parsedLw) && parsedLw.length > 0) {
                                           lehrwerkeList = parsedLw;
@@ -9054,10 +9080,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                   // 2. Songs der Vorwoche übernehmen (falls aktuell leer)
                                   if (otherHWs.length === 0) {
-                                    const snapSongEntry = parsedPastNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                    const snapSongEntry = parsedPastNotes.find((n: string) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
                                     if (snapSongEntry) {
                                       try {
-                                        const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                        const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+                                        const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                                        const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                        const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                                         const parsedSongs = JSON.parse(rawJson);
                                         if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
                                           parsedSongs.forEach((song: any) => addSongToOtherHWs(song));
@@ -9106,7 +9135,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                !n.startsWith('LOOP:') &&
                                                !n.startsWith('SNAPSHOT_') &&
                                                !n.startsWith('FEEDBACK:') &&
-                                               !n.startsWith('STUDENT_NOTE_');
+                                               !n.startsWith('STUDENT_NOTE_') &&
+                                               !n.startsWith('WORLDTOUR_MASTERY:');
                                       })
                                       .map((s: string) => s.trim())
                                       .filter(Boolean);
@@ -9190,16 +9220,20 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                            !n.startsWith('SYSTEM:') && 
                                            !n.startsWith('FEEDBACK:') && 
                                            !n.startsWith('STUDENT_NOTE_') &&
-                                           !n.startsWith('SNAPSHOT_');
+                                           !n.startsWith('SNAPSHOT_') &&
+                                           !n.startsWith('WORLDTOUR_MASTERY:');
                                   })
                                   .map((s: string) => s.trim())
                                   .filter(Boolean);
 
                                 // 📦 1. Parse Lehrwerke-Snapshot aus Wochen-Snapshot
-                                const snapLwEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                                const snapLwEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
                                 if (snapLwEntry) {
                                   try {
-                                    const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                    const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
+                                    const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+                                    const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                    const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                                     const parsedLw = JSON.parse(rawJson);
                                     if (Array.isArray(parsedLw)) {
                                       lehrwerkeList = parsedLw;
@@ -9210,10 +9244,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }
 
                                 // 🎵 2. Parse Songs-Snapshot aus Wochen-Snapshot
-                                const snapSongEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                const snapSongEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
                                 if (snapSongEntry) {
                                   try {
-                                    const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                    const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+                                    const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                                    const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                                    const rawJson = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
                                     const parsedSongs = JSON.parse(rawJson);
                                     if (Array.isArray(parsedSongs)) {
                                       parsedSongs.forEach((song: any) => {
@@ -9372,7 +9409,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           }
                         }
 
-                        const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0;
+                        const effectiveWorldTourMasteries: ParsedWorldTourMastery[] = (isCurrentWeek 
+                          ? parseWorldTourMasteries(homeworkNotesList || [])
+                          : (histWeekItem && histWeekItem.homework_notes
+                              ? (() => {
+                                  try {
+                                    const p = typeof histWeekItem.homework_notes === 'string'
+                                      ? JSON.parse(histWeekItem.homework_notes)
+                                      : histWeekItem.homework_notes;
+                                    return Array.isArray(p) ? parseWorldTourMasteries(p) : [];
+                                  } catch {
+                                    return [];
+                                  }
+                                })()
+                              : [])) || [];
+
+                        const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0 || effectiveWorldTourMasteries.length > 0;
                         
                         const currentHour = getSimulatedNow().getHours();
                         const isSilentTime = currentHour >= 20 || currentHour < 7;
@@ -10814,6 +10866,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 </div>
                               )}
 
+                              {/* 🌍 0,1% Goldstandard WorldTour Mastery Note Card (Schülernotiz an Lehrkraft - Nur für Lehrkräfte sichtbar) */}
+                              {!readOnly && effectiveWorldTourMasteries.length > 0 && (
+                                <WorldTourMasteryNoteCard
+                                  masteries={effectiveWorldTourMasteries}
+                                  readOnly={readOnly}
+                                  studentFirstName={studentFirstName}
+                                  onAcknowledge={handleAcknowledgeWorldTourMastery}
+                                  onOpenStation={handleOpenWorldTourStation}
+                                  onSpeak={handleSpeakText}
+                                  isSpeaking={isTtsSpeaking}
+                                  activeTtsKey={activeTtsKey}
+                                  isMobileView={isMobileView}
+                                />
+                              )}
+
                               {!hasActiveItems ? (
                                 <div style={{
                                   display: 'flex',
@@ -10957,20 +11024,20 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             }}
                                           >
                                             <div style={{
-                                              width: '26px',
-                                              height: '30px',
+                                              width: isJunior ? '36px' : '26px',
+                                              height: isJunior ? '40px' : '30px',
                                               background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                              borderRadius: '6px',
+                                              borderRadius: isJunior ? '10px' : '6px',
                                               flexShrink: 0,
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
-                                              boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                              boxShadow: isJunior ? '0 3px 8px rgba(0,0,0,0.14)' : '0 2px 5px rgba(0,0,0,0.1)'
                                             }}>
-                                              <BookOpen size={13} color={bookColor.text} />
+                                              <BookOpen size={isJunior ? 18 : 13} color={bookColor.text} />
                                             </div>
                                             <span style={{
-                                              fontSize: '0.96rem',
+                                              fontSize: isJunior ? '1.12rem' : '0.96rem',
                                               fontWeight: 850,
                                               color: '#0f172a',
                                               overflow: 'hidden',
@@ -11009,11 +11076,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     aria-label={formatPageNumbersGerman(item.pages)}
                                                     title={`${formatPageNumbersGerman(item.pages)} öffnen`}
                                                     style={{
-                                                      fontSize: '0.82rem',
+                                                      fontSize: isJunior ? '0.96rem' : '0.82rem',
                                                       fontWeight: 850,
                                                       color: '#15803d',
                                                       background: '#dcfce7',
-                                                      padding: '4px 11px',
+                                                      padding: isJunior ? '6px 14px' : '4px 11px',
                                                       borderRadius: '99px',
                                                       display: 'inline-flex',
                                                       alignItems: 'center',
@@ -11085,11 +11152,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                 border: isSpeakingThisBook ? '1px solid #86efac' : '1px solid #cbd5e1',
                                                 background: isSpeakingThisBook ? '#dcfce7' : '#ffffff',
                                                 color: isSpeakingThisBook ? '#15803d' : '#64748b',
-                                                borderRadius: '8px',
-                                                width: '26px',
-                                                height: '26px',
-                                                minWidth: '26px',
-                                                minHeight: '26px',
+                                                borderRadius: isJunior ? '10px' : '8px',
+                                                width: isJunior ? '32px' : '26px',
+                                                height: isJunior ? '32px' : '26px',
+                                                minWidth: isJunior ? '32px' : '26px',
+                                                minHeight: isJunior ? '32px' : '26px',
                                                 padding: 0,
                                                 cursor: 'pointer',
                                                 display: 'inline-flex',
@@ -11103,9 +11170,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                               className="hover-scale-mini"
                                             >
                                               {isSpeakingThisBook ? (
-                                                <VolumeX size={13} strokeWidth={2.4} />
+                                                <VolumeX size={isJunior ? 16 : 13} strokeWidth={2.4} />
                                               ) : (
-                                                <Volume2 size={13} strokeWidth={2.2} />
+                                                <Volume2 size={isJunior ? 16 : 13} strokeWidth={2.2} />
                                               )}
                                             </button>
                                           </div>
@@ -11132,10 +11199,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
                                               gap: '8px',
-                                              fontSize: '0.88rem',
+                                              fontSize: isJunior ? '0.98rem' : '0.88rem',
                                               lineHeight: 1.5,
-                                              padding: '5px 8px',
-                                              marginLeft: '32px',
+                                              padding: isJunior ? '6px 10px' : '5px 8px',
+                                              marginLeft: isJunior ? '40px' : '32px',
                                               borderRadius: '8px',
                                               background: isSpeakingThis ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
                                               border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
@@ -11143,7 +11210,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                               transition: 'all 0.15s ease'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0, fontSize: '0.88rem' }}>S. {p}:</span>
+                                                <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0, fontSize: isJunior ? '0.98rem' : '0.88rem' }}>S. {p}:</span>
                                                 {parsedAnn.isSpecificToCurrent && (
                                                   <span style={{
                                                     display: 'inline-flex',
@@ -11250,7 +11317,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         {deduplicatedOtherHWs.map((item, idx) => {
                                           const songNote = getCleanPageNotes(item.homework_notes);
                                           const songInfo = extractSongArtistAndTitle(item);
-                                          const cleanSongDisplayTitle = item.topic_name.replace(/\s*\([^)]*\)\s*$/, '').replace(/linken park/gi, 'Linkin Park');
+                                          const rawSongTopic = item.topic_name || item.title || item.song_title || 'Song';
+                                          const cleanSongDisplayTitle = rawSongTopic.replace(/\s*\([^)]*\)\s*$/, '').replace(/linken park/gi, 'Linkin Park');
                                           const songTitle = songInfo.displayTitle || formatDisplayTitle(cleanSongDisplayTitle) || songInfo.title;
                                           const songArtist = songInfo.displayArtist || formatDisplayTitle(songInfo.artist) || '';
                                           const songColor = getSongColor(songTitle);
@@ -11276,9 +11344,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                 transition: 'opacity 0.15s ease'
                                               }}>
                                                 <div style={{
-                                                  width: '28px',
-                                                  height: '28px',
-                                                  borderRadius: '8px',
+                                                  width: isJunior ? '36px' : '28px',
+                                                  height: isJunior ? '36px' : '28px',
+                                                  borderRadius: isJunior ? '10px' : '8px',
                                                   background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
                                                   display: 'flex',
                                                   alignItems: 'center',
@@ -11288,11 +11356,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   border: '1px solid rgba(255, 255, 255, 0.85)',
                                                   flexShrink: 0
                                                 }}>
-                                                  <Music size={14} strokeWidth={2.4} />
+                                                  <Music size={isJunior ? 18 : 14} strokeWidth={2.4} />
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                                                   <span style={{
-                                                    fontSize: '0.95rem',
+                                                    fontSize: isJunior ? '1.10rem' : '0.95rem',
                                                     fontWeight: 850,
                                                     color: '#0f172a',
                                                     overflow: 'hidden',
@@ -11341,11 +11409,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     border: isSpeakingThisSongRow ? '1px solid #86efac' : '1px solid #cbd5e1',
                                                     background: isSpeakingThisSongRow ? '#dcfce7' : '#ffffff',
                                                     color: isSpeakingThisSongRow ? '#15803d' : '#64748b',
-                                                    borderRadius: '8px',
-                                                    width: '26px',
-                                                    height: '26px',
-                                                    minWidth: '26px',
-                                                    minHeight: '26px',
+                                                    borderRadius: isJunior ? '10px' : '8px',
+                                                    width: isJunior ? '32px' : '26px',
+                                                    height: isJunior ? '32px' : '26px',
+                                                    minWidth: isJunior ? '32px' : '26px',
+                                                    minHeight: isJunior ? '32px' : '26px',
                                                     padding: 0,
                                                     cursor: 'pointer',
                                                     display: 'inline-flex',
@@ -11359,9 +11427,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   className="hover-scale-mini"
                                                 >
                                                   {isSpeakingThisSongRow ? (
-                                                    <VolumeX size={13} strokeWidth={2.4} />
+                                                    <VolumeX size={isJunior ? 16 : 13} strokeWidth={2.4} />
                                                   ) : (
-                                                    <Volume2 size={13} strokeWidth={2.2} />
+                                                    <Volume2 size={isJunior ? 16 : 13} strokeWidth={2.2} />
                                                   )}
                                                 </button>
                                               </div>
@@ -11378,10 +11446,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   alignItems: 'center',
                                                   justifyContent: 'space-between',
                                                   gap: '8px',
-                                                  fontSize: '0.88rem',
+                                                  fontSize: isJunior ? '0.98rem' : '0.88rem',
                                                   lineHeight: 1.5,
-                                                  padding: '5px 8px',
-                                                  marginLeft: '32px',
+                                                  padding: isJunior ? '6px 10px' : '5px 8px',
+                                                  marginLeft: isJunior ? '40px' : '32px',
                                                   borderRadius: '8px',
                                                   background: isSpeakingThisSong ? '#e0e7ff' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
                                                   border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
@@ -11389,7 +11457,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   transition: 'all 0.15s ease'
                                                 }}>
                                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                    <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0, fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0, fontSize: isJunior ? '0.98rem' : '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                                       <Pin size={11} strokeWidth={2.4} />
                                                       <span>Fahrplan:</span>
                                                     </span>
@@ -11437,7 +11505,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     type="button"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
-                                                      handleSpeakText(`Fahrplan für ${item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}: ${parsedAnn.cleanText}`, `song_note_${idx}`);
+                                                      handleSpeakText(`Fahrplan für ${(item.topic_name || item.title || item.song_title || 'Song').replace(/\s*\([^)]*\)\s*$/, '')}: ${parsedAnn.cleanText}`, `song_note_${idx}`);
                                                     }}
                                                     style={{
                                                       border: 'none',
@@ -11499,7 +11567,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           if (!item || typeof item !== 'string') return false;
                                           if (isInternalMetadataNote(item)) return false;
                                           const lower = item.toLowerCase();
-                                          if (lower.startsWith('latency:') || lower.startsWith('latency_calibration:') || item.startsWith('SYSTEM:') || item.startsWith('STICKER:') || item.startsWith('AUDIO:') || item.startsWith('LOOP:')) return false;
+                                          if (lower.startsWith('latency:') || lower.startsWith('latency_calibration:') || item.startsWith('SYSTEM:') || item.startsWith('STICKER:') || item.startsWith('AUDIO:') || item.startsWith('LOOP:') || item.startsWith('WORLDTOUR_MASTERY:') || lower.includes('worldtour_mastery:')) return false;
 
                                           // 👥 DUO & GRUPPENUNTERRICHT: If in student mode (readOnly), filter out notes explicitly targeted to a different student
                                           if (readOnly) {

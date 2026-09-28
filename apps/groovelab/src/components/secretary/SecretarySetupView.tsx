@@ -221,6 +221,10 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   type="button"
                   role="tab"
                   aria-selected={true}
+                  onClick={() => {
+                    if (props.setSettingsTab) props.setSettingsTab('administration');
+                    props.setActiveSecretarySettingsModal('administration');
+                  }}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '10px',

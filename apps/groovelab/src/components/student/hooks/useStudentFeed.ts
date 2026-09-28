@@ -151,25 +151,77 @@ export function useStudentFeed({
 
     if (!normalizedInput.trim()) return;
 
+    const currentSessionId = ttsSessionIdRef.current;
     setIsTtsSpeaking(true);
     setActiveTtsKey(elementKey);
 
+    let audioPlayed = false;
+
+    // 1. Primär-Versuch: Lokale neuronale TTS (falls aktiv/konfiguriert)
     try {
       const audioBlob = await synthesizeNeuralSpeech(normalizedInput, 'thorsten');
-      if (audioBlob) {
+      if (audioBlob && ttsSessionIdRef.current === currentSessionId) {
         await playAudioBlob(audioBlob);
-      } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        const utter = new SpeechSynthesisUtterance(normalizedInput);
-        utter.lang = 'de-DE';
-        utter.onend = () => {
-          setIsTtsSpeaking(false);
-          setActiveTtsKey(null);
-        };
-        window.speechSynthesis.speak(utter);
+        audioPlayed = true;
       }
     } catch {
+      // Sovereign Zero US Cloud / Piper WASM disabled -> nahtloser Übergang zu nativer Browser-Sprache
+    }
+
+    if (ttsSessionIdRef.current !== currentSessionId) return;
+
+    // 2. Resilienter 0,1% Goldstandard WebSpeech Fallback (0ms Latenz, 0 Byte Netztraffic, iOS/Android/Desktop optimiert)
+    if (!audioPlayed && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        try { window.speechSynthesis.resume(); } catch {}
+
+        const utter = new SpeechSynthesisUtterance(normalizedInput);
+        utter.lang = 'de-DE';
+        utter.rate = 0.92; // Kindgerechtes, leicht entschleunigtes Übetempo für 6-10 Jahre
+        utter.pitch = 1.05; // Freundliche, helle Stimmfarbe
+
+        // Beste deutsche Systemstimme ermitteln
+        const voices = window.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(v => v.lang.startsWith('de') && (
+          v.name.includes('Anna') ||
+          v.name.includes('Markus') ||
+          v.name.includes('Petra') ||
+          v.name.includes('Google') ||
+          v.name.includes('Siri') ||
+          v.name.includes('Deutsch')
+        )) || voices.find(v => v.lang.startsWith('de'));
+
+        if (preferredVoice) {
+          utter.voice = preferredVoice;
+        }
+
+        utter.onend = () => {
+          if (ttsSessionIdRef.current === currentSessionId) {
+            setIsTtsSpeaking(false);
+            setActiveTtsKey(null);
+            setTtsStatusText(null);
+          }
+        };
+
+        utter.onerror = () => {
+          if (ttsSessionIdRef.current === currentSessionId) {
+            setIsTtsSpeaking(false);
+            setActiveTtsKey(null);
+            setTtsStatusText(null);
+          }
+        };
+
+        window.speechSynthesis.speak(utter);
+      } catch {
+        setIsTtsSpeaking(false);
+        setActiveTtsKey(null);
+        setTtsStatusText(null);
+      }
+    } else if (!audioPlayed) {
       setIsTtsSpeaking(false);
       setActiveTtsKey(null);
+      setTtsStatusText(null);
     }
   }, [isTtsSpeaking, activeTtsKey, handleStopSpeaking]);
 

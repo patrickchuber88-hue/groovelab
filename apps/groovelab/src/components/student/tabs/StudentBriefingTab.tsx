@@ -5,7 +5,7 @@ import {
   Zap, Music, School, Calendar, CalendarX, Check, Target, MessageSquare, Pencil, User,
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
   Mic, Disc, Download, Key, Headphones, Sliders, SlidersHorizontal, Bell, Crown, RefreshCw,
-  Signal, Wifi, WifiOff
+  Signal, Wifi, WifiOff, Lightbulb
 } from 'lucide-react';
 import { useNetworkProfile } from '../../../hooks/useNetworkProfile';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
@@ -247,18 +247,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     setJuniorRecordTitle,
     setSessionActive,
     setShowAppointmentChat,
-    setShowJuniorHomeworkModal,
+    setShowJuniorHomeworkModal: setShowJuniorHomeworkModalProp,
     setShowJuniorPreFlightModal,
-    setShowJuniorRecordingsModal,
+    setShowJuniorRecordingsModal: setShowJuniorRecordingsModalProp,
     setShowJuniorStickerModal,
-    setShowJuniorTimerModal,
+    setShowJuniorTimerModal: setShowJuniorTimerModalProp,
     setShowRulesModal,
     setShowStudentToolbox,
     setStudentFeedTab,
-    showJuniorHomeworkModal,
+    showJuniorHomeworkModal: showJuniorHomeworkModalProp,
     showJuniorRecordModal,
-    showJuniorRecordingsModal,
-    showJuniorTimerModal,
+    showJuniorRecordingsModal: showJuniorRecordingsModalProp,
+    showJuniorTimerModal: showJuniorTimerModalProp,
     isJuniorPadActive,
     setIsJuniorPadActive,
     songStats,
@@ -279,6 +279,34 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     pushEnabled,
     setShowPushSoftPrompt
   } = props;
+
+  // 🛡️ Fail-Safe Local State for Junior Briefing Modals (prevents dead prop stubs)
+  const [localShowJuniorHomeworkModal, setLocalShowJuniorHomeworkModal] = useState<boolean>(false);
+  const showJuniorHomeworkModal = Boolean(showJuniorHomeworkModalProp || localShowJuniorHomeworkModal);
+  const setShowJuniorHomeworkModal = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
+    setLocalShowJuniorHomeworkModal(prev => typeof val === 'function' ? val(prev) : val);
+    if (setShowJuniorHomeworkModalProp) {
+      try { setShowJuniorHomeworkModalProp(val as any); } catch {}
+    }
+  }, [setShowJuniorHomeworkModalProp]);
+
+  const [localShowJuniorRecordingsModal, setLocalShowJuniorRecordingsModal] = useState<boolean>(false);
+  const showJuniorRecordingsModal = Boolean(showJuniorRecordingsModalProp || localShowJuniorRecordingsModal);
+  const setShowJuniorRecordingsModal = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
+    setLocalShowJuniorRecordingsModal(prev => typeof val === 'function' ? val(prev) : val);
+    if (setShowJuniorRecordingsModalProp) {
+      try { setShowJuniorRecordingsModalProp(val as any); } catch {}
+    }
+  }, [setShowJuniorRecordingsModalProp]);
+
+  const [localShowJuniorTimerModal, setLocalShowJuniorTimerModal] = useState<boolean>(false);
+  const showJuniorTimerModal = Boolean(showJuniorTimerModalProp || localShowJuniorTimerModal);
+  const setShowJuniorTimerModal = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
+    setLocalShowJuniorTimerModal(prev => typeof val === 'function' ? val(prev) : val);
+    if (setShowJuniorTimerModalProp) {
+      try { setShowJuniorTimerModalProp(val as any); } catch {}
+    }
+  }, [setShowJuniorTimerModalProp]);
 
   // 📱 Prevent tablet display sleep during music practice on music stand
   usePwaWakeLock(true);
@@ -490,9 +518,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
   const handleSetTaskReflection = (taskId: string, status: 'super' | 'wackelig' | 'hilfe', label?: string) => {
     const sId = props.studentId || studentUser?.id || 'default';
+    let nextStatus: 'super' | 'wackelig' | 'hilfe' | undefined;
+
     setTaskReflections(prev => {
       const current = prev[taskId]?.status;
-      const next = current === status ? undefined : { status, timestamp: new Date().toISOString(), label };
+      nextStatus = current === status ? undefined : status;
+      const next = nextStatus ? { status: nextStatus, timestamp: new Date().toISOString(), label } : undefined;
       const updated = { ...prev };
       if (!next) {
         delete updated[taskId];
@@ -509,7 +540,150 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
       }
       return updated;
     });
+
+    // ☁️ Revisionssicherer Cloud-Sync zu Supabase für die Lehrkraft
+    if (sId && sId !== 'default') {
+      Promise.resolve(
+        supabase.rpc('save_student_task_reflection', {
+          p_student_id: sId,
+          p_task_id: taskId,
+          p_status: nextStatus || '',
+          p_label: label || ''
+        })
+      ).then(({ error }: any) => {
+        if (error) {
+          console.warn('[save_student_task_reflection] notice (fallback active):', error.message || error);
+        }
+      }).catch((err: any) => {
+        console.warn('[save_student_task_reflection] notice:', err);
+      });
+    }
   };
+
+  const renderPedagogicalTrafficLightPills = (taskId: string, label: string) => {
+    const current = taskReflections[taskId]?.status;
+    const lights: Array<{
+      status: 'super' | 'wackelig' | 'hilfe';
+      icon: React.ReactNode;
+      shortLabel: string;
+      fullMessage: string;
+      activeBg: string;
+      activeBorder: string;
+      glowColor: string;
+    }> = [
+      {
+        status: 'super',
+        icon: <Check size={16} strokeWidth={3.2} />,
+        shortLabel: 'Vorspielen',
+        fullMessage: 'Vorspielen – Kann ich! 🚀',
+        activeBg: '#16a34a',
+        activeBorder: '#15803d',
+        glowColor: 'rgba(22, 163, 74, 0.45)'
+      },
+      {
+        status: 'wackelig',
+        icon: <Sparkles size={15} strokeWidth={2.8} />,
+        shortLabel: 'Feinschliff',
+        fullMessage: 'Feinschliff – Klappt schon ✨',
+        activeBg: '#d97706',
+        activeBorder: '#b45309',
+        glowColor: 'rgba(217, 119, 6, 0.45)'
+      },
+      {
+        status: 'hilfe',
+        icon: <Lightbulb size={15} strokeWidth={2.8} />,
+        shortLabel: 'Tipp',
+        fullMessage: 'Tipp – Hilf mir mal! 💡',
+        activeBg: '#dc2626',
+        activeBorder: '#b91c1c',
+        glowColor: 'rgba(220, 38, 38, 0.45)'
+      }
+    ];
+
+    return (
+      <div
+        role="group"
+        aria-label={`Mitmach-Ampel für ${label}`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          background: '#f8fafc',
+          padding: '3px 5px',
+          borderRadius: '100px',
+          border: '1.5px solid #e2e8f0',
+          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)'
+        }}
+      >
+        {lights.map((light) => {
+          const isSelected = current === light.status;
+          const hasSelection = Boolean(current);
+          return (
+            <button
+              key={light.status}
+              type="button"
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`${label}: ${light.fullMessage}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSetTaskReflection(taskId, light.status, label);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSetTaskReflection(taskId, light.status, label);
+                }
+              }}
+              style={{
+                width: '32px',
+                height: '32px',
+                minWidth: '44px',
+                minHeight: '44px',
+                padding: '0',
+                border: 'none',
+                background: 'transparent',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                borderRadius: '50%',
+                position: 'relative',
+                opacity: isSelected ? 1 : hasSelection ? 0.35 : 0.85,
+                transform: isSelected ? 'scale(1.12)' : 'scale(1)',
+                transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+              className="hover-scale-mini"
+              title={light.fullMessage}
+            >
+              <div
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: light.activeBg,
+                  color: '#ffffff',
+                  border: isSelected ? '2px solid #ffffff' : `1.5px solid ${light.activeBorder}`,
+                  boxShadow: isSelected
+                    ? `0 0 0 2px ${light.activeBorder}, 0 0 12px ${light.glowColor}`
+                    : '0 1px 3px rgba(0,0,0,0.12)',
+                  transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+              >
+                {light.icon}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+  const renderSmileyReflectionPills = renderPedagogicalTrafficLightPills;
 
   const renderReflectionPills = (taskId: string, label: string) => {
     const current = taskReflections[taskId]?.status;
@@ -1520,49 +1694,50 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       display: 'inline-flex', 
                                       alignItems: 'center', 
                                       gap: '8px', 
-                                      background: hasMessage ? '#fefce8' : '#ffffff', 
-                                      color: hasMessage ? '#ca8a04' : '#475569', 
-                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
-                                      minHeight: isMusicStandMode ? '44px' : '38px', 
+                                      background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
+                                      color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
+                                      padding: isMusicStandMode ? '10px 20px' : '10px 18px', 
+                                      minHeight: isMusicStandMode ? '48px' : '44px', 
                                       boxSizing: 'border-box',
                                       borderRadius: '14px', 
-                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
+                                      fontSize: isMusicStandMode ? '0.96rem' : '0.90rem', 
                                       fontWeight: 900, 
-                                      border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
+                                      border: unreadMsgCount > 0 ? '1.5px solid #86efac' : (hasMessage ? '1px solid #cbd5e1' : '1px solid #cbd5e1'), 
                                       cursor: 'pointer',
-                                      boxShadow: hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                      boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
                                       transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}
                                     onMouseEnter={(e) => {
                                       e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.background = hasMessage ? '#fef08a' : '#f8fafc';
-                                      e.currentTarget.style.boxShadow = hasMessage ? '0 4px 12px rgba(202, 138, 4, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                      e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
+                                      e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
                                     }}
                                     onMouseLeave={(e) => {
                                       e.currentTarget.style.transform = 'none';
-                                      e.currentTarget.style.background = hasMessage ? '#fefce8' : '#ffffff';
-                                      e.currentTarget.style.boxShadow = hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                      e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
+                                      e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
                                     }}
                                     title="1:1 Shoutbox zum Unterrichtstermin"
+                                    aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
                                   >
                                     <MessageSquare 
-                                      size={15} 
-                                      color={hasMessage ? '#ca8a04' : '#64748b'} 
-                                      fill={hasMessage ? '#eab308' : 'none'} 
+                                      size={isMusicStandMode ? 18 : 17} 
+                                      color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
+                                      fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
                                     />
-                                    <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
+                                    <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? 'Nachricht von Lehrkraft' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft')}</span>
                                     {unreadMsgCount > 0 && (
                                       <span style={{
-                                        background: '#f59e0b',
+                                        background: '#15803d',
                                         color: '#ffffff',
-                                        fontSize: '0.70rem',
+                                        fontSize: '0.74rem',
                                         fontWeight: 950,
                                         padding: '2px 8px',
                                         borderRadius: '100px',
                                         letterSpacing: '0.02em',
-                                        boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)'
+                                        boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
                                       }}>
-                                        {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
+                                        {unreadMsgCount === 1 ? '1 neu' : `${unreadMsgCount} neu`}
                                       </span>
                                     )}
                                   </button>
@@ -1960,7 +2135,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         try {
                           const p = JSON.parse(clean);
                           if (Array.isArray(p)) {
-                            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+                            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:') && !x.startsWith('TASK_REFL:')).join(' ');
                           } else if (typeof p === 'string') {
                             clean = p;
                           }
@@ -1969,14 +2144,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       return clean
                         .replace(/\["AUDIO:[^"]*"\]/g, '')
                         .replace(/AUDIO:[^\s,|]+/g, '')
-                        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+                        .replace(/EARLAB_SCORE:[^\s,|]+/g, '')
+                        .replace(/TASK_REFL:[^\s,|]+/g, '')
+                        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION|TASK_REFL):[^|]*\|/, '')
                         .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
+                        .replace(/^TASK_REFL:[^|]*\|?/i, '')
                         .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                         .trim();
                     };
 
                     let isPastNoteCarriedOver = false;
-                    const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+                    const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('TASK_REFL:') && !n.startsWith('❓ Frage für den Unterricht:') && !n.startsWith('WORLDTOUR_MASTERY:') && !n.startsWith('EARLAB_SCORE:');
 
                     let generalNotesList: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
 
@@ -2196,39 +2374,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   </button>
                                 )}
 
-                                  {/* Audio-Pille direkt in Karte 1 */}
-                                  {audioTracks.length > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenHomeworkBookWithView('document', 'recordings');
-                                      }}
-                                      style={{
-                                        background: '#e6f4ea',
-                                        border: '1.5px solid #c7eed2',
-                                        borderRadius: '100px',
-                                        padding: isMusicStandMode ? '8px 14px' : '6px 10px',
-                                        minHeight: '38px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        cursor: 'pointer',
-                                        color: '#1e7037',
-                                        fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
-                                        fontWeight: 900,
-                                        whiteSpace: 'nowrap',
-                                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)',
-                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                      }}
-                                      className="hover-scale-mini"
-                                      title="Aufnahmen deiner Lehrkraft anhören"
-                                      aria-label="Aufnahmen deiner Lehrkraft anhören"
-                                    >
-                                      <Headphones size={15} color="#1e7037" strokeWidth={2.4} />
-                                      <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
-                                    </button>
-                                  )}
+
 
                                   {/* 1-Touch Praxis-Tools Direktzugriff (ehemals Metronom) */}
                                   {props.setShowStudentToolbox && (
@@ -2518,11 +2664,41 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     )}
                                   </button>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                      <Headphones size={12} color="#16a34a" />
-                                      <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        Vorspiel / Feedback
-                                      </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <Headphones size={12} color="#16a34a" />
+                                        <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                          Vorspiel / Feedback
+                                        </span>
+                                      </div>
+                                      {audioTracks.length > 1 && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenHomeworkBookWithView('document', 'recordings');
+                                          }}
+                                          style={{
+                                            fontSize: '0.68rem',
+                                            fontWeight: 900,
+                                            color: '#15803d',
+                                            background: '#e6f4ea',
+                                            border: '1px solid #bbf7d0',
+                                            borderRadius: '100px',
+                                            padding: '1px 7px',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '2px',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          className="hover-scale-mini"
+                                          title={`${audioTracks.length} Aufnahmen vorhanden - alle im Hausaufgabenheft anzeigen`}
+                                          aria-label={`${audioTracks.length} Aufnahmen vorhanden - alle im Hausaufgabenheft anzeigen`}
+                                        >
+                                          +{audioTracks.length - 1} weitere
+                                        </button>
+                                      )}
                                     </div>
                                     <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                       {audioTracks[0].label || 'Aufnahme deiner Lehrkraft'}
@@ -2542,7 +2718,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '10px' }}>
                             <button
                               type="button"
+                              role="button"
+                              tabIndex={0}
+                              aria-label="Hausaufgaben-Übersicht öffnen"
+                              title="Hausaufgaben-Übersicht öffnen"
                               onClick={(e) => { e.stopPropagation(); setShowJuniorHomeworkModal(true); }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setShowJuniorHomeworkModal(true);
+                                }
+                              }}
                               style={{
                                 padding: isMusicStandMode ? '16px 14px' : '14px 12px',
                                 minHeight: '48px',
@@ -2638,7 +2825,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                           return (
                             <div 
+                              role="button"
+                              tabIndex={0}
                               onClick={() => handleTabChangeLocal('practice_board')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleTabChangeLocal('practice_board');
+                                }
+                              }}
                               style={{
                                 background: '#ffffff',
                                 borderRadius: '32px',
@@ -2654,7 +2849,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               }}
                               className="hover-scale"
                             >
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                {/* 1. Header: Squircle-Icon + Kombinierte Status-Synapse (Serie & Schilde) */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{
                                     background: isGoalAchieved ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
@@ -2665,7 +2861,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: isGoalAchieved ? '0 6px 16px rgba(124, 58, 237, 0.25)' : '0 6px 16px rgba(99, 102, 241, 0.2)'
+                                    boxShadow: isGoalAchieved ? '0 6px 16px rgba(124, 58, 237, 0.25)' : '0 6px 16px rgba(99, 102, 241, 0.2)',
+                                    flexShrink: 0
                                   }}>
                                     {isGoalAchieved ? (
                                       <Star size={isMusicStandMode ? 32 : 28} fill="currentColor" />
@@ -2674,32 +2871,60 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     )}
                                   </div>
 
-                                  <span style={{
-                                    background: isGoalAchieved ? '#f5f3ff' : '#eef2ff',
-                                    color: isGoalAchieved ? '#6d28d9' : '#4f46e5',
-                                    fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
-                                    fontWeight: 900,
-                                    padding: isMusicStandMode ? '6px 14px' : '5px 12px',
-                                    borderRadius: '100px',
-                                    border: isGoalAchieved ? '1.5px solid #ddd6fe' : '1.5px solid #c7d2fe',
-                                    whiteSpace: 'nowrap',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
-                                  }}>
-                                    {isGoalAchieved ? (
-                                      <>
-                                        <span>{streak === 0 ? 'Startklar' : streak} {streak === 1 ? 'Tag' : 'Tage'} • Stern gesichert</span>
-                                        <Check size={14} strokeWidth={3} color="#6d28d9" style={{ flexShrink: 0 }} />
-                                      </>
-                                    ) : (
-                                      <span>{streak === 0 ? 'Startklar' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} Serie`}</span>
-                                    )}
-                                  </span>
+                                  {/* Kombinierte Status-Synapse: Flamme/Stern & Schilde vereint */}
+                                  <div 
+                                    style={{
+                                      background: isGoalAchieved ? '#f5f3ff' : '#f8fafc',
+                                      color: isGoalAchieved ? '#6d28d9' : '#334155',
+                                      fontSize: isMusicStandMode ? '0.90rem' : '0.82rem',
+                                      fontWeight: 900,
+                                      padding: isMusicStandMode ? '6px 14px' : '5px 12px',
+                                      borderRadius: '100px',
+                                      border: isGoalAchieved ? '1.5px solid #ddd6fe' : '1.5px solid #e2e8f0',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                    }}
+                                    title={isGoalAchieved ? 'Tages-Stern gesichert • 3 Zauber-Schilde aktiv' : `${streak} Tag(e) Serie • 3 Zauber-Schilde aktiv`}
+                                  >
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      color: isGoalAchieved ? '#6d28d9' : (streak > 0 ? '#ea580c' : '#64748b')
+                                    }}>
+                                      {isGoalAchieved ? (
+                                        <>
+                                          <Star size={13} fill="#7c3aed" color="#7c3aed" style={{ flexShrink: 0 }} />
+                                          <span>{streak === 0 ? 'Stern sicher' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'}`}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span style={{ fontSize: '1em' }}>🔥</span>
+                                          <span>{streak === 0 ? 'Startklar' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'}`}</span>
+                                        </>
+                                      )}
+                                    </span>
+
+                                    <span style={{ color: '#cbd5e1', fontWeight: 400 }}>•</span>
+
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      color: '#059669'
+                                    }}>
+                                      <Shield size={13} color="#059669" fill="#059669" style={{ flexShrink: 0 }} />
+                                      <span>3</span>
+                                    </span>
+                                  </div>
                                 </div>
 
+                                {/* 2. Hero-Bereich: Typografie & Fortschrittstrack */}
                                 <div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, color: isGoalAchieved ? '#7c3aed' : '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.82rem', fontWeight: 900, color: isGoalAchieved ? '#7c3aed' : '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                     Übe-Rakete
                                   </div>
                                   <h3 style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
@@ -2707,73 +2932,57 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       ? 'Tages-Stern entzündet!' 
                                       : `Tagesziel: ${requiredMins} Minuten`}
                                   </h3>
-                                  <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: isGoalAchieved ? '#5b21b6' : '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
-                                    {isGoalAchieved 
-                                      ? `Heute ${todayMins} Min. geübt • Dein Stern leuchtet sicher!` 
-                                      : hasPracticedSome 
-                                        ? `${todayMins} von ${requiredMins} Min. geschafft` 
-                                        : `${requiredMins} Min. üben & Stern entzünden`}
-                                  </p>
 
-                                  {/* Progress bar */}
-                                  <div style={{ marginTop: '12px', width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                  {/* Ruhiger Fortschritts- & Stufen-Subtext (ohne Kasten) */}
+                                  <div style={{
+                                    marginTop: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    fontSize: isMusicStandMode ? '1.02rem' : '0.88rem',
+                                    color: isGoalAchieved ? '#6d28d9' : '#64748b',
+                                    fontWeight: 700
+                                  }}>
+                                    <span>
+                                      {isGoalAchieved 
+                                        ? `Heute ${todayMins} Min. geübt` 
+                                        : hasPracticedSome 
+                                          ? `${todayMins} von ${requiredMins} Min. geschafft` 
+                                          : `Noch ${requiredMins} Min. üben`}
+                                    </span>
+                                    <span style={{
+                                      fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
+                                      fontWeight: 850,
+                                      color: isGoalAchieved ? '#7c3aed' : '#4338ca',
+                                      background: isGoalAchieved ? '#ede9fe' : '#e0e7ff',
+                                      padding: '2px 8px',
+                                      borderRadius: '100px'
+                                    }}>
+                                      {streak >= 9 ? '★ Königsstufe' : streak >= 4 ? '★ Stufe 2' : '★ Stufe 1'}
+                                    </span>
+                                  </div>
+
+                                  {/* Satter 10px Progress Bar (Haptisch & Schlicht) */}
+                                  <div style={{
+                                    marginTop: '10px',
+                                    width: '100%',
+                                    height: '10px',
+                                    background: '#f1f5f9',
+                                    borderRadius: '100px',
+                                    overflow: 'hidden',
+                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+                                  }}>
                                     <div style={{
                                       width: `${progressPercent}%`,
                                       height: '100%',
                                       background: isGoalAchieved 
-                                        ? 'linear-gradient(90deg, #818cf8 0%, #6366f1 50%, #c084fc 100%)' 
+                                        ? 'linear-gradient(90deg, #818cf8 0%, #6366f1 50%, #a855f7 100%)' 
                                         : 'linear-gradient(90deg, #818cf8 0%, #6366f1 100%)',
                                       borderRadius: '100px',
-                                      transition: 'width 0.4s ease'
+                                      transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }} />
                                   </div>
                                 </div>
-                              </div>
-
-                              {/* Sternen-Stufe Status & Zielzeit (Pädagogische Auto-Progression) */}
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '10px 14px',
-                                background: '#f5f3ff',
-                                borderRadius: '16px',
-                                border: '1.5px solid #e0e7ff',
-                                fontSize: '0.86rem',
-                                fontWeight: 900
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <Star size={16} fill="#6366f1" color="#6366f1" style={{ flexShrink: 0 }} />
-                                  <span style={{ color: '#4338ca' }}>
-                                    {streak >= 9 ? 'Sternen-Königsstufe' : streak >= 4 ? 'Sternen-Stufe 2' : 'Sternen-Stufe 1'}
-                                  </span>
-                                </div>
-                                <span style={{
-                                  background: '#ede9fe',
-                                  color: '#6d28d9',
-                                  padding: '4px 10px',
-                                  borderRadius: '100px',
-                                  border: '1px solid #ddd6fe'
-                                }}>
-                                  {requiredMins} Min. Sternen-Ziel
-                                </span>
-                              </div>
-
-                              {/* 3 Zauber-Schilde Puffer-Schutz */}
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 12px',
-                                background: '#ecfdf5',
-                                borderRadius: '12px',
-                                border: '1px solid #a7f3d0',
-                                fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
-                                fontWeight: 800,
-                                color: '#065f46'
-                              }}>
-                                <Shield size={14} color="#059669" fill="#059669" style={{ flexShrink: 0 }} />
-                                <span>3 Zauber-Schilde halten Wache • Dein Stern ist sicher!</span>
                               </div>
 
                               <button
@@ -3029,572 +3238,666 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* ========================================================================= */}
                   {/* MODAL 1: JUNIOR HAUSAUFGABEN-MASKE                                        */}
                   {/* ========================================================================= */}
-                  {showJuniorHomeworkModal && (
-                    <div style={{
-                      position: 'fixed',
-                      inset: 0,
-                      background: 'rgba(15, 23, 42, 0.75)',
-                      backdropFilter: 'blur(12px)',
-                      zIndex: 99999,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px'
-                    }}>
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '32px',
-                        maxWidth: '600px',
-                        width: '100%',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        padding: '32px',
-                        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '22px'
-                      }}>
-                        <button
-                          onClick={() => {
+                  {showJuniorHomeworkModal && (() => {
+                    const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, allTeacherNotes, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary() as any;
+                    const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+
+                    const handleTtsToggle = () => {
+                      if (isTtsSpeaking && activeTtsKey === 'junior_modal') {
+                        handleStopSpeaking();
+                      } else {
+                        const narrative = buildContinuousHomeworkNarrative({
+                          teacherName: formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher),
+                          instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
+                          books: formattedJuniorBooks.map((b: any) => ({
+                            title: b.title,
+                            pageNums: b.pageNums,
+                            notes: b.notesList ? b.notesList.map((n: any) => n.text) : []
+                          })),
+                          songs: otherActiveSongs.map((s: any) => ({
+                            title: cleanTitle(s.topic_name || s.title),
+                            note: s.homework_notes
+                          })),
+                          audioCount: audioTracks.length,
+                          generalNotes: generalNote
+                        });
+                        handleSpeakText(narrative, 'junior_modal');
+                      }
+                    };
+
+                    return (
+                      <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Mein Aufgabenheft"
+                        style={{
+                          position: 'fixed',
+                          inset: 0,
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          backdropFilter: 'blur(12px)',
+                          zIndex: 99999,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '16px'
+                        }}
+                        onClick={(e) => {
+                          if (e.target === e.currentTarget) {
                             handleStopSpeaking();
                             setShowJuniorHomeworkModal(false);
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: '22px',
-                            right: '22px',
-                            background: '#f1f5f9',
-                            border: 'none',
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#64748b',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                        >
-                          <X size={20} />
-                        </button>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          }
+                        }}
+                      >
+                        <div style={{
+                          background: '#ffffff',
+                          borderRadius: '28px',
+                          maxWidth: '680px',
+                          width: 'min(680px, calc(100vw - 32px))',
+                          maxHeight: '90vh',
+                          overflowY: 'auto',
+                          padding: '24px 28px',
+                          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '18px'
+                        }}>
+                          {/* 🌟 1. INTEGRATED CHILD-FRIENDLY HEADER (Vorlesen pill directly beside close X) */}
                           <div style={{
-                            background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                            color: '#34a853',
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '16px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
+                            justifyContent: 'space-between',
+                            gap: '12px'
                           }}>
-                            <BookOpen size={24} strokeWidth={2.4} />
-                          </div>
-                          <div>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              Mein Aufgabenheft
-                            </span>
-                            <h2 style={{ margin: '2px 0 0 0', fontSize: '1.35rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Deine aktuellen Aufgaben 🎵
-                            </h2>
-                          </div>
-                        </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                              <div style={{
+                                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                                color: '#34a853',
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                flexShrink: 0
+                              }}>
+                                <BookOpen size={22} strokeWidth={2.4} />
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>
+                                  Mein Aufgabenheft
+                                </span>
+                                <h2 style={{ margin: '1px 0 0 0', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  Deine Aufgaben 🎵
+                                </h2>
+                              </div>
+                            </div>
 
-                        {(() => {
-                          const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, allTeacherNotes, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary() as any;
-                          const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                            {/* Action Group: Kid-Friendly Vorlesen Pill + Close Button */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                              {hasAnyHomework && (
+                                <button
+                                  type="button"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={handleTtsToggle}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleTtsToggle();
+                                    }
+                                  }}
+                                  aria-label={isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Vorlesen anhalten' : 'Hausaufgaben vorlesen lassen'}
+                                  style={{
+                                    background: isTtsSpeaking && activeTtsKey === 'junior_modal'
+                                      ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                                      : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '100px',
+                                    padding: '0 14px',
+                                    height: '38px',
+                                    minHeight: '38px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: '0.80rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal'
+                                      ? '0 3px 10px rgba(239, 68, 68, 0.35)'
+                                      : '0 3px 10px rgba(34, 197, 94, 0.30)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title={isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Vorlesen stoppen' : 'Hausaufgaben vorlesen lassen'}
+                                >
+                                  {isTtsSpeaking && activeTtsKey === 'junior_modal' ? (
+                                    <>
+                                      <VolumeX size={15} strokeWidth={2.8} />
+                                      <span>Stopp ⏹</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Volume2 size={15} strokeWidth={2.8} />
+                                      <span>Vorlesen ✨</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
 
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                              {hasAnyHomework ? (
-                                <>
-                                  {/* KINDERGERECHTE 3D-VORLESE-LEISTE */}
+                              <button
+                                type="button"
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => {
+                                  handleStopSpeaking();
+                                  setShowJuniorHomeworkModal(false);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+                                    e.preventDefault();
+                                    handleStopSpeaking();
+                                    setShowJuniorHomeworkModal(false);
+                                  }
+                                }}
+                                aria-label="Aufgabenheft schließen"
+                                style={{
+                                  background: '#f1f5f9',
+                                  border: 'none',
+                                  width: '38px',
+                                  height: '38px',
+                                  minWidth: '38px',
+                                  minHeight: '38px',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  color: '#64748b',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                <X size={18} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 🌟 2. CONTENT CONTAINER (No 92px banner: Real homework visible immediately!) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {hasAnyHomework ? (
+                              <>
+                                <div style={{
+                                  background: '#ffffff',
+                                  borderRadius: '20px',
+                                  padding: '16px',
+                                  border: '1.5px solid #f1f5f9',
+                                  boxShadow: '0 4px 16px -2px rgba(0,0,0,0.04)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '12px'
+                                }}>
+                                  {/* 🚦 Perfekte Didaktische Header-Legende */}
                                   <div style={{
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '14px 20px',
-                                    background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
-                                      ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
-                                      : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                    borderRadius: '24px',
-                                    border: isTtsSpeaking && activeTtsKey === 'junior_modal' ? '2px solid #fca5a5' : '2px solid #86efac',
-                                    gap: '14px',
-                                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.04)',
-                                    transition: 'all 0.2s ease'
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                    padding: '10px 14px',
+                                    borderRadius: '14px',
+                                    border: '1.5px solid #e2e8f0',
+                                    boxShadow: '0 2px 6px -2px rgba(0, 0, 0, 0.03)'
                                   }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                      <div style={{
-                                        width: '42px',
-                                        height: '42px',
-                                        borderRadius: '14px',
-                                        background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
-                                          ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                                          : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                                        color: '#ffffff',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal' 
-                                          ? '0 4px 10px rgba(239, 68, 68, 0.3)' 
-                                          : '0 4px 10px rgba(34, 197, 94, 0.3)',
-                                        flexShrink: 0
-                                      }}>
-                                        {isTtsSpeaking && activeTtsKey === 'junior_modal' ? (
-                                          <VolumeX size={22} strokeWidth={2.6} />
-                                        ) : (
-                                          <Volume2 size={22} strokeWidth={2.6} />
-                                        )}
-                                      </div>
-
-                                      <div>
-                                        <div style={{ fontSize: '0.96rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                          {isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Liest deine Aufgaben vor... 🎧' : 'Lass es dir einfach vorlesen! ✨'}
-                                        </div>
-                                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, marginTop: '1px' }}>
-                                          {isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Tippe auf Stopp zum Anhalten' : 'Höre dir alle Hausaufgaben als Audio an'}
-                                        </div>
-                                      </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.80rem', fontWeight: 850, color: '#334155' }}>
+                                      <span>💬</span>
+                                      <span>Wie lief das Üben? Sag deiner Lehrkraft Bescheid:</span>
                                     </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (isTtsSpeaking && activeTtsKey === 'junior_modal') {
-                                          handleStopSpeaking();
-                                        } else {
-                                          const narrative = buildContinuousHomeworkNarrative({
-                                            teacherName: formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher),
-                                            instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
-                                            books: formattedJuniorBooks.map((b: any) => ({
-                                              title: b.title,
-                                              pageNums: b.pageNums,
-                                              notes: b.notesList ? b.notesList.map((n: any) => n.text) : []
-                                            })),
-                                            songs: otherActiveSongs.map((s: any) => ({
-                                              title: cleanTitle(s.topic_name || s.title),
-                                              note: s.homework_notes
-                                            })),
-                                            audioCount: audioTracks.length,
-                                            generalNotes: generalNote
-                                          });
-                                          handleSpeakText(narrative, 'junior_modal');
-                                        }
-                                      }}
-                                      style={{
-                                        background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
-                                          ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                                          : 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        padding: '11px 20px',
-                                        borderRadius: '16px',
-                                        fontSize: '0.90rem',
-                                        fontWeight: 950,
-                                        cursor: 'pointer',
+                                    <div style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                                      gap: '8px'
+                                    }}>
+                                      {/* 1. Vorspielen */}
+                                      <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '8px',
-                                        boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal' 
-                                          ? '0 4px 0 #991b1b, 0 8px 18px rgba(239, 68, 68, 0.4)' 
-                                          : '0 4px 0 #1e7037, 0 8px 18px rgba(52, 168, 83, 0.32)',
-                                        transform: isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'translateY(2px)' : 'none',
-                                        flexShrink: 0,
-                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.filter = 'brightness(1.06)';
-                                        e.currentTarget.style.transform = 'translateY(-1px)';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.filter = 'none';
-                                        e.currentTarget.style.transform = isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'translateY(2px)' : 'none';
-                                      }}
-                                      onMouseDown={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(3px)';
-                                        e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' ? '0 1px 0 #991b1b' : '0 1px 0 #1e7037';
-                                      }}
-                                      onMouseUp={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(-1px)';
-                                        e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' 
-                                          ? '0 4px 0 #991b1b, 0 8px 18px rgba(239, 68, 68, 0.4)' 
-                                          : '0 4px 0 #1e7037, 0 8px 18px rgba(52, 168, 83, 0.32)';
-                                      }}
-                                      title={isTtsSpeaking && activeTtsKey === 'junior_modal' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
-                                    >
-                                      {isTtsSpeaking && activeTtsKey === 'junior_modal' ? (
-                                        <>
-                                          <VolumeX size={18} color="#ffffff" strokeWidth={2.8} />
-                                          <span>Stopp ⏹</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Volume2 size={18} color="#ffffff" strokeWidth={2.8} />
-                                          <span>Vorlesen 🔊</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-
-                                  <div style={{
-                                    background: '#ffffff',
-                                    borderRadius: '24px',
-                                    padding: '20px 24px',
-                                    border: '1.5px solid #f1f5f9',
-                                    boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '16px'
-                                  }}>
-                                    {/* Lehrwerke / Bücher Liste */}
-                                    {formattedJuniorBooks.map((bookItem: any, idx: number) => (
-                                      <div key={`j-modal-book-${idx}`} style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px',
-                                        padding: '12px 14px',
+                                        padding: '6px 10px',
                                         background: '#ffffff',
-                                        border: '1px solid #f1f5f9',
-                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                        borderRadius: '14px'
+                                        borderRadius: '10px',
+                                        border: '1px solid #bbf7d0',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
                                       }}>
-                                        {/* Book Header */}
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                            <div style={{
-                                              width: '28px',
-                                              height: '28px',
-                                              borderRadius: '8px',
-                                              background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: '#e11d48',
-                                              boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
-                                              flexShrink: 0
-                                            }}>
-                                              <BookOpen size={14} strokeWidth={2.4} />
-                                            </div>
-                                            <span style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                              {bookItem.title}
-                                            </span>
-                                          </div>
+                                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#16a34a', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                          <Check size={13} strokeWidth={3.2} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#15803d' }}>Vorspielen</span>
+                                          <span style={{ fontSize: '0.66rem', fontWeight: 600, color: '#64748b' }}>„Kann ich! 🚀“</span>
+                                        </div>
+                                      </div>
 
-                                          {/* Individual Page Pills */}
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                                            {bookItem.pageNums.map((pNum: any) => (
-                                              <span key={`p-${pNum}`} style={{
-                                                background: '#dcfce7',
-                                                color: '#15803d',
-                                                fontSize: '0.80rem',
-                                                fontWeight: 900,
-                                                padding: '3px 9px',
-                                                borderRadius: '7px',
-                                                border: '1px solid #bbf7d0',
-                                                flexShrink: 0
-                                              }}>
-                                                S. {pNum}
-                                              </span>
-                                            ))}
+                                      {/* 2. Feinschliff */}
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '6px 10px',
+                                        background: '#ffffff',
+                                        borderRadius: '10px',
+                                        border: '1px solid #fde68a',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                      }}>
+                                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#d97706', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                          <Sparkles size={12} strokeWidth={2.8} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#b45309' }}>Feinschliff</span>
+                                          <span style={{ fontSize: '0.66rem', fontWeight: 600, color: '#64748b' }}>„Klappt schon ✨“</span>
+                                        </div>
+                                      </div>
+
+                                      {/* 3. Tipp */}
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '6px 10px',
+                                        background: '#ffffff',
+                                        borderRadius: '10px',
+                                        border: '1px solid #fca5a5',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                      }}>
+                                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#dc2626', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                          <Lightbulb size={12} strokeWidth={2.8} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#b91c1c' }}>Tipp / Trick</span>
+                                          <span style={{ fontSize: '0.66rem', fontWeight: 600, color: '#64748b' }}>„Hilf mir mal! 💡“</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Lehrwerke / Bücher Liste */}
+                                  {formattedJuniorBooks.map((bookItem: any, idx: number) => (
+                                    <div key={`j-modal-book-${idx}`} style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '6px',
+                                      padding: '12px 14px',
+                                      background: '#ffffff',
+                                      border: '1px solid #f1f5f9',
+                                      boxShadow: '0 2px 6px -2px rgba(0, 0, 0, 0.04)',
+                                      borderRadius: '14px'
+                                    }}>
+                                      {/* Book Header */}
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                          <div style={{
+                                            width: '26px',
+                                            height: '26px',
+                                            borderRadius: '7px',
+                                            background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#e11d48',
+                                            boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
+                                            flexShrink: 0
+                                          }}>
+                                            <BookOpen size={13} strokeWidth={2.4} />
                                           </div>
+                                          <span style={{ fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {bookItem.title}
+                                          </span>
                                         </div>
 
-                                        {/* Direct Page Notes */}
-                                        {bookItem.notesList && bookItem.notesList.length > 0 && (
-                                          <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '4px',
-                                            marginLeft: '38px',
-                                            marginTop: '2px'
-                                          }}>
-                                            {bookItem.notesList.map((n: any, nIdx: number) => (
-                                              <div key={`j-n-${nIdx}`} style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
-                                                <strong style={{ color: '#dc2626', fontWeight: 850 }}>S. {n.num}:</strong> {n.text}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
+                                        {/* Page Badges */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                          {bookItem.pageNums.map((pNum: any) => (
+                                            <span key={`p-${pNum}`} style={{
+                                              background: '#dcfce7',
+                                              color: '#15803d',
+                                              fontSize: '0.76rem',
+                                              fontWeight: 900,
+                                              padding: '2px 8px',
+                                              borderRadius: '6px',
+                                              border: '1px solid #bbf7d0',
+                                              flexShrink: 0
+                                            }}>
+                                              S. {pNum}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
 
-                                        {/* Interactive Page Reflection Rows */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '38px', marginTop: '6px' }}>
-                                          {bookItem.pageNums.map((pNum: any) => {
-                                            const taskId = `book-${bookItem.title}-page-${pNum}`;
-                                            const pageLabel = `${bookItem.title} S. ${pNum}`;
-                                            const refl = taskReflections[taskId]?.status;
-                                            return (
-                                              <div key={`j-page-row-${pNum}`} style={{
+                                      {/* General Book Notes (if not page-specific) */}
+                                      {bookItem.notesList && bookItem.notesList.filter((n: any) => !bookItem.pageNums.includes(n.num)).length > 0 && (
+                                        <div style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '4px',
+                                          marginLeft: '34px',
+                                          marginTop: '2px'
+                                        }}>
+                                          {bookItem.notesList.filter((n: any) => !bookItem.pageNums.includes(n.num)).map((n: any, nIdx: number) => (
+                                            <div key={`j-n-${nIdx}`} style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 600, lineHeight: 1.35 }}>
+                                              {n.text}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* 🌟 Compact 1-Row per Page with 3-Smiley Pill */}
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginLeft: '8px', marginTop: '4px' }}>
+                                        {bookItem.pageNums.map((pNum: any) => {
+                                          const taskId = `book-${bookItem.title}-page-${pNum}`;
+                                          const pageLabel = `${bookItem.title} S. ${pNum}`;
+                                          const pageSpecificNote = (bookItem.notesList || []).find((n: any) => String(n.num) === String(pNum))?.text;
+                                          const refl = taskReflections[taskId]?.status;
+
+                                          return (
+                                            <div
+                                              key={`j-page-row-${pNum}`}
+                                              style={{
                                                 background: refl === 'super' ? '#f0fdf4' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#f8fafc',
                                                 border: refl === 'super' ? '1.5px solid #86efac' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
-                                                borderRadius: '16px',
-                                                padding: '10px 14px',
+                                                borderRadius: '12px',
+                                                padding: '7px 12px',
                                                 display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '4px',
-                                                transition: 'all 0.2s ease'
-                                              }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                  <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '10px',
+                                                transition: 'all 0.15s ease'
+                                              }}
+                                            >
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a' }}>
                                                     📖 Seite {pNum}
                                                   </span>
                                                   {refl && (
                                                     <span style={{
-                                                      fontSize: '0.74rem',
+                                                      fontSize: '0.68rem',
                                                       fontWeight: 900,
-                                                      padding: '2px 8px',
-                                                      borderRadius: '100px',
+                                                      padding: '2px 7px',
+                                                      borderRadius: '6px',
                                                       background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
-                                                      color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c'
+                                                      color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px'
                                                     }}>
-                                                      {refl === 'super' ? '🟢 Läuft super!' : refl === 'wackelig' ? '🟡 Noch wackelig' : '🔴 Brauche Hilfe'}
+                                                      {refl === 'super' ? '🟢 Vorspielen' : refl === 'wackelig' ? '🟡 Feinschliff' : '🔴 Tipp'}
                                                     </span>
                                                   )}
                                                 </div>
-                                                {renderReflectionPills(taskId, pageLabel)}
+                                                {pageSpecificNote && (
+                                                  <span style={{ fontSize: '0.80rem', color: '#475569', fontWeight: 650, lineHeight: 1.3 }}>
+                                                    {pageSpecificNote}
+                                                  </span>
+                                                )}
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ))}
 
-                                    {/* Songs Liste */}
-                                    {otherActiveSongs.map((item: any, idx: number) => {
-                                      const songTitle = cleanTitle(item.topic_name || item.title);
-                                      const taskId = `song-${item.id || item.topic_name || item.title || idx}`;
-                                      const refl = taskReflections[taskId]?.status;
-                                      return (
-                                        <div key={`j-modal-song-${idx}`} style={{
+                                              <div style={{ flexShrink: 0 }}>
+                                                {renderSmileyReflectionPills(taskId, pageLabel)}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+
+                                  {/* Songs Liste */}
+                                  {otherActiveSongs.map((item: any, idx: number) => {
+                                    const songTitle = cleanTitle(item.topic_name || item.title);
+                                    const taskId = `song-${item.id || item.topic_name || item.title || idx}`;
+                                    const refl = taskReflections[taskId]?.status;
+
+                                    return (
+                                      <div
+                                        key={`j-modal-song-${idx}`}
+                                        style={{
                                           display: 'flex',
                                           flexDirection: 'column',
                                           gap: '8px',
-                                          padding: '14px 16px',
+                                          padding: '12px 14px',
                                           background: refl === 'super' ? '#f0fdf4' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#ffffff',
                                           border: refl === 'super' ? '1.5px solid #86efac' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
-                                          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                          borderRadius: '16px',
-                                          transition: 'all 0.2s ease'
-                                        }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                              <div style={{
-                                                width: '32px',
-                                                height: '32px',
-                                                borderRadius: '10px',
-                                                background: '#ede9fe',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#7c3aed',
-                                                flexShrink: 0
-                                              }}>
-                                                <Music size={16} strokeWidth={2.4} />
-                                              </div>
-
-                                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {songTitle}
-                                              </span>
+                                          boxShadow: '0 2px 6px -2px rgba(0, 0, 0, 0.04)',
+                                          borderRadius: '14px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                            <div style={{
+                                              width: '28px',
+                                              height: '28px',
+                                              borderRadius: '8px',
+                                              background: '#ede9fe',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              color: '#7c3aed',
+                                              flexShrink: 0
+                                            }}>
+                                              <Music size={14} strokeWidth={2.4} />
                                             </div>
 
+                                            <span style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {songTitle}
+                                            </span>
                                             {refl && (
                                               <span style={{
-                                                fontSize: '0.76rem',
+                                                fontSize: '0.68rem',
                                                 fontWeight: 900,
-                                                padding: '3px 10px',
-                                                borderRadius: '100px',
+                                                padding: '2px 7px',
+                                                borderRadius: '6px',
                                                 background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
                                                 color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
-                                                border: refl === 'super' ? '1px solid #86efac' : refl === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '3px',
                                                 flexShrink: 0
                                               }}>
-                                                {refl === 'super' ? '🟢 Läuft super!' : refl === 'wackelig' ? '🟡 Noch wackelig' : '🔴 Brauche Hilfe'}
+                                                <span>{refl === 'super' ? '🟢 Vorspielen' : refl === 'wackelig' ? '🟡 Feinschliff' : '🔴 Tipp'}</span>
                                               </span>
                                             )}
                                           </div>
 
-                                          {item.homework_notes && (
-                                            <div style={{ marginLeft: '42px', fontSize: '0.86rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-                                              <span style={{ color: '#6366f1', fontWeight: 850 }}>🚀 Fahrplan:</span> {item.homework_notes}
-                                            </div>
-                                          )}
-
-                                          <div style={{ marginLeft: '42px' }}>
-                                            {renderReflectionPills(taskId, songTitle)}
+                                          <div style={{ flexShrink: 0 }}>
+                                            {renderSmileyReflectionPills(taskId, songTitle)}
                                           </div>
                                         </div>
-                                      );
-                                    })}
 
-                                    {/* Audio Tracks */}
-                                    {audioTracks.length > 0 && (
+                                        {item.homework_notes && (
+                                          <div style={{ marginLeft: '36px', fontSize: '0.84rem', color: '#475569', fontWeight: 650, lineHeight: 1.35 }}>
+                                            <span style={{ color: '#6366f1', fontWeight: 850 }}>🚀 Fahrplan:</span> {item.homework_notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+
+                                  {/* Audio Tracks */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '6px',
+                                      paddingTop: (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0) ? '2px' : '0'
+                                    }}>
+                                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Headphones size={13} />
+                                        <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
+                                      </div>
+                                      <AudioTrackCarousel
+                                        tracks={audioTracks}
+                                        isTeacher={false}
+                                        readOnly={true}
+                                        uiLevel={(studentUiLevel as any) || 'junior'}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* General Notes */}
+                                  {((allTeacherNotes && allTeacherNotes.length > 0) || generalNote) && (
+                                    <div style={{
+                                      marginTop: '2px',
+                                      padding: '11px 13px',
+                                      background: '#f8fafc',
+                                      borderRadius: '12px',
+                                      border: '1px solid #e2e8f0',
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '8px',
+                                      fontSize: '0.84rem',
+                                      color: '#334155',
+                                      fontWeight: 600
+                                    }}>
+                                      <FileText size={15} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%' }}>
+                                        <strong style={{ color: '#15803d', fontWeight: 850, fontSize: '0.80rem' }}>
+                                          {allTeacherNotes && allTeacherNotes.length > 1 ? 'Hinweise deiner Lehrkraft:' : 'Hinweis:'}
+                                        </strong>
+                                        {allTeacherNotes && allTeacherNotes.length > 0 ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                            {allTeacherNotes.map((noteItem: string, nIdx: number) => (
+                                              <div key={nIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+                                                {allTeacherNotes.length > 1 && <span style={{ color: '#15803d', fontWeight: 900 }}>•</span>}
+                                                <span>{noteItem}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div>{generalNote}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Student Question */}
+                                  {studentQuestionText && (() => {
+                                    const effectiveTeacherName = formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher);
+                                    return (
                                       <div style={{
+                                        marginTop: '2px',
+                                        background: '#fefce8',
+                                        border: '1px solid #fef08a',
+                                        borderRadius: '12px',
+                                        padding: '9px 12px',
+                                        boxShadow: '0 2px 6px rgba(234, 179, 8, 0.05)',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '8px',
-                                        paddingTop: (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0) ? '4px' : '0'
+                                        gap: '4px'
                                       }}>
-                                        <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <Headphones size={13} />
-                                          <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
-                                        </div>
-                                        <AudioTrackCarousel
-                                          tracks={audioTracks}
-                                          isTeacher={false}
-                                          readOnly={true}
-                                          uiLevel={(studentUiLevel as any) || 'junior'}
-                                        />
-                                      </div>
-                                    )}
-
-                                     {/* General Notes */}
-                                     {((allTeacherNotes && allTeacherNotes.length > 0) || generalNote) && (
-                                       <div style={{
-                                         marginTop: '4px',
-                                         padding: '12px 14px',
-                                         background: '#f8fafc',
-                                         borderRadius: '14px',
-                                         border: '1px solid #e2e8f0',
-                                         display: 'flex',
-                                         alignItems: 'flex-start',
-                                         gap: '8px',
-                                         fontSize: '0.86rem',
-                                         color: '#334155',
-                                         fontWeight: 600
-                                       }}>
-                                         <FileText size={16} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-                                           <strong style={{ color: '#15803d', fontWeight: 850 }}>
-                                             {allTeacherNotes && allTeacherNotes.length > 1 ? 'Hinweise deiner Lehrkraft:' : 'Hinweis:'}
-                                           </strong>
-                                           {allTeacherNotes && allTeacherNotes.length > 0 ? (
-                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
-                                               {allTeacherNotes.map((noteItem: string, nIdx: number) => (
-                                                 <div key={nIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                                                   {allTeacherNotes.length > 1 && <span style={{ color: '#15803d', fontWeight: 900 }}>•</span>}
-                                                   <span>{noteItem}</span>
-                                                 </div>
-                                               ))}
-                                             </div>
-                                           ) : (
-                                             <div>{generalNote}</div>
-                                           )}
-                                         </div>
-                                       </div>
-                                     )}
-
-                                    {/* Student Question */}
-                                    {studentQuestionText && (() => {
-                                      const effectiveTeacherName = formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher);
-                                      return (
-                                        <div style={{
-                                          marginTop: '4px',
-                                          background: '#fefce8',
-                                          border: '1px solid #fef08a',
-                                          borderRadius: '14px',
-                                          padding: '10px 14px',
-                                          boxShadow: '0 2px 6px rgba(234, 179, 8, 0.06)',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: '5px'
-                                        }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                                            <span style={{
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              background: '#fef08a',
-                                              border: '1px solid #fde047',
-                                              color: '#854d0e',
-                                              fontSize: '0.70rem',
-                                              fontWeight: 850,
-                                              textTransform: 'uppercase',
-                                              letterSpacing: '0.03em',
-                                              padding: '2px 7px',
-                                              borderRadius: '100px',
-                                              flexShrink: 0
-                                            }}>
-                                              <HelpCircle size={12} color="#ca8a04" strokeWidth={2.5} />
-                                              Frage
-                                            </span>
-                                            <span style={{
-                                              fontSize: '0.90rem',
-                                              fontWeight: 700,
-                                              color: '#0f172a',
-                                              lineHeight: 1.35,
-                                              wordBreak: 'break-word'
-                                            }}>
-                                              „{studentQuestionText}“
-                                            </span>
-                                          </div>
-                                          <div style={{
-                                            fontSize: '0.74rem',
-                                            fontWeight: 650,
-                                            color: '#854d0e',
-                                            display: 'flex',
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                          <span style={{
+                                            display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '4px',
-                                            paddingLeft: '2px'
+                                            gap: '3px',
+                                            background: '#fef08a',
+                                            border: '1px solid #fde047',
+                                            color: '#854d0e',
+                                            fontSize: '0.68rem',
+                                            fontWeight: 850,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.03em',
+                                            padding: '1px 6px',
+                                            borderRadius: '100px',
+                                            flexShrink: 0
                                           }}>
-                                            <Sparkles size={11} color="#ca8a04" />
-                                            <span>Für {effectiveTeacherName} zur nächsten Stunde vorgemerkt</span>
-                                          </div>
+                                            <HelpCircle size={11} color="#ca8a04" strokeWidth={2.5} />
+                                            Frage
+                                          </span>
+                                          <span style={{
+                                            fontSize: '0.86rem',
+                                            fontWeight: 700,
+                                            color: '#0f172a',
+                                            lineHeight: 1.3,
+                                            wordBreak: 'break-word'
+                                          }}>
+                                            „{studentQuestionText}“
+                                          </span>
                                         </div>
-                                      );
-                                    })()}
-                                  </div>
-                                </>
-                              ) : (
-                                <div style={{ padding: '30px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1.5px dashed #cbd5e1' }}>
-                                  <div style={{ fontSize: '2.2rem', marginBottom: '8px' }}>🎉</div>
-                                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 950, color: '#0f172a' }}>
-                                    Keine offenen Aufgaben
-                                  </h3>
-                                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                    Du hast für diese Woche alles erledigt oder kannst frei üben!
-                                  </p>
+                                        <div style={{
+                                          fontSize: '0.72rem',
+                                          fontWeight: 650,
+                                          color: '#854d0e',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          paddingLeft: '2px'
+                                        }}>
+                                          <Sparkles size={11} color="#ca8a04" />
+                                          <span>Für {effectiveTeacherName} zur nächsten Stunde vorgemerkt</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })()}
+                              </>
+                            ) : (
+                              <div style={{ padding: '26px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1.5px dashed #cbd5e1' }}>
+                                <div style={{ fontSize: '2.0rem', marginBottom: '6px' }}>🎉</div>
+                                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.10rem', fontWeight: 950, color: '#0f172a' }}>
+                                  Keine offenen Aufgaben
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 650 }}>
+                                  Du hast für diese Woche alles erledigt oder kannst frei üben!
+                                </p>
+                              </div>
+                            )}
+                          </div>
 
-                        <button
-                          onClick={() => {
-                            handleStopSpeaking();
-                            setShowJuniorHomeworkModal(false);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '16px 20px',
-                            borderRadius: '20px',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                            color: '#ffffff',
-                            fontSize: '1.05rem',
-                            fontWeight: 950,
-                            cursor: 'pointer',
-                            marginTop: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            boxShadow: '0 8px 24px rgba(34, 197, 94, 0.28)',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span>🚀 Verstanden & Jetzt loslegen!</span>
-                        </button>
+                          {/* 🌟 3. BOTTOM CLOSE BUTTON (Ergonomic child primary action) */}
+                          <button
+                            type="button"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              handleStopSpeaking();
+                              setShowJuniorHomeworkModal(false);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleStopSpeaking();
+                                setShowJuniorHomeworkModal(false);
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '14px 20px',
+                              borderRadius: '16px',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                              color: '#ffffff',
+                              fontSize: '0.98rem',
+                              fontWeight: 950,
+                              cursor: 'pointer',
+                              marginTop: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              boxShadow: '0 6px 20px rgba(34, 197, 94, 0.25)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Check size={18} strokeWidth={3} />
+                            <span>Alles klar, los geht's! 🚀</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ========================================================================= */}
                   {/* MODAL 2: JUNIOR ÜBE-TIMER OVERLAY (MINIMALPRINZIP)                         */}
@@ -5147,49 +5450,50 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: hasMessage ? '#fefce8' : '#ffffff', 
-                                  color: hasMessage ? '#ca8a04' : '#475569', 
-                                  padding: '8px 16px', 
-                                  minHeight: '38px', 
+                                  background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
+                                  color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
+                                  padding: isMusicStandMode ? '10px 18px' : '9px 16px', 
+                                  minHeight: '44px', 
                                   boxSizing: 'border-box', 
                                   borderRadius: '14px', 
-                                  fontSize: '0.80rem', 
+                                  fontSize: isMusicStandMode ? '0.90rem' : '0.84rem', 
                                   fontWeight: 900, 
-                                  border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
+                                  border: unreadMsgCount > 0 ? '1.5px solid #86efac' : '1px solid #cbd5e1', 
                                   cursor: 'pointer',
-                                  boxShadow: hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
                                   transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                 }}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.background = hasMessage ? '#fef08a' : '#f8fafc';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 12px rgba(202, 138, 4, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
+                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.background = hasMessage ? '#fefce8' : '#ffffff';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
+                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
                                 }}
                                 title="1:1 Shoutbox zum Unterrichtstermin"
+                                aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
                               >
                                 <MessageSquare 
-                                  size={15} 
-                                  color={hasMessage ? '#ca8a04' : '#64748b'} 
-                                  fill={hasMessage ? '#eab308' : 'none'} 
+                                  size={16} 
+                                  color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
+                                  fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
                                 />
-                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
+                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? 'Nachricht von Lehrkraft' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft')}</span>
                                 {unreadMsgCount > 0 && (
                                   <span style={{
-                                    background: '#f59e0b',
+                                    background: '#15803d',
                                     color: '#ffffff',
-                                    fontSize: '0.70rem',
+                                    fontSize: '0.72rem',
                                     fontWeight: 950,
                                     padding: '2px 8px',
                                     borderRadius: '100px',
                                     letterSpacing: '0.02em',
-                                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)'
+                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
                                   }}>
-                                    {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
+                                    {unreadMsgCount === 1 ? '1 neu' : `${unreadMsgCount} neu`}
                                   </span>
                                 )}
                               </button>
@@ -5442,7 +5746,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           try {
                             const p = JSON.parse(clean);
                             if (Array.isArray(p)) {
-                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:') && !x.startsWith('TASK_REFL:')).join(' ');
                             } else if (typeof p === 'string') {
                               clean = p;
                             }
@@ -5451,14 +5755,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         return clean
                           .replace(/\["AUDIO:[^"]*"\]/g, '')
                           .replace(/AUDIO:[^\s,|]+/g, '')
-                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+                          .replace(/EARLAB_SCORE:[^\s,|]+/g, '')
+                          .replace(/TASK_REFL:[^\s,|]+/g, '')
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION|TASK_REFL):[^|]*\|/, '')
                           .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
+                          .replace(/^TASK_REFL:[^|]*\|?/i, '')
                           .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                           .trim();
                       };
 
                       let isPastNoteCarriedOver = false;
-                      const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+                      const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('TASK_REFL:') && !n.startsWith('❓ Frage für den Unterricht:') && !n.startsWith('WORLDTOUR_MASTERY:') && !n.startsWith('EARLAB_SCORE:');
 
                       let generalNotesList: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
 
@@ -7188,49 +7495,50 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: hasMessage ? '#fefce8' : '#ffffff', 
-                                  color: hasMessage ? '#ca8a04' : '#475569', 
-                                  padding: '8px 16px', 
-                                  minHeight: '38px', 
+                                  background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
+                                  color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
+                                  padding: isMusicStandMode ? '10px 18px' : '9px 16px', 
+                                  minHeight: '44px', 
                                   boxSizing: 'border-box', 
                                   borderRadius: '14px', 
-                                  fontSize: '0.80rem', 
+                                  fontSize: isMusicStandMode ? '0.90rem' : '0.84rem', 
                                   fontWeight: 900, 
-                                  border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
+                                  border: unreadMsgCount > 0 ? '1.5px solid #86efac' : '1px solid #cbd5e1', 
                                   cursor: 'pointer',
-                                  boxShadow: hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
                                   transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                 }}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.background = hasMessage ? '#fef08a' : '#f8fafc';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 12px rgba(202, 138, 4, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
+                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.background = hasMessage ? '#fefce8' : '#ffffff';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
+                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
                                 }}
                                 title="1:1 Shoutbox zum Unterrichtstermin"
+                                aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
                               >
                                 <MessageSquare 
-                                  size={15} 
-                                  color="currentColor" 
-                                  fill="none" 
+                                  size={16} 
+                                  color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
+                                  fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
                                 />
-                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
+                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? 'Nachricht von Lehrkraft' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft')}</span>
                                 {unreadMsgCount > 0 && (
                                   <span style={{
-                                    background: '#f59e0b',
+                                    background: '#15803d',
                                     color: '#ffffff',
-                                    fontSize: '0.70rem',
+                                    fontSize: '0.72rem',
                                     fontWeight: 950,
                                     padding: '2px 8px',
                                     borderRadius: '100px',
                                     letterSpacing: '0.02em',
-                                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)'
+                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
                                   }}>
-                                    {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
+                                    {unreadMsgCount === 1 ? '1 neu' : `${unreadMsgCount} neu`}
                                   </span>
                                 )}
                               </button>
@@ -7539,7 +7847,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           try {
                             const p = JSON.parse(clean);
                             if (Array.isArray(p)) {
-                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:') && !x.startsWith('TASK_REFL:')).join(' ');
                             } else if (typeof p === 'string') {
                               clean = p;
                             }
@@ -7548,14 +7856,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         return clean
                           .replace(/\["AUDIO:[^"]*"\]/g, '')
                           .replace(/AUDIO:[^\s,|]+/g, '')
-                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+                          .replace(/EARLAB_SCORE:[^\s,|]+/g, '')
+                          .replace(/TASK_REFL:[^\s,|]+/g, '')
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION|TASK_REFL):[^|]*\|/, '')
                           .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
+                          .replace(/^TASK_REFL:[^|]*\|?/i, '')
                           .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                           .trim();
                       };
 
                       let isPastNoteCarriedOver = false;
-                      const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+                      const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('TASK_REFL:') && !n.startsWith('❓ Frage für den Unterricht:') && !n.startsWith('WORLDTOUR_MASTERY:') && !n.startsWith('EARLAB_SCORE:');
 
                       let generalNotesList: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
 

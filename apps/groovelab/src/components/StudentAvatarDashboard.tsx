@@ -418,8 +418,23 @@ export function StudentAvatarDashboard({
               supabase={supabase}
               brandColor={profile.studentUser?.schools?.brand_color || '#34a853'}
               studentUser={profile.studentUser}
-              parentAllowChat={true}
-              parentAllowAbsences={true}
+              parentAllowChat={
+                profile.isAdultStudent
+                  ? true
+                  : (profile.studentUser?.parent_allow_chat !== undefined && profile.studentUser?.parent_allow_chat !== null
+                      ? Boolean(profile.studentUser.parent_allow_chat)
+                      : (profile.studentUiLevel !== 'junior'))
+              }
+              parentAllowAbsences={
+                profile.isAdultStudent
+                  ? true
+                  : (profile.studentUiLevel === 'junior'
+                      ? false
+                      : (profile.studentUser?.parent_allow_absences !== undefined && profile.studentUser?.parent_allow_absences !== null
+                          ? Boolean(profile.studentUser.parent_allow_absences)
+                          : (profile.studentUiLevel === 'pro')))
+              }
+              isParentUnlocked={parent.isParentUnlocked || parent.checkIsParentSessionActiveLocal()}
             />
           </Suspense>
         )}
@@ -456,6 +471,8 @@ export function StudentAvatarDashboard({
                 onTriggerSoftLock={() => parent.setShowSoftLockModal(true)}
                 initialLehrwerke={lehrwerke}
                 initialSongs={assignedCampusSongs}
+                assignedCampusSongs={assignedCampusSongs}
+                activeSongSkills={activeSongSkills}
                 initialProgressItems={progressItems}
                 initialLocalProgress={localProgress}
                 onSongsUpdated={(updatedSkills) => {

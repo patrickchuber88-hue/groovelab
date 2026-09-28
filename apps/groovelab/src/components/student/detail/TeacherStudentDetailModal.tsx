@@ -302,6 +302,30 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
           .order('created_at', { ascending: false });
         setCampusHomeworkItems(pmData || []);
 
+        // 🌟 Extract cloud task reflections (TASK_REFL:taskId|status|timestamp|label) for cross-device visibility
+        const cloudReflections: Record<string, { status: 'super' | 'wackelig' | 'hilfe'; timestamp: string; label?: string }> = {};
+        (pmData || []).forEach((item: any) => {
+          if (item.homework_notes) {
+            try {
+              const notesList = typeof item.homework_notes === 'string' ? JSON.parse(item.homework_notes) : item.homework_notes;
+              if (Array.isArray(notesList)) {
+                notesList.forEach((n: any) => {
+                  if (typeof n === 'string' && n.startsWith('TASK_REFL:')) {
+                    const parts = n.replace(/^TASK_REFL:/, '').split('|');
+                    const [tId, st, ts, lbl] = parts;
+                    if (tId && (st === 'super' || st === 'wackelig' || st === 'hilfe') && !cloudReflections[tId]) {
+                      cloudReflections[tId] = { status: st as any, timestamp: ts || '', label: lbl || '' };
+                    }
+                  }
+                });
+              }
+            } catch {}
+          }
+        });
+        if (Object.keys(cloudReflections).length > 0) {
+          setStudentTaskReflections(prev => ({ ...cloudReflections, ...prev }));
+        }
+
         // 🛡️ Auto-healing: Merge any Lehrwerk found in progress_matrix into assignedLehrwerke
         setAssignedLehrwerke(prev => {
           const combined = (prev || []).map((a: any) => ({ ...a, pageStates: { ...(a.pageStates || {}) } }));
@@ -746,6 +770,12 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                       if (k.includes(item.id)) return true;
                       if (item.topic_name && k.toLowerCase().includes(item.topic_name.toLowerCase())) return true;
                       if (item.title && k.toLowerCase().includes(item.title.toLowerCase())) return true;
+                      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                        const parts = item.topic_name.split(' - Seite ');
+                        const bTitle = parts[0]?.trim()?.toLowerCase();
+                        const pStr = parts[1]?.trim();
+                        if (bTitle && pStr && k.toLowerCase().includes(bTitle) && k.includes(`page-${pStr}`)) return true;
+                      }
                       return false;
                     })?.[1];
 
@@ -786,7 +816,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                                 gap: '3px'
                               }}
                             >
-                              <span>{reflEntry.status === 'super' ? '🟢 Super' : reflEntry.status === 'wackelig' ? '🟡 Wackelig' : '🔴 Braucht Hilfe!'}</span>
+                              <span>{reflEntry.status === 'super' ? '🟢 Vorspielen' : reflEntry.status === 'wackelig' ? '🟡 Feinschliff' : '🔴 Tipp'}</span>
                             </span>
                           )}
                           <span

@@ -5910,10 +5910,10 @@ export function ScheduleCalendarViewDesktop({
                     zIndex: 2
                   }}
                 />
-                <button type="button" className="apple-btn" style={{ pointerEvents: 'none' }}>
+                <div className="apple-btn" style={{ pointerEvents: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   <CalendarIcon size={13} />
                   <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
-                </button>
+                </div>
               </div>
             </div>
           </div>

@@ -13,6 +13,14 @@ export type SoundEngineTimbre = 'rhodes' | 'grand_piano' | 'strings';
 export type IntervalPlaybackMode = 'ascending' | 'descending' | 'harmonic';
 export type ChordPlaybackMode = 'block' | 'arpeggio_up' | 'arpeggio_down';
 
+export interface AnchorNoteStep {
+  semitones: number;
+  duration?: number;
+  gap?: number;
+  velocity?: number;
+  isTargetInterval?: boolean;
+}
+
 export class EarSynthEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -274,17 +282,26 @@ export class EarSynthEngine {
 
   /**
    * Spielt die Song-Anchor-Melodie zum Wiedererkennen des Intervalls
+   * Mit dynamischem Spotlighting (die ersten 2 Töne/Ziel-Töne lauter) und authentischer Rhythmik
    */
   public playSongAnchor(
     rootMidi: number, 
-    anchorNotes: number[], 
-    noteDuration: number = 0.35,
+    anchorNotes: (number | AnchorNoteStep)[], 
+    defaultNoteDuration: number = 0.35,
     customTimbre?: SoundEngineTimbre
   ) {
-    anchorNotes.forEach((semi, idx) => {
+    let accumulatedTime = 0;
+    anchorNotes.forEach((step, idx) => {
+      const stepObj: AnchorNoteStep = typeof step === 'number' ? { semitones: step } : step;
       const isLast = idx === anchorNotes.length - 1;
-      const dur = isLast ? noteDuration * 2.2 : noteDuration;
-      this.playNote(rootMidi + semi, dur, 0.35, idx * (noteDuration * 0.95), customTimbre);
+      const dur = stepObj.duration ?? (isLast ? defaultNoteDuration * 2.0 : defaultNoteDuration);
+      const gap = stepObj.gap ?? (dur * 0.98);
+      const isTarget = stepObj.isTargetInterval ?? (idx < 2);
+      // 0,1% Goldstandard Spotlighting: Zieltöne prägnant (0.50), Melodiefortsetzung als sanfte Begleitung (0.22)
+      const vel = stepObj.velocity ?? (isTarget ? 0.50 : 0.22);
+
+      this.playNote(rootMidi + stepObj.semitones, dur, vel, accumulatedTime, customTimbre);
+      accumulatedTime += gap;
     });
   }
 

@@ -85,6 +85,7 @@ export interface CampusEventsBoardProps {
   studentUser?: any;
   parentAllowChat?: boolean;
   parentAllowAbsences?: boolean;
+  isParentUnlocked?: boolean;
 }
 
 interface LessonOccurrence {
@@ -213,7 +214,8 @@ export function CampusEventsBoard({
   brandColor: passedBrandColor,
   studentUser,
   parentAllowChat,
-  parentAllowAbsences
+  parentAllowAbsences,
+  isParentUnlocked = false
 }: CampusEventsBoardProps) {
   const supabase = propSupabase || defaultSupabase;
   // Dynamic Theme calculations
@@ -469,33 +471,37 @@ export function CampusEventsBoard({
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   // Master PIN & Parent Permissions
-  const checkIsParentUnlocked = () => {
+  const checkIsParentUnlocked = useCallback(() => {
+    if (isParentUnlocked) return true;
     if (typeof window === 'undefined') return false;
     const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
     const userSession = sessionStorage.getItem(`groovelab_parent_session_${userId}`);
     return globalUnlocked || (userSession !== null && Number(userSession) > Date.now());
-  };
+  }, [isParentUnlocked, userId]);
 
   const isChatAllowed = useMemo(() => {
     if (role !== 'student') return true;
     if (checkIsParentUnlocked()) return true;
-    if (parentAllowChat !== undefined) return parentAllowChat;
+    if (parentAllowChat !== undefined && parentAllowChat !== null) return parentAllowChat;
     const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_chat') : null;
     if (localSetting !== null) return localSetting === 'true';
     const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_chat_${userId}`) : null;
     if (localUserSetting !== null) return localUserSetting === 'true';
-    return studentUser?.parent_allow_chat ?? false;
-  }, [role, parentAllowChat, studentUser, userId]);
+    const uiLevel = (studentUser as any)?.campus_ui_level || 'junior';
+    return (studentUser as any)?.parent_allow_chat ?? (uiLevel !== 'junior');
+  }, [role, checkIsParentUnlocked, parentAllowChat, studentUser, userId]);
 
   const isAbsenceAllowed = useMemo(() => {
     if (role !== 'student') return true;
+    if (checkIsParentUnlocked()) return true;
     if (parentAllowAbsences !== undefined && parentAllowAbsences !== null) return Boolean(parentAllowAbsences);
     const userAbs = (studentUser as any)?.parent_allow_absences;
     if (userAbs !== undefined && userAbs !== null) return Boolean(userAbs);
     const localUserSetting = typeof window !== 'undefined' && userId ? localStorage.getItem(`groovelab_parent_allow_absences_${userId}`) : null;
     if (localUserSetting !== null) return localUserSetting === 'true';
-    return false;
-  }, [role, parentAllowAbsences, studentUser, userId]);
+    const uiLevel = (studentUser as any)?.campus_ui_level || 'junior';
+    return uiLevel !== 'junior';
+  }, [role, checkIsParentUnlocked, parentAllowAbsences, studentUser, userId]);
 
   const [showPinGateModal, setShowPinGateModal] = useState(false);
   const [pinGateInput, setPinGateInput] = useState('');
@@ -6074,7 +6080,13 @@ export function CampusEventsBoard({
         : null;
 
       const opponentName = groupFirstNames || (role === 'student'
-        ? `Lehrkraft: ${occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name || 'Lehrkraft')}`
+        ? (() => {
+            const rawTeacher = occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name || '');
+            if (!rawTeacher || rawTeacher.trim().toLowerCase() === 'lehrkraft') {
+              return 'Lehrkraft';
+            }
+            return rawTeacher.trim().toLowerCase().startsWith('lehrkraft:') ? rawTeacher.trim() : `Lehrkraft: ${rawTeacher.trim()}`;
+          })()
         : (() => {
             const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
             const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
@@ -6419,10 +6431,14 @@ export function CampusEventsBoard({
               </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.80rem', color: subColor, fontWeight: 700, marginTop: '3px', flexWrap: 'wrap' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Calendar size={13} /> {formatDateGerman(occ.date)}
-                </span>
-                <span>•</span>
+                {isRescheduled && occ.original_date && occ.original_date !== occ.date && (
+                  <>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#b45309' }}>
+                      <Calendar size={13} /> (Statt {formatDateGerman(occ.original_date)})
+                    </span>
+                    <span>•</span>
+                  </>
+                )}
                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                   <Clock size={13} /> {occ.start_time.substring(0, 5)} Uhr
                 </span>
@@ -6441,8 +6457,12 @@ export function CampusEventsBoard({
                 e.stopPropagation();
                 setActiveChatOcc(occ);
               }}
-              title={hasMessages ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
-              aria-label={hasMessages ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
+              title={hasMessages 
+                ? (role === 'student' && !isChatAllowed ? "1:1 Shoutbox (Nachrichten vorhanden • Antworten elterngeschützt)" : "1:1 Shoutbox (Nachrichten vorhanden)") 
+                : (role === 'student' && !isChatAllowed ? "1:1 Shoutbox öffnen (Lesen frei • Antworten elterngeschützt)" : "1:1 Shoutbox öffnen")}
+              aria-label={hasMessages 
+                ? (role === 'student' && !isChatAllowed ? "1:1 Shoutbox (Nachrichten vorhanden • Antworten elterngeschützt)" : "1:1 Shoutbox (Nachrichten vorhanden)") 
+                : (role === 'student' && !isChatAllowed ? "1:1 Shoutbox öffnen (Lesen frei • Antworten elterngeschützt)" : "1:1 Shoutbox öffnen")}
               style={{
                 border: hasMessages ? '1px solid #fde047' : '1px solid #f1f5f9',
                 background: hasMessages ? '#fefce8' : '#f8fafc',
@@ -6457,6 +6477,7 @@ export function CampusEventsBoard({
                 transition: 'all 0.2s',
                 borderRadius: '12px',
                 flexShrink: 0,
+                position: 'relative',
                 boxShadow: hasMessages ? '0 1px 4px rgba(202, 138, 4, 0.15)' : 'none'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = hasMessages ? '#fef08a' : '#f1f5f9'}
@@ -6470,6 +6491,22 @@ export function CampusEventsBoard({
                   animation: hasMessages ? 'pulse 2s infinite' : 'none'
                 }}
               />
+              {role === 'student' && !isChatAllowed && (
+                <span style={{
+                  position: 'absolute',
+                  bottom: '2px',
+                  right: '2px',
+                  background: '#ffffff',
+                  borderRadius: '50%',
+                  padding: '1px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                }}>
+                  <Lock size={9} color="#64748b" />
+                </span>
+              )}
             </button>
 
             {/* Absagen Icon (Nur für zukünftige Termine, geschützt via Master-PIN) */}
@@ -6477,11 +6514,15 @@ export function CampusEventsBoard({
               <button
                 type="button"
                 onClick={(e) => handleCancelClick(occ, e)}
-                title={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen"}
-                aria-label={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen"}
+                title={isCanceled 
+                  ? "Termin ist abgesagt (Klicken zum Reaktivieren)" 
+                  : (role === 'student' && !isAbsenceAllowed ? "Termin absagen (Eltern-PIN erforderlich)" : "Termin absagen")}
+                aria-label={isCanceled 
+                  ? "Termin ist abgesagt (Klicken zum Reaktivieren)" 
+                  : (role === 'student' && !isAbsenceAllowed ? "Termin absagen (Eltern-PIN erforderlich)" : "Termin absagen")}
                 style={{
-                  border: isCanceled ? '1px solid #e2e8f0' : '1px solid #fee2e2',
-                  background: isCanceled ? '#f1f5f9' : '#fef2f2',
+                  border: isCanceled ? '1px solid #e2e8f0' : (role === 'student' && !isAbsenceAllowed ? '1px solid #e2e8f0' : '1px solid #fee2e2'),
+                  background: isCanceled ? '#f1f5f9' : (role === 'student' && !isAbsenceAllowed ? '#f8fafc' : '#fef2f2'),
                   width: '38px',
                   height: '38px',
                   padding: '0',
@@ -6489,18 +6530,43 @@ export function CampusEventsBoard({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isCanceled ? '#94a3b8' : '#ef4444',
+                  color: isCanceled ? '#94a3b8' : (role === 'student' && !isAbsenceAllowed ? '#64748b' : '#ef4444'),
                   transition: 'all 0.2s',
                   borderRadius: '12px',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  position: 'relative'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = isCanceled ? '#e2e8f0' : '#fee2e2'}
-                onMouseLeave={(e) => e.currentTarget.style.background = isCanceled ? '#f1f5f9' : '#fef2f2'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = isCanceled 
+                    ? '#e2e8f0' 
+                    : (role === 'student' && !isAbsenceAllowed ? '#f1f5f9' : '#fee2e2');
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = isCanceled 
+                    ? '#f1f5f9' 
+                    : (role === 'student' && !isAbsenceAllowed ? '#f8fafc' : '#fef2f2');
+                }}
               >
                 <CalendarX 
                   size={17} 
-                  color={isCanceled ? '#94a3b8' : '#ef4444'} 
+                  color={isCanceled ? '#94a3b8' : (role === 'student' && !isAbsenceAllowed ? '#64748b' : '#ef4444')} 
                 />
+                {role === 'student' && !isAbsenceAllowed && !isCanceled && (
+                  <span style={{
+                    position: 'absolute',
+                    bottom: '2px',
+                    right: '2px',
+                    background: '#ffffff',
+                    borderRadius: '50%',
+                    padding: '1px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                  }}>
+                    <Lock size={9} color="#64748b" />
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -14027,6 +14093,8 @@ export function CampusEventsBoard({
           currentUserRole={role}
           currentUserProfile={studentUser || { id: userId, role }}
           isParentUnlocked={checkIsParentUnlocked()}
+          isChatAllowed={isChatAllowed}
+          isAbsenceAllowed={isAbsenceAllowed}
           onRequestPinGate={(action) => {
             setPinGatePendingAction(() => action);
             setShowPinGateModal(true);

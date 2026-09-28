@@ -16,7 +16,7 @@ import { StudentNicknameSetupModal } from '../student/modals/StudentNicknameSetu
 import { supabase } from '../../lib/supabase';
 
 export type EarDiscipline = 'intervals' | 'chords' | 'pitch_match';
-export type EarVdmLevel = 'd1' | 'd2' | 'd3';
+export type EarVdmLevel = 'junior' | 'd1' | 'd2' | 'd3';
 
 export interface EarLeaderboardEntry {
   id: string;
@@ -55,9 +55,10 @@ const DISCIPLINE_TABS: { id: EarDiscipline; label: string; icon: any }[] = [
 ];
 
 const VDM_LEVEL_TABS: { id: EarVdmLevel; label: string; sub: string }[] = [
-  { id: 'd1', label: 'D1', sub: 'Junior' },
-  { id: 'd2', label: 'D2', sub: 'Teen' },
-  { id: 'd3', label: 'D3', sub: 'Pro' }
+  { id: 'junior', label: 'Junior', sub: 'Vorstufe' },
+  { id: 'd1', label: 'D1', sub: 'Bronze' },
+  { id: 'd2', label: 'D2', sub: 'Silber' },
+  { id: 'd3', label: 'D3', sub: 'Gold' }
 ];
 
 export const EarLeaderboardWidget: React.FC<EarLeaderboardWidgetProps> = ({

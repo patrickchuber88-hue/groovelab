@@ -2,8 +2,8 @@
  * 🎛️ Audio Tempo & Pitch Preservation Helper (0,1% Goldstandard)
  * 
  * Central SSOT for:
- * - Didactic Speed Cascades (Junior: 100%/75%, Teen: 100%/85%/75%, Pro: 100%/85%/75%/60%/50%)
- * - Level-Adaptive Labels (Junior: 🐰 100% / 🐢 75%, Teen/Pro: 100%, 85%, etc.)
+ * - Didactic Speed Cascades (Global & Uniform: 100% -> 85% -> 75% -> 50%)
+ * - Pure Swiss Typography Speed Labels (100%, 85%, 75%, 50% - zero emojis/icons)
  * - 100% Pitch-Preservation across WebKit/Blink/Gecko (preservesPitch, webkitPreservesPitch, mozPreservesPitch)
  * - Authoritative Level Resolution (SSOT hierarchy from user, student object and scoped localStorage)
  */
@@ -11,17 +11,12 @@
 export type CampusUiLevel = 'junior' | 'teen' | 'pro';
 
 /**
- * Returns canonical available playback rates for given pedagogical UI level
+ * Returns canonical available playback rates globally across the entire app:
+ * 100% -> 85% -> 75% -> 50%
  */
-export function getAvailablePlaybackRates(uiLevel?: CampusUiLevel | string | null): number[] {
-  if (uiLevel === 'junior') {
-    return [1.0, 0.75];
-  }
-  if (uiLevel === 'teen') {
-    return [1.0, 0.85, 0.75];
-  }
-  // pro (or unconfigured default)
-  return [1.0, 0.85, 0.75, 0.60, 0.50];
+export function getAvailablePlaybackRates(_uiLevel?: CampusUiLevel | string | null): number[] {
+  // Global & einheitlich: 100%, 85%, 75%, 50%
+  return [1.0, 0.85, 0.75, 0.50];
 }
 
 /**
@@ -38,21 +33,25 @@ export function getNextPlaybackRate(currentRate: number, uiLevel?: CampusUiLevel
 }
 
 /**
- * Returns the formatted display label for the speed button
+ * Returns the formatted display label for the speed button (pure Swiss typography, no emojis/icons)
  */
-export function getPlaybackRateLabel(rate: number, uiLevel?: CampusUiLevel | string | null): string {
-  if (uiLevel === 'junior') {
-    return rate < 0.98 ? '🐢 75%' : '🐰 100%';
-  }
+export function getPlaybackRateLabel(rate: number, _uiLevel?: CampusUiLevel | string | null): string {
   return `${Math.round(rate * 100)}%`;
 }
 
 /**
  * Applies authoritative pitch-preservation to HTML5 audio elements across all browsers
+ * Hardware-accelerated TimePitch locks pitch at exact original musical frequency (e.g. A = 440 Hz)
  */
 export function applyPitchPreservation(audio: HTMLAudioElement | null | undefined, rate: number): void {
   if (!audio) return;
   try {
+    // Set pitch-preservation flags before and after assigning playbackRate
+    // Guarantees WebKit (iOS/macOS), Blink (Chrome), and Gecko (Firefox)
+    // lock the AudioUnit into pitch-preserving time-stretch mode
+    audio.preservesPitch = true;
+    (audio as any).webkitPreservesPitch = true;
+    (audio as any).mozPreservesPitch = true;
     audio.playbackRate = rate;
     audio.preservesPitch = true;
     (audio as any).webkitPreservesPitch = true;

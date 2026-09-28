@@ -9,7 +9,7 @@ import { initKioskUrlBootstrap } from './utils/kioskBootstrap';
 
 import { LegalConsentGate } from './components/LegalConsentGate';
 import { SecurityHoneyTrap } from './components/ui/SecurityHoneyTrap';
-import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { ErrorBoundary, DashboardLoader } from './components/ui/ErrorBoundary';
 import { CampusSystemBannersOverlay } from './components/layout/CampusSystemBannersOverlay';
 import { CampusAppLayout } from './components/layout/CampusAppLayout';
 import { useCampusAppOrchestrator } from './hooks/useCampusAppOrchestrator';
@@ -40,7 +40,7 @@ function App() {
 
   return (
     <LegalConsentGate user={orchestrator.user}>
-      <Suspense fallback={null}>
+      <Suspense fallback={<DashboardLoader />}>
         <SecurityHoneyTrap />
         <DeviceSimulator>
           <CampusSystemBannersOverlay {...orchestrator.bannersOverlayProps} />
