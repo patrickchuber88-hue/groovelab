@@ -2641,11 +2641,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 </span>
                 <span style={{ fontSize: '1.4rem', fontWeight: 850, color: '#94a3b8' }}>BPM</span>
               </div>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e2e8f0', marginTop: '8px' }}>
-                {effectiveUiLevel === 'junior'
-                  ? (bpm <= 80 ? '🐢 Leo (Gemütlich)' : bpm <= 130 ? '🐕 Bello (Spazieren)' : '🐆 Gepard (Turbo)')
-                  : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
-              </span>
             </div>
 
             {/* Giant Beat Circles */}
@@ -3773,11 +3768,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     <button
                       type="button"
                       onClick={() => {
-                        setTempBpmInput(String(bpm));
-                        setIsEditingBpm(true);
+                        setShowTempoDeck(prev => !prev);
+                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                          try { navigator.vibrate(15); } catch (_) {}
+                        }
                       }}
-                      title="Klicken, um Tempo direkt als Zahl einzugeben"
-                      aria-label={`Tempo: ${bpm} BPM. Klicken zum direkten Bearbeiten`}
+                      title="Klicken für Tempo-Feineinstellung (Schieberegler, Direkteingabe & Tasten)"
+                      aria-label={`Tempo: ${bpm} BPM. Klicken für Feineinstellung`}
+                      aria-expanded={showTempoDeck}
+                      aria-haspopup="dialog"
                       style={{
                         display: 'flex',
                         alignItems: 'baseline',
@@ -3792,6 +3791,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         transition: 'background 0.12s ease',
                         touchAction: 'manipulation'
                       }}
+                      className="hover-scale-mini"
                     >
                       <span style={{
                         fontSize: '2.9rem',
@@ -3840,83 +3840,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   </button>
                 </div>
 
-                {/* All-in-One Tier- & Tempo-Kapsel mit direktem [TAP] Tempo Button */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {(() => {
-                    const animalInfo = bpm <= 80
-                      ? { emoji: '🐢', name: 'Leo', desc: 'Gemütlich', bg: '#dcfce7', border: '#86efac', text: '#166534' }
-                      : bpm <= 130
-                      ? { emoji: '🐕', name: 'Bello', desc: 'Spazieren', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
-                      : { emoji: '🐆', name: 'Gepard', desc: 'Turbo', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
-
-                    const isBeatBounce = isPlaying && (activeBeatIndex !== null);
-
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowTempoDeck(prev => !prev);
-                          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                            try { navigator.vibrate(15); } catch (_) {}
-                          }
-                        }}
-                        aria-expanded={showTempoDeck}
-                        aria-haspopup="dialog"
-                        aria-label={`Tempo-Feineinstellung öffnen (Slider, Tap & Tasten): ${bpm} BPM, ${animalInfo.name}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          background: effectiveUiLevel === 'junior' ? animalInfo.bg : '#fefce8',
-                          border: `1.5px solid ${effectiveUiLevel === 'junior' ? animalInfo.border : '#fde047'}`,
-                          padding: '5px 12px 5px 14px',
-                          borderRadius: '100px',
-                          transform: isBeatBounce ? 'scale(1.08)' : 'scale(1)',
-                          transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
-                          boxShadow: isBeatBounce 
-                            ? `0 0 12px ${animalInfo.border}` 
-                            : (showTempoDeck ? '0 0 0 3px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.05)'),
-                          cursor: 'pointer',
-                          touchAction: 'manipulation'
-                        }}
-                        title="Klicken für Tempo-Feineinstellung (Schieberegler, Tap & Schnelltasten)"
-                      >
-                        {effectiveUiLevel === 'junior' ? (
-                          <>
-                            <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 900, color: animalInfo.text, whiteSpace: 'nowrap' }}>
-                              {animalInfo.name} • {animalInfo.desc}
-                            </span>
-                          </>
-                        ) : (
-                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#854d0e', whiteSpace: 'nowrap' }}>
-                            {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
-                          </span>
-                        )}
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '50%',
-                          background: showTempoDeck ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)',
-                          color: effectiveUiLevel === 'junior' ? animalInfo.text : '#854d0e',
-                          fontSize: '0.70rem',
-                          fontWeight: 900,
-                          marginLeft: '2px',
-                          lineHeight: 1,
-                          transform: showTempoDeck ? 'rotate(180deg)' : 'none',
-                          transition: 'transform 0.15s ease'
-                        }}>
-                          ▾
-                        </span>
-                      </button>
-                    );
-                  })()}
-
-                  {/* ⚡ DIRECT TAP-TEMPO BUTTON (Organisch & Taktil) */}
+                {/* ⚡ DIRECT TAP-TEMPO BUTTON (Organisch, Taktil & Zentriert) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -3935,7 +3860,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       gap: '5px',
                       background: '#ffffff',
                       border: '1.5px solid #cbd5e1',
-                      padding: '5px 12px',
+                      padding: '5px 14px',
                       borderRadius: '100px',
                       cursor: 'pointer',
                       fontSize: '0.76rem',

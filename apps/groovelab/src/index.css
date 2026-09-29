@@ -4,6 +4,11 @@
 @layer reset, tokens, base, components, utilities, mobile, print;
 
 @layer reset {
+  /* 🏛️ 0,1% Goldstandard Universal Box-Sizing & Defensive Reset */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   /* DSGVO-Compliant Native Apple & Swiss Modernist Font System (LG München I compliant, 0 External Server Calls) */
   *, body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, div, span, p, a, strong, b, td, th {
     font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
@@ -132,7 +137,8 @@
   --glass-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.02), inset 0 1px 0 0 rgba(255, 255, 255, 0.80);
   --glass-shadow-lg: 0 12px 36px 0 rgba(0, 0, 0, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.90);
 
-  /* Canonical Z-Index Stacking Tokens */
+  /* Canonical Z-Index Stacking Tokens (5-Tier Governance Standard) */
+  --z-base: 1;
   --z-inline-badge: 5;
   --z-sticky-header: 100;
   --z-sidebar-nav: 150;
@@ -141,11 +147,11 @@
   --z-mobile-bottom-nav: 1000;
   --z-fab: 1100;
   --z-dropdown-popover: 2000;
-  --z-modal-backdrop: 5000;
-  --z-modal-content: 5001;
-  --z-submodal: 6000;
-  --z-toast-notification: 9000;
-  --z-privacy-shield: 99999;
+  --z-modal-backdrop: 50000;
+  --z-modal-content: 50001;
+  --z-submodal: 60000;
+  --z-toast-notification: 900000;
+  --z-privacy-shield: 999990;
   --z-system-critical-alert: 999999;
 
   /* Legacy */
@@ -282,10 +288,16 @@
     outline-offset: 2px !important;
   }
 
-  /* 4. Text Spacing Immunity (WCAG 1.4.12) */
-  p, span, h1, h2, h3, h4, h5, h6, label, td, th {
+  /* 4. Zero Text Collision & Text Spacing Immunity (WCAG 1.4.12 / 0.1% Goldstandard) */
+  p, span, h1, h2, h3, h4, h5, h6, a, label, li, td, th, blockquote {
     overflow-wrap: break-word;
-    word-wrap: break-word;
+    word-break: break-word;
+  }
+  p, li, td, th, blockquote {
+    line-height: 1.45;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.15;
   }
 
   /* 5. High-Contrast Mode & Windows Forced Colors (WCAG 1.4.3 & 1.4.6) */
@@ -2991,6 +3003,78 @@ input[type="range"]::-moz-range-thumb {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+}
+
+/* ==========================================================================
+   UTILITIES LAYER (0,1% Goldstandard Zero-Overlap & Fluid-Layout Engine)
+   ========================================================================== */
+@layer utilities {
+  /* Flex Child Min-Width & Min-Height Reset (Neutralizes CSS default min-width: auto) */
+  .min-w-0 {
+    min-width: 0 !important;
+  }
+  .min-h-0 {
+    min-height: 0 !important;
+  }
+
+  /* Safe Single-Line Text Truncation with Ellipsis */
+  .text-truncate-safe {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Responsive Multi-Line Text Clamping */
+  .line-clamp-1 {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 1 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+  .line-clamp-2 {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+  .line-clamp-3 {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  /* Zero-Overlap Elastic Flex Row */
+  .zero-overlap-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+  }
+
+  /* Elastic Container Geometry (Prohibits fixed-height truncation and overlap) */
+  .dynamic-card-elastic {
+    height: auto !important;
+    min-height: fit-content !important;
+    max-height: none !important;
+  }
+
+  /* Anti-Collision Badge / Pill */
+  .badge-anti-collision {
+    display: inline-flex !important;
+    align-items: center !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+  }
+  .badge-anti-collision > span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
 }
 
 /* ==========================================================================

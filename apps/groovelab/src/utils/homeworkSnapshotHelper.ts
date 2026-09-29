@@ -59,12 +59,20 @@ export interface ParsedLoopItem {
   rawToken: string;
 }
 
+export interface ParsedStudentQuestionItem {
+  timestamp?: string;
+  question: string;
+  isArchived?: boolean;
+  rawToken: string;
+}
+
 export interface ExtractedHomeworkPayload {
   lehrwerke: ParsedLehrwerkItem[];
   songs: ParsedSongItem[];
   audioItems: ParsedAudioItem[];
   loopItems: ParsedLoopItem[];
   didacticNotes: string[];
+  studentQuestions: ParsedStudentQuestionItem[];
   rawSnapshotLwToken?: string;
   rawSnapshotSongsToken?: string;
 }
@@ -175,7 +183,8 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
     songs: [],
     audioItems: [],
     loopItems: [],
-    didacticNotes: []
+    didacticNotes: [],
+    studentQuestions: []
   };
 
   if (!rawNotes) return result;
@@ -314,7 +323,34 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
       return;
     }
 
-    // 5. Pure Didactic Notes
+    // 5. STUDENT_QUESTION Tokens (STUDENT_QUESTION:timestamp|question or ❓ Frage für den Unterricht: ...)
+    if (str.startsWith('STUDENT_QUESTION:') || str.startsWith('❓ Frage für den Unterricht:')) {
+      let timestamp: string | undefined = undefined;
+      let question = '';
+      if (str.startsWith('STUDENT_QUESTION:')) {
+        const withoutPrefix = str.substring('STUDENT_QUESTION:'.length).trim();
+        const pipeIdx = withoutPrefix.indexOf('|');
+        if (pipeIdx !== -1) {
+          timestamp = withoutPrefix.slice(0, pipeIdx).trim();
+          question = withoutPrefix.slice(pipeIdx + 1).trim();
+        } else {
+          question = withoutPrefix;
+        }
+      } else {
+        question = str.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+      }
+      if (question && !result.studentQuestions.some(q => q.question.toLowerCase() === question.toLowerCase())) {
+        result.studentQuestions.push({
+          timestamp,
+          question,
+          isArchived: true,
+          rawToken: str
+        });
+      }
+      return;
+    }
+
+    // 6. Pure Didactic Notes
     if (isPureDidacticNote(str)) {
       const sanitized = sanitizeDidacticText(str);
       if (sanitized && !result.didacticNotes.includes(sanitized)) {
@@ -328,7 +364,7 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
 
 /**
  * Builds a canonical homework_notes JSON payload for progress_matrix upserts,
- * safely combining didactic notes with serialized snapshots and media tokens.
+ * safely combining didactic notes with serialized snapshots, media tokens, and archived questions.
  */
 export function buildHomeworkNotesPayload(params: {
   didacticNotes?: string[];
@@ -338,6 +374,7 @@ export function buildHomeworkNotesPayload(params: {
   rawSnapshotSongsToken?: string;
   audioTokens?: string[];
   loopTokens?: string[];
+  studentQuestions?: Array<{ question: string; timestamp?: string } | string>;
 }): string {
   const finalNotesList: string[] = [];
 
@@ -375,6 +412,19 @@ export function buildHomeworkNotesPayload(params: {
     finalNotesList.push(`SNAPSHOT_SONGS:${JSON.stringify(params.songs)}`);
   } else if (params.rawSnapshotSongsToken) {
     finalNotesList.push(params.rawSnapshotSongsToken);
+  }
+
+  // 5. Student Questions (Archived with timestamp)
+  if (params.studentQuestions && params.studentQuestions.length > 0) {
+    params.studentQuestions.forEach(q => {
+      if (typeof q === 'string') {
+        if (q && !finalNotesList.includes(q)) finalNotesList.push(q);
+      } else if (q && q.question) {
+        const ts = q.timestamp || new Date().toISOString();
+        const tok = `STUDENT_QUESTION:${ts}|${q.question.trim()}`;
+        if (!finalNotesList.includes(tok)) finalNotesList.push(tok);
+      }
+    });
   }
 
   return JSON.stringify(finalNotesList);

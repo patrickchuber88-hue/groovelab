@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import {
   Activity, ArrowRight, ArrowRightLeft, Award, BookOpen, Calendar, Check, CheckCircle, ChevronDown, ChevronLeft,
   ChevronRight, Clock, Compass, Copy, Disc, Edit3, FileText, Globe, Hash, Headphones, HelpCircle, History, Lightbulb,
-  Lock, Mail, Mic, Moon, Music, Pin, Play, Plus, Radio, RotateCcw, Search, Settings, Share2, Sliders,
+  Lock, Mail, Mic, Moon, Music, Pause, Pin, Play, Plus, Radio, RotateCcw, Search, Settings, Share2, Sliders,
   Sparkles, Square, Star, Target, Timer, Trash2, User, Volume2, VolumeX, AlertCircle,
   Eye, EyeOff, Hand, Info, MessageSquare, Pencil, Printer, RefreshCw, RotateCw, Unlock, Users, Wrench, Zap, X, Send, Wand2, Repeat
 } from 'lucide-react';
@@ -15,7 +15,12 @@ import { SpeechDictationButton } from '../SpeechDictationButton';
 import { MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
 import { AudioSettingsSheet } from './AudioSettingsSheet';
 import { Student } from '../meisterwerk.types';
-import { StudioModuleKey, ALL_STUDIO_MODULE_KEYS } from '../studentAgeStandards';
+import {
+  StudioModuleKey,
+  ALL_STUDIO_MODULE_KEYS,
+  isStudioModuleActive,
+  DEFAULT_ACTIVE_STUDIO_MODULES
+} from '../studentAgeStandards';
 import {
   cleanSongOrBookTitle,
   formatHarmonizedAudioTitle,
@@ -29,6 +34,8 @@ import {
   maskLastName
 } from '../../../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
+import { cleanHomeworkTitle } from '../../../utils/homeworkSnapshotHelper';
+import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
 import {
   formatPageNumbers,
   getCleanPageNotes,
@@ -63,6 +70,7 @@ import { playAlongAudioEngine, DEFAULT_MIXER_STATE, type AudioMixerState } from 
 import { getInstrumentAvatarUrl } from '../studentAvatars.constants';
 import { getSimulatedNow, getWeekDateRange } from '../studentDateUtils';
 import { useDictationInput } from '../../../hooks/useVoiceToText';
+import { CampusStudioModuleCover, TuningForkIcon } from './CampusStudioModuleCover';
 
 export type MeisterwerkBrushType = 'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY' | 'STUDENT_FOCUS';
 export type MeisterwerkFeedbackStatus = 'beherrscht' | 'in_entwicklung' | 'wiederholen' | null;
@@ -308,10 +316,246 @@ export interface MeisterwerkDocumentTabProps {
   triggerImmediateAutoSave: (...args: any[]) => any;
   uiLevel: any;
   parentPermissions?: any;
+  onSaveParentOverrides?: (overrides: Record<string, boolean>) => void;
   updateLehrwerkVisibility: (...args: any[]) => any;
   useNotebookLayout: boolean;
   viewingWeekOffset: number;
 }
+
+interface ArchiveAudioTrackItem {
+  url: string;
+  label: string;
+  duration?: number;
+  author?: string;
+  date?: string;
+}
+
+const ArchiveAudioPlayerRow: React.FC<{ track: ArchiveAudioTrackItem; aIdx: number }> = ({ track, aIdx }) => {
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hasError, setHasError] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(track.duration || 0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Format date: e.g. "17. Aug. • 12:56 Uhr"
+  const formattedDate = useMemo(() => {
+    if (!track.date) return '';
+    try {
+      if (track.date.includes('T') || (track.date.includes('-') && track.date.length > 8)) {
+        const d = new Date(track.date);
+        if (!isNaN(d.getTime())) {
+          const dateStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+          const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+          return `${dateStr} · ${timeStr} Uhr`;
+        }
+      }
+      return track.date;
+    } catch {
+      return track.date;
+    }
+  }, [track.date]);
+
+  // Resolve playable audio source
+  useEffect(() => {
+    let isCancelled = false;
+    setIsLoading(true);
+    setHasError(false);
+
+    const resolve = async () => {
+      try {
+        let src: string | null = null;
+        let cleanup: (() => void) | undefined = undefined;
+
+        // 1. Direct blob / data / http check
+        if (track.url.startsWith('blob:') || track.url.startsWith('data:') || track.url.startsWith('http://') || track.url.startsWith('https://')) {
+          src = track.url;
+        } else {
+          // 2. Primary resolve via campus-assets
+          const res = await resolvePlayableAudioSource(track.url, 'campus-assets', 1800);
+          if (res && res.src) {
+            src = res.src;
+            cleanup = res.cleanup;
+          } else {
+            // 3. Fallback via groovelab-assets
+            const resGroove = await resolvePlayableAudioSource(track.url, 'groovelab-assets', 1800);
+            if (resGroove && resGroove.src) {
+              src = resGroove.src;
+              cleanup = resGroove.cleanup;
+            }
+          }
+        }
+
+        if (isCancelled) {
+          if (cleanup) cleanup();
+          return;
+        }
+
+        if (src) {
+          if (cleanupRef.current && cleanupRef.current !== cleanup) {
+            cleanupRef.current();
+          }
+          cleanupRef.current = cleanup || null;
+          setResolvedUrl(src);
+          setIsLoading(false);
+        } else {
+          setHasError(true);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.warn('[ArchiveAudioPlayerRow] Resolution error for:', track.url, err);
+          setHasError(true);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    resolve();
+
+    return () => {
+      isCancelled = true;
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+    };
+  }, [track.url]);
+
+  const togglePlay = () => {
+    if (!audioRef.current || !resolvedUrl) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(err => {
+          console.warn('[ArchiveAudioPlayerRow] Playback error:', err);
+          setIsPlaying(false);
+        });
+    }
+  };
+
+  const formatSecs = (sec: number) => {
+    if (isNaN(sec) || sec <= 0) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div
+      key={aIdx}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 14px',
+        borderRadius: '14px',
+        background: isPlaying ? '#ecfdf5' : '#f0fdf4',
+        border: `1.5px solid ${isPlaying ? '#34a853' : '#bbf7d0'}`,
+        gap: '12px',
+        flexWrap: 'wrap',
+        transition: 'all 0.15s ease'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+        <button
+          type="button"
+          onClick={togglePlay}
+          disabled={isLoading || hasError || !resolvedUrl}
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            background: hasError ? '#fee2e2' : (isPlaying ? '#15803d' : '#16a34a'),
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: hasError ? '#dc2626' : 'white',
+            cursor: (isLoading || hasError || !resolvedUrl) ? 'default' : 'pointer',
+            flexShrink: 0,
+            boxShadow: isPlaying ? '0 0 0 3px rgba(34, 197, 94, 0.3)' : '0 2px 5px rgba(0,0,0,0.1)',
+            transition: 'all 0.15s ease'
+          }}
+          className={(isLoading || hasError || !resolvedUrl) ? '' : 'hover-scale'}
+          title={isPlaying ? 'Pausieren' : 'Abspielen'}
+          aria-label={isPlaying ? 'Audio pausieren' : 'Audio abspielen'}
+        >
+          {isLoading ? (
+            <RefreshCw size={15} className="spin" />
+          ) : isPlaying ? (
+            <Pause size={16} />
+          ) : (
+            <Play size={16} style={{ marginLeft: '2px' }} />
+          )}
+        </button>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#14532d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {track.label}
+          </div>
+          <div style={{ fontSize: '0.68rem', fontWeight: 650, color: '#15803d', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span>{track.author ? `Von: ${track.author}` : 'Unterricht'}</span>
+            {formattedDate && <span>· {formattedDate}</span>}
+            {duration > 0 && <span style={{ opacity: 0.85 }}>({formatSecs(currentTime)} / {formatSecs(duration)})</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Embedded Native Audio Element with full controls and fallback */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        {hasError ? (
+          <span style={{ fontSize: '0.70rem', color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '3px 8px', borderRadius: '8px', fontWeight: 700 }}>
+            ⚠️ Lokal auf Gerät nicht verfügbar
+          </span>
+        ) : (
+          <audio
+            ref={audioRef}
+            controls
+            src={resolvedUrl || undefined}
+            style={{ height: '34px', maxWidth: '240px', flexShrink: 0 }}
+            preload="metadata"
+            onPlay={(e) => {
+              setIsPlaying(true);
+              document.querySelectorAll('audio').forEach(el => {
+                if (el !== e.currentTarget && !el.paused) {
+                  el.pause();
+                }
+              });
+            }}
+            onPause={() => setIsPlaying(false)}
+            onEnded={() => {
+              setIsPlaying(false);
+              setCurrentTime(0);
+            }}
+            onTimeUpdate={(e) => {
+              const el = e.currentTarget;
+              setCurrentTime(el.currentTime);
+              if (el.duration && !isNaN(el.duration) && el.duration > 0 && duration === 0) {
+                setDuration(el.duration);
+              }
+            }}
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              if (el.duration && !isNaN(el.duration) && el.duration > 0) {
+                setDuration(el.duration);
+              }
+            }}
+            onError={() => {
+              setHasError(true);
+              setIsPlaying(false);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
 
 export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const {
@@ -341,7 +585,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     expressionVal,
     fingerVal,
     formatRecordTime,
-    generalHomeworkNotes,
+    generalHomeworkNotes = '',
     getCanonicalSongKey,
     getFeedbackForWeek,
     getHomeworkNoteItems,
@@ -431,7 +675,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     newSongTitle,
     onClose,
     onOpenAssignModal,
-    pageHomeworkNotes,
+    pageHomeworkNotes = '',
     pageNotesSelectionRef,
     pageNotesTextareaRef,
     parsedStudentQuestion,
@@ -514,7 +758,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     showMatchConfetti,
     showPlayAlongMetronomePopup: propShowPlayAlongMetronomePopup,
     showdownState,
-    songHomeworkNotes,
+    songHomeworkNotes = '',
     songModalTab,
     songNotesSelectionRef,
     songNotesTextareaRef,
@@ -527,13 +771,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     stopRecordingAudio,
     student,
     studentFirstName,
-    studentNotes,
+    studentNotes = '',
     studentNotesSelectionRef,
     studentNotesTextareaRef,
     studentRating,
     studentRatingUpdatedAt,
     teacherId,
-    teacherNotes,
+    teacherNotes = '',
     teacherNotesTextareaRef,
     textbookPageChunkIndex,
     toggleStudentFocusPage,
@@ -545,6 +789,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     triggerDirectSongSave,
     triggerImmediateAutoSave,
     uiLevel,
+    parentPermissions,
+    onSaveParentOverrides,
     updateLehrwerkVisibility,
     useNotebookLayout,
     viewingWeekOffset
@@ -563,16 +809,32 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [showModuleUnlockModal, setShowModuleUnlockModal] = useState(false);
   const [showParentPinModalForModules, setShowParentPinModalForModules] = useState(false);
   const [isConfirmingResolveQuestion, setIsConfirmingResolveQuestion] = useState(false);
+
+  const studentIdVal = (student as any)?.id;
+
   const [localModuleOverrides, setLocalModuleOverrides] = useState<Record<string, boolean>>(() => {
-    return props.parentPermissions?.module_overrides || (student as any)?.parent_permissions?.module_overrides || {};
+    if (props.parentPermissions?.module_overrides) return props.parentPermissions.module_overrides;
+    if ((student as any)?.parent_permissions?.module_overrides) return (student as any).parent_permissions.module_overrides;
+    if (studentIdVal && typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`campus_studio_module_overrides_${studentIdVal}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return {};
   });
 
   useEffect(() => {
     const nextOverrides = props.parentPermissions?.module_overrides || (student as any)?.parent_permissions?.module_overrides;
-    if (nextOverrides) {
+    if (nextOverrides && typeof nextOverrides === 'object') {
       setLocalModuleOverrides(nextOverrides);
+      if (studentIdVal && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`campus_studio_module_overrides_${studentIdVal}`, JSON.stringify(nextOverrides));
+        } catch (e) {}
+      }
     }
-  }, [props.parentPermissions, (student as any)?.parent_permissions]);
+  }, [props.parentPermissions?.module_overrides, (student as any)?.parent_permissions?.module_overrides, studentIdVal]);
 
   // 🎵 Song Selection & Creation Modal State (Self-Contained 1% Goldstandard)
   const [localShowCreateSongModal, setLocalShowCreateSongModal] = useState(false);
@@ -1463,8 +1725,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   }, []);
   const [activeModuleUnlockTab, setActiveModuleUnlockTab] = useState<'restore' | 'extensions'>('restore');
   const [draggedModuleKey, setDraggedModuleKey] = useState<StudioModuleKey | null>(null);
-
-  const studentIdVal = (student as any)?.id;
   const [customModuleLayout, setCustomModuleLayout] = useState<{ order: StudioModuleKey[]; hidden: StudioModuleKey[] }>(() => {
     let parsed: { order: StudioModuleKey[]; hidden: StudioModuleKey[]; isDefault?: boolean; resetAt?: number } | null = null;
     let fromCache = false;
@@ -1606,7 +1866,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         // 2. Autoritativer Backend-RPC (OWASP ASVS Level 3 / Fail-Closed)
         const { error: rpcErr } = await supabase.rpc('save_student_studio_layout', {
           p_student_id: student.id,
-          p_layout: reconciledLayout
+          p_layout: reconciledLayout,
+          p_module_overrides: localModuleOverrides
         });
 
         // 3. Resilienter Fallback auf users table (falls RPC auf Remote-DB noch nicht aktiv)
@@ -1621,7 +1882,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         console.error('[Meisterwerk] Could not save custom module layout:', err);
       }
     }
-  }, [student, studentIdVal]);
+  }, [student, studentIdVal, localModuleOverrides]);
 
   // 🔔 Local Toast Feedback for Module Layout Actions
   const [moduleToast, setModuleToast] = useState<string | null>(null);
@@ -1694,9 +1955,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   }, [student, studentIdVal, isTeacherMode, studentDisplayName]);
 
   // 🔄 Automatic Layout Reset on UI Level change by parents (Junior <-> Teen <-> Pro)
-  const prevUiLevelRef = useRef(uiLevel);
+  const prevUiLevelRef = useRef<string | null>(null);
   useEffect(() => {
-    if (prevUiLevelRef.current && prevUiLevelRef.current !== uiLevel) {
+    if (prevUiLevelRef.current !== null && prevUiLevelRef.current !== uiLevel) {
       handleResetModuleLayout();
     }
     prevUiLevelRef.current = uiLevel;
@@ -1844,14 +2105,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     setDraggedModuleKey(null);
   }, [draggedModuleKey, customModuleLayout, saveCustomLayout, isTeacherMode, studentDisplayName]);
 
-  useEffect(() => {
-    if ((student as any)?.parent_permissions?.module_overrides) {
-      setLocalModuleOverrides((student as any).parent_permissions.module_overrides);
-    }
-  }, [(student as any)?.parent_permissions?.module_overrides]);
-
-  const isLoopstationUnlocked = uiLevel !== "junior" || Boolean(localModuleOverrides.loopstation);
-  const isArchiveUnlocked = uiLevel === "pro" || Boolean(localModuleOverrides.archive);
+  const isLoopstationUnlocked = isStudioModuleActive("loopstation", uiLevel as any, localModuleOverrides);
+  const isArchiveUnlocked = isStudioModuleActive("archive", uiLevel as any, localModuleOverrides);
 
   const handleSaveModuleOverride = async (key: string, enabled: boolean) => {
     const nextOverrides = {
@@ -1860,21 +2115,46 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     };
     setLocalModuleOverrides(nextOverrides);
 
-    if (student?.id) {
+    // 1. Lokalen Cache unverzüglich sichern (verhindert Reversion bei schnellem Reload)
+    if (studentIdVal && typeof window !== 'undefined') {
       try {
-        const existingPermissions = (student as any)?.parent_permissions || {};
-        const updatedPermissions = {
-          ...existingPermissions,
-          module_overrides: nextOverrides
-        };
-        await supabase
-          .from("users")
-          .update({ parent_permissions: updatedPermissions })
-          .eq("id", student.id);
-        
-        (student as any).parent_permissions = updatedPermissions;
-      } catch (err) {
-        console.error("[Meisterwerk] Could not save module overrides:", err);
+        localStorage.setItem(`campus_studio_module_overrides_${studentIdVal}`, JSON.stringify(nextOverrides));
+      } catch (e) {}
+    }
+
+    // 2. Parent-State informieren
+    if (onSaveParentOverrides) {
+      onSaveParentOverrides(nextOverrides);
+    }
+
+    if (student) {
+      const existingPermissions = (student as any)?.parent_permissions || {};
+      const updatedPermissions = {
+        ...existingPermissions,
+        module_overrides: nextOverrides
+      };
+      (student as any).parent_permissions = updatedPermissions;
+
+      if (student.id) {
+        try {
+          // 3. Autoritativer Backend-RPC (OWASP ASVS Level 3 / Fail-Closed)
+          const { error: rpcErr } = await supabase.rpc('save_student_studio_layout', {
+            p_student_id: student.id,
+            p_layout: customModuleLayout,
+            p_module_overrides: nextOverrides
+          });
+
+          // 4. Resilienter Fallback auf users table (falls RPC auf Remote-DB noch nicht aktiv)
+          if (rpcErr) {
+            console.warn('[Meisterwerk] save_student_studio_layout rpc note (falling back to direct update):', rpcErr);
+            await supabase
+              .from("users")
+              .update({ parent_permissions: updatedPermissions })
+              .eq("id", student.id);
+          }
+        } catch (err) {
+          console.error("[Meisterwerk] Could not save module overrides:", err);
+        }
       }
     }
   };
@@ -2059,12 +2339,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       const currentWeek = getISOWeek();
                       const latestExisting = sortedExisting[sortedExisting.length - 1];
                       const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
-                      weeks = getWeeksBetween(earliestWeek, endWeek);
+                      const res = typeof getWeeksBetween === 'function' ? getWeeksBetween(earliestWeek, endWeek) : null;
+                      weeks = Array.isArray(res) && res.length > 0 ? res : [...new Set([currentWeek, ...sortedExisting])].reverse();
                     } else {
                       weeks = [getISOWeek()];
                     }
                     
-                    if (weeks.length === 0) {
+                    if (!Array.isArray(weeks) || weeks.length === 0) {
                       return (
                         <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.8rem' }}>
                           Keine vergangenen Hausaufgaben gefunden.
@@ -2119,12 +2400,30 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         }
                       }
                       const isCompact = homeworkItemsCount === 0;
-                      const dateRangeStr = getWeekDateRange(wk);
+                      const dateRangeStr = typeof getWeekDateRange === 'function' ? getWeekDateRange(wk) : '';
+                      const hasWeekQuestion = weekItems.some(item => {
+                        const notes = typeof item.homework_notes === 'string' ? item.homework_notes : JSON.stringify(item.homework_notes || '');
+                        return notes.includes('STUDENT_QUESTION:') || notes.includes('❓ Frage für den Unterricht:');
+                      });
+                      const hasWeekAudio = weekItems.some(item => {
+                        if (item.recording_url) return true;
+                        const notes = typeof item.homework_notes === 'string' ? item.homework_notes : JSON.stringify(item.homework_notes || '');
+                        return notes.includes('AUDIO:');
+                      });
                       
                       return (
                         <div
                           key={wk}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Hausaufgaben Woche ${weekNum}`}
                           onClick={() => setSelectedHistoryWeek(wk)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedHistoryWeek(wk);
+                            }
+                          }}
                           style={{
                             background: isSelected ? '#f1f5f9' : 'white',
                             border: isSelected ? '1.5px solid #34a853' : '1px solid #cbd5e1',
@@ -2144,7 +2443,39 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isSelected ? '#34a853' : '#0f172a' }}>
                               KW {weekNum}
                             </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              {hasWeekQuestion && (
+                                <span style={{ 
+                                  fontSize: '0.62rem', 
+                                  background: '#fffdf0', 
+                                  color: '#713f12', 
+                                  border: '1px solid #fde047', 
+                                  padding: '2px 7px', 
+                                  borderRadius: '8px', 
+                                  fontWeight: 800,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }} title="Enthält Frage an die Lehrkraft">
+                                  ❓ Frage
+                                </span>
+                              )}
+                              {hasWeekAudio && (
+                                <span style={{ 
+                                  fontSize: '0.62rem', 
+                                  background: '#f8fafc', 
+                                  color: '#475569', 
+                                  border: '1px solid #cbd5e1', 
+                                  padding: '2px 7px', 
+                                  borderRadius: '8px', 
+                                  fontWeight: 800,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }} title="Enthält Audio-Aufnahme">
+                                  🎙️ Audio
+                                </span>
+                              )}
                               {(() => {
                                 const fb = getFeedbackForWeek(wk);
                                 if (!fb?.status) return null;
@@ -2174,7 +2505,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             </div>
                           </div>
                           <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                            {dateRangeStr ? `${dateRangeStr} · Woche ${weekNum}` : `Dokumentiert in Woche ${weekNum}`}
+                            {typeof dateRangeStr === 'string' && dateRangeStr ? `${dateRangeStr} · Woche ${weekNum}` : `Dokumentiert in Woche ${weekNum}`}
                           </span>
 
                           {/* Inline Feedback Panel — only when selected and not readOnly */}
@@ -4291,6 +4622,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       const hasHiddenModules = customModuleLayout.hidden.length > 0;
                       const hasLayoutModifications = isOrderCustomized || hasHiddenModules;
 
+                      const isModActive = (k: StudioModuleKey) => isStudioModuleActive(k, uiLevel as any, localModuleOverrides);
+                      const hasLockedModules = ALL_STUDIO_MODULE_KEYS.some(k => !isModActive(k));
+
                       // Module definitions map for dynamic rendering
                       const moduleDefinitions: Record<StudioModuleKey, {
                         title: string;
@@ -4308,8 +4642,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           icon: <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
                           boxShadow: '0 6px 14px -2px rgba(234, 179, 8, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('practice'),
+                          showInView: isModActive('practice') || !readOnly,
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('practice');
@@ -4321,8 +4655,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           icon: <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
                           boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('recordings'),
+                          showInView: isModActive('recordings') || !readOnly,
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('recordings');
@@ -4334,8 +4668,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                           boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('groovetrainer'),
+                          showInView: isModActive('groovetrainer') || !readOnly,
+                          borderOverride: isModActive('groovetrainer') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('groovetrainer' as any);
@@ -4344,11 +4679,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         tuner: {
                           title: 'Stimmgerät',
-                          icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          icon: <TuningForkIcon size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
                           boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('tuner'),
+                          showInView: isModActive('tuner') || !readOnly,
+                          borderOverride: isModActive('tuner') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('tuner');
@@ -4358,13 +4694,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         loopstation: {
                           title: 'Loopstation',
                           icon: <Sliders size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: isLoopstationUnlocked 
+                          gradient: isModActive('loopstation') 
                             ? 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)'
                             : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-                          boxShadow: isLoopstationUnlocked ? '0 6px 14px -2px rgba(244, 63, 94, 0.40)' : 'none',
-                          isUnlocked: isLoopstationUnlocked,
-                          showInView: isLoopstationUnlocked || !readOnly,
-                          borderOverride: isLoopstationUnlocked ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
+                          boxShadow: isModActive('loopstation') ? '0 6px 14px -2px rgba(244, 63, 94, 0.40)' : 'none',
+                          isUnlocked: isModActive('loopstation'),
+                          showInView: isModActive('loopstation') || !readOnly,
+                          borderOverride: isModActive('loopstation') ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('loopstation');
@@ -4376,8 +4712,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           icon: <Headphones size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
                           boxShadow: '0 6px 14px -2px rgba(139, 92, 246, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('earlab'),
+                          showInView: isModActive('earlab') || !readOnly,
+                          borderOverride: isModActive('earlab') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('earlab' as any);
@@ -4397,19 +4734,24 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           boxShadow: uiLevel === 'junior'
                             ? '0 6px 14px -2px rgba(245, 158, 11, 0.40)'
                             : '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('skillradar'),
+                          showInView: isModActive('skillradar') || !readOnly,
+                          borderOverride: isModActive('skillradar') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('skillradar');
                           }
                         },
                         protocol: {
-                          title: 'Aufgabenheft',
+                          title: uiLevel === 'junior'
+                            ? 'Noten & Songs'
+                            : uiLevel === 'teen'
+                              ? 'Songs & Noten'
+                              : 'Repertoire & Noten',
                           icon: <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
                           boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('protocol'),
+                          showInView: isModActive('protocol') || !readOnly,
                           onClick: () => {
                             setHubTab('protocol');
                           }
@@ -4417,13 +4759,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         archive: {
                           title: 'Verlauf',
                           icon: <History size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: isArchiveUnlocked
+                          gradient: isModActive('archive')
                             ? 'linear-gradient(135deg, #64748b 0%, #334155 100%)'
                             : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-                          boxShadow: isArchiveUnlocked ? '0 6px 14px -2px rgba(100, 116, 139, 0.40)' : 'none',
-                          isUnlocked: isArchiveUnlocked,
-                          showInView: isArchiveUnlocked || !readOnly,
-                          borderOverride: isArchiveUnlocked ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
+                          boxShadow: isModActive('archive') ? '0 6px 14px -2px rgba(100, 116, 139, 0.40)' : 'none',
+                          isUnlocked: isModActive('archive'),
+                          showInView: isModActive('archive') || !readOnly,
+                          borderOverride: isModActive('archive') ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveSubView('history');
@@ -4437,8 +4779,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           icon: <Compass size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                           boxShadow: '0 6px 14px -2px rgba(2, 132, 199, 0.40)',
-                          isUnlocked: true,
-                          showInView: true,
+                          isUnlocked: isModActive('worldtour'),
+                          showInView: isModActive('worldtour') || !readOnly,
+                          borderOverride: isModActive('worldtour') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('worldtour' as any);
@@ -4464,10 +4807,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         if (!def.showInView) return false;
                         return !currentHidden.includes(key);
                       });
-                      const hasArchive = rawVisibleKeys.includes('archive');
-                      const visibleModuleKeys = hasArchive 
-                        ? [...rawVisibleKeys.filter(k => k !== 'archive'), 'archive' as StudioModuleKey]
-                        : rawVisibleKeys;
+                      // 🛡️ Bounded Context Layout: All active studio tools form the quadratic 3-column grid.
+                      // ONLY the archive module ('archive') is rendered as an elongated element underneath the grid.
+                      const gridModuleKeys = rawVisibleKeys.filter(k => k !== 'archive');
+                      const isArchiveVisible = rawVisibleKeys.includes('archive');
 
                       return (
                         <>
@@ -4589,175 +4932,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             gap: '14px 12px',
                             padding: '4px 0 12px 0'
                           }}>
-                            {visibleModuleKeys.map((moduleKey) => {
+                            {gridModuleKeys.map((moduleKey) => {
                               const mod = moduleDefinitions[moduleKey];
                               if (!mod) return null;
 
                               const isGhosted = !isCampusActive ? (moduleKey !== 'protocol') : !mod.isUnlocked;
                               const isDraggingCurrent = draggedModuleKey === moduleKey;
-                              const isLastOrphanBanner = !isModuleEditMode && visibleModuleKeys.length % 3 === 1 && moduleKey === visibleModuleKeys[visibleModuleKeys.length - 1];
-
-                              if (isLastOrphanBanner) {
-                                if (moduleKey === 'archive') {
-                                  return (
-                                    <div
-                                      key={moduleKey}
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={() => {
-                                        if (isModuleEditMode) return;
-                                        mod.onClick();
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                          e.preventDefault();
-                                          if (!isModuleEditMode) mod.onClick();
-                                        }
-                                      }}
-                                      style={{
-                                        gridColumn: '1 / -1',
-                                        background: isGhosted ? '#f8fafc' : '#f8fafc',
-                                        border: '1.5px solid #e2e8f0',
-                                        borderRadius: '14px',
-                                        padding: '8px 14px',
-                                        minHeight: '44px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        cursor: 'pointer',
-                                        opacity: isGhosted ? 0.55 : 1,
-                                        position: 'relative',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                      }}
-                                      className="hover-scale-mini"
-                                      aria-label="Aufgabenheft-Verlauf öffnen"
-                                      title="Frühere Wochen & Aufgabenheft-Archiv öffnen"
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{
-                                          width: '32px',
-                                          height: '32px',
-                                          borderRadius: '9px',
-                                          background: mod.gradient,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          boxShadow: isGhosted ? 'none' : '0 2px 6px rgba(100, 116, 139, 0.25)',
-                                          flexShrink: 0
-                                        }}>
-                                          <History size={16} color="#ffffff" strokeWidth={2.4} />
-                                        </div>
-                                        <div style={{ textAlign: 'left' }}>
-                                          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span>Aufgabenheft-Verlauf</span>
-                                            <span style={{ fontSize: '0.62rem', fontWeight: 750, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '100px', border: '1px solid #e2e8f0' }}>
-                                              Archiv
-                                            </span>
-                                          </div>
-                                          <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', marginTop: '1px' }}>
-                                            Frühere Wochen, Notizen & Hausaufgaben-Historie
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: '#ffffff',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: '100px',
-                                        padding: '4px 10px',
-                                        fontSize: '0.70rem',
-                                        fontWeight: 750,
-                                        color: '#334155',
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                                      }}>
-                                        <span>Öffnen</span>
-                                        <span style={{ color: '#64748b' }}>➜</span>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div
-                                    key={moduleKey}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => {
-                                      if (isModuleEditMode) return;
-                                      mod.onClick();
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        if (!isModuleEditMode) mod.onClick();
-                                      }
-                                    }}
-                                    style={{
-                                      gridColumn: '1 / -1',
-                                      background: isGhosted ? '#f8fafc' : '#ffffff',
-                                      border: mod.borderOverride || '1.5px solid #e2e8f0',
-                                      borderRadius: '16px',
-                                      padding: '10px 16px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      cursor: 'pointer',
-                                      opacity: isGhosted ? 0.55 : 1,
-                                      position: 'relative',
-                                      boxShadow: isGhosted ? 'none' : '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                      <div style={{
-                                        width: '40px',
-                                        height: '40px',
-                                        borderRadius: '12px',
-                                        background: mod.gradient,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        boxShadow: isGhosted ? 'none' : mod.boxShadow,
-                                        flexShrink: 0
-                                      }}>
-                                        <div style={{ transform: 'scale(0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                          {mod.icon}
-                                        </div>
-                                      </div>
-                                      <div style={{ textAlign: 'left' }}>
-                                        <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <span>{mod.title}</span>
-                                          {mod.subtitle && (
-                                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '1px 7px', borderRadius: '100px' }}>
-                                              {mod.subtitle}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      background: '#f8fafc',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '100px',
-                                      padding: '5px 12px',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 800,
-                                      color: '#0f172a',
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                    }}>
-                                      <span>Öffnen</span>
-                                      <span style={{ color: '#64748b' }}>➜</span>
-                                    </div>
-                                  </div>
-                                );
-                              }
 
                               return (
                                 <div
@@ -4856,18 +5036,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     </div>
                                   )}
 
-                                  <div style={{
-                                    width: '72px',
-                                    height: '72px',
-                                    borderRadius: '18px',
-                                    background: mod.gradient,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: isGhosted ? 'none' : mod.boxShadow
-                                  }}>
-                                    {mod.icon}
-                                  </div>
+                                  <CampusStudioModuleCover
+                                    moduleKey={moduleKey as any}
+                                    size="lg"
+                                    isUnlocked={mod.isUnlocked}
+                                    isGhosted={isGhosted}
+                                    uiLevel={uiLevel}
+                                  />
                                   <div style={{ marginTop: '10px', padding: '0 2px' }}>
                                     <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                       {mod.title}
@@ -4883,7 +5058,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             })}
 
                             {/* ➕ SCHÜLER- & ELTERN-FREISCHALTKACHEL (Im Lehrer-Modus nur bei ausgeblendeten Modulen oder im Edit-Modus aktiv) */}
-                            {(hasHiddenModules || isModuleEditMode || (readOnly && (!isLoopstationUnlocked || !isArchiveUnlocked))) && (
+                            {(hasHiddenModules || isModuleEditMode || (readOnly && hasLockedModules)) && (
                               <div
                                 role="button"
                                 tabIndex={0}
@@ -4911,18 +5086,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 title="Module hinzufügen oder Studio-Erweiterungen freischalten"
                                 aria-label="Studio-Module verwalten"
                               >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  border: '1px solid rgba(255, 255, 255, 0.5)'
-                                }}>
-                                  <Plus size={34} color="#64748b" strokeWidth={2.3} />
-                                </div>
+                                <CampusStudioModuleCover
+                                  moduleKey="unlock_tile"
+                                  size="lg"
+                                  uiLevel={uiLevel}
+                                />
                                 <div style={{ marginTop: '10px', padding: '0 2px' }}>
                                   <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#334155', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                     {hasHiddenModules ? 'Module verwalten' : 'Modul freischalten'}
@@ -4941,6 +5109,117 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               </div>
                             )}
                           </div>
+
+                          {/* 🏛️ UNTERRICHTS-ARCHIV (Exklusives längliches Element unterhalb der Modul-Kacheln) */}
+                          {isArchiveVisible && (() => {
+                            const archiveMod = moduleDefinitions['archive'];
+                            if (!archiveMod) return null;
+                            const isArchiveGhosted = !isCampusActive || !archiveMod.isUnlocked;
+                            return (
+                              <div style={{ marginTop: '2px', marginBottom: '8px' }}>
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => {
+                                    if (isModuleEditMode) return;
+                                    archiveMod.onClick();
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      if (!isModuleEditMode) archiveMod.onClick();
+                                    }
+                                  }}
+                                  style={{
+                                    background: isArchiveGhosted ? '#f8fafc' : '#ffffff',
+                                    border: '1.5px solid #e2e8f0',
+                                    borderRadius: '16px',
+                                    padding: '10px 16px',
+                                    minHeight: '48px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    cursor: 'pointer',
+                                    opacity: isArchiveGhosted ? 0.55 : 1,
+                                    position: 'relative',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                  }}
+                                  className="hover-scale"
+                                  aria-label="Unterrichts-Archiv & Verlauf öffnen"
+                                  title="Frühere Wochen, Notizen & Hausaufgaben-Historie öffnen"
+                                >
+                                  {isModuleEditMode && canCustomizeLayout && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleHideModule('archive');
+                                      }}
+                                      style={{
+                                        position: 'absolute',
+                                        top: '-7px',
+                                        left: '-7px',
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        background: '#ef4444',
+                                        color: '#ffffff',
+                                        border: '2px solid #ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
+                                        zIndex: 40
+                                      }}
+                                      className="hover-scale"
+                                      title="Archiv ausblenden"
+                                    >
+                                      <X size={13} strokeWidth={3} />
+                                    </button>
+                                  )}
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <CampusStudioModuleCover
+                                      moduleKey="archive"
+                                      size="sm"
+                                      isUnlocked={archiveMod.isUnlocked}
+                                      isGhosted={isArchiveGhosted}
+                                      uiLevel={uiLevel}
+                                    />
+                                    <div style={{ textAlign: 'left' }}>
+                                      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span>Unterrichts-Archiv</span>
+                                        <span style={{ fontSize: '0.62rem', fontWeight: 750, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '100px', border: '1px solid #e2e8f0' }}>
+                                          Chronik
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '1px' }}>
+                                        Frühere Wochen, Notizen &amp; Hausaufgaben-Historie
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '100px',
+                                    padding: '4px 12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 750,
+                                    color: '#334155',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                  }}>
+                                    <span>Öffnen</span>
+                                    <span style={{ color: '#64748b' }}>➜</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* 🔔 FLOATING TOAST NOTIFICATION */}
                           {moduleToast && (
@@ -6448,11 +6727,20 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   groupedLehrwerke[title].pages.sort((a, b) => a - b);
                 });
 
-                // Extract unique clean homework notes & student questions
+                // Extract unique clean homework notes, student questions & audio tracks
                 const uniqueHomeworkNotes: string[] = [];
                 const studentQuestions: Array<{ timestamp?: string; question: string }> = [];
+                const weekAudioTracks: Array<{ url: string; label: string; duration?: number; author?: string; date?: string }> = [];
 
                 weekItems.forEach(item => {
+                  if (item.recording_url && !weekAudioTracks.some(a => a.url === item.recording_url)) {
+                    weekAudioTracks.push({
+                      url: item.recording_url,
+                      label: item.topic_name ? cleanHomeworkTitle(item.topic_name) : 'Aufnahme',
+                      author: 'Lehrkraft'
+                    });
+                  }
+
                   if (item.homework_notes && item.homework_notes.trim() !== '') {
                     let noteLines: string[] = [];
                     try {
@@ -6472,21 +6760,45 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       const trimmed = line.trim();
                       if (!trimmed) return;
 
-                      // Extract student questions (STUDENT_QUESTION:timestamp|question)
-                      if (trimmed.startsWith('STUDENT_QUESTION:')) {
-                        const payload = trimmed.substring('STUDENT_QUESTION:'.length).trim();
-                        if (payload.includes('|')) {
-                          const [ts, q] = payload.split('|');
-                          if (q && q.trim()) {
-                            studentQuestions.push({ timestamp: ts.trim(), question: q.trim() });
+                      // Extract student questions (STUDENT_QUESTION:timestamp|question or ❓ Frage für den Unterricht:)
+                      if (trimmed.startsWith('STUDENT_QUESTION:') || trimmed.startsWith('❓ Frage für den Unterricht:')) {
+                        let ts: string | undefined = undefined;
+                        let qText = '';
+                        if (trimmed.startsWith('STUDENT_QUESTION:')) {
+                          const payload = trimmed.substring('STUDENT_QUESTION:'.length).trim();
+                          if (payload.includes('|')) {
+                            const [tsPart, qPart] = payload.split('|');
+                            ts = tsPart?.trim();
+                            qText = qPart?.trim() || '';
+                          } else {
+                            qText = payload;
                           }
                         } else {
-                          studentQuestions.push({ question: payload });
+                          qText = trimmed.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                        }
+                        if (qText && !studentQuestions.some(sq => sq.question.toLowerCase() === qText.toLowerCase())) {
+                          studentQuestions.push({ timestamp: ts, question: qText });
                         }
                         return;
                       }
 
-                      // Guard: Filter out all internal metadata strings (SNAPSHOT_*, LATENCY:*, AUDIO:*, etc.)
+                      // Extract audio tracks (AUDIO:url|duration|date|label|author...)
+                      if (trimmed.startsWith('AUDIO:')) {
+                        const parts = trimmed.substring(6).split('|');
+                        const url = parts[0];
+                        if (url && !weekAudioTracks.some(a => a.url === url)) {
+                          weekAudioTracks.push({
+                            url,
+                            duration: parseFloat(parts[1]) || undefined,
+                            date: parts[2] || undefined,
+                            label: parts[3] ? cleanHomeworkTitle(parts[3]) : 'Unterrichts-Aufnahme',
+                            author: parts[4] === 'student' ? 'Schüler' : 'Lehrkraft'
+                          });
+                        }
+                        return;
+                      }
+
+                      // Guard: Filter out all internal metadata strings (SNAPSHOT_*, LATENCY:*, etc.)
                       if (isInternalMetadataNote(trimmed)) {
                         return;
                       }
@@ -6507,13 +6819,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   .filter(Boolean)
                   .join('\n\n');
 
-                const selectedDateRangeStr = getWeekDateRange(selectedHistoryWeek);
+                const selectedDateRangeStr = typeof getWeekDateRange === 'function' && selectedHistoryWeek ? getWeekDateRange(selectedHistoryWeek) : '';
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
                     <div>
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Details KW {weekNum} {selectedDateRangeStr ? `(${selectedDateRangeStr})` : ''}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Details KW {weekNum} {typeof selectedDateRangeStr === 'string' && selectedDateRangeStr ? `(${selectedDateRangeStr})` : ''}</span>
                       </span>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
                         Hausaufgaben und Notizen aus dieser Woche (Schreibgeschützt).
@@ -6658,7 +6970,32 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       border: '1px solid rgba(251, 191, 36, 0.3)',
                                       boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                     }}>
-                                      <span>🎵 {item.topic_name}</span>
+                                      {(() => {
+                                        const rawTitle = item.topic_name || item.title || 'Song';
+                                        const cleanTitle = cleanHomeworkTitle(rawTitle);
+                                        const instMatch = rawTitle.match(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i);
+                                        const instrumentBadge = item.instrument || (instMatch ? instMatch[1] : null);
+
+                                        return (
+                                          <>
+                                            <span>🎵 {cleanTitle}</span>
+                                            {instrumentBadge && (
+                                              <span style={{
+                                                fontSize: '0.66rem',
+                                                fontWeight: 750,
+                                                color: '#64748b',
+                                                background: '#f1f5f9',
+                                                padding: '1px 6px',
+                                                borderRadius: '100px',
+                                                border: '1px solid #e2e8f0',
+                                                textTransform: 'capitalize'
+                                              }}>
+                                                {instrumentBadge}
+                                              </span>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                   ))}
                                 </div>
@@ -6682,13 +7019,37 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </div>
                       </div>
 
-                      {/* Student question(s) */}
+                      {/* Audio-Aufnahmen der Woche (0.1% Goldstandard) */}
+                      {weekAudioTracks.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Headphones size={15} style={{ color: '#16a34a', verticalAlign: 'middle', marginTop: '-2px' }} />
+                            <span>Aufnahmen & Audio-Memos ({weekAudioTracks.length})</span>
+                          </label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {weekAudioTracks.map((track, aIdx) => (
+                              <ArchiveAudioPlayerRow key={aIdx} track={track} aIdx={aIdx} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Student question(s) - 0.1% Goldstandard: Always GrooveLab Gelb */}
                       {studentQuestions.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e40af' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                              <HelpCircle size={15} style={{ color: '#2563eb', verticalAlign: 'middle', marginTop: '-2px' }} />
-                              Frage für den Unterricht
+                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <HelpCircle size={15} style={{ color: '#ca8a04', verticalAlign: 'middle', marginTop: '-2px' }} />
+                            <span>Frage für den Unterricht</span>
+                            <span style={{
+                              fontSize: '0.64rem',
+                              fontWeight: 750,
+                              background: '#fef08a',
+                              color: '#713f12',
+                              padding: '1px 6px',
+                              borderRadius: '100px',
+                              border: '1px solid #fde047'
+                            }}>
+                              Im Unterricht besprochen ✓
                             </span>
                           </label>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -6708,24 +7069,25 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   key={idx}
                                   style={{
                                     padding: '12px 14px',
-                                    background: '#eff6ff',
+                                    background: '#fffdf0',
                                     borderRadius: '16px',
-                                    border: '1px solid #bfdbfe',
+                                    border: '1px solid #fde047',
                                     fontSize: '0.88rem',
                                     fontWeight: 550,
                                     lineHeight: 1.5,
-                                    color: '#1e3a8a',
+                                    color: '#713f12',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '4px'
+                                    gap: '4px',
+                                    boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
                                   }}
                                 >
                                   {formattedDate && (
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3b82f6' }}>
+                                    <div style={{ fontSize: '0.74rem', fontWeight: 750, color: '#a16207' }}>
                                       {formattedDate} Uhr
                                     </div>
                                   )}
-                                  <div style={{ fontWeight: 600 }}>{sq.question}</div>
+                                  <div style={{ fontWeight: 650 }}>„{sq.question}“</div>
                                 </div>
                               );
                             })}
@@ -7354,7 +7716,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       <textarea
                         ref={(el) => { pageNotesTextareaRef.current = el; }}
                         placeholder="Trage hier die Hausaufgabe oder Notizen für diese Seite ein..."
-                        value={pageHomeworkNotes}
+                        value={pageHomeworkNotes || ''}
                         onInput={(e) => {
                           const target = e.currentTarget;
                           pageNotesSelectionRef.current = {
@@ -7432,7 +7794,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       {/* Didactic Quick-Tag Chips */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
                         {DIDACTIC_QUICK_TAGS.map((t) => {
-                          const isActive = pageHomeworkNotes.includes(t.tag);
+                          const isActive = (pageHomeworkNotes || '').includes(t.tag);
                           return (
                             <button
                               key={t.tag}
@@ -7441,11 +7803,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                const { nextText, newCursorPos } = insertOrToggleTagInText(
-                                  pageHomeworkNotes,
+                                const res = insertOrToggleTagInText(
+                                  pageHomeworkNotes || '',
                                   t.tag,
                                   pageNotesSelectionRef.current
                                 );
+                                const nextText = typeof res === 'string' ? res : (res?.nextText ?? '');
+                                const newCursorPos = typeof res === 'object' && typeof res?.newCursorPos === 'number' ? res.newCursorPos : nextText.length;
                                 setPageHomeworkNotes(nextText);
                                 pageNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
                                 triggerDebouncedAutoSave();
@@ -8029,7 +8393,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           </label>
                           <SpeechDictationButton
                             onTranscript={(text) => {
-                              const newNotes = songHomeworkNotes ? `${songHomeworkNotes.trim()}\n${text}` : text;
+                              const newNotes = songHomeworkNotes ? `${(songHomeworkNotes || '').trim()}\n${text}` : text;
                               setSongHomeworkNotes(newNotes);
                               setHasChanges(true);
                               if (selectedActiveSongId) {
@@ -8045,7 +8409,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         <textarea
                           ref={(el) => { songNotesTextareaRef.current = el; }}
                           placeholder="Passagen, Anschlagstechniken oder Rhythmen eintragen..."
-                          value={songHomeworkNotes}
+                          value={songHomeworkNotes || ''}
                           onInput={(e) => {
                             const target = e.currentTarget;
                             songNotesSelectionRef.current = {
@@ -8133,7 +8497,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             { tag: '# 🎵 Rhythmus festigen', label: '🎵 Rhythmus', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
                             { tag: '# 🧠 Auswendig', label: '🧠 Auswendig', color: '#7c3aed', bg: '#faf5ff', border: '#ddd6fe' }
                           ].map((t) => {
-                            const isActive = songHomeworkNotes.includes(t.tag);
+                            const isActive = (songHomeworkNotes || '').includes(t.tag);
                             return (
                               <button
                                 key={t.tag}
@@ -8142,11 +8506,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  const { nextText, newCursorPos } = insertOrToggleTagInText(
-                                    songHomeworkNotes,
+                                  const res = insertOrToggleTagInText(
+                                    songHomeworkNotes || '',
                                     t.tag,
                                     songNotesSelectionRef.current
                                   );
+                                  const nextText = typeof res === 'string' ? res : (res?.nextText ?? '');
+                                  const newCursorPos = typeof res === 'object' && typeof res?.newCursorPos === 'number' ? res.newCursorPos : nextText.length;
                                   setSongHomeworkNotes(nextText);
                                   songNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
                                   setHasChanges(true);
@@ -8197,7 +8563,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             </label>
                             <SpeechDictationButton
                               onTranscript={(text) => {
-                                const newNotes = teacherNotes ? `${teacherNotes.trim()}\n${text}` : text;
+                                const newNotes = teacherNotes ? `${(teacherNotes || '').trim()}\n${text}` : text;
                                 setTeacherNotes(newNotes);
                                 setHasChanges(true);
                                 if (selectedActiveSongId) {
@@ -8214,7 +8580,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           </div>
                           <textarea
                             placeholder="Didaktischer Verlauf &amp; Songnotizen... (Hinweis: Keine Diagnosen oder Gesundheitsdaten gem. Art. 9 DSGVO erfassen)"
-                            value={teacherNotes}
+                            value={teacherNotes || ''}
                             onChange={(e) => {
                               const val = e.target.value;
                               setTeacherNotes(val);
@@ -10029,7 +10395,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 </button>
 
                                 {/* 🔄 3. Destruktives Lehrer-Reset (Hausaufgaben leeren mit Sicherheits-Trenner) */}
-                                {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '' || isCarriedOverPlan) && !readOnly && (
+                                {(progressItems.some(item => item.is_current_homework) || (generalHomeworkNotes || '').trim() !== '' || isCarriedOverPlan) && !readOnly && (
                                   <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -12489,7 +12855,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         >
                                           <BookOpen size={13} />
                                           <span>Hausaufgaben-Bemerkung</span>
-                                          {activeViewingStudentNotes.trim() && (
+                                          {(activeViewingStudentNotes || '').trim() && (
                                             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
                                           )}
                                         </button>
@@ -12518,7 +12884,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         >
                                           <Lock size={12} />
                                           <span>Interne Notiz (Nur Lehrer)</span>
-                                          {teacherNotes.trim() && (
+                                          {(teacherNotes || '').trim() && (
                                             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#b45309' }} />
                                           )}
                                         </button>
@@ -12722,7 +13088,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                   {/* 2. Textarea Bereich */}
                                   <div style={{ padding: '12px 16px' }}>
-                                    {activeNoteTarget === 'student' && viewingWeekOffset === 0 && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver) && !generalHomeworkNotes.trim() && (
+                                    {activeNoteTarget === 'student' && viewingWeekOffset === 0 && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver) && !(generalHomeworkNotes || '').trim() && (
                                       <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -12822,7 +13188,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
                                           }
                                           triggerImmediateAutoSave();
-                                          if (!activeViewingStudentNotes.trim()) setIsNotesFocused(false);
+                                          if (!(activeViewingStudentNotes || '').trim()) setIsNotesFocused(false);
                                         }}
                                         style={{
                                           width: '100%',
@@ -12908,8 +13274,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       </span>
                                       {PRESET_CHIPS.map((chip, cIdx) => {
                                         const isActive = chip.isBpm 
-                                          ? activeViewingStudentNotes.toLowerCase().includes('bpm')
-                                          : activeViewingStudentNotes.includes(chip.text);
+                                          ? (activeViewingStudentNotes || '').toLowerCase().includes('bpm')
+                                          : (activeViewingStudentNotes || '').includes(chip.text);
 
                                         return (
                                           <button
@@ -13008,7 +13374,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 background: "#ffffff",
                 borderRadius: "24px",
                 width: "100%",
-                maxWidth: "480px",
+                maxWidth: "520px",
                 boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
                 border: "1px solid #e2e8f0",
                 overflow: "hidden"
@@ -13064,7 +13430,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 </button>
               </div>
 
-              {/* Tabs: Ausgeblendete Module vs. Erweiterungen */}
+                    {/* Tabs: Ausgeblendete Module vs. Erweiterungen */}
               <div style={{
                 display: "flex",
                 borderBottom: "1px solid #e2e8f0",
@@ -13153,7 +13519,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             loopstation: 'Loopstation',
                             earlab: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
                             skillradar: uiLevel === 'junior' ? 'Musik-Stern' : 'Fähigkeiten',
-                            protocol: 'Aufgabenheft',
+                            protocol: uiLevel === 'junior'
+                              ? 'Noten & Songs'
+                              : uiLevel === 'teen'
+                                ? 'Songs & Noten'
+                                : 'Repertoire & Noten',
                             archive: 'Verlauf',
                             worldtour: 'Musik-Weltreise'
                           };
@@ -13164,15 +13534,27 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "space-between",
-                                padding: "12px 14px",
+                                padding: "10px 14px",
                                 background: "#f8fafc",
                                 border: "1.5px solid #e2e8f0",
-                                borderRadius: "14px"
+                                borderRadius: "16px"
                               }}
                             >
-                              <span style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
-                                {labelMap[hiddenKey] || hiddenKey}
-                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                <CampusStudioModuleCover
+                                  moduleKey={hiddenKey as any}
+                                  size="sm"
+                                  uiLevel={uiLevel}
+                                />
+                                <div>
+                                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#0f172a" }}>
+                                    {labelMap[hiddenKey] || hiddenKey}
+                                  </div>
+                                  <div style={{ fontSize: "0.68rem", color: "#64748b" }}>
+                                    Auf deiner Studio-Leiste ausgeblendet
+                                  </div>
+                                </div>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => handleRestoreModule(hiddenKey)}
@@ -13181,15 +13563,17 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   color: "#ffffff",
                                   border: "none",
                                   borderRadius: "10px",
-                                  padding: "6px 12px",
+                                  padding: "6px 14px",
                                   fontSize: "0.76rem",
                                   fontWeight: 800,
                                   cursor: "pointer",
                                   display: "flex",
                                   alignItems: "center",
-                                  gap: "4px"
+                                  gap: "5px",
+                                  boxShadow: "0 2px 6px rgba(34, 197, 94, 0.25)"
                                 }}
                                 className="hover-scale"
+                                aria-label={`${labelMap[hiddenKey] || hiddenKey} wieder einblenden`}
                               >
                                 <Plus size={13} strokeWidth={2.6} />
                                 <span>Einblenden</span>
@@ -13229,97 +13613,176 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 ) : (
                   <>
                     <p style={{ margin: 0, fontSize: "0.78rem", color: "#475569", lineHeight: 1.45 }}>
-                      Hier können Erziehungsberechtigte zusätzliche Profi-Werkzeuge für {studentFirstName} freischalten.
+                      Hier können Erziehungsberechtigte zusätzliche Werkzeuge und didaktische Erweiterungen für {studentFirstName} freischalten oder anpassen.
                     </p>
 
-                    {/* Loopstation switch */}
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 16px",
-                      background: "#f8fafc",
-                      border: "1.5px solid #e2e8f0",
-                      borderRadius: "16px"
-                    }}>
-                      <div>
-                        <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
-                          Loopstation
-                        </div>
-                        <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "2px" }}>
-                          Mehrspur-Aufnahmen & kreatives Jammen
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleModuleOverride("loopstation", !isLoopstationUnlocked)}
-                        style={{
-                          width: "48px",
-                          height: "28px",
-                          borderRadius: "14px",
-                          background: isLoopstationUnlocked ? "#22c55e" : "#cbd5e1",
-                          border: "none",
-                          padding: "2px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: isLoopstationUnlocked ? "flex-end" : "flex-start",
-                          transition: "all 0.2s ease"
-                        }}
-                      >
-                        <div style={{
-                          width: "24px",
-                          height: "24px",
-                          borderRadius: "50%",
-                          background: "#ffffff",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
-                        }} />
-                      </button>
-                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {[
+                        {
+                          key: 'groovetrainer' as StudioModuleKey,
+                          title: 'Groove-Trainer',
+                          badge: 'TIMING & RHYTHMUS',
+                          badgeColor: '#ea580c',
+                          badgeBg: 'rgba(249, 115, 22, 0.10)',
+                          badgeBorder: '1px solid rgba(249, 115, 22, 0.25)',
+                          description: 'Interaktives Rhythmustraining mit Metronom & Feedback',
+                          pills: ['🥁 Micro-Timing', '⚡ Tempotraining']
+                        },
+                        {
+                          key: 'tuner' as StudioModuleKey,
+                          title: 'Stimmgerät',
+                          badge: 'INTONATION & PITCH',
+                          badgeColor: '#0891b2',
+                          badgeBg: 'rgba(6, 182, 212, 0.10)',
+                          badgeBorder: '1px solid rgba(6, 182, 212, 0.25)',
+                          description: 'Präzises Instrumenten-Stimmgerät mit Frequenzerkennung',
+                          pills: ['🎯 440 Hz / Kalibrierbar', '🎚️ Echtzeit-Pitch']
+                        },
+                        {
+                          key: 'earlab' as StudioModuleKey,
+                          title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
+                          badge: 'GEHÖRBILDUNG',
+                          badgeColor: '#7c3aed',
+                          badgeBg: 'rgba(139, 92, 246, 0.10)',
+                          badgeBorder: '1px solid rgba(139, 92, 246, 0.25)',
+                          description: uiLevel === 'junior' ? 'Spielerisches Erkennen von Tönen und Melodien' : 'Intervalle, Akkorde & Skalen hören und bestimmen',
+                          pills: ['👂 Intervalltraining', '🎶 Melodiediktat']
+                        },
+                        {
+                          key: 'loopstation' as StudioModuleKey,
+                          title: 'Loopstation',
+                          badge: 'PROFI-STUDIO',
+                          badgeColor: '#e11d48',
+                          badgeBg: 'rgba(244, 63, 94, 0.10)',
+                          badgeBorder: '1px solid rgba(244, 63, 94, 0.25)',
+                          description: 'Mehrspur-Aufnahmen & kreatives Jammen',
+                          pills: ['🎙️ 4 Spuren', '🎛️ Beat-Pads']
+                        },
+                        {
+                          key: 'skillradar' as StudioModuleKey,
+                          title: uiLevel === 'junior' ? 'Musik-Stern' : 'Fähigkeiten-Radar',
+                          badge: 'KOMPETENZ-PROFIL',
+                          badgeColor: '#d946ef',
+                          badgeBg: 'rgba(217, 70, 239, 0.10)',
+                          badgeBorder: '1px solid rgba(217, 70, 239, 0.25)',
+                          description: 'Visualisierung des didaktischen Fortschritts und aller Meilensteine',
+                          pills: ['⭐ 5 Dimensionen', '📈 Langzeit-Entwicklung']
+                        },
+                        {
+                          key: 'worldtour' as StudioModuleKey,
+                          title: 'Musik-Weltreise',
+                          badge: 'DIDAKTISCHE EXPEDITION',
+                          badgeColor: '#0284c7',
+                          badgeBg: 'rgba(2, 132, 199, 0.10)',
+                          badgeBorder: '1px solid rgba(2, 132, 199, 0.25)',
+                          description: 'Musikalische Entdeckungsreise durch Rhythmen und Kulturen der Welt',
+                          pills: ['🌍 Kontinente & Stile', '🏆 Reisepass-Sticker']
+                        },
+                        {
+                          key: 'archive' as StudioModuleKey,
+                          title: 'Unterrichts-Archiv',
+                          badge: 'CHRONIK & BACKUP',
+                          badgeColor: '#334155',
+                          badgeBg: 'rgba(71, 85, 105, 0.10)',
+                          badgeBorder: '1px solid rgba(71, 85, 105, 0.25)',
+                          description: 'Vergangene Wochen, Notizen & Hausaufgaben-Chronik',
+                          pills: ['📅 Alle Wochen', '🎵 Sprachnotizen']
+                        }
+                      ].map((ext) => {
+                        const isUnlocked = isStudioModuleActive(ext.key, uiLevel as any, localModuleOverrides);
+                        return (
+                          <div
+                            key={ext.key}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "12px 16px",
+                              background: isUnlocked ? "#ffffff" : "#f8fafc",
+                              border: isUnlocked ? `1.5px solid ${ext.badgeColor}40` : "1.5px solid #e2e8f0",
+                              borderRadius: "18px",
+                              boxShadow: isUnlocked ? `0 4px 14px -2px ${ext.badgeColor}20` : "none",
+                              gap: "14px",
+                              transition: "all 0.2s ease"
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0, flex: 1 }}>
+                              <CampusStudioModuleCover
+                                moduleKey={ext.key as any}
+                                size="md"
+                                isUnlocked={isUnlocked}
+                                uiLevel={uiLevel}
+                              />
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                  <div style={{ fontSize: "0.90rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.01em" }}>
+                                    {ext.title}
+                                  </div>
+                                  <span style={{
+                                    fontSize: "0.60rem",
+                                    fontWeight: 800,
+                                    color: isUnlocked ? ext.badgeColor : "#64748b",
+                                    background: isUnlocked ? ext.badgeBg : "#f1f5f9",
+                                    padding: "1px 6px",
+                                    borderRadius: "100px",
+                                    border: isUnlocked ? ext.badgeBorder : "1px solid #e2e8f0"
+                                  }}>
+                                    {ext.badge}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "2px", lineHeight: 1.35 }}>
+                                  {ext.description}
+                                </div>
+                                <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+                                  {ext.pills.map((pill, pIdx) => (
+                                    <span key={pIdx} style={{ fontSize: "0.62rem", fontWeight: 700, color: "#475569", background: "#f1f5f9", padding: "1px 6px", borderRadius: "4px" }}>
+                                      {pill}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
 
-                    {/* Archiv switch */}
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 16px",
-                      background: "#f8fafc",
-                      border: "1.5px solid #e2e8f0",
-                      borderRadius: "16px"
-                    }}>
-                      <div>
-                        <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
-                          Unterrichts-Archiv
-                        </div>
-                        <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "2px" }}>
-                          Vergangene Wochen & Hausaufgaben-Chronik
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleModuleOverride("archive", !isArchiveUnlocked)}
-                        style={{
-                          width: "48px",
-                          height: "28px",
-                          borderRadius: "14px",
-                          background: isArchiveUnlocked ? "#22c55e" : "#cbd5e1",
-                          border: "none",
-                          padding: "2px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: isArchiveUnlocked ? "flex-end" : "flex-start",
-                          transition: "all 0.2s ease"
-                        }}
-                      >
-                        <div style={{
-                          width: "24px",
-                          height: "24px",
-                          borderRadius: "50%",
-                          background: "#ffffff",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
-                        }} />
-                      </button>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={isUnlocked}
+                              aria-label={`${ext.title} für ${studentFirstName} freischalten`}
+                              onClick={() => handleToggleModuleOverride(ext.key, !isUnlocked)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleToggleModuleOverride(ext.key, !isUnlocked);
+                                }
+                              }}
+                              style={{
+                                width: "52px",
+                                height: "30px",
+                                borderRadius: "15px",
+                                background: isUnlocked ? "#22c55e" : "#cbd5e1",
+                                border: "none",
+                                padding: "3px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: isUnlocked ? "flex-end" : "flex-start",
+                                transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
+                                boxShadow: isUnlocked ? "0 0 12px rgba(34, 197, 94, 0.40)" : "none",
+                                flexShrink: 0
+                              }}
+                              className="hover-scale-mini"
+                            >
+                              <div style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                background: "#ffffff",
+                                boxShadow: "0 2px 5px rgba(0,0,0,0.25)"
+                              }} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -13333,10 +13796,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     color: "#ffffff",
                     border: "none",
                     borderRadius: "12px",
-                    padding: "10px 16px",
-                    fontSize: "0.82rem",
+                    padding: "11px 16px",
+                    fontSize: "0.84rem",
                     fontWeight: 800,
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.20)"
                   }}
                   className="hover-scale"
                 >

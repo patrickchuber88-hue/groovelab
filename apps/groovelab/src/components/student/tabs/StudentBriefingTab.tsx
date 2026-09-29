@@ -1229,7 +1229,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             position: 'relative',
             paddingBottom: isMobile ? 'calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 36px)' : '32px'
           }}>
-          <style>{CAMPUS_XP_EFFECTS_CSS}</style>
+          <style>{`
+            ${CAMPUS_XP_EFFECTS_CSS}
+            @keyframes campusPulseBar {
+              0% { height: 3px; }
+              100% { height: 14px; }
+            }
+          `}</style>
           
           {/* MAIN LAYOUT (Full-width for Junior Level 1 or when Right Sidebar is Collapsed, 2-column when Open) */}
           <div style={{ 
@@ -2600,7 +2606,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 return (
                                   <div style={{
                                     display: 'flex',
-                                    alignItems: 'center',
+                                    alignItems: 'flex-start',
                                     gap: '8px',
                                     fontSize: '0.88rem',
                                     padding: '8px 12px',
@@ -2609,11 +2615,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     border: '1px solid #fde047',
                                     boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
                                   }}>
-                                    <HelpCircle size={14} style={{ color: '#ca8a04', flexShrink: 0 }} strokeWidth={2.5} />
-                                    <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#713f12', fontWeight: 700 }}>
-                                      „{displayedStudentQuestion}“
-                                    </span>
+                                    <HelpCircle size={15} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
+                                      <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
+                                      <span style={{ 
+                                        color: '#713f12', 
+                                        fontWeight: 700,
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                      }}>
+                                        „{displayedStudentQuestion}“
+                                      </span>
+                                    </div>
                                   </div>
                                 );
                               })()}
@@ -2711,11 +2726,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </span>
                                   </div>
                                 </div>
-                                <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-                                  {quickieAudioUrl === audioTracks[0].url && quickieCurrentTime > 0 
-                                    ? `${formatQuickieDuration(quickieCurrentTime)} / ${formatQuickieDuration(quickieDuration || audioTracks[0].duration)}`
-                                    : formatQuickieDuration(audioTracks[0].duration)}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                  {quickieAudioUrl === audioTracks[0].url && quickiePlaying && (
+                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px', paddingRight: '2px' }} aria-hidden="true">
+                                      <span style={{ width: '3px', height: '8px', background: '#16a34a', borderRadius: '4px', animation: 'campusPulseBar 0.6s ease-in-out infinite alternate' }} />
+                                      <span style={{ width: '3px', height: '14px', background: '#16a34a', borderRadius: '4px', animation: 'campusPulseBar 0.4s ease-in-out infinite alternate 0.15s' }} />
+                                      <span style={{ width: '3px', height: '10px', background: '#16a34a', borderRadius: '4px', animation: 'campusPulseBar 0.5s ease-in-out infinite alternate 0.3s' }} />
+                                    </div>
+                                  )}
+                                  <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                                    {quickieAudioUrl === audioTracks[0].url && quickieCurrentTime > 0 
+                                      ? `${formatQuickieDuration(quickieCurrentTime)} / ${formatQuickieDuration(quickieDuration || audioTracks[0].duration)}`
+                                      : formatQuickieDuration(audioTracks[0].duration)}
+                                  </span>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2931,11 +2955,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 {/* 2. Hero-Bereich: Typografie & Fortschrittstrack */}
                                 <div>
                                   <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.82rem', fontWeight: 900, color: isGoalAchieved ? '#7c3aed' : '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                    Übe-Rakete
+                                    {studentUiLevel === 'junior' ? 'Übe-Rakete' : 'Fokus-Session'}
                                   </div>
                                   <h3 style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                                     {isGoalAchieved 
-                                      ? 'Tages-Stern entzündet!' 
+                                      ? (studentUiLevel === 'junior' ? 'Tages-Stern entzündet!' : 'Tagesziel erreicht!') 
                                       : `Tagesziel: ${requiredMins} Minuten`}
                                   </h3>
 
@@ -2968,25 +2992,85 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </span>
                                   </div>
 
-                                  {/* Satter 10px Progress Bar (Haptisch & Schlicht) */}
+                                  {/* 🌟 Runder SVG-Fortschrittsbalken (Goldstandard wie bei den älteren Schülern) */}
                                   <div style={{
-                                    marginTop: '10px',
-                                    width: '100%',
-                                    height: '10px',
-                                    background: '#f1f5f9',
-                                    borderRadius: '100px',
-                                    overflow: 'hidden',
-                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '16px 0 8px 0',
+                                    position: 'relative'
                                   }}>
-                                    <div style={{
-                                      width: `${progressPercent}%`,
-                                      height: '100%',
-                                      background: isGoalAchieved 
-                                        ? 'linear-gradient(90deg, #818cf8 0%, #6366f1 50%, #a855f7 100%)' 
-                                        : 'linear-gradient(90deg, #818cf8 0%, #6366f1 100%)',
-                                      borderRadius: '100px',
-                                      transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-                                    }} />
+                                    <div style={{ position: 'relative', width: '124px', height: '124px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <svg width="124" height="124" viewBox="0 0 124 124" style={{ transform: 'rotate(-90deg)' }}>
+                                        {/* Background Track */}
+                                        <circle
+                                          cx="62"
+                                          cy="62"
+                                          r="50"
+                                          fill="transparent"
+                                          stroke="#f1f5f9"
+                                          strokeWidth="10"
+                                        />
+                                        {/* Progress Track */}
+                                        <circle
+                                          cx="62"
+                                          cy="62"
+                                          r="50"
+                                          fill="transparent"
+                                          stroke={isGoalAchieved ? 'url(#juniorGoalRingGrad)' : 'url(#juniorRocketRingGrad)'}
+                                          strokeWidth="10"
+                                          strokeDasharray={2 * Math.PI * 50}
+                                          strokeDashoffset={2 * Math.PI * 50 * (1 - Math.min(100, progressPercent) / 100)}
+                                          strokeLinecap="round"
+                                          style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                                        />
+                                        <defs>
+                                          <linearGradient id="juniorRocketRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#818cf8" />
+                                            <stop offset="100%" stopColor="#4f46e5" />
+                                          </linearGradient>
+                                          <linearGradient id="juniorGoalRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#a855f7" />
+                                            <stop offset="100%" stopColor="#7c3aed" />
+                                          </linearGradient>
+                                        </defs>
+                                      </svg>
+
+                                      {/* Center Metrics & Icon */}
+                                      <div style={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        pointerEvents: 'none'
+                                      }}>
+                                        {isGoalAchieved ? (
+                                          <>
+                                            <Star size={26} fill="#7c3aed" color="#7c3aed" style={{ filter: 'drop-shadow(0 2px 6px rgba(124, 58, 237, 0.35))' }} />
+                                            <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#6d28d9', marginTop: '2px' }}>
+                                              Erreicht!
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '1px' }}>
+                                              <span style={{ fontSize: '1.55rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1 }}>
+                                                {todayMins}
+                                              </span>
+                                              <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#64748b' }}>
+                                                /{requiredMins}
+                                              </span>
+                                            </div>
+                                            <span style={{ fontSize: '0.70rem', fontWeight: 850, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                                              Minuten
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -3037,7 +3121,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 ) : (
                                   <>
                                     <Rocket size={18} fill="white" color="white" />
-                                    <span>{hasPracticedSome ? 'Rakete weiterfliegen' : 'Rakete zünden & Üben'}</span>
+                                    <span>{hasPracticedSome ? (studentUiLevel === 'junior' ? 'Rakete weiterfliegen' : 'Session fortsetzen') : (studentUiLevel === 'junior' ? 'Rakete zünden & Üben' : 'Session starten & Üben')}</span>
                                   </>
                                 )}
                               </button>

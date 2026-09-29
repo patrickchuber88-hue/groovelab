@@ -50,7 +50,8 @@ const suites = [
   { name: 'Audio Engine Lifecycle Forensic', file: 'apps/groovelab/src/tests/test_audio_engine_lifecycle_forensic.ts' },
   { name: 'Interactive 4-Role Journeys Forensic', file: 'apps/groovelab/src/tests/test_interactive_journeys_forensic.ts' },
   { name: 'Closed-Loop Schedule Lifecycle Forensic', file: 'apps/groovelab/src/tests/test_closed_loop_schedule_lifecycle_forensic.ts' },
-  { name: 'Relational Harmonic Engine Forensic', file: 'apps/groovelab/src/tests/test_relational_harmonic_engine_forensic.ts' }
+  { name: 'Relational Harmonic Engine Forensic', file: 'apps/groovelab/src/tests/test_relational_harmonic_engine_forensic.ts' },
+  { name: 'Zero-Overlap & Bounding-Box Forensic', file: 'apps/groovelab/src/tests/test_zero_overlap_bounding_box_forensic.ts' }
 ];
 
 console.log('╔════════════════════════════════════════════════════════════════════╗');

@@ -466,7 +466,18 @@ export function StudentAvatarDashboard({
                 hasTresorStorage={true}
                 isParentUnlocked={parent.isParentUnlocked || parent.checkIsParentUnlockedGlobal()}
                 parentPermissions={(profile.studentUser as any)?.parent_permissions}
-                onSaveParentOverrides={() => {}}
+                onSaveParentOverrides={(overrides) => {
+                  profile.setStudentUser((prev: any) => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      parent_permissions: {
+                        ...(prev.parent_permissions || {}),
+                        module_overrides: overrides
+                      }
+                    };
+                  });
+                }}
                 isSoftLocked={false}
                 onTriggerSoftLock={() => parent.setShowSoftLockModal(true)}
                 initialLehrwerke={lehrwerke}

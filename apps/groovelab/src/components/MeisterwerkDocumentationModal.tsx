@@ -56,7 +56,7 @@ import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { resolveCampusStudentAvatar, getEffectiveInstrument } from '../utils/avatarResolutionEngine';
 import { formatTeacherFullName, copyTextToClipboard, capitalizeFirstLetter, formatSongTitleCase } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
-import { getSimulatedNow, CANONICAL_LEHRWERK_COLOR, getLehrwerkColor as getLehrwerkColorUtil, getSongColor } from './student/studentDateUtils';
+import { getSimulatedNow, CANONICAL_LEHRWERK_COLOR, getLehrwerkColor as getLehrwerkColorUtil, getSongColor, getWeeksBetween, getWeekDateRange } from './student/studentDateUtils';
 import { renderSongVinylCover } from './student/CampusVinylCoverArt';
 import { broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 import { useMeisterwerkAudioRecording } from './student/meisterwerk/hooks/useMeisterwerkAudioRecording';
@@ -900,36 +900,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return directFromList;
   }, [homeworkNotesList, student?.id, viewingWeekOffset, progressItems, getItemWeek, getTargetWeekIso]);
 
-  const getWeekDateRange = useCallback((offset: number) => {
-    const target = getSimulatedNow();
-    target.setDate(target.getDate() + (offset * 7));
-
-    const day = target.getDay();
-    const diffToMonday = (day === 0 ? -6 : 1) - day;
-    const monday = new Date(target);
-    monday.setDate(target.getDate() + diffToMonday);
-
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-
-    const startDay = monday.getDate();
-    const endDay = sunday.getDate();
-    const startMonth = monday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
-    const endMonth = sunday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
-
-    const dateSpan = startMonth === endMonth
-      ? `${startDay}. – ${endDay}. ${startMonth}`
-      : `${startDay}. ${startMonth} – ${endDay}. ${endMonth}`;
-
-    let label = 'Diese Woche';
-    if (offset === -1) label = 'Letzte Woche';
-    else if (offset < -1) label = `Vor ${Math.abs(offset)} Wochen`;
-    else if (offset === 1) label = 'Folgewoche';
-    else if (offset > 1) label = `In ${offset} Wochen`;
-    else if (offset === 0) label = 'Diese Woche';
-
-    return { dateSpan, label };
-  }, []);
 
   // ❓ Student Question State
   const [isQuestionEditorOpen, setIsQuestionEditorOpen] = useState(false);
@@ -3525,7 +3495,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             expressionVal={expressionVal}
             fingerVal={fingerVal}
             formatRecordTime={formatRecordTime}
-            generalHomeworkNotes={generalHomeworkNotes}
+            generalHomeworkNotes={generalHomeworkNotes || ''}
             getCanonicalSongKey={getCanonicalSongKey}
             getFeedbackForWeek={() => null}
             getHomeworkNoteItems={getHomeworkNoteItems}
@@ -3536,7 +3506,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             getSongColor={getSongColor}
             getTargetWeekIso={getTargetWeekIso}
             getWeekDateRange={getWeekDateRange}
-            getWeeksBetween={() => 0}
+            getWeeksBetween={getWeeksBetween}
             globalLehrwerke={globalLehrwerke}
             handleAddCustomTag={handleAddCustomTag}
             handleAssignLehrwerk={handleAssignLehrwerk}
@@ -3615,7 +3585,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             newSongTitle=""
             onClose={onClose}
             onOpenAssignModal={onOpenAssignModal}
-            pageHomeworkNotes={pageHomeworkNotes}
+            pageHomeworkNotes={pageHomeworkNotes || ''}
             pageNotesSelectionRef={{ current: null } as any}
             pageNotesTextareaRef={{ current: null } as any}
             parsedStudentQuestion={parsedStudentQuestion}
@@ -3709,7 +3679,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             showMatchConfetti={showMatchConfetti || matchGameShowConfetti}
             showPlayAlongMetronomePopup={showPlayAlongMetronomePopup}
             showdownState={showdownState}
-            songHomeworkNotes={songHomeworkNotes}
+            songHomeworkNotes={songHomeworkNotes || ''}
             songModalTab="search"
             songNotesSelectionRef={{ current: null } as any}
             songNotesTextareaRef={{ current: null } as any}
@@ -3721,13 +3691,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             stopRecordingAudio={stopRecordingAudio}
             student={student}
             studentFirstName={studentFirstName}
-            studentNotes={studentNotes}
+            studentNotes={studentNotes || ''}
             studentNotesSelectionRef={{ current: null } as any}
             studentNotesTextareaRef={{ current: null } as any}
             studentRating={studentRating}
             studentRatingUpdatedAt={studentRatingUpdatedAt}
             teacherId={teacherId}
-            teacherNotes={teacherNotes}
+            teacherNotes={teacherNotes || ''}
             teacherNotesTextareaRef={{ current: null } as any}
             textbookPageChunkIndex={0}
             toggleStudentFocusPage={toggleStudentFocusPage}
@@ -3740,6 +3710,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             triggerImmediateAutoSave={triggerImmediateAutoSave}
             uiLevel={uiLevel}
             parentPermissions={propParentPermissions}
+            onSaveParentOverrides={onSaveParentOverrides}
             updateLehrwerkVisibility={() => {}}
             useNotebookLayout={useNotebookLayout}
             viewingWeekOffset={viewingWeekOffset}

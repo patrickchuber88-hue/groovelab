@@ -87,6 +87,39 @@ const storageRateLimiter = rateLimit({
   }
 });
 
+// --- TIER-1 SECURITY: In-Memory Multi-Tenant Token-Bucket (Noisy-Neighbor Immunity) ---
+interface TenantTokenBucket {
+  tokens: number;
+  lastRefill: number;
+}
+const tenantBuckets = new Map<string, TenantTokenBucket>();
+const MAX_TENANT_TOKENS = 2400; // 2.400 Anfragen / Minute pro Schule
+const REFILL_RATE_PER_MS = MAX_TENANT_TOKENS / (60 * 1000); // 0.04 tokens/ms
+
+export const tenantRateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const schoolId = (req.headers['x-school-id'] as string) || (req.query.school_id as string);
+  if (!schoolId) return next();
+
+  const now = Date.now();
+  let bucket = tenantBuckets.get(schoolId);
+  if (!bucket) {
+    bucket = { tokens: MAX_TENANT_TOKENS, lastRefill: now };
+    tenantBuckets.set(schoolId, bucket);
+  } else {
+    const elapsed = now - bucket.lastRefill;
+    bucket.tokens = Math.min(MAX_TENANT_TOKENS, bucket.tokens + elapsed * REFILL_RATE_PER_MS);
+    bucket.lastRefill = now;
+  }
+
+  if (bucket.tokens < 1) {
+    dispatchSecurityAlert('TENANT_RATE_LIMIT_EXCEEDED', req, { schoolId, threshold: MAX_TENANT_TOKENS });
+    return res.status(429).json({ error: 'TENANT_RATE_LIMIT_EXCEEDED', message: 'Schul-Kontingent vorübergehend erschöpft.' });
+  }
+
+  bucket.tokens -= 1;
+  next();
+};
+
 // --- TIER-1 SECURITY: Advanced Origin-Guard & Anti-CSRF ---
 app.use((req, res, next) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
@@ -144,13 +177,13 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 
 // 1. Auth Routes with Strict Rate Limiting & 1MB Body Limit
-app.use('/api/auth', authRateLimiter, express.json({ limit: '1mb' }), authRoutes);
+app.use('/api/auth', authRateLimiter, tenantRateLimiter, express.json({ limit: '1mb' }), authRoutes);
 
 // 2. Supabase PostgREST Proxy with API Rate Limiting & Silent Refresh
-app.use('/api/db', apiRateLimiter, silentRefreshMiddleware, supabaseProxy);
+app.use('/api/db', apiRateLimiter, tenantRateLimiter, silentRefreshMiddleware, supabaseProxy);
 
 // 3. Zero-Memory Direct-to-Storage Presign Routes (Audio & Asset Ingestion)
-app.use('/api/storage', storageRateLimiter, express.json({ limit: '1mb' }), storageRoutes);
+app.use('/api/storage', storageRateLimiter, tenantRateLimiter, express.json({ limit: '1mb' }), storageRoutes);
 
 app.listen(PORT, () => {
   console.log(`🛡️ BFF Server running on http://localhost:${PORT}`);

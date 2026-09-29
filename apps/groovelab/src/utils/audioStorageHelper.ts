@@ -17,7 +17,7 @@ export interface PlayableAudioSourceResult {
 export async function resolvePlayableAudioSource(
   urlOrPath: string,
   bucket: string = 'campus-assets',
-  expiresInSeconds: number = 1800
+  expiresInSeconds: number = 1800 // 30 min TTL (UrhG § 73 & KUG Compliance: max. 1800s Streaming-Lebensdauer)
 ): Promise<PlayableAudioSourceResult> {
   if (!urlOrPath || typeof urlOrPath !== 'string') {
     return { src: '', isBlobUrl: false };
@@ -125,10 +125,22 @@ export async function resolvePlayableAudioSource(
     try {
       let raw = await getBlob(trimmed);
       // Secondary check without or with extension if first key missed
+      const baseKey = trimmed.replace(/\.(webm|wav|mp3|mp4|ogg)$/i, '');
+      if (!raw && baseKey !== trimmed) {
+        raw = await getBlob(baseKey);
+      }
       if (!raw) {
-        const altKey = trimmed.replace(/\.(webm|wav|mp3|mp4|ogg)$/i, '');
-        if (altKey !== trimmed) {
-          raw = await getBlob(altKey);
+        const extCandidates = ['.wav', '.webm', '.mp4', '.m4a', '.mp3'];
+        for (const ext of extCandidates) {
+          raw = await getBlob(`${baseKey}${ext}`);
+          if (raw) break;
+        }
+      }
+      // Tertiary check in offline audio vault
+      if (!raw) {
+        const offRec = await getOfflineAudioRecord(trimmed) || await getOfflineAudioRecord(baseKey);
+        if (offRec && offRec.blob) {
+          raw = offRec.blob;
         }
       }
       if (raw) {
@@ -150,6 +162,23 @@ export async function resolvePlayableAudioSource(
             try { URL.revokeObjectURL(objectUrl); } catch {}
           }
         };
+      }
+
+      // Quaternary check: Did this recording get uploaded to Supabase Storage?
+      const candidatePaths = [
+        trimmed,
+        baseKey,
+        `recordings/${trimmed}`,
+        `audio/${trimmed}`,
+        `campus-recordings/${trimmed}`
+      ];
+      for (const cPath of candidatePaths) {
+        try {
+          const signed = await getSecureAudioUrl(cPath, bucket, expiresInSeconds);
+          if (signed) {
+            return { src: signed, isBlobUrl: false };
+          }
+        } catch {}
       }
     } catch (blobErr) {
       console.warn('[AudioStorageHelper] Binary blob DB lookup error:', trimmed, blobErr);
@@ -225,7 +254,7 @@ const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 export async function getSecureAudioUrl(
   filePath: string,
   bucket: string = 'campus-assets',
-  expiresInSeconds: number = 1800 // 30 minutes TTL for JIT signed audio streaming (Forensic Goldstandard & UrhG § 19a)
+  expiresInSeconds: number = 1800 // 30 minutes TTL for JIT signed audio streaming (Forensic Goldstandard & UrhG § 73 / UrhG § 19a)
 ): Promise<string> {
   if (!filePath) return '';
 
@@ -252,8 +281,8 @@ export async function getSecureAudioUrl(
 
   if (signedUrlCache.has(cacheKey)) {
     const entry = signedUrlCache.get(cacheKey)!;
-    // Return cached if at least 30 seconds remain before expiration
-    if (entry.expiresAt - now > 30 * 1000) {
+    // Return cached if at least 300 seconds (5 minutes) remain before expiration (seamless rolling refresh)
+    if (entry.expiresAt - now > 300 * 1000) {
       return entry.url;
     }
   }

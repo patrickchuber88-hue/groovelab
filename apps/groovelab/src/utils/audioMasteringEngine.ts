@@ -1270,6 +1270,10 @@ export function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): Audi
 // 🎙️ SAFE AUDIO BUFFER DECODER (Universal Safari, WebKit, Chrome & Firefox)
 // ==============================================================================
 export async function safeDecodeAudioData(audioContext: BaseAudioContext, arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
+  if (!arrayBuffer || arrayBuffer.byteLength < 128) {
+    return Promise.reject(new Error('Audio buffer too small or empty to decode'));
+  }
+
   return new Promise<AudioBuffer>((resolve, reject) => {
     let settled = false;
 

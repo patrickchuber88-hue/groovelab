@@ -2,17 +2,17 @@ import React from 'react';
 
 export const normalizeInstrument = (name: string): string => {
   if (!name) return "";
-  const n = (name || "").toLowerCase().trim();
+  const n = String(name || "").toLowerCase().trim();
   if (n.includes('guitar') || n.includes('gitarre')) return 'E-Gitarre';
   if (n.includes('bass')) return 'E-Bass';
   if (n.includes('drum') || n.includes('schlagzeug')) return 'E-Drums';
   if (n.includes('vocals') || n.includes('gesang') || n.includes('stimme')) return 'Vocals';
   if (n.includes('piano') || n.includes('keys') || n.includes('klavier') || n.includes('e-piano')) return 'E-Piano';
-  return name;
+  return String(name || "");
 };
 
 export const renderInstrumentIcon = (name: string, color?: string, size = 18): React.ReactNode => {
-  const norm = (name || '').toLowerCase().trim();
+  const norm = String(name || '').toLowerCase().trim();
   const isBass = norm.includes('bass');
   const isGuitar = norm.includes('guitar') || norm.includes('gitarre');
 

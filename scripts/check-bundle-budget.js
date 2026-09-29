@@ -56,6 +56,17 @@ files.forEach(file => {
   }
 });
 
+// Enterprise Node.js Heap Utilization Budget (< 512 MB)
+const mem = process.memoryUsage();
+const heapUsedMb = (mem.heapUsed / 1024 / 1024).toFixed(1);
+const maxHeapMb = 512;
+if (mem.heapUsed > maxHeapMb * 1024 * 1024) {
+  console.error(`🚨 Error: Process Heap usage (${heapUsedMb} MB) exceeds ${maxHeapMb} MB ceiling`);
+  passed = false;
+} else {
+  console.log(`✅ Process Heap Utilization: ${heapUsedMb} MB (Within ${maxHeapMb} MB memory ceiling)`);
+}
+
 if (!passed) {
   console.error('🚨 Enterprise Performance Budget EXCEEDED! Production build halted.');
   process.exit(1);

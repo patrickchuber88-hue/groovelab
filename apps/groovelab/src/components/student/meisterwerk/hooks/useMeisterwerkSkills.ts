@@ -205,12 +205,39 @@ export function useMeisterwerkSkills({
     setNewCustomTagInput('');
   };
 
-  const insertOrToggleTagInText = useCallback((currentText: string, tagToToggle: string): string => {
-    const tag = tagToToggle.trim();
-    if (currentText.includes(tag)) {
-      return currentText.replace(new RegExp(`\\s*${tag}`, 'g'), '').trim();
+  const insertOrToggleTagInText = useCallback((
+    currentText: string = '',
+    tagToToggle: string = '',
+    selection?: { start: number; end: number } | null
+  ): { nextText: string; newCursorPos: number } => {
+    const text = currentText || '';
+    const tag = (tagToToggle || '').trim();
+    if (!tag) {
+      const pos = selection?.start ?? text.length;
+      return { nextText: text, newCursorPos: pos };
+    }
+
+    const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    if (text.includes(tag)) {
+      // Toggle off: remove tag
+      const nextText = text.replace(new RegExp(`\\s*${escapedTag}`, 'g'), '').trim();
+      const pos = Math.min(selection?.start ?? nextText.length, nextText.length);
+      return { nextText, newCursorPos: pos };
     } else {
-      return currentText ? `${currentText.trim()} ${tag}` : tag;
+      // Toggle on: insert tag at cursor or at end
+      const start = selection?.start ?? text.length;
+      const before = text.slice(0, start);
+      const after = text.slice(start);
+
+      const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+      const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+
+      const insertStr = `${needsSpaceBefore ? ' ' : ''}${tag}${needsSpaceAfter ? ' ' : ''}`;
+      const nextText = `${before}${insertStr}${after}`.trim();
+      const newCursorPos = before.length + insertStr.length;
+
+      return { nextText, newCursorPos };
     }
   }, []);
 

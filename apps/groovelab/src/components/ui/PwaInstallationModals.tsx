@@ -46,6 +46,18 @@ export const PwaInstallationModals: React.FC<PwaInstallationModalsProps> = ({
 
   const isApple = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
+  const [isDesktop, setIsDesktop] = React.useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth >= 769 : false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 769);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <>
       {showInstallBanner && (
@@ -54,16 +66,27 @@ export const PwaInstallationModals: React.FC<PwaInstallationModalsProps> = ({
           aria-label="App Installation"
           style={{
             position: 'fixed',
-            top: '12px',
-            left: '16px',
-            right: '16px',
-            margin: '0 auto',
-            maxWidth: '440px',
+            ...(isDesktop ? {
+              bottom: '24px',
+              right: '24px',
+              top: 'auto',
+              left: 'auto',
+              margin: 0,
+              maxWidth: '380px',
+            } : {
+              top: '12px',
+              left: '16px',
+              right: '16px',
+              margin: '0 auto',
+              maxWidth: '440px',
+            }),
             background: '#ffffff',
             border: '1px solid rgba(0, 0, 0, 0.08)',
             borderRadius: '16px',
             padding: '10px 14px',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
+            boxShadow: isDesktop
+              ? '0 16px 36px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.04)'
+              : '0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
             zIndex: 99999,
             display: 'flex',
             alignItems: 'center',

@@ -44,16 +44,26 @@ function fetchHead(urlObj, options = {}) {
       method: options.method || 'GET',
       headers: {
         'User-Agent': 'CampusGroovelab-PerimeterAudit/2.0 (Enterprise-Security-Guard)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept': options.accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         ...(options.headers || {})
       },
       rejectUnauthorized: true,
       timeout: 10000,
     }, (res) => {
-      resolve({
-        statusCode: res.statusCode || 0,
-        headers: res.headers,
-        httpVersion: res.httpVersion,
+      let body = '';
+      if (options.fetchBody) {
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { body += chunk; });
+      } else {
+        res.resume();
+      }
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode || 0,
+          headers: res.headers,
+          httpVersion: res.httpVersion,
+          body
+        });
       });
     });
 
@@ -325,15 +335,110 @@ async function runAudit() {
   console.log(`  📊  OBSERVATORY ERGEBNIS:  Note ${grade}  |  Score: ${Math.max(0, score)} / 100 Punkte`);
   console.log(`${HR}\n`);
 
-  if (grade === 'A+') {
-    console.log('  🎉 TIER-1 EXCELLENCE BESTÄTIGT:');
-    console.log('     Alle Perimeter-Sicherheits-Header erfüllen die Mozilla Observatory A+');
-    console.log('     und BSI TR-02102-2 Richtlinien zu 100%.\n');
+  // ---------------------------------------------------------------------------
+  // STEP 2: Multi-Asset & Precache Smoke Engine (Zero-404 PWA Protection)
+  // ---------------------------------------------------------------------------
+  console.log(`\n${HR}`);
+  console.log('  📦  MULTI-ASSET & PRECACHE SMOKE ENGINE (ZERO-404 PWA PROTECTION)');
+  console.log(`  ${SUB_HR}`);
+
+  let assetCheckFailed = false;
+  let totalAssetsChecked = 0;
+
+  try {
+    const rootPage = await fetchHead(targetUrl, { method: 'GET', fetchBody: true });
+    const htmlBody = rootPage.body || '';
+
+    // Extract all script src and link href
+    const assetUrls = new Set();
+    const scriptSrcRegex = /<script\s+[^>]*src=["']([^"']+)["']/gi;
+    const linkHrefRegex = /<link\s+[^>]*href=["']([^"']+)["']/gi;
+
+    let match;
+    while ((match = scriptSrcRegex.exec(htmlBody)) !== null) {
+      if (match[1] && !match[1].startsWith('http') && !match[1].startsWith('//')) {
+        assetUrls.add(match[1]);
+      }
+    }
+    while ((match = linkHrefRegex.exec(htmlBody)) !== null) {
+      const href = match[1];
+      if (href && (href.endsWith('.css') || href.endsWith('.js') || href.includes('/assets/') || href.endsWith('.png') || href.endsWith('.json'))) {
+        if (!href.startsWith('http') && !href.startsWith('//')) {
+          assetUrls.add(href);
+        }
+      }
+    }
+
+    // Always check PWA core files
+    assetUrls.add('/sw.js');
+    assetUrls.add('/pwa-boot.js');
+    assetUrls.add('/pwa-recovery.js');
+
+    const assetList = Array.from(assetUrls);
+    totalAssetsChecked = assetList.length;
+
+    console.log(`  🔍 Prüfe ${totalAssetsChecked} Live-Assets auf HTTP 200 & Precache-Synchronisation...\n`);
+
+    const assetResults = await Promise.all(assetList.map(async (assetPath) => {
+      const fullAssetUrl = new URL(assetPath, targetUrl.origin);
+      try {
+        const res = await fetchHead(fullAssetUrl, { method: 'HEAD' });
+        return {
+          path: assetPath,
+          statusCode: res.statusCode,
+          headers: res.headers,
+          passed: res.statusCode === 200
+        };
+      } catch (err) {
+        return {
+          path: assetPath,
+          statusCode: 0,
+          headers: {},
+          passed: false,
+          error: err.message
+        };
+      }
+    }));
+
+    for (const ar of assetResults) {
+      if (ar.passed) {
+        console.log(`  ✅ [200 OK]  ${ar.path.padEnd(52, ' ')}`);
+      } else {
+        assetCheckFailed = true;
+        console.error(`  ❌ [HTTP ${ar.statusCode || 'ERR'}] ${ar.path.padEnd(52, ' ')}`);
+      }
+    }
+
+    // Check sw.js cache-control header
+    const swResult = assetResults.find(ar => ar.path === '/sw.js');
+    if (swResult && swResult.headers) {
+      const cc = swResult.headers['cache-control'] || '';
+      const hasNoCache = /no-cache|no-store|must-revalidate/i.test(cc);
+      if (hasNoCache) {
+        console.log(`  ✅ [PASS]    /sw.js Cache-Busting Header (${cc})`);
+      } else {
+        console.log(`  ⚠️ [WARN]    /sw.js fehlt expliziter no-cache Header (${cc || 'keiner'})`);
+      }
+    }
+
+  } catch (err) {
+    console.error(`  ❌ Fehler bei Asset-Inspektion: ${err.message}`);
+    assetCheckFailed = true;
+  }
+
+  console.log(`\n${HR}`);
+  console.log(`  📊  POST-DEPLOY SMOKE ERGEBNIS: ${totalAssetsChecked} Assets geprüft  |  Fehler: ${assetCheckFailed ? 'JA' : '0'}`);
+  console.log(`${HR}\n`);
+
+  if (grade === 'A+' && !assetCheckFailed) {
+    console.log('  🎉 0,1% POST-DEPLOY EXCELLENCE BESTÄTIGT:');
+    console.log('     100% aller Live-Assets (JS, CSS, PWA, Service Worker) liefern HTTP 200.');
+    console.log('     Alle Perimeter-Sicherheits-Header erfüllen Mozilla Observatory A+ zu 100%.\n');
     process.exit(0);
   } else {
-    console.log(`  🚨 VERSTOSS GEGEN ENTERPRISE-PERIMETER-BASELINE:`);
-    console.log(`     Erreichte Note: ${grade} (Gefordert: A+ / 100%).`);
-    console.log(`     Bitte das bereitgestellte Nginx-Sicherheits-Snippet auf dem Server ausrollen.\n`);
+    console.log(`  🚨 VERSTOSS GEGEN ENTERPRISE-PERIMETER- ODER ASSET-BASELINE:`);
+    if (grade !== 'A+') console.log(`     Erreichte Header-Note: ${grade} (Gefordert: A+ / 100%).`);
+    if (assetCheckFailed) console.log(`     Mindestens ein Bundle oder PWA-Core-Asset liefert einen HTTP-Fehler (404/500)!`);
     process.exit(1);
   }
 }

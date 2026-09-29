@@ -199,7 +199,7 @@ export const formatMins = (mins: number) => {
 };
 
 export const getWeekDateRange = (weekIso: string): string => {
-  if (!weekIso || !weekIso.includes('-W')) return '';
+  if (!weekIso || typeof weekIso !== 'string' || !weekIso.includes('-W')) return '';
   const [yearStr, wStr] = weekIso.split('-W');
   const year = parseInt(yearStr, 10);
   const week = parseInt(wStr, 10);
@@ -214,3 +214,53 @@ export const getWeekDateRange = (weekIso: string): string => {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(targetMonday.getDate())}.${pad(targetMonday.getMonth() + 1)}. – ${pad(targetSunday.getDate())}.${pad(targetSunday.getMonth() + 1)}.`;
 };
+
+/**
+ * 📅 Berechnet alle ISO-Wochen zwischen zwei Wochen-Strings (absteigend, neueste Woche zuerst)
+ */
+export const getWeeksBetween = (startWeekIso: string, endWeekIso: string): string[] => {
+  if (!startWeekIso || !endWeekIso || !startWeekIso.includes('-W') || !endWeekIso.includes('-W')) {
+    const fallback = startWeekIso || endWeekIso || getISOWeek();
+    return [fallback];
+  }
+
+  let [startYear, startWeek] = startWeekIso.split('-W').map(Number);
+  let [endYear, endWeek] = endWeekIso.split('-W').map(Number);
+
+  if (isNaN(startYear) || isNaN(startWeek) || isNaN(endYear) || isNaN(endWeek)) {
+    return [startWeekIso];
+  }
+
+  // Chronologische Ausrichtung sicherstellen
+  if (startYear > endYear || (startYear === endYear && startWeek > endWeek)) {
+    [startYear, endYear] = [endYear, startYear];
+    [startWeek, endWeek] = [endWeek, startWeek];
+  }
+
+  const weeks: string[] = [];
+
+  const getMondayOfIsoWeek = (year: number, week: number): Date => {
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const mondayWeek1 = new Date(jan4.getTime() - (dayOfWeek - 1) * 86400000);
+    return new Date(mondayWeek1.getTime() + (week - 1) * 7 * 86400000);
+  };
+
+  const startDate = getMondayOfIsoWeek(startYear, startWeek);
+  const endDate = getMondayOfIsoWeek(endYear, endWeek);
+
+  const current = new Date(startDate.getTime());
+  let guard = 0;
+  while (current.getTime() <= endDate.getTime() + 86400000 && guard < 104) {
+    guard++;
+    const iso = getISOWeek(current);
+    if (!weeks.includes(iso)) {
+      weeks.push(iso);
+    }
+    current.setTime(current.getTime() + 7 * 86400000);
+  }
+
+  // Neueste Woche zuerst (absteigend für Archiv-Historie)
+  return weeks.reverse();
+};
+

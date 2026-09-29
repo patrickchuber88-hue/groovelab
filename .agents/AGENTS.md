@@ -18,18 +18,18 @@
 - **Verifikations-Doktrin (Striktes Verbot automatischer Terminal-Runs mit Ausnahme des Codeworts „commit“)**: Der KI-Agent führt außerhalb expliziter Aufforderungen NIEMALS eigenständig oder ungefragt `npm run ...` oder `npx ...` (wie `security:check`, `security:secrets`, `tsc`, `vite build` oder `gate`) im Terminal aus. Keine automatischen Test- oder Validierungs-Schleifen am Ende von regulären Antworten. **Ausdrückliche Ausnahme**: Beim Codewort „commit“ (oder „commit and deploy“) darf und soll der KI-Agent alle relevanten `npm runs` (`npm run gate`, `npm run build:groovelab`, `npm run verify:invariants` etc.) vollständig und eigenständig ausführen, um vor dem Commit und Deployment 100%ige Integrität sicherzustellen.
 
 ## 🌅 Automatischer Guten-Morgen-Sicherheitscheck (Morning Security Routine)
-- **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige 4-fache Sicherheits-, Compliance- und Integritätscheck ausgeführt werden:
-  1. `npm run security:check` (Security Drift Guard & Architektur-Invarianten-Scan)
-  2. `npm run security:secrets` (Entropie- & Secret-Leak-Scanner)
-  3. `npm run legal:check` (12-Säulen Legal- & Regulatory-Compliance-as-Code Guard, 18 unbestechliche Checks: DIN EN 301 549, ISO 27001, BGB §§ 312j/k)
-  4. `npm run typecheck` (TypeScript Typprüfung über alle Workspaces)
-  *(Entspricht dem Shortcut: `npm run operator:morning` bzw. `npm run gate`)*
-- **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks), rechtliche Konformität (12/12 Säulen, 18/18 Checks) und den Status des Live-Systems transparent zusammenfasst.
+- **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige Sicherheits-, Compliance-, Layout- und Integritätscheck ausgeführt werden:
+  `npm run operator:morning` (bzw. `npm run gate`)
+  - **Parallele Concurrency-Engine (`morning_gate_orchestrator.mjs`, < 800ms):** Führt alle 8 In-Memory-Guards parallel via `Promise.all` aus (Security Drift, Secrets, Legal 18-Checks, Buttons, PWA Mobile, Lizenzen, Zero-Overlap Tier-1, Static Headers).
+  - **Live-Cluster Health-Preflight:** 20ms Live-Cluster Ping auf den Produktions-Ingress mit automatischem Offline-Airgap-Fallback.
+  - **Monorepo Typecheck:** Parallelisierter TypeScript-Check über alle 4 Workspaces.
+- **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks), rechtliche Konformität (12/12 Säulen, 18/18 Checks), Layout-Immunität (0 Text-/Container-Kollisionen) und den Status des Live-Systems transparent zusammenfasst.
 
 ## 🧭 Autoritative Betreiber-Codewörter & Chat-Trigger (Operator Cockpit)
-- **`Guten Morgen` / `Morning Check`**: Führt den 10-Sekunden Morning Check (`npm run operator:morning` bzw. `npm run gate`) aus und liefert das Morning Health Briefing.
-- **`Freitags-Check` / `Weekly Audit`**: Führt den wöchentlichen Forensik-Tiefenscan (`npm run operator:weekly` bzw. `npm run test:forensics:all`) mit allen 25 Test-Suites (Dashboards, Resilienz, Digitale Souveränität) aus und liefert das Weekly Resilience Dossier.
-- **`Full Audit` / `verify enterprise`**: Führt die maximale Enterprise-Prüfung (`npm run verify:enterprise`) aus (Gate + Pyramide + alle Forensik-Suites).
+- **`Guten Morgen` / `Morning Check`**: Führt den blitzschnellen Morning Check (`npm run operator:morning` bzw. `npm run gate`) aus und liefert das Morning Health Briefing.
+- **`Freitags-Check` / `Weekly Audit`**: Führt die vollständige Wöchentliche B2B-Resilienz-Engine (`npm run operator:weekly` bzw. `scripts/export_weekly_resilience_dossier.ts`) mit allen 3 Master-Runnern (25+ Suiten) aus und generiert ein kryptografisch mit SHA-256 gesiegeltes Compliance-Dossier (`reports/forensics/`).
+- **`Full Audit` / `verify enterprise`**: Führt die maximale Enterprise-Prüfung (`npm run verify:enterprise`) aus (Gate + Pyramide + Forensik-All + Bundle/Heap-Budget).
+- **`post-deploy` / `verify:perimeter`**: Führt die Multi-Asset & Precache Smoke Engine (`npm run operator:post-deploy`) aus (100% HTTP 200 auf alle in `index.html` referenzierten Bundles, `/sw.js` Cache-Busting-Header, Mozilla Observatory A+).
 - **`commit` / `commit and deploy`**: Führt `npm run gate`, `npm run verify:invariants`, `npm run build:groovelab` aus und setzt nach erfolgreicher Integrität den Git-Commit um.
 - **On-Demand Antigravity Skills (`.agents/skills/`)**:
   - `/campus-disaster-recovery`: 7-Phasen Hetzner Notfall-Runbook (RTO $\le$ 45 Min, RPO $\le$ 60 Min, Age X25519, WORM Tombstones).
@@ -157,6 +157,23 @@
     - **GrooveLab-Modul**: Gelber Akzent (`#facc15` / `#eab308`) mit dunklem Kontrasttext (Slate-900 `#0f172a`, Kontrastverhältnis > 12:1).
     - **Admin/Sekretariat**: Roter Akzent (`#ea4335`).
   - Monochrome Icons in allen aktiven Button-Zuständen.
+
+## 📐 0,1% Goldstandard Zero-Overlap & Fluid-Layout Governance (100-Punkte Two-Tier Standard)
+- **Zero-Overlap Axiom**: Überlappungen von Texten, Badges, Buttons und Containern sind im gesamten Monorepo sowohl auf dem Desktop ($\ge 769\,\text{px}$) als auch in der mobilen PWA ($\le 768\,\text{px}$) physikalisch und layout-technisch verboten.
+- **Two-Tier Architektur**:
+  - *Tier 1 (Täglicher Morning Check / `npm run gate` in < 200ms)*: Statischer AST- und Regex-Tiefenscan (`scripts/zero_overlap_guard.mjs`) über Dekaden 1 bis 9 (Viewport/Root, Flexbox-Elasticity, Grid, feste Höhen, Typografie, Z-Index, Safe-Clearance, Modals, Touch-Targets).
+  - *Tier 2 (Wöchentliches Freitags-Audit / `npm run operator:weekly`)*: Dynamische Headless-DOM Bounding-Box-Forensik (`apps/groovelab/src/tests/test_zero_overlap_bounding_box_forensic.ts` in Master-Runner 1) über Dekade 10 mit realer Kollisionsberechnung über 5 Viewports (iPhone SE 375px bis 4K 1920px).
+- **Die 10 Unantastbaren Dekaden des 100-Punkte-Plans**:
+  1. *Viewport, Root & Safe-Areas*: Universal `box-sizing: border-box`, `overflow-x: clip;`, `100dvh`, Safe-Area Insets & `interactive-widget=resizes-content`.
+  2. *Flexbox Elasticity & Child Containment*: `.min-w-0` (`min-width: 0 !important;`), `.zero-overlap-row` (`flex-wrap: wrap;`), Schutz vor `min-width: auto`-Überläufen.
+  3. *CSS-Grid & Responsive Columns*: Fraktionen mit `minmax(0, 1fr)`, Verbot starrer Zeilenhöhen (`grid-template-rows: XXXpx`), 1-Spalten-Collapse auf Mobile.
+  4. *Feste Höhen & Elastic Cards*: Verbot von `height: [fixe px]` auf dynamischen Textkarten (`.dynamic-card-elastic`: `height: auto !important; min-height: fit-content;`).
+  5. *Dynamische Typografie & Line-Heights*: Globales `overflow-wrap: break-word; word-break: break-word;`, Mindestzeilenhöhe $\ge 1.35$ (Body) / $\ge 1.15$ (Headings), `.text-truncate-safe`.
+  6. *Absolute/Fixed Positioning & 5-Tier Z-Index*: Monotone Stufenordnung (Base 1-10 < Sticky 100-150 < Dropdown 2000 < Modal 50000 < Alert 999999), Bann toxischer negativer Margins ($< -16\,\text{px}$).
+  7. *Scroll Clearance & Occlusion Immunity*: Modals und `#main-content` erzwingen `--mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 16px) + 36px)`.
+  8. *Modals, Drawers & Multi-Zone Shells*: 3-Zonen-Architektur (Header, elastischer Body, sticky Footer), `align-items: flex-start; overflow-y: auto;` auf Mobile (Zero Top-Clipping).
+  9. *Badges, Buttons & Interactive Touch*: Reale Trefferzonen $\ge 44\times 44\,\text{px}$ (`.touch-target-44`), `.badge-anti-collision`, Formular-Inputs $\ge 16\,\text{px}$ gegen iOS Auto-Zoom.
+  10. *Canvas, Audio-Waveforms & DOM-Kollisionsmessung*: Bounding-Box-Kollisionsmathematik über 5 Viewports (375px, 390px, 768px, 1280px, 1920px), `touch-action: none;` auf Scrubbern, Responsive Canvas/SVGs.
 
 ## ⚖️ Clean Dashboard Wording & Juristische Trennungs-Doktrin (Zero Paragraphen in Dashboards)
 - **Striktes Verbot von Paragraphen im Dashboard-Frontend**: Paragraphenzeichen (`§`, `§§`) und juristische Gesetzeszitate (z. B. `§ 130 BGB`, `§ 147 AO`, `§ 254 BGB`, `§ 8a SGB VIII` etc.) gehören **NIEMALS** in die sichtbaren Benutzeroberflächen unserer Dashboards (Lehrkräfte, Schüler, Eltern, Schulleitung, Sekretariat). Keine juristische Verunsicherung oder bürokratische Kälte im Lern- und Arbeitsbereich.

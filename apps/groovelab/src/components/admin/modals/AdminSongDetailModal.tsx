@@ -133,12 +133,13 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
         .eq('id', skillId);
       if (skillErr) throw skillErr;
 
-      const topicName = `${selectedSongForDetail.artist} - ${songTitle} (${instrument})`;
+      const cleanTopicName = selectedSongForDetail.artist ? `${selectedSongForDetail.artist} - ${songTitle}` : songTitle;
+      const legacyTopicName = `${cleanTopicName} (${instrument})`;
       await supabase
         .from('progress_matrix')
         .delete()
         .eq('student_id', studentId)
-        .eq('topic_name', topicName);
+        .in('topic_name', [cleanTopicName, legacyTopicName]);
 
       localStorage.removeItem(`song_skills_detail_${studentId}_${skillId}`);
 
@@ -184,7 +185,9 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
 
       setAssignedSongSkills(prev => prev.map(s => s.id === skillId ? { ...s, progress_percent: progress, is_stage_ready: isMastered } : s));
 
-      const topicName = `${selectedSongForDetail.artist} - ${selectedSongForDetail.title} (${instrument})`;
+      const topicName = selectedSongForDetail.artist
+        ? `${selectedSongForDetail.artist} - ${selectedSongForDetail.title}`
+        : selectedSongForDetail.title;
       
       let dbStatus = 'IN_PROGRESS';
       if (songStatus === 'mastered') dbStatus = 'MASTERED';
@@ -270,14 +273,27 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
     setSongDynamicsVal(e);
     setSongTotalProgressVal(skill.progress_percent || 0);
 
-    const topicName = `${selectedSongForDetail.artist} - ${selectedSongForDetail.title} (${skill.instrument})`;
+    const cleanTopicName = selectedSongForDetail.artist
+      ? `${selectedSongForDetail.artist} - ${selectedSongForDetail.title}`
+      : selectedSongForDetail.title;
+    const legacyTopicName = `${cleanTopicName} (${skill.instrument})`;
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('progress_matrix')
         .select('*')
         .eq('student_id', skill.user_id)
-        .eq('topic_name', topicName)
+        .eq('topic_name', cleanTopicName)
         .maybeSingle();
+
+      if (!data) {
+        const { data: legacyData } = await supabase
+          .from('progress_matrix')
+          .select('*')
+          .eq('student_id', skill.user_id)
+          .eq('topic_name', legacyTopicName)
+          .maybeSingle();
+        data = legacyData;
+      }
 
       if (data) {
         setSongInternalNotes(data.teacher_notes || '');

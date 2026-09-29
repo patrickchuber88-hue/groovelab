@@ -273,44 +273,18 @@ router.get('/stream/:bucket/*', async (req: Request, res: Response) => {
     const storageClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
     const { data: signedData, error: signError } = await storageClient.storage
       .from(bucket)
-      .createSignedUrl(filePath, 1800); // 30 minutes TTL for playback (UrhG § 73)
+      .createSignedUrl(filePath, 3600); // 3.600s TTL (60 Minuten) für Unterrichtseinheiten & Bandproben (UrhG § 73)
 
     if (signError || !signedData?.signedUrl) {
       return res.status(404).json({ error: 'FILE_NOT_FOUND', message: 'Audiodatei nicht gefunden oder Signierung fehlgeschlagen.' });
     }
 
-    // Forward range requests to upstream storage to ensure iOS Safari WebAudio compatibility
-    const rangeHeader = req.headers.range;
-    const fetchHeaders: Record<string, string> = {};
-    if (rangeHeader) {
-      fetchHeaders['Range'] = rangeHeader;
-    }
-
-    const upstreamRes = await fetch(signedData.signedUrl, { headers: fetchHeaders });
-
-    res.status(upstreamRes.status);
-    upstreamRes.headers.forEach((value, key) => {
-      // Forward relevant audio streaming headers
-      if (['content-range', 'content-length', 'content-type', 'accept-ranges'].includes(key.toLowerCase())) {
-        res.setHeader(key, value);
-      }
-    });
-
-    if (upstreamRes.body) {
-      const reader = upstreamRes.body.getReader();
-      const pump = async () => {
-        const { done, value } = await reader.read();
-        if (done) {
-          res.end();
-          return;
-        }
-        res.write(Buffer.from(value));
-        await pump();
-      };
-      await pump();
-    } else {
-      res.end();
-    }
+    // 🛡️ ZERO-PROXY ARCHITECTURE (OWASP ASVS L3 / Zero Heap Buffering of Children's Voices)
+    // Direct HTTP 307 Temporary Redirect with Range Headers to signed storage endpoint
+    res.setHeader('Location', signedData.signedUrl);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+    return res.status(307).end();
   } catch (err: any) {
     console.error('[BFF Storage Stream] Error streaming media:', err);
     return res.status(500).json({ error: 'STREAMING_ERROR', message: 'Fehler beim Medienstreaming.' });

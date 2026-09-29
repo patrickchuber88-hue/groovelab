@@ -459,7 +459,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       candidateStudentIds.forEach(cid => {
         localStorage.setItem(`campus_homework_notes_${cid}`, allNotesJson);
         localStorage.setItem(`campus_homework_week_${cid}`, currentWeek);
-        localStorage.setItem(`campus_teacher_notes_${cid}`, teacherNotes.trim());
+        localStorage.setItem(`campus_teacher_notes_${cid}`, (teacherNotes || '').trim());
 
         const teacherVaultKey = `campus_teacher_audio_vault_${cid}`;
         const existingVaultStr = localStorage.getItem(teacherVaultKey);
@@ -490,11 +490,11 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       if (dummyWeeklyItem) {
         const { error } = await supabase
           .from('progress_matrix')
-          .update({ homework_notes: allNotesJson, teacher_notes: teacherNotes.trim(), updated_at: new Date().toISOString() })
+          .update({ homework_notes: allNotesJson, teacher_notes: (teacherNotes || '').trim(), updated_at: new Date().toISOString() })
           .eq('id', dummyWeeklyItem.id);
         if (error) console.warn('[syncHomeworkNotes] Supabase update warning:', error);
         else {
-          setProgressItems(prev => (prev || []).map(p => p.id === dummyWeeklyItem.id ? { ...p, homework_notes: allNotesJson, teacher_notes: teacherNotes.trim(), updated_at: new Date().toISOString() } : p));
+          setProgressItems(prev => (prev || []).map(p => p.id === dummyWeeklyItem.id ? { ...p, homework_notes: allNotesJson, teacher_notes: (teacherNotes || '').trim(), updated_at: new Date().toISOString() } : p));
         }
       } else {
         const activeTId = await getCurrentTeacherId();
@@ -506,7 +506,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
             topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
             status: 'IN_PROGRESS',
             is_current_homework: true,
-            teacher_notes: teacherNotes.trim(),
+            teacher_notes: (teacherNotes || '').trim(),
             homework_notes: allNotesJson,
             updated_at: new Date().toISOString()
           })
@@ -550,7 +550,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
           pageStatus = 'mastered';
         } else if (status === 'THEORY_DONE') {
           pageStatus = 'purple';
-        } else if (isCurrentHomework || (status === 'IN_PROGRESS' && pageHomeworkNotes.trim().length > 0)) {
+        } else if (isCurrentHomework || (status === 'IN_PROGRESS' && (pageHomeworkNotes || '').trim().length > 0)) {
           pageStatus = 'homework';
           targetHomework = true;
         }
@@ -583,9 +583,9 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
                 [activePageNumber]: {
                   ...existingPageState,
                   status: pageStatus,
-                  notes: teacherNotes.trim(),
-                  homeworkNotes: pageHomeworkNotes.trim(),
-                  studentNotes: studentNotes.trim(),
+                  notes: (teacherNotes || '').trim(),
+                  homeworkNotes: (pageHomeworkNotes || '').trim(),
+                  studentNotes: (studentNotes || '').trim(),
                   studentNotesIsPrivate: isStudentNotePrivate,
                   updatedAt: new Date(Date.now() + 10000).toISOString()
                 }
@@ -604,7 +604,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
 
     if (activeInputTab === 'active_song' && selectedActiveSongId) {
       try {
-        const noteToSave = songHomeworkNotes.trim();
+        const noteToSave = (songHomeworkNotes || '').trim();
         const finalHw = isCurrentHomework || noteToSave.length > 0;
         await triggerDirectSongSave(selectedActiveSongId, status as any, finalHw, noteToSave);
         setStudentNotesSavedToast(true);
@@ -623,17 +623,17 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
     const isLehrwerkPage = (activeInputTab === 'lehrwerk_page');
     const isSong = (activeInputTab === 'active_song');
 
-    const effectiveGeneralNotes = latestGeneralHomeworkNotesRef.current !== undefined
+    const effectiveGeneralNotes = (latestGeneralHomeworkNotesRef.current !== undefined
       ? latestGeneralHomeworkNotesRef.current
-      : generalHomeworkNotes;
-    const effectiveTeacherNotes = latestTeacherNotesRef.current !== undefined
+      : generalHomeworkNotes) || '';
+    const effectiveTeacherNotes = (latestTeacherNotesRef.current !== undefined
       ? latestTeacherNotesRef.current
-      : teacherNotes;
+      : teacherNotes) || '';
 
     const specialNotes = homeworkNotesList.filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
     const finalNotesList = [...specialNotes];
-    if (!isLehrwerkPage && !isSong && effectiveGeneralNotes.trim().length > 0) {
-      const noteLines = effectiveGeneralNotes.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!isLehrwerkPage && !isSong && (effectiveGeneralNotes || '').trim().length > 0) {
+      const noteLines = (effectiveGeneralNotes || '').split('\n').map(s => s.trim()).filter(Boolean);
       noteLines.forEach(line => {
         if (!finalNotesList.includes(line)) {
           finalNotesList.push(line);
@@ -650,12 +650,12 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
     }
     const combinedHomeworkNotes = JSON.stringify(finalNotesList);
 
-    const hasHomeworkText = isSong ? songHomeworkNotes.trim().length > 0 : (isLehrwerkPage ? pageHomeworkNotes.trim().length > 0 : finalNotesList.length > 0);
+    const hasHomeworkText = isSong ? (songHomeworkNotes || '').trim().length > 0 : (isLehrwerkPage ? (pageHomeworkNotes || '').trim().length > 0 : finalNotesList.length > 0);
     const isExplicitHomework = targetHomework !== undefined ? targetHomework : isCurrentHomework;
     const finalIsCurrentHomework = isSong 
-      ? (isCurrentHomework || songHomeworkNotes.trim().length > 0)
+      ? (isCurrentHomework || (songHomeworkNotes || '').trim().length > 0)
       : (isLehrwerkPage
-          ? (isCurrentHomework || pageHomeworkNotes.trim().length > 0)
+          ? (isCurrentHomework || (pageHomeworkNotes || '').trim().length > 0)
           : (isExplicitHomework || hasHomeworkText));
 
     try {
@@ -685,9 +685,9 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       const currentWeek = getISOWeek();
 
       const rowHomeworkNotes = isSong
-        ? songHomeworkNotes.trim()
+        ? (songHomeworkNotes || '').trim()
         : (isLehrwerkPage
-            ? pageHomeworkNotes.trim()
+            ? (pageHomeworkNotes || '').trim()
             : combinedHomeworkNotes);
 
       const row = {
@@ -696,7 +696,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         topic_name: finalTopicName,
         status,
         is_current_homework: finalIsCurrentHomework,
-        teacher_notes: effectiveTeacherNotes.trim(),
+        teacher_notes: (effectiveTeacherNotes || '').trim(),
         homework_notes: rowHomeworkNotes,
         updated_at: new Date().toISOString()
       };
@@ -705,7 +705,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         try {
           localStorage.setItem(`campus_homework_notes_${student.id}`, combinedHomeworkNotes);
           localStorage.setItem(`campus_homework_week_${student.id}`, currentWeek);
-          localStorage.setItem(`campus_teacher_notes_${student.id}`, effectiveTeacherNotes.trim());
+          localStorage.setItem(`campus_teacher_notes_${student.id}`, (effectiveTeacherNotes || '').trim());
         } catch (lsErr) {
           console.warn('[useMeisterwerkHomework] localStorage backup notice:', lsErr);
         }
@@ -755,7 +755,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
               topic_name: finalTopicName,
               status,
               is_current_homework: finalIsCurrentHomework,
-              teacher_notes: effectiveTeacherNotes.trim(),
+              teacher_notes: (effectiveTeacherNotes || '').trim(),
               homework_notes: rowHomeworkNotes,
               updated_at: new Date().toISOString()
             };

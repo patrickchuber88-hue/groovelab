@@ -135,6 +135,26 @@ export const ALL_STUDIO_MODULE_KEYS: StudioModuleKey[] = [
   'archive'
 ];
 
+export const DEFAULT_ACTIVE_STUDIO_MODULES: Record<'junior' | 'teen' | 'pro', StudioModuleKey[]> = {
+  // 👦 Junior (6–10 J.): Radikale Klarheit & Übefokus (Die "Goldene Trias")
+  junior: ['practice', 'protocol', 'recordings'],
+  // 🧑 Teen (11–15 J.): 7 interaktive Module (inkl. Beatmaking & Looper)
+  teen: ['practice', 'protocol', 'recordings', 'groovetrainer', 'tuner', 'loopstation', 'earlab'],
+  // 🎓 Pro (16+ J. & Erwachsene): Alle 10 Module standardmäßig freigeschaltet
+  pro: [
+    'practice',
+    'protocol',
+    'recordings',
+    'groovetrainer',
+    'tuner',
+    'earlab',
+    'loopstation',
+    'skillradar',
+    'worldtour',
+    'archive'
+  ]
+};
+
 export function isStudioModuleActive(
   moduleKey: StudioModuleKey,
   uiLevel: 'junior' | 'teen' | 'pro',
@@ -143,12 +163,7 @@ export function isStudioModuleActive(
   if (moduleOverrides && moduleOverrides[moduleKey] !== undefined) {
     return Boolean(moduleOverrides[moduleKey]);
   }
-  if (moduleKey === 'loopstation') {
-    return uiLevel !== 'junior';
-  }
-  if (moduleKey === 'archive') {
-    return uiLevel === 'pro';
-  }
-  return true;
+  const defaults = DEFAULT_ACTIVE_STUDIO_MODULES[uiLevel] || DEFAULT_ACTIVE_STUDIO_MODULES.junior;
+  return defaults.includes(moduleKey);
 }
 
