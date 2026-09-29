@@ -1222,7 +1222,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
           const sidebarTotalAlertsCount = sidebarAppointmentChanges.length + (unreadClassFeedCount || 0) + (totalUnreadDirectMessages || 0);
 
           return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '24px', 
+            position: 'relative',
+            paddingBottom: isMobile ? 'calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 36px)' : '32px'
+          }}>
           <style>{CAMPUS_XP_EFFECTS_CSS}</style>
           
           {/* MAIN LAYOUT (Full-width for Junior Level 1 or when Right Sidebar is Collapsed, 2-column when Open) */}
@@ -3277,9 +3283,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           backdropFilter: 'blur(12px)',
                           zIndex: 99999,
                           display: 'flex',
+                          flexDirection: 'column',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '16px'
+                          justifyContent: isMobile ? 'flex-start' : 'center',
+                          overflowY: 'auto',
+                          WebkitOverflowScrolling: 'touch',
+                          overscrollBehaviorY: 'contain',
+                          padding: isMobile 
+                            ? 'max(12px, env(safe-area-inset-top, 12px)) 12px calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 24px) 12px' 
+                            : '28px 16px',
+                          boxSizing: 'border-box'
                         }}
                         onClick={(e) => {
                           if (e.target === e.currentTarget) {
@@ -3290,24 +3303,31 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       >
                         <div style={{
                           background: '#ffffff',
-                          borderRadius: '28px',
+                          borderRadius: isMobile ? '24px' : '28px',
                           maxWidth: '680px',
-                          width: 'min(680px, calc(100vw - 32px))',
-                          maxHeight: '90vh',
-                          overflowY: 'auto',
-                          padding: '24px 28px',
+                          width: 'min(680px, calc(100vw - 24px))',
+                          maxHeight: isMobile 
+                            ? 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-h, 72px) - env(safe-area-inset-bottom, 16px) - 24px)' 
+                            : 'min(90dvh, 860px)',
                           boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)',
                           position: 'relative',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '18px'
+                          margin: isMobile ? '0 auto' : 'auto',
+                          boxSizing: 'border-box',
+                          overflow: 'hidden'
                         }}>
-                          {/* 🌟 1. INTEGRATED CHILD-FRIENDLY HEADER (Vorlesen pill directly beside close X) */}
+                          {/* 🌟 1. INTEGRATED CHILD-FRIENDLY HEADER (Sticky Top: Never scrolls out of view!) */}
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            gap: '12px'
+                            gap: '12px',
+                            padding: isMobile ? '16px 18px 12px 18px' : '20px 24px 14px 24px',
+                            background: '#ffffff',
+                            borderBottom: '1px solid #f1f5f9',
+                            flexShrink: 0,
+                            zIndex: 10
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                               <div style={{
@@ -3425,8 +3445,21 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             </div>
                           </div>
 
-                          {/* 🌟 2. CONTENT CONTAINER (No 92px banner: Real homework visible immediately!) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          {/* 🌟 2. CONTENT CONTAINER (Flex 1, with smooth touch momentum scrolling) */}
+                          <div 
+                            style={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: '14px',
+                              padding: isMobile ? '14px 16px 16px 16px' : '18px 24px 20px 24px',
+                              overflowY: 'auto',
+                              WebkitOverflowScrolling: 'touch',
+                              overscrollBehaviorY: 'contain',
+                              flex: 1,
+                              minHeight: 0
+                            }}
+                            className="thin-scrollbar"
+                          >
                             {hasAnyHomework ? (
                               <>
                                 <div style={{
@@ -3855,45 +3888,54 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             )}
                           </div>
 
-                          {/* 🌟 3. BOTTOM CLOSE BUTTON (Ergonomic child primary action) */}
-                          <button
-                            type="button"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              handleStopSpeaking();
-                              setShowJuniorHomeworkModal(false);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
+                          {/* 🌟 3. BOTTOM CLOSE BUTTON (Sticky Bottom: Always accessible and visible above PWA bar) */}
+                          <div style={{
+                            padding: isMobile ? '10px 16px 14px 16px' : '12px 24px 18px 24px',
+                            background: 'linear-gradient(to top, #ffffff 90%, rgba(255, 255, 255, 0) 100%)',
+                            borderTop: '1px solid #f1f5f9',
+                            flexShrink: 0,
+                            zIndex: 10
+                          }}>
+                            <button
+                              type="button"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
                                 handleStopSpeaking();
                                 setShowJuniorHomeworkModal(false);
-                              }
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '14px 20px',
-                              borderRadius: '16px',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                              color: '#ffffff',
-                              fontSize: '0.98rem',
-                              fontWeight: 950,
-                              cursor: 'pointer',
-                              marginTop: '2px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
-                              boxShadow: '0 6px 20px rgba(34, 197, 94, 0.25)',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Check size={18} strokeWidth={3} />
-                            <span>Alles klar, los geht's! 🚀</span>
-                          </button>
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleStopSpeaking();
+                                  setShowJuniorHomeworkModal(false);
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '14px 20px',
+                                minHeight: '48px',
+                                borderRadius: '16px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                color: '#ffffff',
+                                fontSize: '0.98rem',
+                                fontWeight: 950,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 6px 20px rgba(34, 197, 94, 0.25)',
+                                transition: 'all 0.15s ease',
+                                touchAction: 'manipulation'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Check size={18} strokeWidth={3} />
+                              <span>Alles klar, los geht's! 🚀</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -3910,23 +3952,36 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       backdropFilter: 'blur(16px)',
                       zIndex: 99999,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px'
+                      justifyContent: isMobile ? 'flex-start' : 'center',
+                      overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch',
+                      overscrollBehaviorY: 'contain',
+                      padding: isMobile 
+                        ? 'max(16px, env(safe-area-inset-top, 16px)) 16px calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 24px) 16px' 
+                        : '32px 20px',
+                      boxSizing: 'border-box'
                     }}>
                       <div style={{
                         background: '#ffffff',
-                        borderRadius: '40px',
+                        borderRadius: isMobile ? '28px' : '40px',
                         maxWidth: '520px',
-                        width: '100%',
-                        padding: '40px 32px',
+                        width: 'min(520px, calc(100vw - 24px))',
+                        maxHeight: isMobile ? 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-h, 72px) - env(safe-area-inset-bottom, 16px) - 24px)' : 'min(90dvh, 700px)',
+                        overflowY: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        overscrollBehaviorY: 'contain',
+                        padding: isMobile ? '24px 20px' : '40px 32px',
                         boxShadow: '0 30px 70px rgba(0, 0, 0, 0.3)',
                         position: 'relative',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '28px',
-                        textAlign: 'center'
+                        textAlign: 'center',
+                        margin: isMobile ? '0 auto' : 'auto',
+                        boxSizing: 'border-box'
                       }}>
                         <button
                           onClick={() => {
@@ -4222,23 +4277,36 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       backdropFilter: 'blur(16px)',
                       zIndex: 99999,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px'
+                      justifyContent: isMobile ? 'flex-start' : 'center',
+                      overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch',
+                      overscrollBehaviorY: 'contain',
+                      padding: isMobile 
+                        ? 'max(16px, env(safe-area-inset-top, 16px)) 16px calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 24px) 16px' 
+                        : '32px 20px',
+                      boxSizing: 'border-box'
                     }}>
                       <div style={{
                         background: '#ffffff',
-                        borderRadius: '40px',
+                        borderRadius: isMobile ? '28px' : '40px',
                         maxWidth: '520px',
-                        width: '100%',
-                        padding: '40px 32px',
+                        width: 'min(520px, calc(100vw - 24px))',
+                        maxHeight: isMobile ? 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-h, 72px) - env(safe-area-inset-bottom, 16px) - 24px)' : 'min(90dvh, 700px)',
+                        overflowY: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        overscrollBehaviorY: 'contain',
+                        padding: isMobile ? '24px 20px' : '40px 32px',
                         boxShadow: '0 30px 70px rgba(0, 0, 0, 0.3)',
                         position: 'relative',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '24px',
-                        textAlign: 'center'
+                        textAlign: 'center',
+                        margin: isMobile ? '0 auto' : 'auto',
+                        boxSizing: 'border-box'
                       }}>
                         {/* 🎛️ Instrumenten-PAD Button (-6 dB Dämpfung für dynamikstarke Instrumente / Slap-Transienten) */}
                         {setIsJuniorPadActive && (
@@ -4707,23 +4775,34 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       backdropFilter: 'blur(14px)',
                       zIndex: 99999,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px'
+                      justifyContent: isMobile ? 'flex-start' : 'center',
+                      overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch',
+                      overscrollBehaviorY: 'contain',
+                      padding: isMobile 
+                        ? 'max(16px, env(safe-area-inset-top, 16px)) 16px calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 24px) 16px' 
+                        : '32px 20px',
+                      boxSizing: 'border-box'
                     }}>
                       <div style={{
                         background: '#ffffff',
-                        borderRadius: '36px',
+                        borderRadius: isMobile ? '24px' : '36px',
                         maxWidth: '700px',
-                        width: '100%',
-                        maxHeight: '90vh',
+                        width: 'min(700px, calc(100vw - 24px))',
+                        maxHeight: isMobile ? 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-h, 72px) - env(safe-area-inset-bottom, 16px) - 24px)' : 'min(90dvh, 850px)',
                         overflowY: 'auto',
-                        padding: '36px',
+                        WebkitOverflowScrolling: 'touch',
+                        overscrollBehaviorY: 'contain',
+                        padding: isMobile ? '24px 18px' : '36px',
                         boxShadow: '0 30px 70px rgba(0, 0, 0, 0.25)',
                         position: 'relative',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '24px'
+                        gap: '24px',
+                        margin: isMobile ? '0 auto' : 'auto',
+                        boxSizing: 'border-box'
                       }}>
                         <button
                           onClick={() => {

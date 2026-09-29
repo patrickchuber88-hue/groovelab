@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1790629583833';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1790629583833';
+const CACHE_NAME = 'groovelab-static-v1790681476398';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1790681476398';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

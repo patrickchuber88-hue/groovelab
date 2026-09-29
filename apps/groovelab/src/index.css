@@ -62,7 +62,7 @@
   --mobile-bottom-nav-bar-h: 64px;
   --mobile-bottom-nav-h: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 0px));
   --mini-player-h: 0px;
-  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px);
+  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 16px) + 36px);
   --mobile-scroll-clearance-top: var(--mobile-header-h);
   --mobile-sheet-radius: 28px;
 

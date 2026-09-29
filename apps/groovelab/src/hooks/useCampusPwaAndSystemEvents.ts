@@ -102,11 +102,26 @@ export function useCampusPwaAndSystemEvents({
               if (res.ok) {
                 const data = await res.json();
                 const currentAppVer = sessionStorage.getItem('campus_app_loaded_version');
+                const installedCacheVer = localStorage.getItem('campus_installed_cache_version');
+
                 if (!currentAppVer) {
                   sessionStorage.setItem('campus_app_loaded_version', data.version);
-                } else if (currentAppVer !== data.version) {
+                }
+
+                if (installedCacheVer && installedCacheVer !== data.version) {
+                  console.log('[PWA] Stale cache detected! Server:', data.version, 'Local cache:', installedCacheVer);
+                  setShowPwaUpdateToast(true);
+                  if (reg && reg.update) {
+                    reg.update().catch(() => {});
+                  }
+                } else if (currentAppVer && currentAppVer !== data.version) {
                   console.log('[PWA] New server version detected via version.json:', data.version);
                   setShowPwaUpdateToast(true);
+                  if (reg && reg.update) {
+                    reg.update().catch(() => {});
+                  }
+                } else {
+                  localStorage.setItem('campus_installed_cache_version', data.version);
                 }
               }
             } catch {}

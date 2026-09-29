@@ -14,7 +14,9 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
       aria-atomic="true"
       style={{
         position: 'fixed',
-        bottom: '24px',
+        bottom: typeof window !== 'undefined' && window.innerWidth <= 768 
+          ? 'calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 16px)' 
+          : '28px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 9999999,
@@ -24,7 +26,7 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
         backdropFilter: 'blur(16px)',
         border: '1px solid rgba(255, 255, 255, 0.15)',
         borderRadius: '100px',
-        padding: '8px 12px 8px 16px',
+        padding: '6px 10px 6px 16px',
         boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
         display: 'flex',
         alignItems: 'center',
@@ -70,19 +72,21 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
           type="button"
           onClick={onUpdate}
           style={{
-            padding: '6px 14px',
+            padding: '8px 16px',
+            minHeight: '44px',
             borderRadius: '100px',
             background: '#34a853',
             color: '#ffffff',
             border: 'none',
-            fontSize: '0.78rem',
+            fontSize: '0.82rem',
             fontWeight: 800,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '6px',
             boxShadow: '0 2px 8px rgba(52, 168, 83, 0.3)',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
+            touchAction: 'manipulation'
           }}
           onMouseOver={(e) => { e.currentTarget.style.background = '#2e9549'; }}
           onMouseOut={(e) => { e.currentTarget.style.background = '#34a853'; }}
@@ -95,8 +99,10 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
           type="button"
           onClick={onDismiss}
           style={{
-            width: '28px',
-            height: '28px',
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
+            minHeight: '44px',
             borderRadius: '50%',
             background: 'transparent',
             color: '#94a3b8',
@@ -105,7 +111,8 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'color 0.15s ease'
+            transition: 'color 0.15s ease',
+            touchAction: 'manipulation'
           }}
           onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; }}

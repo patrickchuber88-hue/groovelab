@@ -137,6 +137,8 @@ export const CampusSystemBannersOverlay: React.FC<CampusSystemBannersOverlayProp
                     reg.waiting.postMessage({ action: 'skipWaiting' });
                   }
                 }
+                localStorage.removeItem('campus_installed_cache_version');
+                sessionStorage.removeItem('campus_app_loaded_version');
               } catch {}
               window.location.replace('/?v=' + Date.now());
             }}
