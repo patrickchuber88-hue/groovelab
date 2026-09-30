@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { DEFAULT_QUIET_HOURS_CONFIG, QuietHoursConfig } from '../../utils/chatRespectGuard';
 import { isWebAuthnSupported, registerBiometrics } from '../../utils/webauthn';
 import { formatTeacherFullName } from '../../utils/nameHelper';
+import { resolveUserCampusId } from '../../utils/campusIdHelper';
 
 export interface TeacherSettingsViewProps {
   teacher: any;
@@ -881,11 +882,11 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
                         }
 
-                        const email = teacher.email || `lehrer.${teacher.id.substring(0, 8)}@campus-groovelab.local`;
+                        const userHandle = `lehrkraft_${teacher.id.substring(0, 8)}`;
                         const teacherName = formatTeacherFullName(teacher) || 'Lehrkraft';
 
                         const passkeyResult = await registerBiometrics(
-                          email,
+                          userHandle,
                           teacher.id,
                           chalData.challenge,
                           `${teacherName} (Lehrkraft)`
@@ -1333,7 +1334,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Kopplung &amp; Proberaum-Status</strong>
                           <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.5 }}>
                             Schul-ID: <strong>{teacher?.school_id || 'Aktiv'}</strong><br />
-                            Schulausweis-ID: <strong>{securityOverview?.ausweis_nummer || teacher?.ausweis_nummer || teacher?.id?.substring(0, 8) || '–'}</strong><br />
+                            Schulausweis-ID: <strong>{resolveUserCampusId(teacher)}</strong><br />
                             Rolle: <strong>GrooveLab Coach (Lehrkraft)</strong><br />
                             Sperrbildschirm-Schutz: <strong>Aktiviert (45 Min. Inaktivitätssperre)</strong>
                           </span>

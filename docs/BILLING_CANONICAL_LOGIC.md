@@ -58,31 +58,29 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
 ---
 
 ### Modell B: Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)
-*Gilt AUSSCHLIESSLICH für das Campus-Modul. GrooveLab bleibt immer bei der Schule.*
+*Gilt AUSSCHLIESSLICH für das Campus-Modul. GrooveLab bleibt immer 100% bei der Schule.*
 
-> ⚖️ **Juristisches & Ökonomisches Gebot:**  
-> Schüler-Direktabrechnungen dürfen **IMMER NUR als Jahresbeitragszahlung (einmalige Schuljahresgebühr)** gebucht und eingezogen werden – **NIEMALS monatlich**!  
-> *Begründung:* Ein monatlicher Einzug von 0,49 € würde unverhältnismäßig hohe Banktransaktions-, Stripe- und Buchungsgebühren erzeugen.
+> ⚖️ **Juristisches & Ökonomisches Gebot (Binary Clarity):**  
+> Schüler-Direktabrechnungen erfolgen **ausnahmslos als Jahresbeitragszahlung (einmalige Schuljahresgebühr von 5,39 € / CHF 11.00)** – **NIEMALS monatlich**!  
+> *Begründung:* Ein monatlicher Einzug von 0,49 € würde durch Transaktions- und Stripe-Gebühren ökonomisch erodieren. Das Modell B entlastet die Musikschule zu 100 % von jeglichen Schülergebühren (Schule zahlt 0,00 €).
 
-1. **Vollständige Direktabrechnung:**
+1. **Vollständige Direktabrechnung (Der kanonische 0,1% Standard):**
    - Einmaliger Jahresbeitrag von **maximal 5,39 € / Schuljahr** (DE/AT in EUR: 1 Monat kostenlos/Schnupperphase + bis zu 11 Monate × 0,49 €) bzw. **maximal CHF 11.00 / Schuljahr** (CH: 1 Monat kostenlos + bis zu 11 Monate × CHF 1.00).
    - Die Schule wird für alle aktivierten Campus-Schüler vollständig entlastet (**Schule zahlt 0,00 € / CHF 0.00**).
-2. **Teilweise Direktabrechnung (Schule bezuschusst):**
-   - Einmaliger Jahresbeitrag von **maximal 4,40 € / Schuljahr** (DE/AT: 1 Monat kostenlos + bis zu 11 Monate × 0,40 €) bzw. **maximal CHF 8.80 / Schuljahr** (CH: 1 Monat kostenlos + bis zu 11 Monate × CHF 0.80).
-   - Die Schule deckt den verbleibenden Beitrag (0,09 € / CHF 0.20 / Mo.).
-3. **Automatische Beendigung zum Schuljahresende (Keine Abofalle / § 309 Nr. 9 BGB):**
+   - *(0,1 % Goldstandard Bereinigung: Das historische Zwittermodell einer Teilbezuschussung mit 4,40 € wurde vollständig aus den AGB, PDF-Generatoren und Benutzeroberflächen getilgt. Es gilt ausnahmslos das binäre Modell: Sammelzahler 0,00 € vs. Direktabrechnung 5,39 € / CHF 11.00).*
+2. **Automatische Beendigung zum Schuljahresende (Keine Abofalle / § 309 Nr. 9 BGB):**
    - Die Beitragsperiode endet verbindlich und automatisch mit dem Ablauf des jeweiligen Schuljahres (31. Juli bzw. 31. August). Es findet **keine** stillschweigende Vertragsverlängerung und kein automatischer Einzug im Folgejahr statt.
-4. **Jährlicher Probemonat (Reset zum Schuljahresbeginn):**
+3. **Jährlicher Probemonat (Reset zum Schuljahresbeginn):**
    - Zu Beginn eines jeden neuen Schuljahres (z. B. 1. September) wird der erste Nutzungsmonat für **alle Schüler erneut vollumfänglich kostenfrei** (Probemonat) bereitgestellt.
-5. **Sanfter Rückfall in den Basistarif (0,09 € / Mo. - Keine Aussperrung):**
+4. **Sanfter Rückfall in den Basistarif (0,09 € / Mo. - Keine Aussperrung):**
    - Entscheiden sich Eltern im neuen Schuljahr gegen die Zahlung des Bereitstellungsbeitrags (5,39 € / CHF 11.00), wird das Schülerprofil **zu keinem Zeitpunkt gelöscht oder der Unterricht unterbrochen**.
    - Das Profil wird automatisch in den Basistarif überführt (Basis-Unterrichtskanal zu 0,09 € / Monat), für den die Musikschule im Rahmen der Grundinfrastruktur aufkommt. Sämtliche Unterrichtstermine, Raumzuordnungen und Kontaktdaten bleiben unangetastet.
-6. **Härtefall- & Geschwisterausnahmen (Einzelübernahme durch Schule):**
+5. **Härtefall- & Geschwisterausnahmen (Einzelübernahme durch Schule):**
    - Einzelne Schüler können in der Schülerverwaltung jederzeit manuell als Härtefall oder Geschwisterkind markiert werden (`exempt_from_direct_billing = true`).
    - In diesem Fall entfällt der Zahlungsdialog bei den Eltern vollständig; das Profil wird unmittelbar für das gesamte Schuljahr freigeschaltet.
-7. **Verbraucherschutz & Widerruf (§ 356 Abs. 5 BGB):**
+6. **Verbraucherschutz & Widerruf (§ 356 Abs. 5 BGB):**
    - Mit Beginn der digitalen Nutzung vor Ablauf der gesetzlichen 14-tägigen Widerrufsfrist stimmt der Erziehungsberechtigte der sofortigen Ausführung zu und nimmt zur Kenntnis, dass das Widerrufsrecht bei vollständiger Bereitstellung digitaler Inhalte erlischt. Keine Rückforderungs- oder Mahnschleifen.
-8. **Härtefall-Stufenstaffel & Freikontingent (Sozial-Governance):**
+7. **Härtefall-Stufenstaffel & Freikontingent (Sozial-Governance):**
    - **Mathematische Formel:** $\text{Freikontingent} = \left\lfloor \frac{n_{\text{Vollzahler}}}{20} \right\rfloor$
    - Es müssen mindestens 20 aktivierte Vollzahler-Schülerprofile vorliegen, bevor der erste kostenfreie Härtefallplatz gewährt wird.
    - Jede weitere volle 20 aktivierte Schüler schaltet genau einen weiteren Freiplatz frei (strikte kaufmännische Abrundung / Floor-Logik):
@@ -172,18 +170,18 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
    - Die Funktion erzeugt eine gegenbuchungsfähige Gutschrift (Typ `STORNO`) mit negativem Cent-Betrag (`-amount_cents`), eigener Rechnungsnummer und Verknüpfung zur Originalrechnung (`canceled_invoice_id`).
 4. **Cent-Arithmetik (Integer):**
    - Beträge werden in der Datenbank und in Zod-Schnittstellen ausnahmslos als ganzzahlige Cent-Beträge (`amount_cents BIGINT`) gespeichert, um Rundungsverluste aus Floating-Point-Zahlen physikalisch auszuschließen.
-5. **Umsatzsteuerbefreiung:**
-   - Rechnungen weisen standardmäßig den Vermerk *„Steuerbefreit gem. § 4 Nr. 21 UStG (Musikschulunterricht)“* aus.
+5. **Umsatzsteuer-Regelung (B2B-SaaS vs. B2C):**
+   - B2B-Rechnungen an Musikschulen in Deutschland weisen regulär 19 % Umsatzsteuer aus (elektronische Dienstleistung gem. § 3a Abs. 5 UStG; bzw. gesetzlicher Kleinunternehmer-Hinweis gem. § 19 UStG des Plattformbetriebs). Bei Musikschulen in Österreich und der Schweiz greift automatisch der Steuerschuldübergang (Reverse Charge gem. § 13b UStG / Art. 196 MWST-SystRL / Art. 10 MWSTG CH).
 6. **Kalendermäßiges Zahlungsziel & Werktags-Klausel (§§ 286, 193 BGB):**
-   - Das formelle Zahlungsziel auf Rechnungen ist auf **14 Tage** festgesetzt (Begründung der rechtlichen Fälligkeit).
-   - Fällt der 14. Tag auf ein Wochenende (Samstag/Sonntag) oder einen gesetzlichen Feiertag, verschiebt sich die Fälligkeit gemäß § 193 BGB automatisch auf den nächsten Werktag (Montag).
+   - Das formelle Zahlungsziel auf B2B-Rechnungen ist auf **30 Tage netto** festgesetzt (harmonisiert mit dem gesetzlichen Leitbild des § 286 Abs. 3 BGB; Begründung der rechtlichen Fälligkeit).
+   - Fällt der 30. Tag auf ein Wochenende (Samstag/Sonntag) oder einen gesetzlichen Feiertag, verschiebt sich die Fälligkeit gemäß § 193 BGB automatisch auf den nächsten Werktag (Montag).
 7. **EPC-GiroCode (Europäischer QR-Standard):**
    - Jede Rechnung enthält den offiziellen EPC-QR-Code (European Payments Council) zur beleglosen 1-Scan-Zahlung in Banking-Apps.
    - Bankverbindung des Plattformbetriebs: *Campus-Groovelab Plattformbetrieb*, IBAN `DE89 3704 0044 0532 9482 11`, BIC `GENODEFFXXX`.
 8. **Didaktische Immunität & Schonfristen (§ 242 BGB):**
-   - Musikschulen erhalten eine reale **Basis-Schonfrist von 28 Tagen (4 Wochen)** und in den Monaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
+   - Musikschulen erhalten nach Fälligkeit eine reale **Schonfrist von weiteren 30 Tagen (Stufe 1 & 2 als Ambient-Hinweise)** und in den Sommermonaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
    - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität).
-   - Erst ab Tag 44 greift ein administrativer Schreibschutz im Sekretariat, der per 48h-Vertrauenspass oder Master-Kulanzjoker jederzeit entsperrt werden kann.
+   - Erst ab Tag 61 greift ein administrativer Schreibschutz im Sekretariat, der per 48h-Vertrauenspass oder Master-Kulanzjoker jederzeit entsperrt werden kann.
 
 ---
 

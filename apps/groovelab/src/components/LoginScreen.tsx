@@ -813,11 +813,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const params = new URLSearchParams(window.location.search);
     return params.get('day') || '';
   });
-  const [parentEmail, setParentEmail] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('email') || '';
-  });
-  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'setup-pin' | 'pin' | 'frozen' | 'email' | 'preferences' | 'success'>('verify');
+  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'setup-pin' | 'pin' | 'frozen' | 'preferences' | 'success'>('verify');
   const [studentPaymentMethod, setStudentPaymentMethod] = useState<'debit' | 'cash'>('debit');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [parentNotes, setParentNotes] = useState('');
@@ -873,10 +869,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [verifiedStudentDetails, setVerifiedStudentDetails] = useState<any>(null);
   const [parentOnboardingError, setParentOnboardingError] = useState<string | null>(null);
   const [parentOnboardingLoading, setParentOnboardingLoading] = useState(false);
-  const [magicLinkEmail, setMagicLinkEmail] = useState('');
-  const [showMagicLinkModal, setShowMagicLinkModal] = useState(false);
-  const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
-  const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
   const [isAlreadyOnboarded, setIsAlreadyOnboarded] = useState(false);
   const [lockoutNotice, setLockoutNotice] = useState<{ title: string; message: string; type?: 'trial_expired' | 'suspended' | 'contract_expired' | 'general' } | null>(null);
 
@@ -2655,48 +2647,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   };
 
-  const handleParentEmailSubmission = async (e?: React.FormEvent, skipEmail = false) => {
-    if (e) e.preventDefault();
-    
-    const emailToSubmit = skipEmail ? '' : parentEmail.trim();
-    if (!skipEmail && !emailToSubmit) {
-      setParentOnboardingError('Bitte gib eine gültige E-Mail-Adresse ein.');
-      return;
-    }
-
-    if (!verifiedStudentId) {
-      setParentOnboardingError('Schüler-ID fehlt.');
-      return;
-    }
-
-    setParentOnboardingLoading(true);
-    setParentOnboardingError(null);
-
-    try {
-      const { data, error } = await supabase.rpc('complete_onboarding', {
-        input_student_id: verifiedStudentId,
-        input_email: emailToSubmit
-      });
-
-      if (error) throw error;
-
-      // Onboarding complete! The RPC returns the user profile row directly
-      const studentUser = Array.isArray(data) ? data[0] : data;
-
-      if (!studentUser) {
-        throw new Error('Fehler beim Abrufen des Schülerprofils nach Onboarding.');
-      }
-
-      setVerifiedStudentDetails(studentUser);
-      setParentOnboardingStep('preferences');
-    } catch (err: any) {
-      console.error('Email submission error:', err);
-      setParentOnboardingError(err.message || 'Aktivierung konnte nicht abgeschlossen werden.');
-    } finally {
-      setParentOnboardingLoading(false);
-    }
-  };
-
   const handleSavePaymentSelection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verifiedStudentId) {
@@ -2844,17 +2794,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             asset_path: avatarUrl,
             streak_flame: 0
           });
-
-          // Copy encrypted parent email from Sibling 1
-          const { data: emailPref } = await supabase.from('user_email_prefixes').select('*').eq('user_id', parentChildren[0].id).maybeSingle();
-          const { data: emailSuff } = await supabase.from('user_email_suffixes').select('*').eq('user_id', parentChildren[0].id).maybeSingle();
-          
-          if (emailPref) {
-            await supabase.from('user_email_prefixes').insert({ user_id: currentUserId, prefix: emailPref.prefix });
-          }
-          if (emailSuff) {
-            await supabase.from('user_email_suffixes').insert({ user_id: currentUserId, suffix: emailSuff.suffix });
-          }
         }
 
         if (!currentUserId) continue;
@@ -2901,34 +2840,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   };
 
-  const handleMagicLinkRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!magicLinkEmail.trim()) {
-      setMagicLinkMessage('Bitte gib eine E-Mail-Adresse ein.');
-      return;
-    }
-
-    setParentOnboardingLoading(true);
-    setMagicLinkMessage(null);
-
-    try {
-      const { data, error } = await supabase.rpc('request_magic_link', {
-        input_email: magicLinkEmail.trim()
-      });
-
-      if (error) throw error;
-      
-      const result = Array.isArray(data) ? data[0] : data;
-      setMagicLinkSuccess(true);
-      setMagicLinkMessage(result?.message || 'Wenn die E-Mail registriert ist, wurde ein Magic Link gesendet.');
-    } catch (err: any) {
-      console.error('Magic link error:', err);
-      setMagicLinkMessage(err.message || 'Fehler beim Anfordern des Magic Links.');
-    } finally {
-      setParentOnboardingLoading(false);
-    }
-  };
-
   const handleRegisterBiometrics = async () => {
     if (!verifiedStudentDetails) return;
     setBiometricsStatus('registering');
@@ -2944,9 +2855,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
       }
 
-      const email = `${verifiedStudentDetails.first_name.toLowerCase()}.${verifiedStudentDetails.last_name.toLowerCase()}@campus-groovelab.local`;
+      const userHandle = `schueler_${verifiedStudentDetails.id.substring(0, 8)}`;
       const result = await registerBiometrics(
-        email,
+        userHandle,
         verifiedStudentDetails.id,
         chalData.challenge
       );
@@ -2967,7 +2878,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // Save to local Biometric Device Vault for instant Quick-Login persistence
       saveBiometricProfile({
         userId: verifiedStudentDetails.id,
-        email,
         firstName: verifiedStudentDetails.first_name,
         lastName: verifiedStudentDetails.last_name,
         role: 'student',
@@ -7107,7 +7017,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   is_groovelab_active: true,
                   first_name: 'Master',
                   last_name: 'Admin',
-                  email: 'admin@groovelab.de',
                   school_id: targetSchoolId
                 }));
                 sessionStorage.removeItem('groovelab_qr_token');
@@ -7660,122 +7569,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             >
               Verstanden
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Magic Link Modal */}
-      {showMagicLinkModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(9, 9, 11, 0.70)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          padding: '24px',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            background: 'rgba(24, 24, 27, 0.95)',
-            borderRadius: '32px',
-            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '32px',
-            maxWidth: '440px',
-            width: '100%',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            boxSizing: 'border-box',
-            color: '#ffffff'
-          }}>
-            <button 
-              onClick={() => setShowMagicLinkModal(false)} 
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.4)',
-                cursor: 'pointer',
-                fontSize: '18px',
-                outline: 'none'
-              }}
-            >
-              ✕
-            </button>
-
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#e6f4ea', letterSpacing: '-0.02em' }}>
-              🔑 Magic Link anfordern
-            </h3>
-
-            {magicLinkMessage && (
-              <div style={{
-                background: magicLinkSuccess ? 'rgba(52, 168, 83, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                border: magicLinkSuccess ? '1px solid #34a853' : '1px solid #ef4444',
-                padding: '12px 16px',
-                borderRadius: '16px',
-                color: magicLinkSuccess ? '#e6f4ea' : '#fca5a5',
-                fontSize: '13px',
-                fontWeight: 650
-              }}>
-                {magicLinkMessage}
-              </div>
-            )}
-
-            {!magicLinkSuccess ? (
-              <form onSubmit={handleMagicLinkRequest} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '13px', lineHeight: '1.5' }}>
-                  Gib die registrierte E-Mail-Adresse ein. Wir senden dir einen temporären Link, um dich ohne QR-Code einzuloggen.
-                </p>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse *</label>
-                  <input
-                    type="email"
-                    required
-                    value={magicLinkEmail}
-                    onChange={(e) => setMagicLinkEmail(e.target.value)}
-                    placeholder="eltern@beispiel.de"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={parentOnboardingLoading}
-                  style={{
-                    width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                    background: schoolData?.primary_color || '#e6f4ea',
-                    color: schoolData?.primary_color ? '#ffffff' : '#062413',
-                    fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s'
-                  }}
-                >
-                  {parentOnboardingLoading ? 'Prüfe E-Mail...' : 'Link senden'}
-                </button>
-              </form>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '13px', lineHeight: '1.5' }}>
-                  Bitte überprüfe dein E-Mail-Postfach. Wenn die Adresse im System hinterlegt ist, findest du dort in Kürze einen Link zum direkten Login.
-                </p>
-                <button
-                  onClick={() => setShowMagicLinkModal(false)}
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '16px', border: 'none',
-                    background: 'rgba(255,255,255,0.1)',
-                    color: '#ffffff',
-                    fontWeight: 800, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                  }}
-                >
-                  Schließen
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}

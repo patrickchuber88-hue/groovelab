@@ -285,7 +285,6 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
     id: teacher.id,
     firstName: teacher.firstName || teacher.first_name || '',
     lastName: teacher.lastName || teacher.last_name || '',
-    email: teacher.email || '',
     phone: teacher.phone || '',
     instrument: teacher.instrument || '',
     requiredEquipment: Array.isArray(teacher.requiredEquipment)
@@ -388,10 +387,9 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
     }
   };
 
-  // Send Passkey Invitation via mailto
+  // Send Passkey Invitation via native mailto
   const handleSendPasskeyInvitation = () => {
     const teacherName = formData.firstName || 'Kollegin / Kollege';
-    const emailRecipient = formData.email || '';
     const subject = encodeURIComponent(`Dein biometrischer Passkey-Zugang für ${schoolName || 'Campus-Groovelab'} 🍏`);
     const body = encodeURIComponent(
       `Hallo ${teacherName},\n\n` +
@@ -406,7 +404,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
       `Herzliche Grüße,\n` +
       `${schoolName || 'Deine Musikschule'}`
     );
-    window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   // Regenerate Support-PIN

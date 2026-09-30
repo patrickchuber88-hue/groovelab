@@ -3258,22 +3258,36 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     padding: '3px',
                                     flexShrink: 0,
                                     boxShadow: '0 3px 8px rgba(0,0,0,0.15)',
-                                    overflow: 'hidden'
+                                    overflow: 'hidden',
+                                    position: 'relative'
                                   }}>
+                                    <span style={{
+                                      fontSize: isMusicStandMode ? '1.5rem' : '1.3rem',
+                                      lineHeight: 1,
+                                      userSelect: 'none',
+                                      position: 'absolute'
+                                    }}>
+                                      {nextLockedSticker.emoji}
+                                    </span>
                                     <img
-                                      src={`/stickers/${nextLockedSticker.id}.png`}
+                                      src={`/stickers/thumbs/${nextLockedSticker.id}.png`}
                                       alt={nextLockedSticker.title}
                                       style={{
                                         width: '100%',
                                         height: '100%',
                                         objectFit: 'contain',
                                         borderRadius: '10px',
-                                        filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.15))'
+                                        filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.15))',
+                                        position: 'relative',
+                                        zIndex: 1
                                       }}
                                       onError={(e) => {
-                                        (e.currentTarget as any).style.display = 'none';
-                                        if (e.currentTarget.parentElement) {
-                                          e.currentTarget.parentElement.innerText = nextLockedSticker.emoji;
+                                        const target = e.currentTarget;
+                                        if (!target.dataset.triedFallback) {
+                                          target.dataset.triedFallback = 'true';
+                                          target.src = `/stickers/${nextLockedSticker.id}.png`;
+                                        } else {
+                                          target.style.display = 'none';
                                         }
                                       }}
                                     />

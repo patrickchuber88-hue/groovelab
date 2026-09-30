@@ -44,14 +44,27 @@ fi
 
 # 2. Versuch: Hole die aktuellste Tombstone-Liste von der Storage Box (Speicher 3)
 echo "📥 1. Prüfe Storage Box (Speicher 3) auf aktuelle Offsite-Tombstones..."
+FETCHED=0
+# Primärer Pfad: backups/compliance/gdpr_tombstones.jsonl
 if rsync -avz -e "ssh -p ${STORAGE_BOX_PORT} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10" \
-    "${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:${STORAGE_BOX_DEST_DIR}/gdpr_tombstones.jsonl" "${TOMBSTONE_FILE}.remote" 2>/dev/null; then
-    if [ -s "${TOMBSTONE_FILE}.remote" ]; then
-        mv "${TOMBSTONE_FILE}.remote" "${TOMBSTONE_FILE}"
-        echo "  ✓ Aktuellste Tombstones erfolgreich von Storage Box geladen."
-    fi
+    "${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:${STORAGE_BOX_DEST_DIR}/gdpr_tombstones.jsonl" "${TOMBSTONE_FILE}.remote" 2>/dev/null && [ -s "${TOMBSTONE_FILE}.remote" ]; then
+    mv "${TOMBSTONE_FILE}.remote" "${TOMBSTONE_FILE}"
+    echo "  ✓ Aktuellste Tombstones erfolgreich von Storage Box geladen (${STORAGE_BOX_DEST_DIR}/gdpr_tombstones.jsonl)."
+    FETCHED=1
+# Fallback Pfad: backups/gdpr_tombstones.jsonl
+elif rsync -avz -e "ssh -p ${STORAGE_BOX_PORT} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10" \
+    "${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:backups/gdpr_tombstones.jsonl" "${TOMBSTONE_FILE}.remote" 2>/dev/null && [ -s "${TOMBSTONE_FILE}.remote" ]; then
+    mv "${TOMBSTONE_FILE}.remote" "${TOMBSTONE_FILE}"
+    echo "  ✓ Aktuellste Tombstones erfolgreich von Storage Box geladen (backups/gdpr_tombstones.jsonl)."
+    FETCHED=1
 else
-    echo "  ℹ️  Storage Box nicht direkt erreichbar. Nutze lokalen Stand / Cache."
+    echo "  ℹ️  Storage Box nicht direkt erreichbar oder keine Remote-Datei. Prüfe lokalen Stand / Cache..."
+fi
+
+# Lokaler Fallback-Check: Falls ${TOMBSTONE_FILE} nicht existiert, aber ${CLOUD_VOLUME}/backups/gdpr_tombstones.jsonl da ist
+if [ ! -f "${TOMBSTONE_FILE}" ] && [ -f "${CLOUD_VOLUME}/backups/gdpr_tombstones.jsonl" ]; then
+    cp -p "${CLOUD_VOLUME}/backups/gdpr_tombstones.jsonl" "${TOMBSTONE_FILE}"
+    echo "  ✓ Lokales Fallback-Löschregister aus ${CLOUD_VOLUME}/backups/ übernommen."
 fi
 
 # 3. Verarbeite persistentes DSGVO-Löschregister

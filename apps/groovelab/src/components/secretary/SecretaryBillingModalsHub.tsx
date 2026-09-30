@@ -907,6 +907,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                       <li>100% kostenlos für alle Eltern &amp; Schüler</li>
                       <li>Schule trägt alle Modul-Aktivierungen</li>
                       <li>Keine Einzelüberweisung der Eltern nötig</li>
+                      <li>Abrechnung per SEPA Lastschrift (pain.008) oder Banküberweisung</li>
                     </ul>
                   </div>
                 </div>

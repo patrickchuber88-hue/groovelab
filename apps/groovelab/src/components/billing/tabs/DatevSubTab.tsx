@@ -8,7 +8,7 @@ import {
   History as HistoryIcon 
 } from 'lucide-react';
 import { ChartOfAccounts, DATEV_ACCOUNT_MAPPINGS } from '../../../utils/datevExporter';
-import { Invoice } from '../types';
+import { Invoice, formatSchoolNumericId } from '../types';
 
 interface DatevSubTabProps {
   selectedChartOfAccounts: ChartOfAccounts;
@@ -193,7 +193,7 @@ export const DatevSubTab: React.FC<DatevSubTabProps> = ({
             <tbody>
               {invoices.filter(inv => inv.total > 0).map((inv, idx) => {
                 const map = DATEV_ACCOUNT_MAPPINGS[selectedChartOfAccounts];
-                const numId = inv.schoolId ? inv.schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
+                const numId = formatSchoolNumericId(inv.schoolId, 3);
                 const yy = String(datevPeriodYear).slice(-2);
                 const mm = String(datevPeriodMonth).padStart(2, '0');
                 const invId = `RE-${numId}-${yy}${mm}-01`;

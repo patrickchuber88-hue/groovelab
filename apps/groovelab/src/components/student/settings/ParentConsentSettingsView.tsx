@@ -13,6 +13,26 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
 }) => {
   const [showDeletionModal, setShowDeletionModal] = useState<boolean>(false);
   const [deletionRequested, setDeletionRequested] = useState<boolean>(false);
+  const [isPurgingAudio, setIsPurgingAudio] = useState<boolean>(false);
+  const [audioPurgeSuccess, setAudioPurgeSuccess] = useState<string | null>(null);
+
+  const handleImmediateAudioPurge = async () => {
+    if (!window.confirm('Möchtest du wirklich alle eigenen Übe-Audioaufnahmen sofort und unwiderruflich von den Servern löschen (Art. 17 DSGVO)?')) {
+      return;
+    }
+    try {
+      setIsPurgingAudio(true);
+      const { data, error } = await supabase.rpc('purge_student_recordings_by_parent', {
+        p_student_id: studentId
+      });
+      if (error) throw error;
+      setAudioPurgeSuccess(data?.message || 'Alle Aufnahmen wurden unverzüglich gelöscht.');
+    } catch (e: any) {
+      alert('Fehler beim Löschen: ' + (e?.message || e));
+    } finally {
+      setIsPurgingAudio(false);
+    }
+  };
 
   const handleRequestGdprDeletion = async () => {
     try {
@@ -153,6 +173,85 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
             </p>
           </div>
         </div>
+      </div>
+
+      {/* 🛡️ 1-Klick-Sofortlöschung für eigene Audioaufnahmen (Art. 17 Abs. 1 DSGVO) */}
+      <div style={{
+        marginTop: '8px',
+        padding: '16px',
+        background: '#fef2f2',
+        border: '1.5px solid #fecaca',
+        borderRadius: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        textAlign: 'left'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Trash2 size={18} color="#dc2626" />
+            <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 850, color: '#991b1b' }}>
+              Sofortige Löschung aller Übe-Audioaufnahmen (Art. 17 DSGVO)
+            </h4>
+          </div>
+          <span style={{
+            background: '#ffffff',
+            color: '#dc2626',
+            border: '1px solid #fca5a5',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            fontSize: '0.66rem',
+            fontWeight: 800
+          }}>
+            Autonome Eltern-Souveränität
+          </span>
+        </div>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: '#7f1d1d', lineHeight: 1.45 }}>
+          Löscht alle von deinem Kind erstellten Instrumental-Aufnahmen unverzüglich und dauerhaft von den Plattform-Servern. Dein Schulkonto und Unterrichtspläne bleiben vollständig erhalten.
+        </p>
+
+        {audioPurgeSuccess ? (
+          <div style={{
+            background: '#ecfdf5',
+            color: '#166534',
+            padding: '8px 12px',
+            borderRadius: '10px',
+            fontSize: '0.76rem',
+            fontWeight: 750,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>✓</span>
+            <span>{audioPurgeSuccess}</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleImmediateAudioPurge}
+            disabled={isPurgingAudio}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: 'none',
+              background: '#dc2626',
+              color: '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: 850,
+              cursor: isPurgingAudio ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)',
+              opacity: isPurgingAudio ? 0.6 : 1
+            }}
+          >
+            <Trash2 size={15} />
+            <span>{isPurgingAudio ? 'Wird physisch gelöscht...' : 'Alle Übe-Aufnahmen jetzt sofort löschen'}</span>
+          </button>
+        )}
       </div>
 
       {/* Revisionssicherer Löschantrag */}

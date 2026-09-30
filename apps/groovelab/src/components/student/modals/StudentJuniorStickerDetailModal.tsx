@@ -170,6 +170,15 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
           padding: '12px',
           boxSizing: 'border-box'
         }}>
+          <span style={{
+            fontSize: '4.5rem',
+            lineHeight: 1,
+            userSelect: 'none',
+            position: 'absolute',
+            filter: sticker.isUnlocked ? 'none' : 'grayscale(0.6) opacity(0.7)'
+          }}>
+            {sticker.emoji}
+          </span>
           <img
             src={`/stickers/thumbs/${sticker.id}.png`}
             alt={sticker.title}
@@ -179,25 +188,20 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
               height: '100%',
               objectFit: 'contain',
               borderRadius: '24px',
+              position: 'relative',
+              zIndex: 1,
               filter: sticker.isUnlocked 
                 ? 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))' 
                 : 'saturate(0.85) opacity(0.70) drop-shadow(0 6px 14px rgba(15, 23, 42, 0.10))',
               transition: 'all 0.2s ease'
             }}
             onError={(e) => {
-              // Fallback to original path if thumb missing
-              const currentSrc = e.currentTarget.src;
-              if (currentSrc.includes('/thumbs/')) {
-                e.currentTarget.src = `/stickers/${sticker.id}.png?v=1`;
-                return;
-              }
-              e.currentTarget.style.display = 'none';
-              const parent = e.currentTarget.parentElement;
-              if (parent) {
-                const span = document.createElement('span');
-                span.style.fontSize = '4.5rem';
-                span.innerText = sticker.emoji;
-                parent.appendChild(span);
+              const target = e.currentTarget;
+              if (!target.dataset.triedFallback) {
+                target.dataset.triedFallback = 'true';
+                target.src = `/stickers/${sticker.id}.png`;
+              } else {
+                target.style.display = 'none';
               }
             }}
           />

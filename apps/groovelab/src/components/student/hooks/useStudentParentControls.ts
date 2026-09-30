@@ -227,13 +227,10 @@ export function useStudentParentControls({
         throw new Error('Sicherheits-Challenge konnte nicht bezogen werden.');
       }
 
-      const safeFirstName = (studentUser?.first_name || 'schueler')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '');
-      const email = `eltern.${safeFirstName || 'kind'}@campus-groovelab.local`;
+      const userHandle = `eltern_${targetId.substring(0, 8)}`;
 
       const passkeyResult = await registerBiometrics(
-        email,
+        userHandle,
         targetId,
         chalData.challenge,
         `Eltern-Gerät • ${studentUser?.first_name || 'Kind'}`

@@ -44,17 +44,6 @@ export interface Avatar {
 
 export { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../StudioAvatar';
 
-export const maskEmail = (email: string | null | undefined): string => {
-  if (!email) return 'Nicht hinterlegt';
-  const parts = email.split('@');
-  if (parts.length !== 2) return email;
-  const [prefix, domain] = parts;
-  if (prefix.length <= 2) {
-    return `${prefix.charAt(0)}...@${domain}`;
-  }
-  return `${prefix.substring(0, 2)}...${prefix.charAt(prefix.length - 1)}@${domain}`;
-};
-
 export const STUDENT_AVATARS = [
   // E-Gitarre (15)
   { id: 'student_boy_guitar_1', label: 'E-Gitarre (Boy Black)', url: '/avatars/student_boy_black_guitar.png', category: 'E-Gitarre' },

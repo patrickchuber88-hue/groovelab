@@ -31,7 +31,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
 
   // 1. Trennung: Aktive Übe-Sticker (20 Gamification-Erfolge) vs. 15-jährige Schuljahres-Chronik
   const activeGamificationStickers = useMemo(() => {
-    return allStickers.filter(st => st.category !== 'schuljahr');
+    return allStickers.filter(st => st.category !== 'schuljahr' && st.category !== 'worldtour');
   }, [allStickers]);
 
   const schoolYearStickers = useMemo(() => {
@@ -319,8 +319,17 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     justifyContent: 'center',
                     flexShrink: 0,
                     overflow: 'hidden',
-                    padding: '3px'
+                    padding: '3px',
+                    position: 'relative'
                   }}>
+                    <span style={{
+                      fontSize: isMobile ? '1.8rem' : '2.1rem',
+                      lineHeight: 1,
+                      userSelect: 'none',
+                      position: 'absolute'
+                    }}>
+                      {currentSchoolYearSticker.emoji}
+                    </span>
                     <img
                       src={`/stickers/thumbs/${currentSchoolYearSticker.id}.png`}
                       alt={currentSchoolYearSticker.title}
@@ -329,10 +338,18 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         width: '100%',
                         height: '100%',
                         objectFit: 'contain',
-                        borderRadius: '14px'
+                        borderRadius: '14px',
+                        position: 'relative',
+                        zIndex: 1
                       }}
                       onError={(e) => {
-                        e.currentTarget.src = `/stickers/${currentSchoolYearSticker.id}.png?v=1`;
+                        const target = e.currentTarget;
+                        if (!target.dataset.triedFallback) {
+                          target.dataset.triedFallback = 'true';
+                          target.src = `/stickers/${currentSchoolYearSticker.id}.png`;
+                        } else {
+                          target.style.display = 'none';
+                        }
                       }}
                     />
                   </div>
@@ -461,6 +478,15 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     padding: '3px',
                     position: 'relative'
                   }}>
+                    <span style={{
+                      fontSize: isMobile ? '1.8rem' : '2.1rem',
+                      lineHeight: 1,
+                      userSelect: 'none',
+                      position: 'absolute',
+                      filter: 'grayscale(0.6) opacity(0.7)'
+                    }}>
+                      {nextMilestone.sticker.emoji}
+                    </span>
                     <img
                       src={`/stickers/thumbs/${nextMilestone.sticker.id}.png`}
                       alt={nextMilestone.sticker.title}
@@ -470,10 +496,18 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         height: '100%',
                         objectFit: 'contain',
                         borderRadius: '14px',
-                        filter: 'saturate(0.85) opacity(0.72) drop-shadow(0 2px 6px rgba(0,0,0,0.06))'
+                        filter: 'saturate(0.85) opacity(0.72) drop-shadow(0 2px 6px rgba(0,0,0,0.06))',
+                        position: 'relative',
+                        zIndex: 1
                       }}
                       onError={(e) => {
-                        e.currentTarget.src = `/stickers/${nextMilestone.sticker.id}.png?v=1`;
+                        const target = e.currentTarget;
+                        if (!target.dataset.triedFallback) {
+                          target.dataset.triedFallback = 'true';
+                          target.src = `/stickers/${nextMilestone.sticker.id}.png`;
+                        } else {
+                          target.style.display = 'none';
+                        }
                       }}
                     />
                     {/* Corner Lock Medallion */}
@@ -757,6 +791,15 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         overflow: 'hidden',
                         padding: '3px'
                       }}>
+                        <span style={{
+                          fontSize: isMobile ? '1.8rem' : '2.1rem',
+                          lineHeight: 1,
+                          userSelect: 'none',
+                          position: 'absolute',
+                          filter: isUnlocked ? 'none' : 'grayscale(0.6) opacity(0.7)'
+                        }}>
+                          {st.emoji}
+                        </span>
                         <img
                           src={`/stickers/thumbs/${st.id}.png`}
                           alt={st.title}
@@ -766,12 +809,20 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             height: '100%',
                             objectFit: 'contain',
                             borderRadius: '12px',
+                            position: 'relative',
+                            zIndex: 1,
                             filter: isUnlocked 
                               ? 'drop-shadow(0 4px 8px rgba(255,255,255,0.18))' 
                               : 'saturate(0.85) opacity(0.70) drop-shadow(0 2px 6px rgba(15,23,42,0.06))'
                           }}
                           onError={(e) => {
-                            e.currentTarget.src = `/stickers/${st.id}.png?v=1`;
+                            const target = e.currentTarget;
+                            if (!target.dataset.triedFallback) {
+                              target.dataset.triedFallback = 'true';
+                              target.src = `/stickers/${st.id}.png`;
+                            } else {
+                              target.style.display = 'none';
+                            }
                           }}
                         />
 
@@ -1014,6 +1065,15 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                 overflow: 'hidden',
                                 padding: '3px'
                               }}>
+                                <span style={{
+                                  fontSize: isMobile ? '1.8rem' : '2.1rem',
+                                  lineHeight: 1,
+                                  userSelect: 'none',
+                                  position: 'absolute',
+                                  filter: isUnlocked ? 'none' : 'grayscale(0.6) opacity(0.7)'
+                                }}>
+                                  {st.emoji}
+                                </span>
                                 <img
                                   src={`/stickers/thumbs/${st.id}.png`}
                                   alt={st.title}
@@ -1023,24 +1083,20 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     height: '100%',
                                     objectFit: 'contain',
                                     borderRadius: '12px',
+                                    position: 'relative',
+                                    zIndex: 1,
                                     filter: isUnlocked 
                                       ? 'drop-shadow(0 4px 8px rgba(255,255,255,0.18))' 
                                       : 'saturate(0.85) opacity(0.70) drop-shadow(0 2px 6px rgba(15,23,42,0.06))',
                                     transition: 'transform 0.2s ease'
                                   }}
                                   onError={(e) => {
-                                    const src = e.currentTarget.src;
-                                    if (src.includes('/thumbs/')) {
-                                      e.currentTarget.src = `/stickers/${st.id}.png?v=1`;
-                                      return;
-                                    }
-                                    e.currentTarget.style.display = 'none';
-                                    const parent = e.currentTarget.parentElement;
-                                    if (parent) {
-                                      const span = document.createElement('span');
-                                      span.style.fontSize = isMobile ? '1.8rem' : '2.1rem';
-                                      span.innerText = st.emoji;
-                                      parent.appendChild(span);
+                                    const target = e.currentTarget;
+                                    if (!target.dataset.triedFallback) {
+                                      target.dataset.triedFallback = 'true';
+                                      target.src = `/stickers/${st.id}.png`;
+                                    } else {
+                                      target.style.display = 'none';
                                     }
                                   }}
                                 />

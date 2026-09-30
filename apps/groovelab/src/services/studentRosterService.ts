@@ -25,7 +25,6 @@ export interface RosterStudent {
   role: 'student';
   first_name: string;
   last_name: string;
-  email?: string | null;
   instrument?: string;
   is_active: boolean;
   is_campus_active: boolean;
@@ -150,7 +149,6 @@ export const ROSTER_STUDENT_PROJECTION = [
   'role',
   'first_name',
   'last_name',
-  'email',
   'avatar_url',
   'photo_url',
   'qr_token',
@@ -211,7 +209,7 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
         console.warn('[StudentRosterService] Primary student projection failed, activating resilient fallback:', regUsersRes.error);
         const fallbackRes = await supabaseClient
           .from('users')
-          .select('id, school_id, role, first_name, last_name, email, avatar_url, photo_url, qr_token, instrument, created_at, is_active, is_campus_active, is_groovelab_active, teacher_id, birth_date, group_id, sibling_group_id, lesson_duration, status, contract_ends_at, trial_ends_at, is_trial, exempt_from_direct_billing, ausweis_nummer')
+          .select('id, school_id, role, first_name, last_name, avatar_url, photo_url, qr_token, instrument, created_at, is_active, is_campus_active, is_groovelab_active, teacher_id, birth_date, group_id, sibling_group_id, lesson_duration, status, contract_ends_at, trial_ends_at, is_trial, exempt_from_direct_billing, ausweis_nummer')
           .eq('school_id', schoolId)
           .eq('role', 'student')
           .order('first_name');
@@ -302,7 +300,6 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
               role: 'student' as const,
               first_name: (ps.first_name || '').trim(),
               last_name: ps.last_name || '',
-              email: '',
               instrument: finalInst,
               resolved_instrument: finalInst,
               is_active: false,

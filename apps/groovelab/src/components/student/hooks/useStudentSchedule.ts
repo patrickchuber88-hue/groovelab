@@ -59,7 +59,7 @@ export function useStudentSchedule({
       // 1. Fetch upcoming occurrences
       const { data: occData, error: occError } = await supabase
         .from('schedule_occurrences')
-        .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role, email)')
+        .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role), rooms(name)')
         .eq('student_id', studentId)
         .gte('date', todayStr)
         .order('date', { ascending: true })
@@ -68,7 +68,7 @@ export function useStudentSchedule({
       // 2. Fetch master schedule (schedules) for SSOT fallback & todayLesson calculation
       const { data: masterSchedules } = await supabase
         .from('schedules')
-        .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role, email), rooms(name)')
+        .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role), rooms(name)')
         .eq('student_id', studentId)
         .eq('status', 'approved');
 

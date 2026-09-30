@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { 
   Search, Plus, QrCode, Trash2, Edit2, Link as LinkIcon, 
   Check, X, ChevronRight, Sliders, ExternalLink, RefreshCw,
-  DoorOpen, School, Sparkles
+  DoorOpen, School, Sparkles, ShieldCheck
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
@@ -269,6 +269,35 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
               : 'Hier werden alle Instrumente der Musikschule aufgelistet. Ziehe freie Instrumente auf die Räume rechts, um sie zuzuweisen.'
             }
           </p>
+
+          {/* Ambient Botenstatus & ERP-Subsidiaritäts-Banner */}
+          <div style={{ 
+            marginTop: '14px', 
+            padding: '10px 14px', 
+            borderRadius: '14px', 
+            background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95))', 
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <div style={{ 
+              width: '26px', 
+              height: '26px', 
+              borderRadius: '8px', 
+              background: '#f1f5f9', 
+              border: '1px solid #cbd5e1', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              flexShrink: 0 
+            }}>
+              <ShieldCheck size={14} color="#64748b" />
+            </div>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45, fontWeight: 500 }}>
+              <strong style={{ color: '#334155', fontWeight: 700 }}>Didaktisches Raum-Inventar (Didaktischer Botenstatus):</strong> Diese Übersicht dient der internen Raum- und Stundenplanung vor Ort. Die rechtsverbindliche Vermögens-, Inventur- und Leihverwaltung verbleibt zu 100 % im Primär-ERP der Musikschule (WinMusik, MBS etc.). Kein Verleih, keine Vermietung, kein Verkauf.
+            </p>
+          </div>
         </div>
 
         {/* Unified Instruments List Widget */}

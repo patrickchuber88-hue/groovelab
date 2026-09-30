@@ -108,13 +108,17 @@ if ! command -v age >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ ! -f "${SECRET_KEY_FILE}" ]; then
-    echo "❌ KRITISCHER FEHLER: Private Key '${SECRET_KEY_FILE}' nicht gefunden!"
-    echo "   Für automatisierte DR-Drills muss der Private Key für deployuser lesbar sein."
+if [ -n "${AGE_SECRET_KEY:-}" ]; then
+    echo "  ✓ Age Private Key via Umgebungsvariable (In-Memory Zero-Knowledge Isolation) bereitgestellt."
+    SECRET_KEY_SRC="env"
+elif [ -f "${SECRET_KEY_FILE}" ]; then
+    echo "  ✓ Age Private Key Datei vorhanden: ${SECRET_KEY_FILE}"
+    SECRET_KEY_SRC="file"
+else
+    echo "❌ KRITISCHER FEHLER: Weder AGE_SECRET_KEY Umgebungsvariable noch '${SECRET_KEY_FILE}' gefunden!"
+    echo "   Für automatisierte Drills: Private Key temporär injizieren oder als AGE_SECRET_KEY übergeben."
     exit 1
 fi
-
-echo "  ✓ Age Private Key vorhanden: ${SECRET_KEY_FILE}"
 
 # ------------------------------------------------------------------------------
 # 4. Ephemeren Docker-Sandbox-Container initialisieren
@@ -169,9 +173,15 @@ RESTORE_START=$(date +%s)
 
 # Streaming: age -d -> gzip -d -> psql in sandbox
 set +e
-age -d -i "${SECRET_KEY_FILE}" "${LATEST_BACKUP}" \
-    | gzip -d \
-    | docker exec -i "${SANDBOX_CONTAINER}" psql -U postgres -d postgres > /tmp/dr_restore_$$.log 2>&1
+if [ "${SECRET_KEY_SRC}" = "env" ]; then
+    age -d -i <(echo "${AGE_SECRET_KEY}") "${LATEST_BACKUP}" \
+        | gzip -d \
+        | docker exec -i "${SANDBOX_CONTAINER}" psql -U postgres -d postgres > /tmp/dr_restore_$$.log 2>&1
+else
+    age -d -i "${SECRET_KEY_FILE}" "${LATEST_BACKUP}" \
+        | gzip -d \
+        | docker exec -i "${SANDBOX_CONTAINER}" psql -U postgres -d postgres > /tmp/dr_restore_$$.log 2>&1
+fi
 RESTORE_STATUS=$?
 set -e
 

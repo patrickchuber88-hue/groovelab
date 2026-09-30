@@ -14,7 +14,7 @@
 | **Firma / Unternehmensbezeichnung** | Patrick Huber Softwareentwicklung & Cloud-Dienstleistungen (Plattform Campus-Groovelab) |
 | **Rechtsform** | Einzelunternehmen (nicht im Handelsregister eingetragen / Freiberufler/Gewerbe) |
 | **Anschrift** | Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), Deutschland |
-| **Kontakt** | E-Mail: kontakt@campus-groovelab.de / patrick.huber@musaek.de |
+| **Kontakt** | E-Mail: kontakt@campus-groovelab.de / support@campus-groovelab.de |
 | **Website** | https://campus-groovelab.de |
 | **Gründungsdatum / Tätigkeitsbeginn** | Bestandsbetrieb seit mehreren Monaten/Jahren (Rechtfertigung unbegrenzte Rückwärtsdeckung) |
 | **Aktueller / Geplanter Jahresumsatz** | **Stufe 1 (bis 50.000 €)** (Kleinunternehmerregelung gem. § 19 UStG) |

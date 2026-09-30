@@ -535,10 +535,9 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       const safeFirstName = (student.first_name || 'schueler')
         .toLowerCase()
         .replace(/[äöüß]/g, (m: string) => ({ 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }[m] || m))
-        .replace(/[^a-z0-9]/g, '');
-      const email = `eltern.${safeFirstName || 'kind'}@campus-groovelab.local`;
+      const userHandle = `eltern_${student.id.slice(0, 8)}`;
       const passkeyResult = await registerBiometrics(
-        email,
+        userHandle,
         student.id,
         chalData.challenge,
         `Eltern-Gerät • ${student.first_name || 'Kind'}`

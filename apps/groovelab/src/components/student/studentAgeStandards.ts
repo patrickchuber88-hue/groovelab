@@ -50,7 +50,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowRescheduleConfirm: true,
     allowChat: true,
     allowTimer: true,
-    allowLeaderboard: true,
+    allowLeaderboard: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 / Art. 8 DSGVO): Standardmäßig deaktiviert bis elterliches Opt-in
     allowProposals: true,
     allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 / Art. 8 DSGVO): Standardmäßig immer deaktiviert
     allowStudentAudio: false,
@@ -64,7 +64,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
       mediathek: true,
       recordings: false, // 🛡️ Privacy by Default: Standardmäßig deaktiviert
       events: true,
-      campus_cup: true,
+      campus_cup: false, // 🛡️ Privacy by Default: Standardmäßig deaktiviert
       messages: true
     }
   },

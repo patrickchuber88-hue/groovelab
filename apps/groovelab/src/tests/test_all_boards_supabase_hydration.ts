@@ -138,7 +138,7 @@ async function runHydrationTestSuite() {
     'Mitarbeiter (Staff/Teachers)',
     'Verwaltung',
     "users.select('*').eq('school_id', schoolId)",
-    () => authenticatedClient.from('users').select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer').eq('school_id', schoolId)
+    () => authenticatedClient.from('users').select('id, first_name, last_name, role, roles, instrument, is_active, ausweis_nummer').eq('school_id', schoolId)
   );
 
   // 3. Rooms Board (Verwaltung -> Räume)
@@ -159,7 +159,7 @@ async function runHydrationTestSuite() {
 
   // 5. Equipment Board (Verwaltung -> Equipment & Instrumente)
   await testBoard(
-    'Inventar & Leihequipment',
+    'Raum-Ausstattung & Inventar',
     'Verwaltung',
     "school_equipment.select('*').eq('school_id', schoolId)",
     () => authenticatedClient.from('school_equipment').select('*').eq('school_id', schoolId)

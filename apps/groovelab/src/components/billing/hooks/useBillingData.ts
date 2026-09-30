@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { useMasterPricing } from '../../../context/MasterPricingContext';
 import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../../../domain/schoolMetricsAggregator';
 import { computeSchoolStorageUsedBytes } from '../../../utils/audioStorageHelper';
-import { Invoice, PlatformSummary, getSchoolNumericId } from '../types';
+import { Invoice, PlatformSummary, getSchoolNumericId, formatSchoolNumericId } from '../types';
 
 export function useBillingData(initialSchoolId?: string) {
   const masterPricing = useMasterPricing();
@@ -116,7 +116,7 @@ export function useBillingData(initialSchoolId?: string) {
 
     while (y < currentYear || (y === currentYear && m <= currentMonth)) {
       const monthStr = m < 10 ? `0${m}` : `${m}`;
-      const numId = schoolId ? schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
+      const numId = formatSchoolNumericId(schoolId, 3);
       const yy = String(y).slice(-2);
       
       const lastDay = new Date(y, m, 0).getDate();
@@ -505,7 +505,7 @@ export function useBillingData(initialSchoolId?: string) {
         let m = startMonth;
         while (y < currentYear || (y === currentYear && m <= currentMonth)) {
           const monthStr = m < 10 ? `0${m}` : `${m}`;
-          const numId = inv.schoolId ? inv.schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
+          const numId = formatSchoolNumericId(inv.schoolId, 3);
           const yy = String(y).slice(-2);
           const lastDay = new Date(y, m, 0).getDate();
           const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);

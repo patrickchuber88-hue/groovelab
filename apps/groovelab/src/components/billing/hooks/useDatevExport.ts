@@ -6,7 +6,7 @@ import {
   downloadDatevExportFile 
 } from '../../../utils/datevExporter';
 import { logSecurityEvent } from '../../../services/auditLogService';
-import { Invoice, DatevTaxMode } from '../types';
+import { Invoice, DatevTaxMode, formatSchoolNumericId } from '../types';
 
 export function useDatevExport(showActionToast: (msg: string) => void) {
   const [selectedChartOfAccounts, setSelectedChartOfAccounts] = useState<ChartOfAccounts>('SKR03');
@@ -67,7 +67,7 @@ export function useDatevExport(showActionToast: (msg: string) => void) {
       if (records.length === 0) {
         invoices.forEach(inv => {
           if (inv.total > 0) {
-            const numId = inv.schoolId ? inv.schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
+            const numId = formatSchoolNumericId(inv.schoolId, 3);
             const yy = String(datevPeriodYear).slice(-2);
             const mm = String(datevPeriodMonth).padStart(2, '0');
             records.push({

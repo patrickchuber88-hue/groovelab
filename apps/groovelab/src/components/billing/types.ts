@@ -97,15 +97,7 @@ export const formatDateDisplay = (dateString: string): string => {
   }
 };
 
-export const getSchoolNumericId = (id?: string | null): number => {
-  if (!id || typeof id !== 'string') return 1;
-  if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash % 98) + 2;
-};
+export { getSchoolNumericId, formatSchoolNumericId } from '../../utils/campusIdHelper';
 
 export type {
   ChartOfAccounts,

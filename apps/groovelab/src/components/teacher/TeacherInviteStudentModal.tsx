@@ -10,8 +10,6 @@ export interface TeacherInviteStudentModalProps {
   setInviteFirstName: (name: string) => void;
   inviteLastName: string;
   setInviteLastName: (name: string) => void;
-  inviteEmail: string;
-  setInviteEmail: (email: string) => void;
   inviteSaving: boolean;
   handleInviteStudent: (e: React.FormEvent) => Promise<void>;
 }
@@ -25,8 +23,6 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
   setInviteFirstName,
   inviteLastName,
   setInviteLastName,
-  inviteEmail,
-  setInviteEmail,
   inviteSaving,
   handleInviteStudent
 }) => {
@@ -67,12 +63,22 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
                   style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail (optional)</label>
-              <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="max@example.com"
-                style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }} />
-              <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>Wird für den mailto-Link benötigt</span>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <span style={{ fontSize: '1.1rem' }}>🛡️</span>
+              <span style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4, fontWeight: 600 }}>
+                <strong>100 % Zero-User-Mail:</strong> Es werden keine E-Mail-Adressen von Familien gespeichert. Einladungen können direkt per Link oder über Ihr lokales E-Mail-Programm übermittelt werden.
+              </span>
             </div>
+
             <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
               <button type="button" onClick={() => { setShowInviteStudent(false); setInviteLink(null); }}
                 style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 800, color: '#475569', cursor: 'pointer' }}>
@@ -105,13 +111,11 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
                 style={{ padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(139,92,246,0.2)' }}>
                 <Copy size={16} /> Link kopieren
               </button>
-              {inviteEmail && (
-                <a href={`mailto:${inviteEmail}?subject=Einladung%20zur%20Campus-Aktivierung&body=Hallo%20${encodeURIComponent(inviteFirstName)}%2C%0A%0Ahier%20ist%20der%20persönliche%20Einladungslink%20zur%20Aktivierung%20des%20Schülerprofils%20(30%20Tage%20gültig)%3A%0A${encodeURIComponent(inviteLink!)}`}
-                  style={{ padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', fontSize: '0.9rem' }}>
-                  <Mail size={16} /> Per E-Mail an Eltern senden
-                </a>
-              )}
-              <button onClick={() => { setShowInviteStudent(false); setInviteLink(null); setInviteFirstName(''); setInviteLastName(''); setInviteEmail(''); }}
+              <a href={`mailto:?subject=${encodeURIComponent('Einladung zur Campus-Aktivierung')}&body=${encodeURIComponent(`Hallo ${inviteFirstName || 'Familie'},\n\nhier ist der persönliche Einladungslink zur Aktivierung des Schülerprofils (30 Tage gültig):\n${inviteLink!}`)}`}
+                style={{ padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', fontSize: '0.9rem' }}>
+                <Mail size={16} /> Per E-Mail an Eltern senden
+              </a>
+              <button onClick={() => { setShowInviteStudent(false); setInviteLink(null); setInviteFirstName(''); setInviteLastName(''); }}
                 style={{ padding: '10px', borderRadius: '16px', border: 'none', background: 'transparent', color: '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
                 Schließen
               </button>

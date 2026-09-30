@@ -421,7 +421,6 @@ export function useSecretaryStudents({
         const studentId = crypto.randomUUID();
         const qrToken = crypto.randomUUID();
         const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
-        const finalEmail = `student.${studentId}@campus-groovelab.local`;
 
         const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
 
@@ -434,7 +433,6 @@ export function useSecretaryStudents({
             role: 'student',
             first_name: firstName,
             last_name: finalLastName,
-            email: finalEmail,
             instrument: finalInstrument || 'Nicht festgelegt',
             avatar_url: defaultAvatarUrl,
             is_active: true,

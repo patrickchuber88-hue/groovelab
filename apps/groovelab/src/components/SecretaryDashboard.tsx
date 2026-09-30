@@ -38,6 +38,7 @@ import { SecretaryDeveloperResetButton } from './secretary/SecretaryDeveloperRes
 import { migrateRoomLocalStorageToSupabase } from './secretary/utils/migrateRoomLocalStorage';
 import { generateStarterPin } from './secretary/utils/secretaryAuthUtils';
 import { checkTimeOverlap, formatInstrumentName } from './secretary/utils/secretaryFormatters';
+import { getSchoolNumericId } from '../utils/campusIdHelper';
 
 // Props Builders
 import { buildSecretaryDashboardDataProps } from './secretary/hooks/buildSecretaryDashboardDataProps';
@@ -99,13 +100,7 @@ export function SecretaryDashboard({
   });
 
   const schoolNumericId = useMemo(() => {
-    if (!schoolId || typeof schoolId !== 'string') return 1;
-    if (schoolId === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
-    let hash = 0;
-    for (let i = 0; i < schoolId.length; i++) {
-      hash = schoolId.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return Math.abs(hash % 98) + 2;
+    return getSchoolNumericId(schoolId);
   }, [schoolId]);
 
   // 2. Modals, Views, Permissions & Teacher Profiles (Modular Hooks)

@@ -308,8 +308,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   }, [token]);
 
   // Inaktive Aktivierungs-States
-  const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
-  const [parentEmail, setParentEmail] = useState('');
+  const [activationStep, setActivationStep] = useState<'landing' | 'payment' | 'success'>('landing');
   const [paymentMethod, setPaymentMethod] = useState<'debit' | 'cash' | 'bank_transfer'>('bank_transfer');
   const [showGiroCodeModal, setShowGiroCodeModal] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -2398,19 +2397,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     setActivationError(null);
 
     try {
-      // 1. Save parent email using secure update_student_emails RPC
       sessionStorage.setItem('groovelab_user_id', profile.id);
       sessionStorage.setItem('groovelab_qr_token', token);
 
-      const { error: emailError } = await supabase.rpc('update_student_emails', {
-        student_id_param: profile.id,
-        input_student_email: '', // student email remains empty
-        input_parent_email: parentEmail
-      });
-
-      if (emailError) throw emailError;
-
-      // 2. Update is_campus_active and payment method
+      // 1. Update is_campus_active and payment method
       const updatePayload: any = {
         is_campus_active: true,
         student_billing_payment_method: paymentMethod
@@ -8957,7 +8947,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {activationAllowed && (
               <button
                 type="button"
-                onClick={() => setActivationStep('email')}
+                onClick={() => setActivationStep('payment')}
                 style={{
                   width: '100%',
                   padding: '16px',
@@ -9146,7 +9136,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           </div>
         )}
 
-        {activationStep === 'email' && (
+        {activationStep === 'payment' && (
           <div style={{...styles.card, maxWidth: '400px', gap: '24px'}}>
             <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
               <button 
@@ -9157,72 +9147,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </button>
               <div>
                 <h2 style={{margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a'}}>Campus Aktivierung</h2>
-                <span style={{fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase'}}>Schritt 1 von 2</span>
-              </div>
-            </div>
-
-            <form onSubmit={(e) => { e.preventDefault(); setActivationStep('payment'); }} style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-              <p style={{margin: 0, fontSize: '0.875rem', color: '#475569', lineHeight: 1.5, fontWeight: 550}}>
-                Gib bitte die <strong>E-Mail-Adresse deiner Eltern</strong> ein. Dorthin senden wir alle Vertragsunterlagen und Infos zum Campus.
-              </p>
-
-              <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                <label style={{fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase'}}>E-Mail-Adresse der Eltern *</label>
-                <div style={{position: 'relative'}}>
-                  <Mail size={18} color="#94a3b8" style={{position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)'}} />
-                  <input
-                    type="email"
-                    required
-                    value={parentEmail}
-                    onChange={(e) => setParentEmail(e.target.value)}
-                    placeholder="eltern@beispiel.de"
-                    style={{
-                      width: '100%',
-                      padding: '14px 14px 14px 44px',
-                      borderRadius: '14px',
-                      border: '1.5px solid #cbd5e1',
-                      fontSize: '0.95rem',
-                      outline: 'none',
-                      transition: 'border-color 0.2s',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '16px',
-                  background: '#34a853',
-                  color: 'white',
-                  border: 'none',
-                  fontWeight: 800,
-                  fontSize: '0.95rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                  marginTop: '8px'
-                }}
-              >
-                Weiter
-              </button>
-            </form>
-          </div>
-        )}
-
-        {activationStep === 'payment' && (
-          <div style={{...styles.card, maxWidth: '400px', gap: '24px'}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-              <button 
-                onClick={() => setActivationStep('email')}
-                style={{background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569'}}
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <div>
-                <h2 style={{margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a'}}>Gebühr & Rechtliches</h2>
-                <span style={{fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase'}}>Schritt 2 von 2</span>
+                <span style={{fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase'}}>Gebühr & Rechtliches</span>
               </div>
             </div>
 
@@ -10707,7 +10632,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           .from('parent_consent_logs')
                           .insert({
                             student_id: profile.id,
-                            parent_email: 'eltern@campus-groovelab.de',
                             consent_type: 'direct_communication',
                             ip_address: '127.0.0.1',
                             user_agent: navigator.userAgent

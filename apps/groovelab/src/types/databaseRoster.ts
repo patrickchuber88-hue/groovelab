@@ -43,7 +43,6 @@ export interface DbUserRosterRecord {
   role: 'student';
   first_name: string;
   last_name?: string | null;
-  email?: string | null;
   avatar_url?: string | null;
   photo_url?: string | null;
   qr_token?: string | null;

@@ -58,10 +58,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
       if (!isWebAuthnSupported()) {
         throw new Error('Biometrisches Anmelden (Touch ID / Face ID) wird von diesem Browser/Gerät nicht unterstützt.');
       }
-      const email = `${createdUser.first_name.toLowerCase()}.${createdUser.last_name.toLowerCase()}@campus-groovelab.local`;
+      const userHandle = `${createdUser.first_name.toLowerCase()}.${createdUser.last_name.toLowerCase()}`;
       
       const profile = await registerUserBiometrics(
-        email,
+        userHandle,
         createdUser.id,
         createdUser.first_name,
         createdUser.last_name,

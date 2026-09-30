@@ -148,7 +148,6 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
                   id: 'NEW-' + Math.random(),
                   firstName: '',
                   lastName: '',
-                  email: '',
                   instrument: '',
                   ausweisNummer: 'GL-' + Math.floor(1000 + Math.random() * 9000),
                   isCampusActive: true,

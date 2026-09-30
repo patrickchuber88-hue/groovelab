@@ -38,7 +38,7 @@ Ist das Profil bereits freigeschaltet (`is_pin_activated = true`), sperrt das Sy
                                                           │
                                                           ▼
                                       autoritative RPC: get_student_onboarding_preview()
-                                      • Entschlüsselung des Vornamens (pgp_sym_decrypt)
+                                      • Just-in-Time Entschlüsselung (safe_pgp_sym_decrypt)
                                       • Maskierung des Nachnamens ("Amelia H.")
                                       • Zero-PII-Leakage (Keine Adressen, PINs, Passwörter)
                                                           │
@@ -59,7 +59,8 @@ Ist das Profil bereits freigeschaltet (`is_pin_activated = true`), sperrt das Sy
 
 | Sicherheitsaxiom | Implementierung | Normativer Standard |
 |---|---|---|
-| **Zero-Trust RPCs** | Keine direkten SELECT/UPDATE Abfragen auf `users_raw`, `student_first_names` | OWASP ASVS V5 |
+| **Dual At-Rest Encryption & Blind Index** | Beide Namen (`student_first_names` & `student_last_names`) liegen als `bytea` mit AES-256 verschlüsselt; Suchen laufen über HMAC-SHA256 Blind Index (`bidx_last_name`) | DSGVO Art. 25 & 32 / BSI TR-02102 |
+| **Zero-Trust RPCs** | Keine direkten SELECT/UPDATE Abfragen auf `users_raw`, `student_first_names`, `student_last_names` | OWASP ASVS V5 |
 | **Server-Side PIN Hashing** | Eltern-PIN wird mit bcrypt (`gen_salt('bf', 10)`) serverseitig gehasht | BSI TR-02102-1 |
 | **Mandantentrennung** | Link-Generierung strikt auf `v_student_school = v_caller_school` begrenzt | ISO/IEC 27001 Multi-Tenancy |
 | **Revisionssicheres Audit** | Unveränderbare Protokollierung in `public.audit_logs` | GoBD / DSGVO Art. 30 |

@@ -49,7 +49,7 @@
 
 | Datenart / Objekt | DIN 66398 Löschklasse | Regelspeicherdauer | Löschmechanismus |
 |---|---|---|---|
-| **Didaktische Audio-Aufnahmen** (Hausaufgaben, Studio) | LK 2 (Ausbildungszyklus) | Bis zum Ende des laufenden Schuljahres (Stichtag: **30. September**) | Automatischer Cron-Purge (`storage_janitor_cron.sh`) und physische Vernichtung aus Supabase Storage |
+| **Didaktische Audio-Aufnahmen** (Hausaufgaben, Studio) | LK 2 (Ausbildungszyklus) | Bis zum Ende des ersten Monats des individuellen Schuljahres der Schule (Migration 454) | Automatischer Cron-Purge (`cron_enforce_academic_year_audio_purge`) und physische Vernichtung aus Supabase Storage |
 | **Flüchtige Chat-Memos & Transiente Caches** | LK 1 (Kurzfristig) | Max. 30 Tage | Automatische Tabellen-Rotation |
 | **Bildungsbiografie & Meisterwerk-Dokumentation** | LK 4 (Vertragslaufzeit) | Für die Dauer des aktiven Unterrichtsvertrags | Physische Löschung 30 Tage nach formeller Exmatrikulation / Schulabgang |
 | **Revisionssichere Audit-Logs** | LK 5 (Gesetzliche Aufbewahrung) | 10 Jahre (§ 147 AO / GoBD) | WORM-geschütztes Merkle-Chain-Ledger |
@@ -72,6 +72,16 @@
 4. **Weitergabekontrolle:** End-to-End TLS 1.3 Transportverschlüsselung mit striktem HSTS und __Host-Cookie-Präfixen.
 5. **Verfügbarkeitskontrolle:** Stündliche verschlüsselte Backups mit GFS-Rotationszyklus und georedundanter Cold-Storage-Replikation.
 6. **Trennungsgebot:** Strikte logische Mandantentrennung auf Datenbank- und Storage-Ebene (Default-Deny RLS).
+
+---
+
+## 7. Formelles DSFA-Negativattest gem. Art. 35 DSGVO (DSK-Blacklist Ausschluss)
+
+Im Rahmen der Schwellwertprüfung nach Art. 35 Abs. 1 DSGVO i. V. m. den bundeseinheitlichen Positiv-/Negativlisten der Konferenz der unabhängigen Datenschutzaufsichtsbehörden des Bundes und der Länder (DSK) wird verbindlich festgestellt:
+1. **Keine systematische und umfassende Überwachung:** Es findet keine Überwachung öffentlich zugänglicher Räume und keine Leistungs-/Verhaltenskontrolle statt.
+2. **Keine automatisierten Einzelfallentscheidungen oder Profiling:** Weder Schüler noch Lehrkräfte werden Algorithmen, probabilistischer KI oder automatisierter Leistungsbewertung unterworfen.
+3. **Keine besonderen Kategorien personenbezogener Daten:** Es werden keine Gesundheitsdaten (Art. 9 DSGVO / § 26 BDSG) und keine biometrischen Stimm- oder Gesichtserkennungsmerkmale verarbeitet.
+4. **Ergebnis:** Eine Datenschutz-Folgenabschätzung (DSFA) ist für den Einsatz von Campus-Groovelab nicht erforderlich; das verbleibende Restrisiko für die Rechte und Freiheiten natürlicher Personen ist nach Implementierung der TOMs als **gering** eingestuft.
 
 ---
 

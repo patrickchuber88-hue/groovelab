@@ -2366,17 +2366,6 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                     />
                                   </div>
                                 </div>
-                                
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse</label>
-                                  <input
-                                    type="email"
-                                    value={newTeacherEmail}
-                                    onChange={(e) => setNewTeacherEmail(e.target.value)}
-                                    placeholder="z.B. bach@musaek.de"
-                                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                                  />
-                                </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente/Fächer *</label>

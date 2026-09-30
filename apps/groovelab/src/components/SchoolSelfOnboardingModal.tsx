@@ -180,7 +180,6 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           school_id: rpcData.school_id,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          email: email.trim().toLowerCase(),
           role: 'admin',
           roles: ['admin'],
           ausweis_nummer: rpcData.pin,
@@ -256,7 +255,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       }
 
       await registerUserBiometrics(
-        createdData.user.email || `${createdData.user.id}@campus-groovelab.de`,
+        `${createdData.user.first_name.toLowerCase()}_${createdData.user.id.slice(0, 8)}`,
         createdData.user.id,
         createdData.user.first_name,
         createdData.user.last_name,

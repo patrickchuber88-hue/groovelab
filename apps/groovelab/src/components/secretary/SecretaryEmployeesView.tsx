@@ -3,6 +3,7 @@ import {
   Eye, EyeOff, FileText, GraduationCap, Plus, Search,
   ShieldAlert, Sliders, Trash2, UserCheck, Users
 } from 'lucide-react';
+import { resolveUserCampusId } from '../../utils/campusIdHelper';
 
 export interface SecretaryEmployeesViewProps {
   employees: any[];
@@ -469,9 +470,24 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                     </span>
                                   )}
                                 </div>
-                                <span style={{ fontSize: '0.74rem', color: emp.email ? '#86868b' : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {emp.email || 'Keine E-Mail hinterlegt'}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                                  <span style={{ fontSize: '0.74rem', color: emp.email ? '#86868b' : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {emp.email || 'Keine E-Mail hinterlegt'}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: 800,
+                                    fontFamily: 'monospace',
+                                    color: '#475569',
+                                    background: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    letterSpacing: '0.04em'
+                                  }} title="Kanonische Campus-ID">
+                                    ID: {resolveUserCampusId(emp)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 

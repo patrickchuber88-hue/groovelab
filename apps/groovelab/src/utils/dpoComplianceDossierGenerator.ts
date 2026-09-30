@@ -381,19 +381,19 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     const toms = [
       {
         t: '1. Vertraulichkeit & Mandanten-Airgap (Art. 32 Abs. 1 lit. b)',
-        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs.'
+        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs; Bcrypt-Hashing (Migration 510) im isolierten Schema private_auth.'
       },
       {
         t: '2. Integrität & Datenhygiene (Art. 32 Abs. 1 lit. b)',
-        d: 'TLS 1.3 End-to-End Transportverschlüsselung mit HSTS Preload (max-age=63072000). Datei-Uploads mit Magic-Byte-Prüfung, Stripping von EXIF/GPS-Metadaten und SHA-256 Integritätssiegel. Micro-TTL (<= 1800s) für Audio-Streams.'
+        d: 'TLS 1.3 End-to-End Transportverschlüsselung mit HSTS Preload (max-age=63072000). Datei-Uploads mit Magic-Byte-Prüfung, Stripping von EXIF/GPS-Metadaten und SHA-256 Integritätssiegel. Micro-TTL (<= 1800s) für Audio-Streams mit Zero-Heap HTTP 307 Edge Streaming.'
       },
       {
         t: '3. Verfügbarkeit & 3-2-1 Backup (Art. 32 Abs. 1 lit. b)',
-        d: '3-2-1 Backup-Strategie: Tägliche AES-256 verschlüsselte Dumps via rsync/SSH auf geographisch getrennte Hetzner Storage Boxen. Automatisierte DR-Reconciliation und Tombstone-Scrubbing nach Notfall-Wiederherstellungen.'
+        d: '3-2-1 Backup-Strategie: Stündliche Age X25519 verschlüsselte Dumps via rsync/SSH (Port 23) auf geographisch getrennte Hetzner Storage Boxen mit automatisierter Restricted-Shell Vorab-Speicherplatzprüfung (SEC-77). Automatisierte DR-Reconciliation und Art. 17 DSGVO WORM-Tombstone-Scrubbing.'
       },
       {
         t: '4. WORM-Manipulationsschutz & Auditing (Art. 32 Abs. 1 lit. d)',
-        d: 'Revisionssicheres WORM-Logging (Write-Once-Read-Many) mit PostgreSQL-Triggern gegen UPDATE/DELETE auf audit_logs. Kontinuierliche Security-Drift-Guards in der CI/CD-Pipeline (Zero-Sampling-Axiom).'
+        d: 'Revisionssicheres WORM-Logging (Write-Once-Read-Many) mit PostgreSQL-Triggern gegen UPDATE/DELETE auf audit_logs. SHA-256 Merkle-Hash-Chaining nach GoBD- und OWASP ASVS Level 3-Standard. Kontinuierliche Security-Drift-Guards (Zero-Sampling-Axiom).'
       },
       {
         t: '5. WebAuthn / Passkeys (Keine Biometrie gem. Art. 9 DSGVO)',

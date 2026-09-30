@@ -194,18 +194,20 @@ async function runAudit() {
     'Referrer-Policy: strict-origin-when-cross-origin setzen.'
   );
 
-  // --- CHECK 6: Permissions-Policy (Hardware Protection) ---
+  // --- CHECK 6: Permissions-Policy (Hardware Protection & TDDDG § 25 Sensor-Sperre) ---
   const permPol = headers['permissions-policy'] || '';
   const hasCameraDisabled = /camera=\(\)/i.test(permPol);
   const hasMicrophoneSelf = /microphone=\(self\)/i.test(permPol);
+  const hasGeolocationDisabled = /geolocation=\(\)/i.test(permPol);
+  const hasSensorsDisabled = /gyroscope=\(\)/i.test(permPol) && /accelerometer=\(\)/i.test(permPol) && /magnetometer=\(\)/i.test(permPol);
   const hasPermPol = permPol.length > 0;
   record(
     'PERM-01',
-    'Permissions-Policy (Hardware Sandbox)',
-    hasPermPol && hasCameraDisabled && hasMicrophoneSelf,
+    'Permissions-Policy (Hardware Sandbox & TDDDG § 25 Sensor-Sperre)',
+    hasPermPol && hasCameraDisabled && hasMicrophoneSelf && hasGeolocationDisabled && hasSensorsDisabled,
     10,
     permPol ? `Wert: "${permPol}"` : 'Header fehlt',
-    'Permissions-Policy: camera=(), microphone=(self), geolocation=(), payment=(), usb=() setzen.'
+    'Permissions-Policy: camera=(), microphone=(self), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=() setzen.'
   );
 
   // --- CHECK 7: Content-Security-Policy (CSP) ---

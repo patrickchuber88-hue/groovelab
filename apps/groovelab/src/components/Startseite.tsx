@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Sparkles, Search, School, MapPin, Loader2, ArrowRight, ShieldCheck, 
   Lock, X, Eye, EyeOff, KeyRound, AlertTriangle, Fingerprint, 
-  Building2, CheckCircle2, Compass, Layers, Clock, RotateCcw, Smartphone, Key
+  Building2, CheckCircle2, Compass, Layers, Clock, RotateCcw, Smartphone, Key,
+  FileText, Building, Accessibility
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { isWebAuthnSupported, isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey, authenticateMasterBiometricPasskey } from '../utils/webauthn';
@@ -283,7 +284,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
   const handleBackgroundClick = (e: React.MouseEvent | React.TouchEvent) => {
     // Only count clicks on the background canvas, ignoring search inputs, results, buttons, footer links, and modals
     const target = e.target as HTMLElement;
-    if (target.closest('.magic-search-container, .footer-link, .search-result-item, .school-card-item, .master-auth-modal, input, button, .filter-chip')) {
+    if (target.closest('.magic-search-container, .footer-link, .footer-link-b2b, .apple-floating-dock, .search-result-item, .school-card-item, .master-auth-modal, input, button, .filter-chip')) {
       return;
     }
     const now = Date.now();
@@ -762,20 +763,72 @@ export const Startseite: React.FC<StartseiteProps> = ({
           -webkit-text-fill-color: transparent;
         }
 
-        /* Footer Links */
-        .footer-link {
-          color: #71717a;
+        /* Apple Floating Glass Dock & Footer */
+        .apple-floating-dock {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justifyContent: center;
+          background: rgba(18, 18, 24, 0.72);
+          backdrop-filter: blur(20px) saturate(190%);
+          -webkit-backdrop-filter: blur(20px) saturate(190%);
+          border: 1px solid rgba(255, 255, 255, 0.09);
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          padding: 6px 14px;
+          border-radius: 100px;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .apple-floating-dock:hover {
+          border-color: rgba(255, 255, 255, 0.16);
+          box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+        .footer-link-b2b {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          background: rgba(52, 168, 83, 0.14);
+          border: 1px solid rgba(52, 168, 83, 0.35);
+          color: #4ade80;
+          padding: 6px 14px;
+          border-radius: 100px;
+          font-size: 0.79rem;
+          font-weight: 750;
+          cursor: pointer;
+          transition: all 0.18s ease;
           text-decoration: none;
-          font-size: 0.82rem;
+          outline: none;
+        }
+        .footer-link-b2b:hover {
+          background: rgba(52, 168, 83, 0.22);
+          border-color: rgba(52, 168, 83, 0.55);
+          color: #86efac;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(52, 168, 83, 0.25);
+        }
+        .footer-link-b2b:focus-visible {
+          box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .footer-link {
+          color: #a1a1aa;
+          text-decoration: none;
+          font-size: 0.80rem;
           font-weight: 600;
-          transition: all 0.2s;
+          transition: all 0.18s ease;
           cursor: pointer;
           display: flex;
           align-items: center;
           gap: 6px;
+          padding: 5px 10px;
+          border-radius: 8px;
+          outline: none;
         }
         .footer-link:hover {
-          color: #f4f4f5;
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.06);
+        }
+        .footer-link:focus-visible {
+          box-shadow: 0 0 0 2px #3b82f6;
         }
         
         /* Custom Scrollbar */
@@ -1196,61 +1249,97 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
       </div>
 
-      {/* Footer Navigation (Natural Page Flow) */}
+      {/* Footer Navigation (Apple Floating Glass Dock) */}
       <footer style={{
         marginTop: 'auto',
-        paddingTop: '64px',
-        paddingBottom: '16px',
+        paddingTop: '48px',
+        paddingBottom: '24px',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
         alignItems: 'center',
-        gap: '24px',
-        flexWrap: 'wrap',
+        gap: '12px',
         zIndex: 10,
-        width: '100%'
+        width: '100%',
+        paddingLeft: '16px',
+        paddingRight: '16px'
       }}>
-        <div 
-          role="button"
-          tabIndex={0}
-          className="footer-link" 
-          onClick={() => triggerProtectedRegistration()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerProtectedRegistration(); } }}
-        >
-          <School size={14} />
-          Als Schule registrieren
-        </div>
-        <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.12)' }}></div>
-        <div 
-          role="button"
-          tabIndex={0}
-          className="footer-link" 
-          onClick={() => onShowPrivacy?.()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowPrivacy?.(); } }}
-        >Datenschutz</div>
-        <div 
-          role="button"
-          tabIndex={0}
-          className="footer-link" 
-          onClick={() => onShowAgb?.()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAgb?.(); } }}
-        >AGB</div>
-        <div 
-          role="button"
-          tabIndex={0}
-          className="footer-link" 
-          onClick={() => onShowImpressum?.()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowImpressum?.(); } }}
-        >Impressum</div>
-        <div 
-          role="button"
-          tabIndex={0}
-          className="footer-link" 
-          onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.(); } }}
-        >Barrierefreiheit</div>
+        {/* Apple Floating Glass Dock */}
+        <div className="apple-floating-dock">
+          <div 
+            role="button"
+            tabIndex={0}
+            className="footer-link-b2b" 
+            onClick={() => triggerProtectedRegistration()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerProtectedRegistration(); } }}
+          >
+            <School size={14} color="#4ade80" />
+            <span>Als Schule registrieren</span>
+          </div>
 
-        <div style={{ width: '100%', fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.4, marginTop: '4px' }}>
-          Hinweis: Campus-Groovelab ist eine unabhängige Plattform und steht in keiner Verbindung zum GrooveLAB-Projekt der Städtischen Musikschule Lahr bzw. deren Freundeskreis e.V.
+          <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.12)' }} />
+
+          <div 
+            role="button"
+            tabIndex={0}
+            className="footer-link" 
+            onClick={() => onShowPrivacy?.()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowPrivacy?.(); } }}
+          >
+            <ShieldCheck size={13} color="#94a3b8" />
+            <span>Datenschutz</span>
+          </div>
+
+          <div 
+            role="button"
+            tabIndex={0}
+            className="footer-link" 
+            onClick={() => onShowAgb?.()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAgb?.(); } }}
+          >
+            <FileText size={13} color="#94a3b8" />
+            <span>AGB</span>
+          </div>
+
+          <div 
+            role="button"
+            tabIndex={0}
+            className="footer-link" 
+            onClick={() => onShowImpressum?.()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowImpressum?.(); } }}
+          >
+            <Building size={13} color="#94a3b8" />
+            <span>Impressum</span>
+          </div>
+
+          <div 
+            role="button"
+            tabIndex={0}
+            className="footer-link" 
+            onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.(); } }}
+          >
+            <Accessibility size={13} color="#94a3b8" />
+            <span>Barrierefreiheit</span>
+          </div>
+        </div>
+
+        {/* Lahr Compatibility Disclaimer Card */}
+        <div style={{ 
+          maxWidth: '740px', 
+          width: '100%', 
+          fontSize: '0.74rem', 
+          color: 'rgba(255,255,255,0.55)', 
+          textAlign: 'center', 
+          lineHeight: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px'
+        }}>
+          <span>⚖️</span>
+          <span>
+            Campus-Groovelab ist eine unabhängige Plattform und steht in keiner Verbindung zum GrooveLAB-Projekt der Städtischen Musikschule Lahr bzw. deren Freundeskreis e.V.
+          </span>
         </div>
       </footer>
 

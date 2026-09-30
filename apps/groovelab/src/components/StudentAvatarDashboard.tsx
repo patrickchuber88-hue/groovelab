@@ -545,8 +545,6 @@ export function StudentAvatarDashboard({
             setShowAvatarSelector={profile.setShowAvatarSelector}
             avatarCategoryFilter={profile.avatarCategoryFilter}
             setAvatarCategoryFilter={profile.setAvatarCategoryFilter}
-            showSecondEmail={profile.showSecondEmail}
-            setShowSecondEmail={profile.setShowSecondEmail}
             familyProfiles={parent.familyProfiles}
             handleSwitchFamilyStudent={parent.handleSwitchFamilyStudent}
             setIsAddSiblingModalOpen={parent.setIsAddSiblingModalOpen}

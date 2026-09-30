@@ -28,8 +28,11 @@ HOURLY_DIR="${LOCAL_BACKUP_ROOT}/hourly"
 DAILY_DIR="${LOCAL_BACKUP_ROOT}/daily"
 WEEKLY_DIR="${LOCAL_BACKUP_ROOT}/weekly"
 MONTHLY_DIR="${LOCAL_BACKUP_ROOT}/monthly"
+LOCAL_COMPLIANCE_DIR="${LOCAL_BACKUP_ROOT}/compliance"
+TOMBSTONE_FILE="${LOCAL_COMPLIANCE_DIR}/gdpr_tombstones.jsonl"
+CONFIGS_BACKUP_DIR="${LOCAL_BACKUP_ROOT}/configs"
 
-mkdir -p "${HOURLY_DIR}" "${DAILY_DIR}" "${WEEKLY_DIR}" "${MONTHLY_DIR}"
+mkdir -p "${HOURLY_DIR}" "${DAILY_DIR}" "${WEEKLY_DIR}" "${MONTHLY_DIR}" "${LOCAL_COMPLIANCE_DIR}" "${CONFIGS_BACKUP_DIR}"
 
 CONTAINER_NAME="supabase-db"
 DB_USER="postgres"
@@ -158,10 +161,42 @@ if [ "${DAY_OF_MONTH}" = "01" ] && ([ "${CURRENT_HOUR}" = "02" ] || [ "${CURRENT
 fi
 
 # ------------------------------------------------------------------------------
-# 4. Offsite-Replikation auf Hetzner Storage Box (Port 23)
+# 4. Synchronisiere DSGVO Art. 17 Löschregister (WORM-Tombstones)
 # ------------------------------------------------------------------------------
 echo ""
-echo "☁️  3. Starte Offsite-Spiegelung zur Hetzner Storage Box (Port ${STORAGE_BOX_PORT})..."
+echo "⚖️  3. Aktualisiere DSGVO Art. 17 Löschregister (Tombstones)..."
+docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}" -t -A -c \
+    "SELECT json_build_object('record_id', record_id, 'table_name', table_name, 'deleted_at', created_at) FROM audit_logs WHERE action = 'DELETE';" 2>/dev/null > "${TOMBSTONE_FILE}.tmp" || true
+
+if [ -f "${TOMBSTONE_FILE}.tmp" ]; then
+    mv "${TOMBSTONE_FILE}.tmp" "${TOMBSTONE_FILE}"
+    cp -p "${TOMBSTONE_FILE}" "${LOCAL_BACKUP_ROOT}/gdpr_tombstones.jsonl" 2>/dev/null || true
+    echo "  ✓ DSGVO-Löschregister aktualisiert: ${TOMBSTONE_FILE}"
+fi
+
+# ------------------------------------------------------------------------------
+# 4.1 Konfigurations- & Secrets-Tresor sichern (/etc/campus-groovelab)
+# ------------------------------------------------------------------------------
+CONFIGS_SRC="/etc/campus-groovelab"
+if [ -d "${CONFIGS_SRC}" ]; then
+    echo "🔐 3.1 Sichere Konfigurations- und Secret-Dateien aus ${CONFIGS_SRC}..."
+    CONFIGS_TARGET="${CONFIGS_BACKUP_DIR}/cg_configs_${TIMESTAMP}.tar.gz.age"
+    tar -cz -C "${CONFIGS_SRC}" . 2>/dev/null | age -r "${AGE_RECIPIENT}" > "${CONFIGS_TARGET}.tmp" || true
+    if [ -s "${CONFIGS_TARGET}.tmp" ]; then
+        mv "${CONFIGS_TARGET}.tmp" "${CONFIGS_TARGET}"
+        sha256sum "${CONFIGS_TARGET}" > "${CONFIGS_TARGET}.sha256"
+        echo "  ✓ Konfigurations-Archiv verschlüsselt: ${CONFIGS_TARGET}"
+        find "${CONFIGS_BACKUP_DIR}" -type f -name "*.tar.gz.age*" -mtime +14 -delete 2>/dev/null || true
+    else
+        rm -f "${CONFIGS_TARGET}.tmp"
+    fi
+fi
+
+# ------------------------------------------------------------------------------
+# 5. Offsite-Replikation auf Hetzner Storage Box (Port 23)
+# ------------------------------------------------------------------------------
+echo ""
+echo "☁️  4. Starte Offsite-Spiegelung zur Hetzner Storage Box (Port ${STORAGE_BOX_PORT})..."
 
 SSH_TARGET="${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}"
 SSH_OPTS="-p ${STORAGE_BOX_PORT} -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10"
@@ -170,10 +205,22 @@ SSH_OPTS="-p ${STORAGE_BOX_PORT} -o StrictHostKeyChecking=accept-new -o BatchMod
 if ssh ${SSH_OPTS} "${SSH_TARGET}" "pwd" &>/dev/null; then
     echo "  ✓ Storage Box SSH-Handshake erfolgreich."
 
-    # Zielordner auf der Storage Box anlegen
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${STORAGE_BOX_DEST}/db/hourly ${STORAGE_BOX_DEST}/db/daily ${STORAGE_BOX_DEST}/db/weekly ${STORAGE_BOX_DEST}/db/monthly ${STORAGE_BOX_DEST}/storage"
+    # 5.0 Kapazitäts-Wächter (Preflight Quota Check auf der Storage Box)
+    STORAGE_USAGE=$(ssh ${SSH_OPTS} "${SSH_TARGET}" "df -P ." 2>/dev/null | awk 'NR==2 {print $5}' | tr -d '%' || true)
+    if [ -n "${STORAGE_USAGE}" ] && [ "${STORAGE_USAGE}" -eq "${STORAGE_USAGE}" ] 2>/dev/null; then
+        echo "  📊 Storage Box Füllstand: ${STORAGE_USAGE}%"
+        if [ "${STORAGE_USAGE}" -ge 95 ]; then
+            send_alert "KRITISCH: Hetzner Storage Box ist zu ${STORAGE_USAGE}% belegt! Breche Backup fail-closed ab."
+            exit 1
+        elif [ "${STORAGE_USAGE}" -ge 85 ]; then
+            send_alert "WARNUNG: Hetzner Storage Box ist zu ${STORAGE_USAGE}% belegt. Bitte zeitnah Kapazität erweitern."
+        fi
+    fi
 
-    # 4.1 Synchronisiere Datenbank-Archive nach GFS-Stufen
+    # Zielordner auf der Storage Box anlegen
+    ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${STORAGE_BOX_DEST}/db/hourly ${STORAGE_BOX_DEST}/db/daily ${STORAGE_BOX_DEST}/db/weekly ${STORAGE_BOX_DEST}/db/monthly ${STORAGE_BOX_DEST}/storage ${STORAGE_BOX_DEST}/compliance ${STORAGE_BOX_DEST}/configs"
+
+    # 5.1 Synchronisiere Datenbank-Archive nach GFS-Stufen
     echo "  ➔ Synchronisiere verschlüsselte GFS-Dumps nach ${STORAGE_BOX_DEST}/db/..."
     rsync -avz --delete -e "ssh -p ${STORAGE_BOX_PORT}" \
         "${HOURLY_DIR}/" \
@@ -189,7 +236,7 @@ if ssh ${SSH_OPTS} "${SSH_TARGET}" "pwd" &>/dev/null; then
         "${SSH_TARGET}:${STORAGE_BOX_DEST}/db/monthly/"
     echo "  ✓ GFS-Archive erfolgreich zur Storage Box repliziert."
 
-    # 4.2 Spiegle Medien-Tresor (/mnt/cloud-volume/storage-data) inkrementell
+    # 5.2 Spiegle Medien-Tresor (/mnt/cloud-volume/storage-data) inkrementell
     if [ -d "${LOCAL_STORAGE_DATA}" ]; then
         echo "  ➔ Spiegle Medien-Tresor (${LOCAL_STORAGE_DATA}/) nach ${STORAGE_BOX_DEST}/storage/..."
         rsync -avz --delete -e "ssh -p ${STORAGE_BOX_PORT}" \
@@ -197,31 +244,41 @@ if ssh ${SSH_OPTS} "${SSH_TARGET}" "pwd" &>/dev/null; then
             "${SSH_TARGET}:${STORAGE_BOX_DEST}/storage/"
         echo "  ✓ Medien-Tresor erfolgreich gespiegelt."
     fi
+
+    # 5.3 Spiegle DSGVO Art. 17 Löschregister (WORM-Tombstones)
+    if [ -f "${TOMBSTONE_FILE}" ]; then
+        echo "  ➔ Spiegle DSGVO Art. 17 Löschregister nach ${STORAGE_BOX_DEST}/compliance/..."
+        rsync -avz -e "ssh -p ${STORAGE_BOX_PORT}" \
+            "${TOMBSTONE_FILE}" \
+            "${SSH_TARGET}:${STORAGE_BOX_DEST}/compliance/gdpr_tombstones.jsonl"
+        rsync -avz -e "ssh -p ${STORAGE_BOX_PORT}" \
+            "${TOMBSTONE_FILE}" \
+            "${SSH_TARGET}:${STORAGE_BOX_DEST}/gdpr_tombstones.jsonl"
+        echo "  ✓ DSGVO-Löschregister erfolgreich repliziert."
+    fi
+
+    # 5.4 Spiegle verschlüsselten Konfigurations-Tresor
+    if [ -d "${CONFIGS_BACKUP_DIR}" ]; then
+        echo "  ➔ Spiegle Konfigurations-Tresor nach ${STORAGE_BOX_DEST}/configs/..."
+        rsync -avz --delete -e "ssh -p ${STORAGE_BOX_PORT}" \
+            "${CONFIGS_BACKUP_DIR}/" \
+            "${SSH_TARGET}:${STORAGE_BOX_DEST}/configs/"
+        echo "  ✓ Konfigurations-Tresor erfolgreich repliziert."
+    fi
 else
     echo "  ℹ️  Storage Box aktuell nicht erreichbar. Dumps verbleiben lokal auf Cloud Volume."
 fi
 
 # ------------------------------------------------------------------------------
-# 5. Lokale Retention Pruning (Cloud Volume schonen)
+# 6. Lokale Retention Pruning (Cloud Volume schonen)
 # ------------------------------------------------------------------------------
 echo ""
-echo "🧹 4. Bereinige lokale Backups auf dem Cloud Volume..."
+echo "🧹 5. Bereinige lokale Backups auf dem Cloud Volume..."
 find "${HOURLY_DIR}"  -type f -name "*.sql.gz.age*" -mtime +1   -delete 2>/dev/null || true # 24 Stunden
 find "${DAILY_DIR}"   -type f -name "*.sql.gz.age*" -mtime +14  -delete 2>/dev/null || true # 14 Tage lokal
 find "${WEEKLY_DIR}"  -type f -name "*.sql.gz.age*" -mtime +60  -delete 2>/dev/null || true # 2 Monate lokal
 find "${MONTHLY_DIR}" -type f -name "*.sql.gz.age*" -mtime +365 -delete 2>/dev/null || true # 1 Jahr lokal
 echo "  ✓ Lokale Bereinigung abgeschlossen."
-
-echo ""
-echo "⚖️  5. Synchronisiere DSGVO Art. 17 Löschregister (Tombstones)..."
-TOMBSTONE_FILE="${LOCAL_BACKUP_ROOT}/gdpr_tombstones.jsonl"
-docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}" -t -A -c \
-    "SELECT json_build_object('record_id', record_id, 'table_name', table_name, 'deleted_at', created_at) FROM audit_logs WHERE action = 'DELETE';" 2>/dev/null > "${TOMBSTONE_FILE}.tmp" || true
-
-if [ -f "${TOMBSTONE_FILE}.tmp" ]; then
-    mv "${TOMBSTONE_FILE}.tmp" "${TOMBSTONE_FILE}"
-    echo "  ✓ DSGVO-Löschregister aktualisiert: ${TOMBSTONE_FILE}"
-fi
 
 send_success
 

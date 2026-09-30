@@ -408,7 +408,6 @@ export function useStudentProfile({
   const [savingProfile, setSavingProfile] = useState<boolean>(false);
   const [showAvatarSelector, setShowAvatarSelector] = useState<boolean>(false);
   const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
-  const [showSecondEmail, setShowSecondEmail] = useState<boolean>(false);
   const [showOwnQr, setShowOwnQr] = useState<boolean>(false);
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
 
@@ -542,8 +541,6 @@ export function useStudentProfile({
     setShowAvatarSelector,
     avatarCategoryFilter,
     setAvatarCategoryFilter,
-    showSecondEmail,
-    setShowSecondEmail,
     showOwnQr,
     setShowOwnQr,
     studentSchedules

@@ -208,7 +208,7 @@ export const MASTER_ADMIN_GUIDES: AkademieBoardGuide[] = [
       'Nutze den Resilienz-Audit PDF-Export als formalen Nachweis für Schulträger und Datenschutzbeauftragte.'
     ],
     invariants: [
-      'Hochverfügbarkeits-SLA: Ausfallzeiten dürfen im Monatsmittel 0,05% nicht überschreiten.'
+      'Hochverfügbarkeits-SLA: Ausfallzeiten dürfen im Monatsmittel 0,5% (99,5% Uptime) nicht überschreiten.'
     ],
     tags: ['telemetrie', 'hetzner', 'latenz', 'p95', 'health', 'postgresql', 'sla'],
     pdfDownloadType: 'resilience_audit'

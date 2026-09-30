@@ -11431,10 +11431,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
         {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
 
-        {/* Hinweis didaktisches Koordinierungsinstrument */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
+        {/* Hinweis didaktisches Koordinierungsinstrument & ArbZG Höchstarbeitszeit-Transparenz */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
           <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>
             <strong>Hinweis:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
+          </span>
+          <span style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', lineHeight: 1.3 }}>
+            ArbZG Höchstarbeitszeit-Transparenz: Planungen über 8 Std. Tagesunterricht erfordern die Einhaltung gesetzlicher Ausgleichs- und Ruhezeiten.
           </span>
         </div>
 

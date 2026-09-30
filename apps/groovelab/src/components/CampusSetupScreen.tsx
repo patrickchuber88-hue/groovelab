@@ -1095,11 +1095,11 @@ export function CampusSetupScreen({
                       throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
                     }
 
-                    const email = admin?.email || `benutzer.${currentUserId.substring(0, 8)}@campus-groovelab.local`;
+                    const userHandle = `${admin?.role || 'admin'}_${currentUserId.substring(0, 8)}`;
                     const userName = `${admin?.first_name || ''} ${admin?.last_name || ''}`.trim() || 'Benutzer';
 
                     const passkeyResult = await registerBiometrics(
-                      email,
+                      userHandle,
                       currentUserId,
                       chalData.challenge,
                       `${userName} (${admin?.role === 'admin' ? 'Schulleitung' : 'Lehrkraft'})`

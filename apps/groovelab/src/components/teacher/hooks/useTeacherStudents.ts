@@ -97,7 +97,6 @@ export function useTeacherStudents({
   const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [inviteFirstName, setInviteFirstName] = useState('');
   const [inviteLastName, setInviteLastName] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteSaving, setInviteSaving] = useState(false);
 
@@ -174,7 +173,6 @@ export function useTeacherStudents({
         role: 'student',
         first_name: inviteFirstName.trim(),
         last_name: formattedLast,
-        email: `student.${studentId}@campus-groovelab.local`,
         photo_url: '/avatar_ghost.jpg',
         qr_token: qrToken,
         instrument: teacher?.instrument || 'Gitarre',
@@ -240,8 +238,6 @@ export function useTeacherStudents({
     setInviteFirstName,
     inviteLastName,
     setInviteLastName,
-    inviteEmail,
-    setInviteEmail,
     inviteLink,
     setInviteLink,
     inviteSaving,

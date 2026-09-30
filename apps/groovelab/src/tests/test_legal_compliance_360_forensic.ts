@@ -264,6 +264,21 @@ function testTeacherUrheberrechtAndAbsence() {
     'Rolle 2 (Lehrkraft)',
     '2.6 UrhDaG § 1 Abs. 2 & EU AI Act: Ausschluss von Noten-Uploads (reine Metadaten) und deterministisches Audio-DSP garantiert'
   );
+
+  // 2.7 Zero-Payroll & Herrenberg Status-Autonomie (§ 266a StGB / BSG B 12 R 3/20 R)
+  let hasStatusAutonomyWording = false;
+  if (fs.existsSync(masterWordingPath)) {
+    const mWording = fs.readFileSync(masterWordingPath, 'utf8');
+    hasStatusAutonomyWording = 
+      mWording.includes('zeroPayrollDoctrine') &&
+      mWording.includes('didacticFreedomMethodology') &&
+      mWording.includes('nonExclusivityMultiSchoolFreedom');
+  }
+  assert(
+    hasStatusAutonomyWording,
+    'Rolle 2 (Lehrkraft)',
+    '2.7 Statusrecht & Zero-Payroll: Methodenfreiheit, Multi-Schul-Freiheit und Ausschluss von Lohnberechnung verankert'
+  );
 }
 
 // ------------------------------------------------------------------------------
@@ -278,11 +293,12 @@ function testSchoolLeadershipAndCourtProof() {
 
   const callsExportRpc = courtProofCode.includes('export_school_forensic_dossier');
   const displaysSha256 = courtProofCode.includes('sha256') || courtProofCode.includes('Prüfsumme') || courtProofCode.includes('SHA-256');
+  const hasHerrenbergAttestation = courtProofCode.includes('herrenberg_status_attestation');
 
   assert(
-    callsExportRpc && displaysSha256,
+    callsExportRpc && displaysSha256 && hasHerrenbergAttestation,
     'Rolle 3 (Schulleitung)',
-    '3.1 ISO/IEC 27037 Court-Proof: CourtProofExportModal bindet export_school_forensic_dossier mit SHA-256 Siegel ein'
+    '3.1 ISO/IEC 27037 Court-Proof: CourtProofExportModal bindet export_school_forensic_dossier & herrenberg_status_attestation mit SHA-256 Siegel ein'
   );
 
   // 3.2 Preistransparenz & Gesetzlicher Steuernachweis (§ 19 UStG Kleinunternehmerklausel)

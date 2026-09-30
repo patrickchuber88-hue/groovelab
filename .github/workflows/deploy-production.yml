@@ -1,0 +1,79 @@
+name: "Campus-Groovelab Air-Gapped Production Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+  push:
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  gate-and-deploy:
+    name: "Gate Verification & Production Deployment"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: "1. Checkout Repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "2. Setup Node.js (v20 LTS)"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: "3. Clean Install Dependencies"
+        run: npm ci
+
+      - name: "4. Campus-Groovelab Security Gate (OWASP ASVS L3 & Drift Protection)"
+        run: npm run gate
+
+      - name: "5. Production Build (TypeScript + Vite + Precompression)"
+        run: npm run build:groovelab
+
+      - name: "6. Configure SSH Keys (Ephemeral Agent)"
+        if: env.DEPLOY_SSH_KEY != ''
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER || 'deployuser@178.105.10.2' }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${DEPLOY_SSH_KEY}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H 178.105.10.2 >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: "7. Deploy Release to Live Production Cluster"
+        if: env.DEPLOY_SSH_KEY != ''
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SERVER: ${{ secrets.DEPLOY_SERVER || 'deployuser@178.105.10.2' }}
+          SKIP_BUILD: "1"
+          SKIP_AUDIT: "1"
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new "${SERVER}" "echo 'SSH connection verified.'"
+          bash deploy.sh
+
+      - name: "8. Post-Deploy Live Health & Perimeter Verification"
+        run: |
+          echo "Verifying live edge ingress: https://campus-groovelab.de/healthz"
+          HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 https://campus-groovelab.de/healthz || echo "000")
+          if [ "$HEALTH" != "200" ]; then
+            echo "::error::Live edge health check failed with status: $HEALTH"
+            exit 1
+          fi
+          echo "Live health confirmed: HTTP 200 OK"

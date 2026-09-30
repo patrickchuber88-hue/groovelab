@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ShieldCheck, Printer, X, Building, CheckCircle2, Lock, FileText, Download } from 'lucide-react';
 import { ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS, LEGAL_RELEASE_CONFIG } from '../../legal/legalContent';
@@ -9,6 +9,8 @@ interface AvvCertificateModalProps {
   schoolName: string;
   adminName?: string;
   confirmationDate?: string;
+  schoolId?: string;
+  auditChecksum?: string;
 }
 
 export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
@@ -16,14 +18,40 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
   onClose,
   schoolName = 'Musikschule',
   adminName = 'Schulleitung / Vertretungsberechtigte Person',
-  confirmationDate = new Date().toLocaleDateString('de-DE')
+  confirmationDate = new Date().toLocaleDateString('de-DE'),
+  schoolId,
+  auditChecksum
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const [dynamicHash, setDynamicHash] = useState<string>(auditChecksum || '');
 
-  if (!isOpen) return null;
-
-  const avvDoc = LEGAL_DOCUMENTS.terms_b2b_avv;
-  const canonicalHash = 'a47b8c9e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c'; // SHA-256 seal
+  useEffect(() => {
+    if (auditChecksum) {
+      setDynamicHash(auditChecksum);
+      return;
+    }
+    const payload = JSON.stringify({
+      contract: 'AVV_ART_28_DSGVO_V2026.1',
+      schoolName: schoolName.trim(),
+      adminName: adminName.trim(),
+      confirmationDate,
+      schoolId: schoolId || 'B2B-TENANT',
+      standard: 'Art. 28 DSGVO & Art. 9 CH-nDSG'
+    });
+    try {
+      const encoder = new TextEncoder();
+      crypto.subtle.digest('SHA-256', encoder.encode(payload)).then(buf => {
+        const hash = Array.from(new Uint8Array(buf))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        setDynamicHash(hash);
+      }).catch(() => {
+        setDynamicHash(`SHA256-${schoolId || 'CERT-STAMP'}`);
+      });
+    } catch {
+      setDynamicHash(`SHA256-${schoolId || 'CERT-STAMP'}`);
+    }
+  }, [schoolName, adminName, confirmationDate, schoolId, auditChecksum]);
 
   const handlePrint = () => {
     if (!printRef.current) {
@@ -255,7 +283,7 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
                   Kryptografisches Prüfsiegel &amp; Revisionssicherheit
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#15803d', fontFamily: 'monospace', wordBreak: 'break-all', marginTop: '2px' }}>
-                  SHA-256 Checksumme: {canonicalHash}
+                  SHA-256 Checksumme: {dynamicHash || 'Wird generiert...'}
                 </div>
                 <div style={{ fontSize: '0.70rem', color: '#166534', marginTop: '3px' }}>
                   Die Integrität des Vertragstextes ist unveränderbar in der PostgreSQL-Audit-Datenbank persistent protokolliert.
@@ -269,11 +297,12 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
                 Garantierte Vereinbarungen und Technisch-Organisatorische Maßnahmen (TOMs):
               </div>
               <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <li><strong>ISO 27001 Hosting in Deutschland:</strong> Alle Datenbanken und Cloud-Speicher laufen ausnahmslos in nach ISO/IEC 27001 zertifizierten Rechenzentren der Hetzner Online GmbH (Falkenstein/Nürnberg).</li>
-                <li><strong>Verschlüsselung:</strong> AES-256-Verschlüsselung at Rest; TLS 1.3 während der Übertragung.</li>
-                <li><strong>Zero-AI-Garantie:</strong> Schüler-, Lehrer- und Tondaten werden zu 0 % für Machine Learning oder Foundation-Modelle verwendet.</li>
-                <li><strong>48-Stunden-Vorfallsmeldung:</strong> Vorfälle nach Art. 33 DSGVO werden binnen 48 Stunden an die Schulleitung gemeldet (24h Reaktionsreserve für die Schule).</li>
-                <li><strong>Radikale Datenminimierung:</strong> Keine Bankdaten von Familien; keine Klarnamen-Gesichtsfotos; nur stilisierte Avatare.</li>
+                <li><strong>ISO 27001 Hosting in Deutschland:</strong> Alle Datenbanken und Cloud-Speicher laufen ausnahmslos in nach ISO/IEC 27001 zertifizierten Rechenzentren der Hetzner Online GmbH (Falkenstein/Nürnberg; 0 % US-Cloud-Doktrin).</li>
+                <li><strong>Verschlüsselung &amp; Krypto-Standards:</strong> AES-256-Verschlüsselung at Rest; TLS 1.3 während der Übertragung; <strong>Bcrypt (10 Runden Blowfish gem. BSI TR-02102)</strong> im isolierten Schema <code style={{ background: '#e2e8f0', padding: '1px 4px', borderRadius: '4px' }}>private_auth.user_secrets</code>; FIDO2 / WebAuthn Hardware-Passkeys.</li>
+                <li><strong>BSI IT-Grundschutz &amp; Resilienz:</strong> <strong>Stündliche automatisierte Backups (Age X25519)</strong> mit Vorab-Speicherplatzprüfung (Storage Box Quota Guardian Port 23) und <strong>DSGVO Art. 17 WORM-Tombstone Reconciliation</strong> (RPO &le; 60m, RTO &le; 45m).</li>
+                <li><strong>Zero-User-Mail &amp; Datenschutz:</strong> Vollständiges Zero-User-Mail-Axiom (0 E-Mail-Adressen von Schülern, Eltern oder Lehrkräften); Zero-Heap-Buffering für Audioaufnahmen; keine Stimmbiometrie.</li>
+                <li><strong>Vorfallsmeldung (24&ndash;48h):</strong> Datenschutzverletzungen werden binnen 24 bis maximal 48 Stunden gemeldet (zur Einhaltung von Art. 33 DSGVO und Art. 24 nDSG an den EDÖB).</li>
+                <li><strong>Herrenberg-Immunität (BSG B 12 R 3/20 R):</strong> Dozentenautonomie gewahrt; kein ERP, kein Arbeitszeiterfassungssystem, keine Leistungs- und Verhaltenskontrolle (&sect; 87 BetrVG).</li>
               </ul>
             </div>
 

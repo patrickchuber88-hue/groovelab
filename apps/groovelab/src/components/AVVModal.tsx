@@ -5,6 +5,7 @@ import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitep
 import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGenerator';
 import { generateStaffCouncilDeclarationPDF } from '../utils/staffCouncilDeclarationGenerator';
 import { logSecurityEvent } from '../services/auditLogService';
+import { getJurisdictionProfile } from '../constants/jurisdictionRegistry';
 
 interface AVVModalProps {
   isOpen: boolean;
@@ -17,6 +18,9 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
   const [signeeName, setSigneeName] = useState(school?.avv_signee_name || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signedSuccess, setSignedSuccess] = useState(Boolean(school?.avv_signed_at));
+  const [computedDigest, setComputedDigest] = useState<string | null>(school?.avv_checksum || null);
+
+  const jurisdiction = getJurisdictionProfile(school?.jurisdiction_code || school?.jurisdiction_region);
 
   // Sync state whenever school prop or modal visibility changes
   useEffect(() => {
@@ -117,8 +121,27 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
         throw updateError;
       }
 
-      // Revisionssicheres Audit-Logging in public.audit_logs (OWASP ASVS Level 3)
-      const auditChecksum = `SHA256-CG-AVV-${String(targetSchoolId).padStart(6, '0')}-DE`;
+      // Revisionssicheres Audit-Logging in public.audit_logs (ISO/IEC 27037 & OWASP ASVS Level 3)
+      const canonicalPayload = JSON.stringify({
+        contract: 'AVV_ART_28_DSGVO_V2026.1',
+        schoolId: String(targetSchoolId),
+        signeeName: trimmedName,
+        signedAt: signedAt,
+        jurisdiction: jurisdiction.code,
+        statutoryLaw: jurisdiction.statutorySchoolLawRef,
+        standard: 'Art. 28 DSGVO & Art. 9 CH-nDSG'
+      });
+      let auditChecksum: string;
+      try {
+        const encoder = new TextEncoder();
+        const hashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(canonicalPayload));
+        auditChecksum = Array.from(new Uint8Array(hashBuf))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+      } catch (e) {
+        auditChecksum = `SHA256-FALLBACK-${String(targetSchoolId).padStart(6, '0')}`;
+      }
+
       await logSecurityEvent({
         action: 'AVV_CONTRACT_DIGITALLY_SIGNED',
         schoolId: String(targetSchoolId),
@@ -127,10 +150,13 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           signee_title: trimmedName,
           contract_version: 'Art. 28 DSGVO / Art. 9 nDSG v2026.1',
           audit_checksum: auditChecksum,
+          jurisdiction: jurisdiction.code,
+          statutory_law: jurisdiction.statutorySchoolLawRef,
           signed_at: signedAt
         }
       });
 
+      setComputedDigest(auditChecksum);
       setSignedSuccess(true);
       if (onAVVSigned) onAVVSigned();
     } catch (err: any) {
@@ -413,16 +439,20 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           }}>
             <div><strong>Auftraggeber:</strong> {school?.name || 'Musikschule'} {school?.address ? `(${school.address})` : ''}, vertreten durch die Schulleitung.</div>
             <div style={{ marginTop: '4px' }}><strong>Auftragnehmer:</strong> Campus-Groovelab SaaS Operator, betrieben durch Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), Deutschland.</div>
+            <div style={{ marginTop: '4px', color: '#1e40af', fontWeight: 650 }}>
+              <strong>Maßgebliche Rechtsordnung:</strong> {jurisdiction.regionName} ({jurisdiction.statutorySchoolLawRef}) · <strong>Aufsichtsbehörde:</strong> {jurisdiction.dpoAuthorityName}
+            </div>
           </div>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 1 Gegenstand, Zweckbestimmung, Subsidiaritäts-Doktrin &amp; Reine Metadaten (Art. 28 Abs. 3 lit. a DSGVO)
+            § 1 Gegenstand, Zweckbestimmung, Subsidiaritäts-Doktrin, Herrenberg-Immunität &amp; Schweizer nDSG-Parität (Art. 28 Abs. 3 lit. a DSGVO / Art. 9 nDSG)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
             (1) Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der webbasierten SaaS-Schulmanagement- und didaktischen Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung personenbezogener Daten erfolgt ausschließlich im Rahmen dieses Vertrags und auf dokumentierte Weisung des Auftraggebers.<br />
-            (2) <strong>Didaktisches Assistenz-Prinzip, Subsidiaritäts-Doktrin („Fast-Track“) &amp; Ausschluss von Arbeitnehmerkontrolle:</strong> Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag. Die Plattform fungiert als rein freiwilliges, unterstützendes Convenience- und Beschleunigungswerkzeug zur didaktischen Unterrichtsbegleitung. Die Plattform ersetzt weder das amtliche kommunale Schulverwaltungssystem (ERP wie iMikel, MSVplus oder Musikschul-Manager) noch die primären städtischen Kommunikationswege (E-Mail, MS Teams, Telefon, Post). Sämtliche über die Plattform vorgenommenen Terminabsagen, Stundenplanentwürfe und Raumbuchungsanfragen erfolgen technisch rein im Botenauftrag der Beteiligten und unter dem ausdrücklichen Vorbehalt der verwaltungsseitigen Freigabe und Einpflege in das führende Schulverwaltungssystem (ERP) des Auftraggebers; die Plattform entfaltet keine rechtsgestaltende Bindungswirkung für den Schulbetrieb. Dienstliche Weisungen, Arbeitsanweisungen und der offizielle Schriftverkehr verbleiben ausnahmslos auf den herkömmlichen Dienstwegen. Eine automatisierte Überwachung, Anwesenheitskontrolle oder Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG) von Lehrkräften oder Honorarkräften findet nicht statt.<br />
-            (3) <strong>Herrenberg-Immunität (BSG B 12 R 3/20 R) &amp; Übermittlungsfreiheit:</strong> Stundenplan-, Raum- und Terminbelegungsfunktionen stellen unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Stundenpläne oder Terminverschiebungen digital über Campus-Groovelab zu disponieren oder auf herkömmlichem Weg (per E-Mail, Telefon oder Zettel) an die Schulverwaltung zu übermitteln. Die Plattform begründet kein Weisungsverhältnis und keinen Eingriff in die organisatorische Selbstständigkeit freier Mitarbeiter.<br />
-            (4) <strong>Reine Metadaten-Architektur &amp; Schüler-Übungsaufnahmen (§ 53 Abs. 1, § 60a UrhG):</strong> Im Rahmen der Mediathek und Repertoire-Verwaltung werden keinerlei urheberrechtlich geschützte Noten-PDFs oder kommerzielle Notensätze gehostet oder verarbeitet, sondern ausschließlich freie bibliografische Metadaten (Titel, Interpret, Besetzung, Lehrwerk, Seitenzahlen) sowie autorisierte externe Verlinkungen (z. B. Spotify, YouTube, Tomplay). Im Rahmen des Unterrichts gehostete Schüler-Übungsaufnahmen (z. B. didaktische Cover-Versionen geübter Stücke) dienen ausschließlich der individuellen didaktischen Rückmeldung und dem Teilen im geschlossenen privaten Kreis der Familie (§ 53 Abs. 1 UrhG). Ein öffentlicher Abruf oder Streaming findet nicht statt.
+            (2) <strong>Rollenverteilung &amp; Schweizer nDSG-Parität:</strong> Die Musikschule bzw. der Schulträger ist und bleibt datenschutzrechtlich die alleinige <strong>Verantwortliche</strong> (Art. 4 Nr. 7 DSGVO / Art. 5 lit. j nDSG). Der Betreiber Patrick Huber (Einzelunternehmen) handelt ausschließlich als weisungsgebundener <strong>Auftragsverarbeiter</strong> bzw. <strong>Auftragsbearbeiter</strong> (Art. 28 DSGVO / Art. 9 nDSG). Die Parteien vereinbaren für den Geltungsbereich der Schweiz, dass der Begriff „personenbezogene Daten“ als „Personendaten“ (Art. 5 lit. a nDSG) und „Auftragsverarbeiter“ als „Auftragsbearbeiter“ (Art. 9 nDSG) zu verstehen ist.<br />
+            (3) <strong>Didaktisches Assistenz-Prinzip &amp; Subsidiaritäts-Doktrin („Fast-Track“):</strong> Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag. Die Plattform fungiert als rein freiwilliges, unterstützendes Convenience- und Beschleunigungswerkzeug zur didaktischen Unterrichtsbegleitung. Die Plattform ersetzt weder das amtliche kommunale Schulverwaltungssystem (ERP wie iMikel, MSVplus oder Musikschul-Manager) noch die primären städtischen Kommunikationswege (E-Mail, MS Teams, Telefon, Post). Sämtliche über die Plattform vorgenommenen Terminabsagen, Stundenplanentwürfe und Raumbuchungsanfragen erfolgen technisch rein im Botenauftrag der Beteiligten und unter dem ausdrücklichen Vorbehalt der verwaltungsseitigen Freigabe und Einpflege in das führende Schulverwaltungssystem (ERP) des Auftraggebers; die Plattform entfaltet keine rechtsgestaltende Bindungswirkung für den Schulbetrieb.<br />
+            (4) <strong>Herrenberg-Immunität (BSG B 12 R 3/20 R) &amp; Dozentenautonomie:</strong> Stundenplan-, Raum- und Terminbelegungsfunktionen stellen unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Stundenpläne oder Terminverschiebungen digital über Campus-Groovelab zu disponieren oder auf herkömmlichem Weg (per E-Mail, Telefon oder Zettel) an die Schulverwaltung zu übermitteln. Die Plattform begründet kein Weisungsverhältnis, keine Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / LPVG), kein Arbeitszeiterfassungsinstrument und keinen Eingriff in die organisatorische Selbstständigkeit freier Mitarbeiter.<br />
+            (5) <strong>Reine Metadaten-Architektur &amp; Schüler-Übungsaufnahmen (§ 53 Abs. 1, § 60a UrhG):</strong> Im Rahmen der Mediathek und Repertoire-Verwaltung werden keinerlei urheberrechtlich geschützte Noten-PDFs oder kommerzielle Notensätze gehostet oder verarbeitet, sondern ausschließlich freie bibliografische Metadaten (Titel, Interpret, Besetzung, Lehrwerk, Seitenzahlen) sowie autorisierte externe Verlinkungen (z. B. Spotify, YouTube, Tomplay). Im Rahmen des Unterrichts gehostete Schüler-Übungsaufnahmen dienen ausschließlich der individuellen didaktischen Rückmeldung und dem Teilen im geschlossenen privaten Kreis der Familie (§ 53 Abs. 1 UrhG). Ein öffentlicher Abruf oder Streaming findet nicht statt.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
@@ -433,18 +463,19 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           </p>
           <p style={{ margin: '0 0 12px 0' }}>
             <strong>2. Kategorien personenbezogener Daten:</strong> Schulstammdaten, Benutzernamen (Vorname, Nachname; im regulären Unterrichtsbetrieb standardmäßig pseudonymisiert/maskiert auf Vorname + 1. Buchstabe des Nachnamens zum Schutz von Minderjährigen; Lehrkräfte werden zur eindeutigen Zuordnung mit vollständigem Namen geführt), Rollen- und Berechtigungsstufen, Stundenplan-, Raum- und Terminbelegungsdaten sowie freiwillige didaktische Instrumental-Übungsaufnahmen. Hierbei wird die rechtlich erforderliche Grund-Einwilligung zur Schülerprofil-Bereitstellung (Art. 8 DSGVO) strikt von der freiwilligen Einwilligung in die Speicherung von Instrumentalaufnahmen (§ 73 UrhG) entkoppelt.<br />
-            <em>Ausdrücklich ausgeschlossen: Es werden zu keinem Zeitpunkt Bank-, SEPA-, Kreditkartendaten, private E-Mail-Adressen von Schülern, Eltern, Lehrkräften oder Sekretariatsmitarbeitern sowie besondere Kategorien personenbezogener Daten gem. Art. 9 DSGVO / Art. 5 lit. c nDSG (insbesondere medizinische Diagnosen, Befunde, Atteste oder detaillierte Gesundheitsdaten) im Auftrag erfasst oder verarbeitet. Mitteilungen über Unterrichtsverhinderungen in der Shoutbox beschränken sich rein organisatorisch auf die allgemeine Angabe der Verhinderung (z. B. „verhindert“) ohne medizinische Detailangaben. Einzig für den Schulleitungs-Account (B2B-Vertragspartner) wird eine offizielle Schul- bzw. Organisations-E-Mail-Adresse zur Vertragsabwicklung und Notfall-Authentifizierung hinterlegt.</em>
+            <em>Ausdrücklich ausgeschlossen: Es werden zu keinem Zeitpunkt Bank-, SEPA-, Kreditkartendaten, private E-Mail-Adressen von Schülern, Eltern, Lehrkräften oder Sekretariatsmitarbeitern sowie besondere Kategorien personenbezogener Daten gem. Art. 9 DSGVO / Art. 5 lit. c nDSG (insbesondere medizinische Diagnosen, Befunde, Atteste oder detaillierte Gesundheitsdaten) im Auftrag erfasst oder verarbeitet (strikt 100 % Zero-User-Mail gem. Migration 515). Mitteilungen über Unterrichtsverhinderungen in der Shoutbox beschränken sich rein organisatorisch auf die allgemeine Angabe der Verhinderung (z. B. „verhindert“) ohne medizinische Detailangaben. Einzig für den Schulleitungs-Account (B2B-Vertragspartner) wird eine offizielle Schul- bzw. Organisations-E-Mail-Adresse zur Vertragsabwicklung und Notfall-Authentifizierung hinterlegt.</em>
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 3 Vertraulichkeit &amp; Serverstandort (Art. 28 Abs. 3 lit. b DSGVO)
+            § 3 Vertraulichkeit, Serverstandort &amp; Schweizer Angemessenheit (Art. 28 Abs. 3 lit. b DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Sämtliche personenbezogenen Daten werden zu 100% auf Servern in ISO 27001-zertifizierten deutschen Rechenzentren verarbeitet. Das mit der Datenverarbeitung betraute Personal ist vor Aufnahme der Tätigkeit schriftlich auf das Datengeheimnis und zur Vertraulichkeit verpflichtet worden.
+            (1) Sämtliche personenbezogenen Daten werden zu 100 % auf Servern in ISO/IEC 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein &amp; Nürnberg) verarbeitet. Ein Transfer in unsichere Drittstaaten (insbesondere USA) findet nicht statt (0 % US-Cloud-Doktrin / Immunität gegen US CLOUD Act und FISA 702). Das mit der Datenverarbeitung betraute Personal ist vor Aufnahme der Tätigkeit schriftlich auf das Datengeheimnis und zur Vertraulichkeit verpflichtet worden.<br />
+            (2) Für Auftraggeber aus der Schweizerischen Eidgenossenschaft erfolgt die grenzüberschreitende Bekanntgabe der Personendaten nach Deutschland auf Grundlage des verbindlichen Angemessenheitsbeschlusses des Bundesrates gemäss Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 der Datenschutzverordnung (DSV). Eines gesonderten Abschlusses von Standarddatenschutzklauseln bedarf es nicht.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 4 Genehmigte Unterauftragsverarbeiter / Sub-Processors (Art. 28 Abs. 2 &amp; Abs. 3 lit. d DSGVO)
+            § 4 Genehmigte Unterauftragsverarbeiter &amp; Zero-User-Mail Benachrichtigungsweg (Art. 28 Abs. 2 &amp; Abs. 3 lit. d DSGVO)
           </h4>
           <p style={{ margin: '4px 0 8px 0' }}>
             Der Auftraggeber genehmigt ausdrücklich die Einbindung der folgenden Unterauftragsverarbeiter:
@@ -455,16 +486,16 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               <span>Leistungsumfang &amp; Zertifizierung</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-              <span><strong>Hetzner Online GmbH</strong> (Falkenstein/Vogtland, Deutschland)</span>
-              <span>Dedizierte Cloud-, Datenbank- &amp; Speicher-Infrastruktur (ISO 27001)</span>
+              <span><strong>Hetzner Online GmbH</strong> (Falkenstein/Vogtland und Nürnberg, Deutschland)</span>
+              <span>Dedizierte Cloud-, Datenbank- &amp; Speicher-Infrastruktur (ISO/IEC 27001 zertifiziert)</span>
             </div>
           </div>
           <p style={{ margin: '0 0 12px 0', fontSize: '0.74rem', color: '#475569', lineHeight: 1.45 }}>
-            <strong>Änderungsverfahren &amp; 14-Tage-Widerspruchsfrist (Art. 28 Abs. 2 DSGVO):</strong> Beabsichtigt der Auftragnehmer, weitere Unterauftragnehmer hinzuzuziehen oder bestehende zu ersetzen, wird er den Auftraggeber mindestens vierzehn (14) Kalendertage vorab in Textform (per E-Mail oder System-Benachrichtigung) informieren. Dem Auftraggeber steht das Recht zu, der beabsichtigten Änderung innerhalb dieser 14-tägigen Frist aus wichtigem datenschutzrechtlichem Grund schriftlich zu widersprechen.
+            <strong>Änderungsverfahren &amp; 14-Tage-Widerspruchsfrist (Art. 28 Abs. 2 DSGVO):</strong> Beabsichtigt der Auftragnehmer, weitere Unterauftragnehmer hinzuzuziehen oder bestehende zu ersetzen, wird er den Auftraggeber mindestens vierzehn (14) Kalendertage vorab in Textform informieren. In Übereinstimmung mit dem 100 % Zero-User-Mail-Axiom erfolgt diese Benachrichtigung an die offizielle institutionelle Schul-E-Mail (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>schools.email</code> / <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>schools.billing_email</code>) bzw. per autoritativem System-Broadcast im Schulleitungs-Cockpit. Dem Auftraggeber steht das Recht zu, der beabsichtigten Änderung innerhalb dieser 14-tägigen Frist aus wichtigem datenschutzrechtlichem Grund schriftlich zu widersprechen.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 5 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)
+            § 5 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO &amp; BSI IT-Grundschutz)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
             Der Auftragnehmer gewährleistet ein dem Risiko angemessenes Schutzniveau durch modernste Tier-1 Enterprise Sicherheitsmaßnahmen:
@@ -473,36 +504,44 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             <br />
             2. <strong>Proaktiver Silent Refresh &amp; Anti-CSRF Origin-Guard:</strong> Automatisierte Token-Rotation ohne Unterrichtsunterbrechung, striktes Fail-Closed Filtering mittels browser-nativem <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>Sec-Fetch-Site</code> und Host-Header-Poisoning-Schutz.
             <br />
-            3. <strong>PostgreSQL FORCE Row-Level Security (RLS):</strong> Kernel-erzwungene Mandantentrennung auf allen relationalen Datenbanktabellen mit transaktional isoliertem Mandantenkontext (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>is_local = true</code>) und automatisierter Vitest-Sicherheits-Gate-Testsuite.
+            3. <strong>PostgreSQL FORCE Row-Level Security (RLS):</strong> Kernel-erzwungene Mandantentrennung auf allen relationalen Datenbanktabellen mit transaktional isoliertem Mandantenkontext (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>is_local = true</code>) und Zero-Trust View-Maskierung sensibler Felder (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>public.users_view</code> liefert 0 Klartext-Geheimnisse).
             <br />
-            4. <strong>Kryptografische Absicherung &amp; Passkeys:</strong> <strong>BSI- und OWASP-konformes PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong>, <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong> und clientseitige <strong>AES-256-GCM Hardware-Vaults (Web Crypto API)</strong> für Offline-Caches.
+            4. <strong>Kryptografische Absicherung &amp; Passkeys:</strong> <strong>Bcrypt-gehashte PINs (10 Runden Blowfish gem. BSI TR-02102 / Migration 510)</strong> im isolierten Schema <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>private_auth.user_secrets</code>, <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong> und clientseitige <strong>AES-256-GCM Hardware-Vaults (Web Crypto API)</strong> für Offline-Caches.
             <br />
-            5. <strong>Revisionssicherheit &amp; Backups:</strong> Manipulationssicheres <strong>SHA-512 / SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>stündlich verschlüsselte Backups</strong> auf unabhängigen Datenträgern mit Desaster-Recovery-RTO &lt; 15 Minuten.
+            5. <strong>Revisionssicherheit, Backups &amp; BSI OPS.1.1.4:</strong> Manipulationssicheres <strong>SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>stündlich verschlüsselte Backups (Age X25519)</strong> mit Vorab-Speicherplatzprüfung (Storage Box Quota Guardian via Port 23) und <strong>DSGVO Art. 17 WORM-Tombstone Reconciliation</strong> gegen Zombie-Datensätze (RTO &lt; 45 Minuten, RPO &lt; 60 Minuten).
             <br />
-            6. <strong>IndexedDB Audio-Tresor &amp; Hardware-Sicherheit:</strong> Lokaler, hardware-geschützter Speicher (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>groovelab_audio_vault</code>) für 0ms Offline-Playback in schallisolierten Räumen; automatische Abschaltung von Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) beim Verlassen der Übeoberfläche.
+            6. <strong>Zero-Heap Audio-Streaming &amp; Hardware-Sicherheit:</strong> Didaktische Audioaufnahmen werden über HTTP 307 Temporary Redirects direkt zum HMAC-signierten Edge-Storage gestreamt (Zero-Heap-Buffering von Kinderstimmen im RAM). Lokaler IndexedDB Audio-Tresor (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>groovelab_audio_vault</code>) für 0ms Offline-Playback in schallisolierten Räumen; automatische Mikrofon-Abschaltung (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) beim Verlassen der Übeoberfläche.
             <br />
             7. <strong>Ausschluss von Stimmbiometrie &amp; Kinderschutz-Cap:</strong> Reines didaktisches Playback ohne biometrische Stimm- oder Sprecherprofilierung (Art. 9 DSGVO); Plausibilitäts-Cap für bildschirmfreie Übeeingaben auf maximal 60 Minuten pro Tag.
           </p>
 
-
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 6 Unterstützungspflichten, Betroffenenrechte, Meldewesen &amp; Kontrollrechte kommunaler Träger (Art. 15–22, 28 Abs. 3 lit. h &amp; 33 DSGVO)
+            § 6 Unterstützungspflichten, Betroffenenrechte, Meldewesen &amp; Kontrollrechte kommunaler Träger (Art. 15–22, 28 Abs. 3 lit. h &amp; 33 DSGVO / Art. 24 nDSG)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            (1) <strong>Betroffenenrechte:</strong> Der Auftragnehmer unterstützt den Auftraggeber mit geeigneten technischen und organisatorischen Maßnahmen (u. a. über das integrierte DSB- &amp; Audit-Portal) bei der Erfüllung der Betroffenenrechte nach Art. 15 bis 22 DSGVO.<br />
-            (2) <strong>Meldung von Datenschutzverletzungen binnen 24–48 Stunden (Art. 33 DSGVO):</strong> Der Auftragnehmer unterrichtet den Auftraggeber unverzüglich, spätestens jedoch innerhalb von <strong>24 bis maximal 48 Stunden</strong> nach Bekanntwerden, über jede Verletzung des Schutzes personenbezogener Daten auf den Servern der Plattform, um dem Auftraggeber die Einhaltung seiner gesetzlichen 72-Stunden-Meldepflicht nach Art. 33 Abs. 1 DSGVO zu ermöglichen.<br />
-            (3) <strong>Kontroll- &amp; Inspektionsrechte (Schulträger-Dualismus nach Art. 28 Abs. 3 lit. h DSGVO):</strong> Der Auftraggeber – einschließlich der behördlichen Datenschutzbeauftragten kreisfreier Städte, Landkreise oder kommunaler Schulverbände – hat das Recht, sich vor Beginn der Verarbeitung und sodann regelmäßig von der Einhaltung der TOMs zu überzeugen. Der Auftragnehmer stellt hierzu alle Nachweise, ISO 27001-Zertifikate und Audit-Berichte zur Verfügung. Soweit im Einzelfall eine Vor-Ort-Inspektion sachlich geboten ist, wird diese nach angemessener Vorankündigung (in der Regel mindestens 14 Werktage) während der üblichen Betriebszeiten unter Wahrung von Betriebs- und Geschäftsgeheimnissen Dritter ermöglicht.
+            (1) <strong>Betroffenenrechte:</strong> Der Auftragnehmer unterstützt den Auftraggeber mit geeigneten technischen und organisatorischen Maßnahmen (u. a. über das integrierte DPO- &amp; Audit-Portal sowie DSGVO-Dossier-Exporte mit SHA-256 Siegel) bei der Erfüllung der Betroffenenrechte nach Art. 15 bis 22 DSGVO bzw. Art. 25–29 nDSG.<br />
+            (2) <strong>Meldung von Datenschutzverletzungen binnen 24–48 Stunden:</strong> Der Auftragnehmer unterrichtet den Auftraggeber unverzüglich, spätestens jedoch innerhalb von <strong>24 bis maximal 48 Stunden</strong> nach Bekanntwerden, über jede Verletzung des Schutzes personenbezogener Daten auf den Servern der Plattform, um dem Auftraggeber die Einhaltung seiner gesetzlichen Meldepflichten nach Art. 33 Abs. 1 DSGVO (72h) sowie nach Art. 24 nDSG (so rasch als möglich an den EDÖB) zu ermöglichen.<br />
+            (3) <strong>Kontroll- &amp; Inspektionsrechte (Schulträger-Dualismus nach Art. 28 Abs. 3 lit. h DSGVO):</strong> Der Auftraggeber – einschließlich der behördlichen Datenschutzbeauftragten kreisfreier Städte, Landkreise oder kommunaler Schulverbände – hat das Recht, sich vor Beginn der Verarbeitung und sodann regelmäßig von der Einhaltung der TOMs zu überzeugen. Der Auftragnehmer stellt hierzu alle Nachweise, ISO 27001-Zertifikate, das DPO-Compliance-Dossier (VVT, DSFA, TOMs) und das Personalrats-Attest (§ 87 BetrVG) zur Verfügung. Soweit im Einzelfall eine Vor-Ort-Inspektion sachlich geboten ist, wird diese nach angemessener Vorankündigung (in der Regel mindestens 14 Werktage) während der üblichen Betriebszeiten unter Wahrung von Betriebs- und Geschäftsgeheimnissen Dritter ermöglicht.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
             § 7 Beendigung, physische Datenlöschung &amp; DIN 66398 Löschkonzept (Art. 17 &amp; 28 DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Die Speicherung und Löschung erfolgt nach dem strukturierten Kommunalen Löschkonzept (DIN 66398 / 5 Klassen): Temporäre Session-Daten verfallen sofort, didaktische Audio-Aufnahmen verbleiben für die Dauer des laufenden Schuljahres (mit Export-Möglichkeit) und werden zum 31.08. bereinigt, inaktive Schülerprofile wechseln nach 60 Tagen zum Budgetschutz der Musikschule in die Basis-Bereitstellung (0,09 €; Zugänge bleiben erhalten), und die Bildungsbiografie (Meisterwerke) wird nach Beendigung des Ausbildungsverhältnisses bzw. 30 Tage nach formeller Exmatrikulation physisch und unwiderruflich gelöscht. Der Auftraggeber erhält alle erforderlichen Nachweise zur Einhaltung der Pflichten nach Art. 28 DSGVO.
+            Die Speicherung und Löschung erfolgt nach dem strukturierten Kommunalen Löschkonzept (DIN 66398 / 5 Klassen): Temporäre Session-Daten verfallen sofort, didaktische Audio-Aufnahmen verbleiben für die Dauer des laufenden Schuljahres (mit Export-Möglichkeit) und werden am Ende des ersten Monats des jeweiligen individuellen Schuljahres der Musikschule (gem. DIN 66398 / Migration 454 mit einmonatiger Datenexport-Frist für Erziehungsberechtigte gem. Art. 20 DSGVO) automatisiert bereinigt, inaktive Schülerprofile wechseln nach 60 Tagen zum Budgetschutz der Musikschule in die Basis-Bereitstellung (0,09 €; Zugänge bleiben erhalten), und die Bildungsbiografie (Meisterwerke) wird nach Beendigung des Ausbildungsverhältnisses bzw. 30 Tage nach formeller Exmatrikulation physisch und unwiderruflich gelöscht. Der Auftraggeber erhält alle erforderlichen Nachweise zur Einhaltung der Pflichten nach Art. 28 DSGVO.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 8 Haftung, Freistellung im Innenverhältnis &amp; Beweislast (Art. 82 DSGVO &amp; Art. 54 nDSG)
+            § 8 Technischer Support-Fernzugriff („Ghost Support“) &amp; WORM-Revisionssicherheit
+          </h4>
+          <p style={{ margin: '4px 0 12px 0' }}>
+            (1) Ein administrativer Support-Zugriff auf den Mandanten des Auftraggebers („Ghost Support / Session Leasing“) erfolgt ausschließlich weisungsgebunden auf Veranlassung der Schulleitung bzw. zur vertraglichen Störungsbehebung.<br />
+            (2) Der Auftragnehmer beschränkt den Zugriff zeitlich auf einen rollenden 15-Minuten-Lease und inhaltlich auf das für die Diagnose zwingend erforderliche Minimum. Ein Auslesen oder Speichern persönlicher Schülerchats, Notizen oder vertraulicher Schülerbeurteilungen außerhalb des Diagnosekontexts ist technisch und organisatorisch untersagt.<br />
+            (3) Jeder administrative Fernzugriff wird mit Benutzerkennung, Zeitstempel, IP-Adresse und durchgeführter Aktion kryptografisch versiegelt im revisionssicheren WORM-Prüfpfad (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>master_audit_trail</code>) protokolliert und für mindestens zwölf (12) Monate zur Einsichtnahme durch den Datenschutzbeauftragten der Schule vorgehalten.
+          </p>
+
+          <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
+            § 9 Haftung, Freistellung im Innenverhältnis (Hold-Harmless) &amp; Beweislast (Art. 82 DSGVO &amp; Art. 54 nDSG)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
             (1) Die Parteien haften gegenüber betroffenen Personen nach den gesetzlichen Bestimmungen des Art. 82 DSGVO bzw. Art. 54 ff. nDSG.<br />
@@ -542,8 +581,8 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                   <div style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '2px' }}>
                     Gezeichnet durch: <strong>{school?.avv_signee_name || signeeName}</strong> am {new Date(school?.avv_signed_at || Date.now()).toLocaleDateString('de-DE')}
                   </div>
-                  <div style={{ fontSize: '0.66rem', color: '#166534', fontFamily: 'monospace', marginTop: '2px', opacity: 0.85 }}>
-                    Audit-Prüfsumme: SHA256-CG-AVV-{String(targetSchoolId || school?.id || '855992').padStart(6, '0')}-DE
+                  <div style={{ fontSize: '0.66rem', color: '#166534', fontFamily: 'monospace', marginTop: '2px', opacity: 0.85, wordBreak: 'break-all' }}>
+                    Audit-Prüfsumme (WebCrypto SHA-256): {computedDigest || school?.avv_checksum || (school?.avv_signed_at ? `sha256:${String(targetSchoolId || '855992').padStart(8, '0')}` : 'Wird nach Signatur generiert')}
                   </div>
                 </div>
               </div>

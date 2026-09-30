@@ -782,8 +782,6 @@ export function TeacherDashboard({
         setInviteFirstName={students.setInviteFirstName}
         inviteLastName={students.inviteLastName}
         setInviteLastName={students.setInviteLastName}
-        inviteEmail={students.inviteEmail}
-        setInviteEmail={students.setInviteEmail}
         inviteLink={students.inviteLink}
         setInviteLink={students.setInviteLink}
         inviteSaving={students.inviteSaving}

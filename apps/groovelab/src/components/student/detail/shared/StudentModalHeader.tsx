@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Calendar, Pencil, Eye, EyeOff, Award, QrCode, Trophy } from 'lucide-react';
+import { X, Calendar, Pencil, Eye, EyeOff, Award, QrCode, Trophy, Copy, Check } from 'lucide-react';
 import { formatSingleStudentAnonymized } from '../../../../utils/nameHelper';
+import { resolveUserCampusId } from '../../../../utils/campusIdHelper';
 
 export interface StudentModalHeaderProps {
   mode: 'admin' | 'teacher';
@@ -40,6 +41,8 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
   const [editFirst, setEditFirst] = useState(firstName);
   const [editLast, setEditLast] = useState(lastName);
   const [isSaving, setIsSaving] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
+  const resolvedCampusId = resolveUserCampusId(student);
 
   React.useEffect(() => {
     setEditFirst(firstName);
@@ -289,6 +292,49 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#64748b', fontWeight: 650 }}>
               <Calendar size={14} /> Member seit {memberSince}
             </div>
+
+            {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-S-{Nummer}) */}
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(resolvedCampusId);
+                  setCopiedId(true);
+                  setTimeout(() => setCopiedId(false), 2000);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(resolvedCampusId);
+                    setCopiedId(true);
+                    setTimeout(() => setCopiedId(false), 2000);
+                  }
+                }
+              }}
+              style={{
+                background: '#f8fafc',
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
+                padding: '3px 10px',
+                borderRadius: '100px',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                fontFamily: 'monospace',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              }}
+              title="Campus-ID (Klicken zum Kopieren für Support, Überweisung & Ausweis)"
+              aria-label={`Campus-ID ${resolvedCampusId}, klicken zum Kopieren`}
+            >
+              <span>ID: {resolvedCampusId}</span>
+              {copiedId ? <Check size={11} color="#16a34a" /> : <Copy size={11} color="#64748b" />}
+            </span>
 
             {student?.nickname && (
               <span

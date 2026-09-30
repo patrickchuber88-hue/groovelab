@@ -3,6 +3,7 @@ import QRCode from 'react-qr-code';
 import { Check } from 'lucide-react';
 import { formatTeacherFullName, formatSingleStudentAnonymized, maskLastName } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
+import { resolveUserCampusId } from '../utils/campusIdHelper';
 
 export const urlToDataUrl = async (url: string): Promise<string> => {
   if (!url) return '';
@@ -75,6 +76,10 @@ export const inlineAllImagesInElement = async (container: HTMLElement): Promise<
 export interface IDBadgeCardProps {
   user: {
     id?: string;
+    school_id?: string;
+    schoolId?: string;
+    school_numeric_id?: number | string;
+    schoolNumericId?: number | string;
     first_name?: string;
     last_name?: string;
     role?: string;
@@ -186,6 +191,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
     displayLastName = parts.slice(1).join(' ') || (user?.last_name && user?.last_name !== 'L.' ? user?.last_name : 'Landenberger');
   }
 
+  const canonicalCampusId = resolveUserCampusId(user);
   const finalQrSize = qrSize || (isPrintVersion ? 74 : 135);
 
   return (
@@ -406,6 +412,33 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
               </span>
             </div>
           )}
+        </div>
+
+        {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-{Rolle}-{Nummer}) */}
+        <div 
+          style={{ 
+            textAlign: 'center', 
+            marginTop: isPrintVersion ? '1px' : '4px',
+            marginBottom: isPrintVersion ? '1px' : '2px',
+            flexShrink: 0
+          }}
+          title="Campus-ID (Kanonischer Schulausweis-Identifikator)"
+          aria-label={`Campus-ID ${canonicalCampusId}`}
+        >
+          <span style={{ 
+            fontSize: isPrintVersion ? '0.46rem' : '0.68rem', 
+            fontWeight: 800, 
+            color: '#475569', 
+            fontFamily: "'SF Mono', Monaco, Menlo, Consolas, monospace",
+            letterSpacing: '0.08em',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            padding: isPrintVersion ? '1px 5px' : '2px 8px',
+            borderRadius: '6px',
+            display: 'inline-block'
+          }}>
+            ID: {canonicalCampusId}
+          </span>
         </div>
       </div>
 

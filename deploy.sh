@@ -115,7 +115,7 @@ ssh "$SERVER" "cd '$RELEASES_DIR' 2>/dev/null && ls -dt release_* 2>/dev/null | 
 # 7. Synchronisiere Enterprise Server-Skripte nach ~/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
 ssh "$SERVER" "mkdir -p ~/scripts"
-scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh "$SERVER:~/scripts/" || true
+scp scripts/backup.sh scripts/post_restore_reconcile_tombstones.sh scripts/verify_backup_restore.sh scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh "$SERVER:~/scripts/" || true
 ssh "$SERVER" "chmod +x ~/scripts/*.sh 2>/dev/null || true; sudo mkdir -p /root/scripts 2>/dev/null && sudo cp ~/scripts/*.sh /root/scripts/ 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."
 

@@ -315,6 +315,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
     onOpenDunningPayModal
   } = props;
 
+  const formattedSchoolNumericId = String(schoolNumericId || '1').padStart(3, '0');
+
   const effectiveSchoolRates = {
     priceCampus: Number(rawEffectiveSchoolRates?.priceCampus ?? rawMasterRates?.campus ?? 14.9),
     priceGroovelab: Number(rawEffectiveSchoolRates?.priceGroovelab ?? rawMasterRates?.groovelab ?? 9.9),
@@ -921,80 +923,50 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   gap: '12px'
                                 }}>
                                   <strong style={{ fontSize: '0.82rem', color: '#78350f', fontFamily: 'Urbanist' }}>
-                                    Abrechnungsmodell für Schüler-Aktivierungen wählen:
+                                    Abrechnungsmodell: Eltern-Direktabrechnung (5,39 € / Schuljahr)
                                   </strong>
                                   <span style={{ fontSize: '0.72rem', color: '#78350f', opacity: 0.85, lineHeight: '1.4', marginTop: '-4px' }}>
-                                    Die Schule zahlt nur den monatlichen Grundpreis für die schulseitige Infrastruktur. Schüler und Eltern übernehmen die Aktivierung ihres persönlichen Profils selbst.
+                                    Die Schule zahlt nur die Basispauschale für die schulseitige Infrastruktur. Schüler und Eltern übernehmen die Bereitstellung ihres Profils direkt per Einmalzahlung.
                                   </span>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     
-                                    {/* Option 1: Vollständige Umlage (student_full) */}
-                                    <label style={{
+                                    {/* Kanonische 0,1% Voll-Direktabrechnung (student_full) */}
+                                    <div style={{
                                       display: 'flex',
                                       alignItems: 'flex-start',
-                                      gap: '10px',
-                                      cursor: 'pointer',
+                                      gap: '12px',
                                       background: '#ffffff',
-                                      border: '1.5px solid',
-                                      borderColor: studentBillingOption === 'student_full' ? '#f59e0b' : '#e2e8f0',
-                                      borderRadius: '12px',
-                                      padding: '12px',
-                                      transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'student_full' ? '0 4px 12px rgba(245, 158, 11, 0.04)' : 'none'
+                                      border: '1.5px solid #f59e0b',
+                                      borderRadius: '14px',
+                                      padding: '14px',
+                                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.05)'
                                     }}>
-                                      <input
-                                        type="radio"
-                                        name="studentCampusBillingOption"
-                                        checked={studentBillingOption === 'student_full'}
-                                        onChange={() => {
-                                          setStudentBillingOption('student_full');
-                                          setCustomUmlageAmount(effectiveSchoolRates.priceStudent);
-                                        }}
-                                        style={{ marginTop: '3px', accentColor: '#f59e0b' }}
-                                      />
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          1. Vollständige Direktabrechnung (Einmaliger Jahresbeitrag: {(effectiveSchoolRates.priceStudent * 12).toFixed(2).replace('.', ',')} € – umgerechnet {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Monat)
+                                      <div style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        background: '#fef3c7',
+                                        border: '1.5px solid #f59e0b',
+                                        color: '#d97706',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 900,
+                                        flexShrink: 0,
+                                        marginTop: '1px'
+                                      }}>
+                                        ✓
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                                          Kanonische Eltern-Direktabrechnung (Maximal 5,39 € / Schuljahr • CHF 11.00)
                                         </span>
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen den Jahresbeitrag als Einmalzahlung ({(effectiveSchoolRates.priceStudent * 12).toFixed(2).replace('.', ',')} € pro Schuljahr). Monatliche Buchungen sind ausgeschlossen. Die Musikschule wird komplett entlastet (0,00 € Kosten).
+                                        <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.4' }}>
+                                          Eltern und Schüler zahlen den Jahresbeitrag als Einmalzahlung (1. Monat kostenlos, danach max. 11 × 0,49 €; CH: max. CHF 11.00). Monatliche Buchungen und stillschweigende Verlängerungen sind gesetzlich ausgeschlossen. <strong>Deine Musikschule wird für diese Schüler zu 100 % finanziell entlastet (0,00 € Schülerkosten auf der Schulrechnung).</strong>
                                         </span>
                                       </div>
-                                    </label>
-
-                                    {/* Option 2: Teilweise Umlage (student_partial) */}
-                                    <label style={{
-                                      display: 'flex',
-                                      alignItems: 'flex-start',
-                                      gap: '10px',
-                                      cursor: 'pointer',
-                                      background: '#ffffff',
-                                      border: '1.5px solid',
-                                      borderColor: studentBillingOption === 'student_partial' ? '#f59e0b' : '#e2e8f0',
-                                      borderRadius: '12px',
-                                      padding: '12px',
-                                      transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'student_partial' ? '0 4px 12px rgba(245, 158, 11, 0.04)' : 'none'
-                                    }}>
-                                      <input
-                                        type="radio"
-                                        name="studentCampusBillingOption"
-                                        checked={studentBillingOption === 'student_partial'}
-                                        onChange={() => {
-                                          setStudentBillingOption('student_partial');
-                                          setCustomUmlageAmount(0.40);
-                                        }}
-                                        style={{ marginTop: '3px', accentColor: '#f59e0b' }}
-                                      />
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          2. Teilweise Direktabrechnung (Einmaliger Jahresbeitrag: 4,80 € / CHF 9.60 – umgerechnet 0,40 € / CHF 0.80 / Monat)
-                                        </span>
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen den reduzierten Jahresbeitrag von 4,80 € (bzw. CHF 9.60). Monatliche Buchungen sind ausgeschlossen. Die Schule trägt weiterhin die passive Datenbankgebühr.
-                                        </span>
-                                      </div>
-                                    </label>
+                                    </div>
 
                                   </div>
                                   <div style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4', borderTop: '1px solid #fed7aa', paddingTop: '8px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -3582,7 +3554,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
                                     const actDateStr = actDate ? actDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Automatisch aktiv';
                                     const firstMonth = actDate ? `${deMonthsLocal[actDate.getMonth() + 1]} ${actDate.getFullYear()}` : null;
-                                    const firstInvoiceId = actDate ? `AKT-${schoolNumericId}-${String(actDate.getFullYear()).slice(-2)}${String(actDate.getMonth() + 1).padStart(2, '0')}-01` : null;
+                                    const firstInvoiceId = actDate ? `AKT-${formattedSchoolNumericId}-${String(actDate.getFullYear()).slice(-2)}${String(actDate.getMonth() + 1).padStart(2, '0')}-01` : null;
 
                                     return (
                                       <div key={s.id} style={{
@@ -3727,8 +3699,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   const dueYear = dueDateObj.getFullYear();
                                   const dueDateStr = `${dueDay}. ${dueMonthName} ${dueYear}`;
 
-                                  const infId = `INF-${schoolNumericId}-${yearShort}${monthStr}-01`;
-                                  const aktId = `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`;
+                                  const infId = `INF-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`;
+                                  const aktId = `AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`;
 
                                   // Payment Status Invariant: Invoices are 'Versendet' (open) until actually marked as paid via bank reconciliation!
                                   let paidInvoicesList: string[] = [];
@@ -3737,7 +3709,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     paidInvoicesList = storedPaid ? JSON.parse(storedPaid) : [];
                                   } catch {}
 
-                                  const isInfPaid = paidInvoicesList.includes(infId) || paidInvoicesList.includes(`RE-${schoolNumericId}-${yearShort}${monthStr}-01`);
+                                  const isInfPaid = paidInvoicesList.includes(infId) || paidInvoicesList.includes(`RE-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`);
                                   const isAktPaid = paidInvoicesList.includes(aktId);
 
                                   const infStatus = isInfPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
@@ -3858,7 +3830,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     groovelabStudentsHostingFee: monthGroovelabStudentFee,
                                     storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
                                     storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
-                                    auditHash: `CG-INF-${schoolNumericId}-${yearShort}${monthStr}`,
+                                    auditHash: `CG-INF-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
                                     gobd_version: 5,
                                     activatedStudentsList: []
                                   };
@@ -3889,7 +3861,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     activationsCount: effectiveActivationsCount,
                                     restmonate: restmonate,
                                     studentFee: studentFee,
-                                    auditHash: `CG-AKT-${schoolNumericId}-${yearShort}${monthStr}`,
+                                    auditHash: `CG-AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
                                     gobd_version: 5,
                                     activatedStudentsList: invoiceStudentsList.map((s: any) => {
                                       const isNewlyActivated = (() => {

@@ -2,7 +2,7 @@ export interface BypassTeacher {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
   instrument: string;
   maxStudents: number;
   ausweisNummer: string;
@@ -23,7 +23,7 @@ export interface GrooveLabCoach {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
   role: string;
   roles?: string[];
   instrument: string;

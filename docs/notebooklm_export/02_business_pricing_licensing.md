@@ -52,8 +52,5 @@ Vollständig kostenlos für Schülerinnen, Schüler und Eltern.
   * Einmaliger Jahresbeitrag von maximal **`5,39 €` / Schuljahr** (DE/AT) bzw. **`CHF 11.00`** (CH).
   * Berechnung: 1 Monat kostenlos/Schnupperphase + bis zu 11 Monate × `0,49 €`.
   * Die Musikschule wird für alle aktivierten Campus-Schüler komplett entlastet (`0,00 €`).
-* **Teilweise Direktabrechnung**:
-  * Maximal **`4,40 €` / Schuljahr** (1 Monat kostenlos + 11 Monate × `0,40 €`).
-  * Die Schule trägt den Differenzbeitrag von `0,09 €` / Monat.
-* **Härtefall- & Geschwisterregelung**:
+* **Härtefall- & Geschwisterregelung (Das 20:1 Solidaritätsprinzip)**:
   * Einzelne Schüler können in der Administration als Härtefall oder Geschwisterkind markiert werden, sodass die Gebühr bei der Schule verbleibt und keine Elternbeiträge erhoben werden.

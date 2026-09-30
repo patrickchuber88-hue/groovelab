@@ -45,8 +45,8 @@ Pädagogische Notizen, persönliche Feedbacks und didaktische Memos zwischen Leh
 ---
 
 ## § 4 Recht auf Nichterreichbarkeit & Schutz vor Entgrenzung (§ 5 ArbSchG)
-(1) **Asynchrone Natur der Kommunikation:**  
-Die in Campus-Groovelab integrierte Mitteilungsfunktion („Shouts“) ist ein rein asynchrones Kommunikationsmedium. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihrer individuellen Unterrichtszeiten, an Wochenenden, an Feiertagen oder während der Schulferien Benachrichtigungen abzurufen oder Nachrichten zu beantworten.  
+(1) **Asynchrone Natur der Kommunikation & Gefährdungsbeurteilung:**  
+Die in Campus-Groovelab integrierte Mitteilungsfunktion („Shouts“) ist ein rein asynchrones Kommunikationsmedium. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihrer individuellen Unterrichtszeiten, an Wochenenden, an Feiertagen oder während der Schulferien Benachrichtigungen abzurufen oder Nachrichten zu beantworten. Die Einhaltung der Schutzmaßnahmen richtet sich nach der anliegenden *Gefährdungsbeurteilung psychischer Belastungen für digitale Medien gem. §§ 5, 6 ArbSchG*.
 (2) **Benachrichtigungs-Steuerung:**  
 Den Lehrkräften steht es frei, Push- oder Browser-Benachrichtigungen auf ihren Endgeräten dauerhaft oder zeitgesteuert zu deaktivieren. Aus einer verzögerten Kenntnisnahme oder Nicht-Reaktion außerhalb der Dienstzeit dürfen den Lehrkräften keinerlei dienstrechtliche Nachteile entstehen.  
 (3) **Dringende Notfälle:**  
@@ -67,7 +67,7 @@ Dringende Dienst- und Notfallmeldungen (z. B. plötzliche Schulschließung, Unwe
 ---
 
 ## § 7 Beteiligungs- und Einsichtsrechte des Personalrats
-(1) Dem Personalrat wird auf Wunsch ein personalisierter Testzugang zur Verfügung gestellt, um sich jederzeit von der Funktionsweise und der Einhaltung des Überwachungsverbots zu überzeugen.  
+(1) Dem Personalrat wird auf Wunsch ein personalisierter Testzugang zur Verfügung gestellt, um sich jederzeit von der Funktionsweise und der Einhaltung des Überwachungsverbots zu überzeugen. Die Beteiligungsrechte richten sich nach den landesspezifischen Vorschriften des jeweiligen Landespersonalvertretungsgesetzes (LPVG der Länder / BPersVG des Bundes / § 87 BetrVG).  
 (2) Wesentliche Software-Updates, die den Funktionsumfang im Bereich der Mitarbeiterdaten oder Kommunikationskanäle erweitern, sind dem Personalrat vorab rechtzeitig anzuzeigen.
 
 ---

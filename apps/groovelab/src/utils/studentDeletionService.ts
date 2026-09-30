@@ -192,10 +192,6 @@ export async function deleteStudentFully(
     await safeDeleteIds('student_last_names', 'student_id');
     await safeDeleteIds('student_onboarding_tokens', 'student_id');
     await safeDeleteIds('onboarding_attempts', 'student_id');
-    await safeDeleteIds('parent_email_prefixes', 'student_id');
-    await safeDeleteIds('parent_email_suffixes', 'student_id');
-    await safeDeleteIds('user_email_prefixes', 'user_id');
-    await safeDeleteIds('user_email_suffixes', 'user_id');
     await safeDeleteIds('pending_students', 'id');
     await safeDeleteIds('users_raw', 'id');
     await safeDeleteIds('students', 'id');

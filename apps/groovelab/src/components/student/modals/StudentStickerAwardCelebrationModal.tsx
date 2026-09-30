@@ -434,23 +434,32 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
                 filter: 'drop-shadow(0 16px 28px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 16px rgba(255, 255, 255, 0.15))'
               }}
             >
+              <span style={{
+                fontSize: '5.5rem',
+                lineHeight: 1,
+                userSelect: 'none',
+                position: 'absolute'
+              }}>
+                {sticker.emoji || '🏆'}
+              </span>
               <img
-                src={`/stickers/${sticker.id}.png?v=1`}
+                src={`/stickers/thumbs/${sticker.id}.png`}
                 alt={sticker.title}
                 style={{
                   maxWidth: '100%',
                   maxHeight: '100%',
                   objectFit: 'contain',
-                  borderRadius: '24px'
+                  borderRadius: '24px',
+                  position: 'relative',
+                  zIndex: 1
                 }}
                 onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const parent = e.currentTarget.parentElement;
-                  if (parent) {
-                    const span = document.createElement('span');
-                    span.style.fontSize = '5.5rem';
-                    span.innerText = sticker.emoji || '🏆';
-                    parent.appendChild(span);
+                  const target = e.currentTarget;
+                  if (!target.dataset.triedFallback) {
+                    target.dataset.triedFallback = 'true';
+                    target.src = `/stickers/${sticker.id}.png`;
+                  } else {
+                    target.style.display = 'none';
                   }
                 }}
               />

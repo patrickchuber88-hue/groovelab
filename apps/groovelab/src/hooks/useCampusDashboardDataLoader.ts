@@ -1454,7 +1454,7 @@ export function useCampusDashboardDataLoader({
 
       const uResSchool = await supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, ausfall_until, ausfall_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username, master_admin_email')
+        .select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, ausfall_until, ausfall_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username')
         .eq('school_id', schoolId)
         .order('first_name');
 

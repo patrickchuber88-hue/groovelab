@@ -23,7 +23,7 @@ import { computeSchoolDunningStatus, SchoolDunningStatus } from '../../../domain
 import { getSimulatedNow } from '../utils/teacherDashboardUtils';
 
 // 🛡️ OWASP ASVS Level 3: Strict explicit column whitelists for teacher profiles (Zero Wildcards & Zero Secret Leakage)
-export const TEACHER_SELECT_COLUMNS = 'id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, avatar_url, instrument, is_active, ausweis_nummer, teacher_qr_token, qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, lesson_duration, is_pin_activated, ausfall_until, ausfall_start, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing';
+export const TEACHER_SELECT_COLUMNS = 'id, school_id, first_name, last_name, nickname, role, roles, photo_url, avatar_url, instrument, is_active, ausweis_nummer, teacher_qr_token, qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, lesson_duration, is_pin_activated, ausfall_until, ausfall_start, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing';
 
 export const TEACHER_WITH_SCHOOL_SELECT = `${TEACHER_SELECT_COLUMNS}, schools(id, name, subdomain, logo_url, primary_color, calendar_url, status, opening_hours, is_trial, trial_ends_at, subscription_bypass, has_campus_subscription, has_groovelab_subscription, allow_messages_global)`;
 

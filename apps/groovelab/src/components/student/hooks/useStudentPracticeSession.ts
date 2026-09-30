@@ -64,6 +64,31 @@ export function useStudentPracticeSession({
   // WakeLock ref for active practice sessions
   const wakeLockRef = useRef<any>(null);
 
+  // 🛡️ Fail-Safe Screen-WakeLock Helper Functions (TDDDG § 25 Akkuschonung & Tab-Switch-Immunität)
+  const requestScreenWakeLock = useCallback(async () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (!('wakeLock' in navigator) || document.hidden) return;
+    try {
+      if (!wakeLockRef.current) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
+      }
+    } catch (_) {
+      // Graceful fallback: Batteriemodus oder Berechtigungsverweigerung
+    }
+  }, []);
+
+  const releaseScreenWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (_) {}
+      wakeLockRef.current = null;
+    }
+  }, []);
+
   // Active Timer Loop (Stoppt zuverlässig, wenn pausiert)
   useEffect(() => {
     let timer: any = null;
@@ -72,25 +97,35 @@ export function useStudentPracticeSession({
         setSecondsElapsed(prev => prev + 1);
       }, 1000);
 
-      if ('wakeLock' in navigator) {
-        (navigator as any).wakeLock.request('screen').then((lock: any) => {
-          wakeLockRef.current = lock;
-        }).catch(() => {});
-      }
+      requestScreenWakeLock();
     } else {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release().catch(() => {});
-        wakeLockRef.current = null;
-      }
+      releaseScreenWakeLock();
     }
     return () => {
       if (timer) clearInterval(timer);
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release().catch(() => {});
-        wakeLockRef.current = null;
+      releaseScreenWakeLock();
+    };
+  }, [sessionActive, isSessionPaused, requestScreenWakeLock, releaseScreenWakeLock]);
+
+  // 🛡️ Automatic WakeLock Release on Tab-Switch / VisibilityChange (TDDDG § 25 Compliance)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab im Hintergrund: Sofortige Akku- & Display-Entlastung
+        releaseScreenWakeLock();
+      } else if (sessionActive && !isSessionPausedRef.current) {
+        // Tab wieder im Vordergrund: Nahtlose Wiederaufnahme des WakeLocks
+        requestScreenWakeLock();
       }
     };
-  }, [sessionActive, isSessionPaused]);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sessionActive, requestScreenWakeLock, releaseScreenWakeLock]);
 
   // Fetch Fokus Logs
   const fetchFokusLogs = useCallback(async () => {

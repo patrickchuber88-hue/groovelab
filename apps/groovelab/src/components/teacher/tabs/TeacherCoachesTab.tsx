@@ -60,9 +60,9 @@ export const TeacherCoachesTab: React.FC<TeacherCoachesTabProps> = ({
                   <span style={{ fontWeight: 800 }}>{coach.instrument || 'Allgemein'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748b', fontWeight: 600 }}>E-Mail:</span>
-                  <span style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px', color: coach.email ? '#1e293b' : '#94a3b8' }}>
-                    {coach.email || 'Nicht hinterlegt'}
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>Ausweis-ID:</span>
+                  <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#1e293b' }}>
+                    {coach.ausweis_nummer || (coach.id ? `#${coach.id.slice(0, 8)}` : 'Aktiv')}
                   </span>
                 </div>
               </div>

@@ -78,12 +78,12 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
         throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
       }
 
-      const email = currentUser.email || `${currentUser.role || 'user'}.${currentUser.id.substring(0, 8)}@campus-groovelab.local`;
+      const userHandle = `${currentUser.role || 'user'}_${currentUser.id.substring(0, 8)}`;
       const userName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Mitarbeiter';
       const roleLabel = currentUser.role === 'admin' ? 'Schulleitung' : currentUser.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft';
 
       const passkeyResult = await registerBiometrics(
-        email,
+        userHandle,
         currentUser.id,
         chalData.challenge,
         `${userName} (${roleLabel})`
@@ -108,7 +108,6 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
       // 3. Save to local Biometric Device Vault for instant Quick-Login persistence
       saveBiometricProfile({
         userId: currentUser.id,
-        email,
         firstName: currentUser.first_name || '',
         lastName: currentUser.last_name || '',
         role: currentUser.role || 'teacher',

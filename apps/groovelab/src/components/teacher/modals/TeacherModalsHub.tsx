@@ -86,8 +86,6 @@ export interface TeacherModalsHubProps {
   setInviteFirstName: (name: string) => void;
   inviteLastName: string;
   setInviteLastName: (name: string) => void;
-  inviteEmail: string;
-  setInviteEmail: (email: string) => void;
   inviteLink: string | null;
   setInviteLink: (link: string | null) => void;
   inviteSaving: boolean;
@@ -224,8 +222,6 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
   setInviteFirstName,
   inviteLastName,
   setInviteLastName,
-  inviteEmail,
-  setInviteEmail,
   inviteLink,
   setInviteLink,
   inviteSaving,
@@ -478,8 +474,6 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
         setInviteFirstName={setInviteFirstName}
         inviteLastName={inviteLastName}
         setInviteLastName={setInviteLastName}
-        inviteEmail={inviteEmail}
-        setInviteEmail={setInviteEmail}
         inviteSaving={inviteSaving}
         handleInviteStudent={handleInviteStudent}
       />

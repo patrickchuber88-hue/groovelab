@@ -123,12 +123,15 @@ const REQUIRED_INVARIANTS = [
   },
   {
     key: 'permissions-policy',
-    name: 'Permissions-Policy (Hardware Sandbox)',
+    name: 'Permissions-Policy (Hardware Sandbox & TDDDG § 25 Sensor-Sperre)',
     validate: (val) => {
       if (!val) return 'Header fehlt';
       if (!/camera=\(/i.test(val)) return 'camera-Restriktion fehlt';
       if (!/microphone=\(/i.test(val)) return 'microphone-Restriktion fehlt';
       if (!/geolocation=\(\)/i.test(val)) return 'geolocation=() fehlt';
+      if (!/gyroscope=\(\)/i.test(val)) return 'gyroscope=() fehlt (TDDDG § 25)';
+      if (!/accelerometer=\(\)/i.test(val)) return 'accelerometer=() fehlt (TDDDG § 25)';
+      if (!/magnetometer=\(\)/i.test(val)) return 'magnetometer=() fehlt (TDDDG § 25)';
       return null;
     }
   },

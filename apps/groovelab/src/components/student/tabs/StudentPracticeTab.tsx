@@ -932,20 +932,34 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             justifyContent: 'center',
                             flexShrink: 0,
                             padding: '2px',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            position: 'relative'
                           }}>
+                            <span style={{
+                              fontSize: isMusicStandMode ? '1.6rem' : '1.3rem',
+                              lineHeight: 1,
+                              userSelect: 'none',
+                              position: 'absolute'
+                            }}>
+                              {stickerIcon}
+                            </span>
                             <img
-                              src={`/stickers/${stickerId}.png?v=1`}
+                              src={`/stickers/thumbs/${stickerId}.png`}
                               alt={nextStickerName}
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                position: 'relative',
+                                zIndex: 1
+                              }}
                               onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const span = document.createElement('span');
-                                  span.style.fontSize = '1.4rem';
-                                  span.innerText = stickerIcon;
-                                  parent.appendChild(span);
+                                const target = e.currentTarget;
+                                if (!target.dataset.triedFallback) {
+                                  target.dataset.triedFallback = 'true';
+                                  target.src = `/stickers/${stickerId}.png`;
+                                } else {
+                                  target.style.display = 'none';
                                 }
                               }}
                             />
@@ -3782,20 +3796,34 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             justifyContent: 'center',
                             flexShrink: 0,
                             padding: '3px',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            position: 'relative'
                           }}>
+                            <span style={{
+                              fontSize: '1.3rem',
+                              lineHeight: 1,
+                              userSelect: 'none',
+                              position: 'absolute'
+                            }}>
+                              {stickerIcon}
+                            </span>
                             <img
-                              src={`/stickers/${stickerId}.png?v=1`}
+                              src={`/stickers/thumbs/${stickerId}.png`}
                               alt={nextStickerName}
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                position: 'relative',
+                                zIndex: 1
+                              }}
                               onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const span = document.createElement('span');
-                                  span.style.fontSize = '1.3rem';
-                                  span.innerText = stickerIcon;
-                                  parent.appendChild(span);
+                                const target = e.currentTarget;
+                                if (!target.dataset.triedFallback) {
+                                  target.dataset.triedFallback = 'true';
+                                  target.src = `/stickers/${stickerId}.png`;
+                                } else {
+                                  target.style.display = 'none';
                                 }
                               }}
                             />

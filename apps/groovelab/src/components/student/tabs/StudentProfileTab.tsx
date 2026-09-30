@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Building, Calendar, Camera, Clock, Flame, Lock, Pencil, QrCode, Star, Users, X } from "lucide-react";
+import { Building, Calendar, Camera, Clock, Flame, Lock, Pencil, QrCode, Star, Users, X, Copy, Check } from "lucide-react";
 import { QRCodeModal } from "../../QRCodeModal";
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from "../../../utils/avatarHelper";
 import { STUDENT_AVATARS } from "../studentAvatars.constants";
 import { formatTeacherFullName } from "../../../utils/nameHelper";
+import { resolveUserCampusId } from "../../../utils/campusIdHelper";
 
 export interface StudentProfileTabProps {
   activeTab: string;
@@ -20,8 +21,6 @@ export interface StudentProfileTabProps {
   setShowAvatarSelector: (show: boolean) => void;
   avatarCategoryFilter: string;
   setAvatarCategoryFilter: (cat: string) => void;
-  showSecondEmail: boolean;
-  setShowSecondEmail: (show: boolean) => void;
   familyProfiles: any[];
   handleSwitchFamilyStudent: (student: any) => void;
   setIsAddSiblingModalOpen: (open: boolean) => void;
@@ -52,8 +51,6 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
   setShowAvatarSelector,
   avatarCategoryFilter,
   setAvatarCategoryFilter,
-  showSecondEmail,
-  setShowSecondEmail,
   familyProfiles,
   handleSwitchFamilyStudent,
   setIsAddSiblingModalOpen,
@@ -68,6 +65,9 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
   flamesActive = true,
   xpActive = true,
 }) => {
+  const [copiedCampusId, setCopiedCampusId] = useState(false);
+  const resolvedCampusId = resolveUserCampusId(studentUser);
+
   // ♿ BFSG 2025 / WCAG 2.2 AA: Escape-Key-Listener zum Schließen des Modals
   useEffect(() => {
     if (!showEditProfile) return;
@@ -223,6 +223,49 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                 <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', fontWeight: 500 }}>
                   • Mitglied seit {studentUser.created_at && !isNaN(new Date(studentUser.created_at).getTime()) ? new Date(studentUser.created_at).toLocaleDateString('de-DE') : 'unbekannt'}
                 </span>
+
+                {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-S-{Nummer}) */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(resolvedCampusId);
+                      setCopiedCampusId(true);
+                      setTimeout(() => setCopiedCampusId(false), 2000);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(resolvedCampusId);
+                        setCopiedCampusId(true);
+                        setTimeout(() => setCopiedCampusId(false), 2000);
+                      }
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(255, 255, 255, 0.35)',
+                    padding: '3px 12px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    fontFamily: 'monospace',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
+                  }}
+                  title="Campus-ID (Klicken zum Kopieren für Support, Überweisung & Ausweis)"
+                  aria-label={`Campus-ID ${resolvedCampusId}, klicken zum Kopieren`}
+                >
+                  <span>ID: {resolvedCampusId}</span>
+                  {copiedCampusId ? <Check size={12} color="#86efac" /> : <Copy size={12} color="#ffffff" />}
+                </span>
               </div>
 
               <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#ffffff', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
@@ -291,7 +334,6 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                 onClick={() => {
                   setEditingProfile({ ...studentUser });
                   setAvatarCategoryFilter('Alle');
-                  setShowSecondEmail(!!studentUser?.parent_email);
                   setShowAvatarSelector(false);
                   setShowEditProfile(true);
                 }} 
