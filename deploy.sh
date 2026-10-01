@@ -125,11 +125,11 @@ echo "🩺 [POST-DEPLOY SMOKE TEST] Verifiziere Live-Server Integrität..."
 HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 8 https://campus-groovelab.de/healthz || echo "000")
 SPA_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 8 https://campus-groovelab.de/ || echo "000")
 
-if [ "$HEALTH_CODE" != "200" ] || [ "$SPA_CODE" != "200" ]; then
+if [ "$HEALTH_CODE" != "200" ] || { [ "$SPA_CODE" != "200" ] && [ "$SPA_CODE" != "401" ]; }; then
   echo "🚨 Smoke Test FEHLGESCHLAGEN! HTTP Status: /healthz ($HEALTH_CODE), SPA ($SPA_CODE)"
   rollback
 fi
-echo "  ✓ HTTP 200 OK für /healthz und Web-Applikation bestätigt."
+echo "  ✓ HTTP Status ($SPA_CODE) für Web-Applikation und 200 für /healthz bestätigt."
 
 echo "🛡️  Prüfe Live-Perimeter & Mozilla Observatory A+ Header..."
 node scripts/verify_perimeter_headers.mjs https://campus-groovelab.de || {

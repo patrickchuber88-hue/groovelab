@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import storageRoutes from './routes/storage';
+import gateRoutes from './routes/gate';
 import { supabaseProxy, silentRefreshMiddleware } from './routes/proxy';
 
 dotenv.config();
@@ -145,9 +146,16 @@ app.use((req, res, next) => {
     }
 
     // 3. Strict Fail-Closed Origin Verification
-    const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
-    if (!requestOrigin || requestOrigin !== allowedOrigin) {
-      dispatchSecurityAlert('CSRF_ORIGIN_MISMATCH', req, { requestOrigin, allowedOrigin });
+    const configuredOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const trustedOrigins = new Set([
+      configuredOrigin,
+      'https://campus-groovelab.de',
+      'https://www.campus-groovelab.de',
+      'http://localhost:5173',
+      'http://localhost:4000',
+    ]);
+    if (!requestOrigin || !trustedOrigins.has(requestOrigin)) {
+      dispatchSecurityAlert('CSRF_ORIGIN_MISMATCH', req, { requestOrigin, configuredOrigin });
       return res.status(403).json({ error: 'CSRF blocked: Untrusted or missing origin' });
     }
 
@@ -175,6 +183,14 @@ app.use((req, res, next) => {
 });
 
 app.use(cookieParser());
+
+// 0. Site-Gate Ingress Routes (Password Protection & Ingress Subrequest Verification)
+app.use(
+  ['/gate', '/api/gate'],
+  express.json({ limit: '64kb' }),
+  express.urlencoded({ extended: true }),
+  gateRoutes
+);
 
 // 1. Auth Routes with Strict Rate Limiting & 1MB Body Limit
 app.use('/api/auth', authRateLimiter, tenantRateLimiter, express.json({ limit: '1mb' }), authRoutes);
