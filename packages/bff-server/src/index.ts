@@ -186,7 +186,7 @@ app.use(cookieParser());
 
 // 0. Site-Gate Ingress Routes (Password Protection & Ingress Subrequest Verification)
 app.use(
-  ['/gate', '/api/gate'],
+  ['/gate', '/api/gate', '/api/bff/gate'],
   express.json({ limit: '64kb' }),
   express.urlencoded({ extended: true }),
   gateRoutes

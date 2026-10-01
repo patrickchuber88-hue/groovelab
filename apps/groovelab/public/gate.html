@@ -334,7 +334,7 @@
     </div>
 
     <!-- Progressive Enhancement: Native POST fallback if JS is disabled -->
-    <form id="gateForm" method="POST" action="/api/bff/gate/login">
+    <form id="gateForm" method="POST" action="/api/gate/login">
       <div class="form-group">
         <label for="passwordInput">Zugangscode</label>
         <div class="input-wrapper">
@@ -423,7 +423,7 @@
 
         try {
           // Attempt login via the BFF gate endpoint
-          const res = await fetch('/api/bff/gate/login', {
+          const res = await fetch('/api/gate/login', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
