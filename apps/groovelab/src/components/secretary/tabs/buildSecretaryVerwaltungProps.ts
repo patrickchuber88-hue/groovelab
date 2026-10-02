@@ -69,6 +69,8 @@ export interface BuildSecretaryVerwaltungPropsParams {
   setIsFeedbackModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setShowDpoIdCardModal: React.Dispatch<React.SetStateAction<boolean>>;
   setShowDpoPortalModal: React.Dispatch<React.SetStateAction<boolean>>;
+  showOwnQrModal?: boolean;
+  setShowOwnQrModal?: (val: boolean) => void;
   setQrModalUser: (user: any) => void;
   getEffectiveStorageUsedBytes: (profile: any) => number;
   formatInstrumentName: (name?: string | null | any) => string;
@@ -114,6 +116,8 @@ export function buildSecretaryVerwaltungProps(
     setIsFeedbackModalOpen,
     setShowDpoIdCardModal,
     setShowDpoPortalModal,
+    showOwnQrModal,
+    setShowOwnQrModal,
     setQrModalUser,
     getEffectiveStorageUsedBytes,
     formatInstrumentName,
@@ -489,8 +493,8 @@ export function buildSecretaryVerwaltungProps(
     setShowResetModal: settings.setShowResetModal,
     resetConfirmText: settings.resetConfirmText,
     setResetConfirmText: settings.setResetConfirmText,
-    showOwnQrModal: settings.showOwnQrModal,
-    setShowOwnQrModal: settings.setShowOwnQrModal,
+    showOwnQrModal: showOwnQrModal ?? settings?.showOwnQrModal ?? false,
+    setShowOwnQrModal: setShowOwnQrModal ?? settings?.setShowOwnQrModal ?? (() => {}),
     copiedSettingsLink: settings.copiedSettingsLink,
     setCopiedSettingsLink: settings.setCopiedSettingsLink,
     copiedSettingsPin: settings.copiedSettingsPin,
@@ -519,6 +523,12 @@ export function buildSecretaryVerwaltungProps(
     kioskToken: extendedSettings.kioskToken,
     isExporting: settings.isExporting,
     isRestoring: settings.isRestoring,
+
+    // Statutory Holidays & Feiertage
+    showSchoolHolidays: settings.showSchoolHolidays,
+    setShowSchoolHolidays: settings.setShowSchoolHolidays,
+    holidayJurisdiction: settings.holidayJurisdiction,
+    setHolidayJurisdiction: settings.setHolidayJurisdiction,
 
     // Announcements
     announcementsList: announcements.announcementsList,

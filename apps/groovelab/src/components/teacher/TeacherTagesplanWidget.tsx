@@ -1,7 +1,7 @@
 import { formatCleanNoteContent } from '../notes/notesConstants';
 import React, { useState, useRef } from 'react';
 import {
-  CalendarX, Check, ChevronDown, Clock, Coffee, DoorOpen, Eye, EyeOff,
+  Calendar, CalendarX, Check, ChevronDown, Clock, Coffee, DoorOpen, Eye, EyeOff,
   Headphones, HelpCircle, MessageSquare, Mic, Music, Sparkles, Sun, Users
 } from 'lucide-react';
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
@@ -657,7 +657,7 @@ export const resolveSlotStudent = (slotOrStudent: any, allStudents?: any[]) => {
     slot_id: target.id,
     first_name: matchedFromAll?.first_name || targetFn || 'Schüler',
     last_name: matchedFromAll?.last_name || targetLn || '',
-    photo_url: matchedFromAll?.photo_url || target.photo_url || '/avatar_ghost.jpg',
+    photo_url: (matchedFromAll?.photo_url && !matchedFromAll.photo_url.includes('avatar_ghost')) ? matchedFromAll.photo_url : (target.photo_url && !target.photo_url.includes('avatar_ghost') ? target.photo_url : '/avatars/gitarre_avatar_new.png'),
     is_campus_active: matchedFromAll ? matchedFromAll.is_campus_active : target.is_campus_active,
     canonical_uuid: isUUID(canonicalId) ? canonicalId : (isUUID(matchedFromAll?.id) ? matchedFromAll.id : undefined)
   };
@@ -712,6 +712,10 @@ export interface TeacherTagesplanWidgetProps {
   onOpenMakeupModal?: (params: { mode: 'create' | 'redeem', slot: any }) => void;
   rooms?: any[];
   handleUpdateIssueRoom?: (issueId: string, newRoom: string) => Promise<void> | void;
+  onNavigateSchedule?: () => void;
+  onTabChange?: (tab: string) => void;
+  activeChatOccIds?: Set<string>;
+  unreadChatOccIds?: Set<string>;
 }
 
 export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
@@ -756,6 +760,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
   onOpenMakeupModal,
   rooms = [],
   handleUpdateIssueRoom,
+  onNavigateSchedule,
+  onTabChange,
+  activeChatOccIds = new Set(),
+  unreadChatOccIds = new Set(),
 }) => {
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -1816,49 +1824,97 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                     );
                                   })()}
 
-                                  {/* 1:1 Shoutbox Icon Button */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const targetSlot = slot.isGroup ? slot.slots[0] : slot;
-                                      const resolved = resolveSlotStudent(slot, allStudents);
-                                      if (targetSlot && resolved) {
-                                        setActiveChatOcc({
-                                          id: targetSlot.id,
-                                          student_id: resolved.canonicalId,
-                                          teacher_id: targetSlot.teacher_id || userId,
-                                          date: targetSlot.date,
-                                          start_time: targetSlot.timeSlot,
-                                          student: {
-                                            first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler')
+                                   {/* 1:1 Shoutbox Icon Button */}
+                                  {(() => {
+                                    const targetSlot = slot.isGroup ? slot.slots?.[0] : slot;
+                                    const resolved = resolveSlotStudent(slot, allStudents);
+                                    const slotOccId = String(targetSlot?.id || slot.id || '');
+                                    const slotSchedId = targetSlot?.schedule_id || slot.schedule_id;
+                                    const slotDate = targetSlot?.date || slot.date;
+                                    const studentCanonicalId = resolved?.canonicalId || slot.student?.id || slot.student_id;
+
+                                    const hasSlotMessages = Boolean(
+                                      (slotOccId && activeChatOccIds?.has(slotOccId)) ||
+                                      (slot.occurrence_id && activeChatOccIds?.has(String(slot.occurrence_id))) ||
+                                      (slotSchedId && slotDate && activeChatOccIds?.has(`virtual-${slotSchedId}-${slotDate}`)) ||
+                                      (studentCanonicalId && slotDate && activeChatOccIds?.has(`${studentCanonicalId}_${slotDate}`)) ||
+                                      (studentCanonicalId && activeChatOccIds?.has(String(studentCanonicalId)))
+                                    );
+
+                                    const hasSlotUnread = Boolean(
+                                      (slotOccId && unreadChatOccIds?.has(slotOccId)) ||
+                                      (slot.occurrence_id && unreadChatOccIds?.has(String(slot.occurrence_id))) ||
+                                      (slotSchedId && slotDate && unreadChatOccIds?.has(`virtual-${slotSchedId}-${slotDate}`)) ||
+                                      (studentCanonicalId && slotDate && unreadChatOccIds?.has(`${studentCanonicalId}_${slotDate}`)) ||
+                                      (studentCanonicalId && unreadChatOccIds?.has(String(studentCanonicalId)))
+                                    );
+
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (targetSlot && resolved) {
+                                            setActiveChatOcc({
+                                              id: targetSlot.id,
+                                              student_id: resolved.canonicalId,
+                                              teacher_id: targetSlot.teacher_id || userId,
+                                              date: targetSlot.date,
+                                              start_time: targetSlot.timeSlot,
+                                              student: {
+                                                first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler')
+                                              }
+                                            });
                                           }
-                                        });
-                                      }
-                                    }}
-                                    title="Termingekoppelte Shoutbox öffnen"
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      background: '#ffffff',
-                                      color: '#34a853',
-                                      width: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
-                                      height: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
-                                      minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
-                                      minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
-                                      borderRadius: '8px',
-                                      border: '1px solid #e2e8f0',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.18s ease',
-                                      flexShrink: 0,
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                      touchAction: 'manipulation'
-                                    }}
-                                    className="hover-scale-mini"
-                                  >
-                                    <MessageSquare size={(isMobileDevice || windowWidth < 768) ? 16 : 15} />
-                                  </button>
+                                        }}
+                                        title={hasSlotUnread ? "Termingekoppelte Shoutbox (Neue ungelesene Nachricht)" : (hasSlotMessages ? "Termingekoppelte Shoutbox (Nachrichten vorhanden)" : "Termingekoppelte Shoutbox öffnen")}
+                                        aria-label={hasSlotUnread ? "Termingekoppelte Shoutbox: Neue ungelesene Nachricht vorhanden" : (hasSlotMessages ? "Termingekoppelte Shoutbox: Nachrichten vorhanden" : "Termingekoppelte Shoutbox öffnen")}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          background: hasSlotMessages ? '#fefce8' : '#ffffff',
+                                          color: hasSlotMessages ? '#ca8a04' : '#64748b',
+                                          width: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          height: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          borderRadius: '8px',
+                                          border: hasSlotMessages ? '1.5px solid #fde047' : '1px solid #e2e8f0',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.18s ease',
+                                          flexShrink: 0,
+                                          boxShadow: hasSlotMessages ? '0 1px 4px rgba(202, 138, 4, 0.20)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                          touchAction: 'manipulation',
+                                          position: 'relative'
+                                        }}
+                                        className="hover-scale-mini"
+                                      >
+                                        <MessageSquare 
+                                          size={(isMobileDevice || windowWidth < 768) ? 16 : 15} 
+                                          color={hasSlotMessages ? '#ca8a04' : '#64748b'}
+                                          fill={hasSlotMessages ? '#eab308' : 'none'}
+                                        />
+                                        {hasSlotUnread && (
+                                          <span 
+                                            style={{
+                                              position: 'absolute',
+                                              top: '2px',
+                                              right: '2px',
+                                              width: '7px',
+                                              height: '7px',
+                                              borderRadius: '50%',
+                                              background: '#eab308',
+                                              border: '1.5px solid #ffffff',
+                                              animation: 'pulse 1.5s infinite',
+                                              boxShadow: '0 0 6px rgba(234, 179, 8, 0.6)'
+                                            }} 
+                                            title="Neue ungelesene Nachricht vorhanden"
+                                          />
+                                        )}
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
@@ -2153,147 +2209,200 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 })() : (
                   <div 
                     style={{
-                      background: '#ffffff',
-                      borderRadius: '20px',
-                      padding: (windowWidth < 768 || isMobileDevice) ? '16px 12px' : '20px',
+                      background: 'transparent',
+                      borderRadius: '0px',
+                      padding: (windowWidth < 768 || isMobileDevice) ? '28px 16px 20px' : '36px 24px 28px',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'stretch',
-                      gap: '16px',
-                      textAlign: 'left',
-                      position: 'relative'
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: 1,
+                      gap: '20px',
+                      border: 'none',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
                     }}
                   >
-                    {/* Status Header */}
+                    {/* Decorative ambient background glows */}
                     <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingBottom: '12px',
-                      borderBottom: '1px solid #f1f5f9'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '8px',
-                          background: isWeekend ? '#f5f3ff' : '#f0fdf4',
-                          border: isWeekend ? '1px solid #ede9fe' : '1px solid #dcfce7',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          {isWeekend ? <Music size={14} color="#7c3aed" /> : <Sparkles size={14} color="#16a34a" />}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            {isWeekend ? 'Wochenend-Ruhe' : 'Unterrichtsfrei'}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                            {isWeekend ? 'Keine Termine bis Montag' : 'Keine aktiven Termine für heute'}
-                          </div>
-                        </div>
-                      </div>
+                      position: 'absolute',
+                      top: '-20%',
+                      right: '-20%',
+                      width: '65%',
+                      height: '65%',
+                      background: isWeekend
+                        ? 'radial-gradient(circle, rgba(192, 132, 252, 0.18) 0%, transparent 65%)'
+                        : isFreeDay
+                          ? 'radial-gradient(circle, rgba(74, 222, 128, 0.12) 0%, transparent 65%)'
+                          : 'radial-gradient(circle, rgba(96, 165, 250, 0.12) 0%, transparent 65%)',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-20%',
+                      left: '-20%',
+                      width: '65%',
+                      height: '65%',
+                      background: isWeekend
+                        ? 'radial-gradient(circle, rgba(129, 140, 248, 0.14) 0%, transparent 65%)'
+                        : isFreeDay
+                          ? 'radial-gradient(circle, rgba(34, 197, 94, 0.08) 0%, transparent 65%)'
+                          : 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 65%)',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }} />
 
-                      <span style={{
-                        fontSize: '0.70rem',
-                        fontWeight: 750,
-                        color: isWeekend ? '#7c3aed' : '#16a34a',
-                        background: isWeekend ? '#f5f3ff' : '#f0fdf4',
-                        border: isWeekend ? '1px solid #ede9fe' : '1px solid #bbf7d0',
-                        padding: '3px 10px',
-                        borderRadius: '100px'
+                    {/* Refined Luminous Apple Squircle */}
+                    <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div 
+                        style={{ 
+                          width: '68px', 
+                          height: '68px', 
+                          background: isWeekend
+                            ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+                            : isFreeDay
+                              ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+                              : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+                          borderRadius: '22px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          boxShadow: isWeekend
+                            ? '0 12px 28px -6px rgba(109, 40, 217, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.4)'
+                            : isFreeDay
+                              ? '0 12px 28px -6px rgba(21, 128, 61, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.4)'
+                              : '0 12px 28px -6px rgba(29, 78, 216, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.4)',
+                          position: 'relative',
+                          cursor: 'default'
+                        }}
+                      >
+                        {isWeekend ? (
+                          <Music size={32} color="#ffffff" strokeWidth={2.2} />
+                        ) : isFreeDay ? (
+                          <Sparkles size={30} color="#ffffff" strokeWidth={2.2} />
+                        ) : (
+                          <Coffee size={30} color="#ffffff" strokeWidth={2.2} />
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Typographic Hero */}
+                    <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', textAlign: 'center' }}>
+                      <h4 style={{ 
+                        margin: 0, 
+                        fontSize: (windowWidth < 768 || isMobileDevice) ? '1.5rem' : '1.75rem', 
+                        fontWeight: 850, 
+                        color: '#0f172a',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                        letterSpacing: '-0.025em',
+                        lineHeight: 1.2
                       }}>
-                        {isWeekend ? 'Dienst-Pause' : 'Planmäßig frei'}
-                      </span>
+                        {isWeekend
+                          ? 'Klang & Erholung'
+                          : isFreeDay
+                            ? 'Heute hast du frei!'
+                            : 'Unterrichtsfrei'}
+                      </h4>
+                      <p style={{ 
+                        margin: 0, 
+                        fontSize: '0.94rem', 
+                        color: '#64748b', 
+                        fontWeight: 500, 
+                        maxWidth: '380px', 
+                        lineHeight: 1.55 
+                      }}>
+                        {isWeekend
+                          ? 'Heute ruht der Unterricht. Zeit für frische Inspiration, eigene Musik und neue Grooves.'
+                          : isFreeDay
+                            ? 'Für den heutigen Tag stehen keine Unterrichtsstunden im Stundenplan.'
+                            : 'Aktuell sind für diesen Tag keine aktiven Unterrichtsstunden hinterlegt.'}
+                      </p>
                     </div>
 
-                    {/* Next Lesson Preview Box */}
+                    {/* Editorial Musical Quote (Floating Typography without Box Prison) */}
                     <div style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '16px',
-                      padding: '16px',
+                      position: 'relative',
+                      zIndex: 2,
+                      maxWidth: '380px',
+                      textAlign: 'center',
+                      padding: '4px 0',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px'
+                      alignItems: 'center',
+                      gap: '5px'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Clock size={14} color="#475569" />
-                          <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            {isWeekend ? 'Vorschau Montag, 28. September' : 'Vorschau nächster Unterrichtstag'}
-                          </span>
-                        </div>
-                        <span style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 750,
-                          color: '#166534',
-                          background: '#dcfce7',
-                          border: '1px solid #bbf7d0',
-                          padding: '2px 8px',
-                          borderRadius: '6px'
-                        }}>
-                          4 Schüler vorbereitet
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {[
-                          { time: '14:00 Uhr', name: 'Justus G.', inst: 'Gitarre', room: 'Raum 4' },
-                          { time: '14:30 Uhr', name: 'Celina S.', inst: 'Gitarre', room: 'Raum 4' },
-                          { time: '15:00 Uhr', name: 'Marlene F.', inst: 'Gitarre', room: 'Raum 4' },
-                          { time: '15:30 Uhr', name: 'Felix M.', inst: 'Gitarre', room: 'Raum 4' }
-                        ].map((slot, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: '#ffffff',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '10px',
-                              padding: '9px 12px',
-                              fontSize: '0.80rem',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{
-                                fontFamily: 'monospace',
-                                fontWeight: 800,
-                                fontSize: '0.74rem',
-                                color: '#166534',
-                                background: '#f0fdf4',
-                                border: '1px solid #bbf7d0',
-                                padding: '2px 6px',
-                                borderRadius: '6px'
-                              }}>
-                                {slot.time}
-                              </span>
-                              <span style={{ fontWeight: 800, color: '#0f172a' }}>{slot.name}</span>
-                            </div>
-                            <span style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 600 }}>
-                              {slot.inst} • {slot.room}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
                       <div style={{
-                        fontSize: '0.70rem',
-                        color: '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingTop: '6px',
-                        borderTop: '1px solid #f1f5f9'
+                        fontSize: '0.86rem',
+                        fontStyle: 'italic',
+                        color: '#475569',
+                        lineHeight: 1.5
                       }}>
-                        <span>Erster Unterrichtsstart um 14:00 Uhr</span>
-                        <span style={{ fontWeight: 700, color: '#16a34a' }}>Raum 4 freigegeben</span>
+                        {isWeekend 
+                          ? '„Wo die Sprache aufhört, fängt die Musik an.“'
+                          : isFreeDay
+                            ? '„Musik wäscht die Seele vom Staub des Alltags rein.“'
+                            : '„Ohne Musik wäre das Leben ein Irrtum.“'}
+                      </div>
+                      <div style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        color: '#94a3b8',
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif"
+                      }}>
+                        {isWeekend ? '— E.T.A. Hoffmann' : isFreeDay ? '— Berthold Auerbach' : '— Friedrich Nietzsche'}
                       </div>
                     </div>
+
+                    {/* Clear Primary Action Button */}
+                    {(onNavigateSchedule || onTabChange) && (
+                      <button
+                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (onNavigateSchedule) onNavigateSchedule();
+                          else if (onTabChange) onTabChange('live');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            if (onNavigateSchedule) onNavigateSchedule();
+                            else if (onTabChange) onTabChange('live');
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          zIndex: 2,
+                          marginTop: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: '#ffffff',
+                          border: isWeekend ? '1px solid #ddd6fe' : isFreeDay ? '1px solid #bbf7d0' : '1px solid #bfdbfe',
+                          borderRadius: '100px',
+                          padding: '9px 20px',
+                          minHeight: '44px',
+                          fontSize: '0.8rem',
+                          fontWeight: 750,
+                          fontFamily: "'Plus Jakarta Sans', sans-serif",
+                          color: isWeekend ? '#6d28d9' : isFreeDay ? '#15803d' : '#1d4ed8',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                          cursor: 'pointer',
+                          transition: 'all 0.18s ease',
+                          touchAction: 'manipulation',
+                          userSelect: 'none'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Calendar size={14} color={isWeekend ? '#6d28d9' : isFreeDay ? '#15803d' : '#1d4ed8'} />
+                        <span>Zum Wochenstundenplan</span>
+                        <span style={{ fontSize: '0.85rem', marginLeft: '2px' }}>→</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

@@ -4,6 +4,8 @@
  * Standards: OWASP ASVS Level 3 / DSGVO Compliance / Legal SaaS Nomenclature / GoBD-konform
  */
 
+import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
+
 export interface TariffBookingReceiptData {
   receiptNumber: string;
   schoolName: string;
@@ -28,34 +30,24 @@ export interface TariffBookingReceiptData {
   effectiveDate: string;
   createdAt: string;
   notes?: string;
+  returnBlob?: boolean;
 }
 
 /**
- * Deterministic audit hash generation for tamper-evident booking receipts
+ * Deterministic cryptographic audit hash generation for tamper-evident booking receipts
  */
-function generateAuditHash(receiptNumber: string, createdAt: string, totalNet: number): { shortHash: string; fullHash: string } {
-  const raw = `CG-AUDIT-${receiptNumber}-${createdAt}-${totalNet.toFixed(2)}-POSTGRESQL-JOURNAL`;
-  let h1 = 0xdeadbeef;
-  let h2 = 0x41c6ce57;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
-  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
-  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-
-  const hex1 = (h1 >>> 0).toString(16).padStart(8, '0').toUpperCase();
-  const hex2 = (h2 >>> 0).toString(16).padStart(8, '0').toUpperCase();
-  const hex3 = ((h1 ^ h2) >>> 0).toString(16).padStart(8, '0').toUpperCase();
-  const hex4 = ((h1 + h2) >>> 0).toString(16).padStart(8, '0').toUpperCase();
-
-  return {
-    shortHash: `${hex1.slice(0, 4)}-${hex2.slice(0, 4)}`,
-    fullHash: `${hex1}${hex2}${hex3}${hex4}`
+async function generateAuditHash(receiptNumber: string, createdAt: string, totalNet: number, schoolName: string, bookingType: string): Promise<{ shortHash: string; fullHash: string }> {
+  const payload = {
+    receiptNumber,
+    createdAt,
+    totalNet: totalNet.toFixed(2),
+    schoolName,
+    bookingType,
+    journal: 'POSTGRESQL-TRANSACTION-JOURNAL'
   };
+  const fullHash = await computeCanonicalPayloadHash(payload);
+  const shortHash = `${fullHash.slice(0, 4).toUpperCase()}-${fullHash.slice(4, 8).toUpperCase()}`;
+  return { shortHash, fullHash };
 }
 
 export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) => {
@@ -79,7 +71,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
       : `${val.toFixed(2).replace('.', ',')} €`;
   };
 
-  const auditHashes = generateAuditHash(data.receiptNumber, data.createdAt, netAmount);
+  const auditHashes = await generateAuditHash(data.receiptNumber, data.createdAt, netAmount, data.schoolName, data.bookingType);
 
   // Palette (Swiss / Apple Editorial Typography)
   const primaryGreen = [22, 163, 74];   // #16a34a (Authoritative Emerald)
@@ -251,7 +243,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-  doc.text(`✓ ${bookingTitle}`, 25, currentY + 6.5);
+  doc.text(cleanPdfText(bookingTitle), 25, currentY + 6.5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -446,7 +438,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(22, 101, 52); // emerald-800
-  doc.text('🛡️ REVISIONSSICHERHEIT, GoBD- & DATENSCHUTZ-GARANTIE', 25, currentY + 6.5);
+  doc.text('REVISIONSSICHERHEIT, GoBD- & DATENSCHUTZ-GARANTIE', 25, currentY + 6.5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.8);
@@ -471,7 +463,11 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
     { align: 'center' }
   );
 
-  // Save / Trigger Download
+  // Save / Trigger Download or Return Blob
+  if (data.returnBlob) {
+    return doc.output('blob');
+  }
+
   const sanitizedSchool = (data.schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_');
   const filename = `Buchungsbeleg_${data.receiptNumber}_${sanitizedSchool}.pdf`;
   doc.save(filename);

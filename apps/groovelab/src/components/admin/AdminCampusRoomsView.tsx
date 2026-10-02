@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { formatTeacherFullName, maskLastName } from "../../utils/nameHelper";
+import { CampusMyBookingsList } from "./rooms/CampusMyBookingsList";
+import { isInsideRegularWindow, isLessonBooking, purgeSpuriousLessonBookings } from "./rooms/roomBookingHelpers";
 
 const capitalizeName = (str: string | null | undefined): string => {
   if (!str) return "";
@@ -74,6 +76,8 @@ export interface AdminCampusRoomsViewProps {
   activePlatform: string;
   admin: any;
   userId: string;
+  activeWorkspace?: string | null;
+  userRole?: string;
   rooms: any[];
   setRooms?: (r: any) => void;
   schoolObj: any;
@@ -156,6 +160,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
   activePlatform,
   admin,
   userId,
+  activeWorkspace,
+  userRole,
   rooms,
   setRooms,
   schoolObj,
@@ -235,8 +241,228 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 }) => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
-    const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
+    const storedWorkspace = typeof window !== 'undefined'
+      ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
+      : null;
+    const effectiveWorkspace = activeWorkspace || storedWorkspace;
+    const isTeacherContext = effectiveWorkspace === 'teacher' || 
+                             userRole === 'teacher' || 
+                             admin?.activeWorkspace === 'teacher' ||
+                             (!activeWorkspace && admin?.role?.toLowerCase() === 'teacher');
+    const isStaff = !isTeacherContext && (
+      admin?.role?.toLowerCase() === 'secretary' || 
+      admin?.role?.toLowerCase() === 'admin' || 
+      admin?.role?.toLowerCase() === 'master_admin' || 
+      admin?.is_master_admin === true
+    );
     
+    // Quick-Booking Modal State & Debounce Timing Refs
+    const [quickBookingModalData, setQuickBookingModalData] = useState<{
+      isOpen: boolean;
+      roomId: string;
+      roomName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      purpose: string;
+      isSubmitting?: boolean;
+    } | null>(null);
+
+    const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastDblClickTimeRef = useRef<number>(0);
+    const lastClickedCellRef = useRef<{ dayIdx: number; hour: string } | null>(null);
+    const quickBookingInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      return () => {
+        if (clickTimerRef.current) {
+          clearTimeout(clickTimerRef.current);
+        }
+      };
+    }, []);
+
+    // CAM-59: Self-healing cleanup of any spurious lesson bookings within teacher's regular schedule window
+    useEffect(() => {
+      if (userId && dbRoomBookings?.length > 0 && schedules?.length > 0) {
+        purgeSpuriousLessonBookings(supabase, userId, dbRoomBookings, schedules);
+      }
+    }, [userId, dbRoomBookings, schedules]);
+
+    useEffect(() => {
+      if (!quickBookingModalData?.isOpen) return;
+
+      const timer = setTimeout(() => {
+        quickBookingInputRef.current?.focus();
+      }, 50);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && !quickBookingModalData.isSubmitting) {
+          setQuickBookingModalData(null);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }, [quickBookingModalData?.isOpen, quickBookingModalData?.isSubmitting]);
+
+    const formatGermanDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const [y, m, d] = parts.map(Number);
+      if (!y || !m || !d) return dateStr;
+      const dateObj = new Date(y, m - 1, d);
+      const weekdayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+      const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+      return `${weekdayNames[dateObj.getDay()]}, ${d}. ${monthNames[m - 1]} ${y}`;
+    };
+
+    const handleConfirmQuickBooking = async () => {
+      if (!quickBookingModalData || quickBookingModalData.isSubmitting) return;
+
+      const targetRoomId = quickBookingModalData.roomId;
+      const targetDate = quickBookingModalData.date;
+      const targetStartTime = quickBookingModalData.startTime;
+      const targetEndTime = quickBookingModalData.endTime;
+      const rawPurpose = quickBookingModalData.purpose.trim();
+
+      if (!targetRoomId || !targetDate || !targetStartTime || !targetEndTime) {
+        alert('Bitte alle Pflichtfelder ausfüllen.');
+        return;
+      }
+
+      const [sh, sm] = targetStartTime.split(':').map(Number);
+      const [eh, em] = targetEndTime.split(':').map(Number);
+      const qStart = (sh || 0) * 60 + (sm || 0);
+      const qEnd = (eh || 0) * 60 + (em || 0);
+
+      if (qStart >= qEnd) {
+        alert('Die Endzeit muss nach der Startzeit liegen.');
+        return;
+      }
+
+      // Pre-check collisions against existing manual bookings
+      const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+      const allBookings = [...(campusBookings || []), ...(dbRoomBookings || [])];
+      const hasConflict = allBookings.some((b: any) => {
+        if (b.roomId !== targetRoomId || b.date !== targetDate) return false;
+        if (b.isPreview || b.id === 'preview_draft_booking') return false;
+        const bStart = toMin(b.startTime);
+        const bEnd = toMin(b.endTime);
+        return bStart < qEnd && bEnd > qStart;
+      });
+
+      const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const targetDateObj = parseLocalDate(targetDate);
+      const dayVal = targetDateObj.getUTCDay();
+      const targetDay = DAYS_MAP[dayVal];
+      const targetDayInt = dayVal === 0 ? 7 : dayVal;
+
+      const hasScheduleConflict = (mergedSchedules || []).some((s: any) => {
+        if (s.room_id !== targetRoomId) return false;
+        const startTimeStr = s.time_slot || s.start_time;
+        if (!startTimeStr) return false;
+        const matchesDay = s.day_of_week === targetDay || s.day_of_week === targetDayInt || String(s.day_of_week) === String(targetDayInt);
+        if (!matchesDay) return false;
+        const sStart = toMin(startTimeStr);
+        const sEnd = sStart + (s.duration || s.duration_minutes || 45);
+        return sStart < qEnd && sEnd > qStart;
+      });
+
+      const hasBlockedConflict = (roomBlockedSlots || []).some((s: any) => {
+        if (s.room_id !== targetRoomId) return false;
+        if (s.day_of_week !== targetDayInt) return false;
+        const sStart = toMin(s.start_time);
+        const sEnd = toMin(s.end_time);
+        return sStart < qEnd && sEnd > qStart;
+      });
+
+      if (hasConflict || hasScheduleConflict || hasBlockedConflict) {
+        alert('Kollisions-Sperre: Dieser Raum ist zum gewählten Zeitraum bereits belegt.');
+        return;
+      }
+
+      setQuickBookingModalData(prev => prev ? { ...prev, isSubmitting: true } : null);
+
+      const isStaffUser = isStaff;
+      const creatorName = admin 
+        ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
+        : 'Lehrer';
+
+      const finalPurpose = rawPurpose || (isStaffUser ? creatorName : 'Eigennutzung');
+      const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === targetRoomId)?.school_id);
+
+      try {
+        let bookingCreatedId: string | null = null;
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('book_room_atomic', {
+          p_room_id: targetRoomId,
+          p_date: targetDate,
+          p_start_time: targetStartTime.length === 5 ? `${targetStartTime}:00` : targetStartTime,
+          p_end_time: targetEndTime.length === 5 ? `${targetEndTime}:00` : targetEndTime,
+          p_title: finalPurpose
+        });
+
+        if (rpcErr) {
+          console.warn('RPC book_room_atomic failed, falling back to direct insert:', rpcErr);
+          const { data: insertData, error: insertErr } = await supabase
+            .from('room_bookings')
+            .insert({
+              school_id: resolvedSchoolId,
+              room_id: targetRoomId,
+              booked_by: userId,
+              date: targetDate,
+              start_time: targetStartTime.length === 5 ? `${targetStartTime}:00` : targetStartTime,
+              end_time: targetEndTime.length === 5 ? `${targetEndTime}:00` : targetEndTime,
+              title: finalPurpose,
+              status: isStaffUser ? 'confirmed' : 'pending',
+              is_confirmed: isStaffUser
+            })
+            .select('id')
+            .single();
+
+          if (insertErr) throw insertErr;
+          bookingCreatedId = insertData?.id || null;
+        } else if (rpcRes) {
+          if (rpcRes.success === false) {
+            if (rpcRes.code === 'ROOM_COLLISION') {
+              alert(rpcRes.error || 'Kollisions-Sperre: Dieser Raum ist zum gewählten Zeitraum bereits belegt.');
+              setQuickBookingModalData(prev => prev ? { ...prev, isSubmitting: false } : null);
+              return;
+            }
+            throw new Error(rpcRes.error || 'Fehler beim Buchen des Raums.');
+          }
+          bookingCreatedId = rpcRes.booking_id;
+          if (isStaffUser && bookingCreatedId) {
+            await supabase
+              .from('room_bookings')
+              .update({ status: 'confirmed', is_confirmed: true })
+              .eq('id', bookingCreatedId);
+          } else if (bookingCreatedId) {
+            await supabase
+              .from('room_bookings')
+              .update({ status: 'pending', is_confirmed: false })
+              .eq('id', bookingCreatedId);
+          }
+        }
+
+        window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        if (typeof fetchData === 'function') {
+          await fetchData();
+        }
+
+        setShowPreviewField(false);
+        setSuccessAnimationRoomId(targetRoomId);
+        setTimeout(() => setSuccessAnimationRoomId(null), 1000);
+        setQuickBookingModalData(null);
+      } catch (err: any) {
+        console.error('Error in handleConfirmQuickBooking:', err);
+        alert('Fehler beim Buchen des Raums: ' + (err.message || 'Unbekannter Fehler'));
+        setQuickBookingModalData(prev => prev ? { ...prev, isSubmitting: false } : null);
+      }
+    };
+
     // Fast lookup map for resolving teacher names from teacher_id
     const teacherLookupMap = useMemo(() => {
       const map: Record<string, string> = {};
@@ -630,11 +856,22 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
     // Check if room is occupied *right now* (Ist-Zustand)
     const isRoomOccupiedNow = (roomId: string) => {
       const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
-      const currentMin = now.getHours() * 60 + now.getMinutes();
+      const todayStr = toBerlinYYYYMMDD(now);
+
+      let currentMin = now.getHours() * 60 + now.getMinutes();
+      try {
+        const berlinParts = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Europe/Berlin',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23'
+        }).formatToParts(now);
+        const bHour = parseInt(berlinParts.find(p => p.type === 'hour')?.value || String(now.getHours()));
+        const bMin = parseInt(berlinParts.find(p => p.type === 'minute')?.value || String(now.getMinutes()));
+        currentMin = bHour * 60 + bMin;
+      } catch (e) {
+        // Fallback to local system time
+      }
 
       const isHolidayNow = holidays.some(h => todayStr >= h.start && todayStr <= h.end);
       if (isHolidayNow) {
@@ -662,12 +899,18 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         return hasDynamicNow;
       }
 
-      const todayBookings = campusBookings.filter((b: any) => b.roomId === roomId && b.date === todayStr);
+      const allManualBookings = [...(campusBookings || []), ...(dbRoomBookings || [])];
+      const todayBookings = allManualBookings.filter((b: any) => 
+        b.roomId === roomId && 
+        b.date === todayStr && 
+        !b.isPreview && 
+        b.id !== 'preview_draft_booking'
+      );
       const hasBookingNow = todayBookings.some((b: any) => {
-        const [sh, sm] = b.startTime.split(':').map(Number);
-        const [eh, em] = b.endTime.split(':').map(Number);
-        const bStart = sh * 60 + sm;
-        const bEnd = eh * 60 + em;
+        const [sh, sm] = (b.startTime || '00:00').split(':').map(Number);
+        const [eh, em] = (b.endTime || '00:00').split(':').map(Number);
+        const bStart = (sh || 0) * 60 + (sm || 0);
+        const bEnd = (eh || 0) * 60 + (em || 0);
         return currentMin >= bStart && currentMin < bEnd;
       });
 
@@ -698,7 +941,19 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         return currentMin >= schedStartMin && currentMin < schedEndMin;
       });
 
-      return hasScheduleNow;
+      if (hasScheduleNow) return true;
+
+      const hasBlockedNow = (roomBlockedSlots || []).some((s: any) => {
+        if (s.room_id !== roomId) return false;
+        if (s.day_of_week !== targetDayInt) return false;
+        const [shStr, smStr] = (s.start_time || '00:00').split(':');
+        const [ehStr, emStr] = (s.end_time || '23:59').split(':');
+        const sStart = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
+        const sEnd = (parseInt(ehStr) || 0) * 60 + (parseInt(emStr) || 0);
+        return currentMin >= sStart && currentMin < sEnd;
+      });
+
+      return hasBlockedNow;
     };
 
     // Filter rooms by floor, equipment, search query AND availability filters
@@ -730,7 +985,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         const newStart = toMin(bookingStartTime);
         const newEnd = toMin(bookingEndTime);
         
-        const hasBooking = campusBookings.some((b: any) => {
+        const allBookings = [...(campusBookings || []), ...(dbRoomBookings || [])];
+        const hasBooking = allBookings.some((b: any) => {
           if (b.roomId !== room.id || b.date !== bookingDate) return false;
           const bStart = toMin(b.startTime);
           const bEnd = toMin(b.endTime);
@@ -855,16 +1111,15 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         return bStartMin < slotEndMin && bEndMin > slotStartMin;
       });
 
-      // Combine local and DB manual bookings, de-duplicating by date + room + start_time
-      const combinedManuals = [...manualForSlot];
-      dbManualForSlot.forEach((dbB: any) => {
-        const isDup = combinedManuals.some((m: any) => 
-          m.date === dbB.date && 
-          m.startTime === dbB.startTime && 
-          m.roomId === dbB.roomId
+      // Single Source of Truth (SSOT): Database bookings always take precedence over local cache
+      const combinedManuals = [...dbManualForSlot];
+      manualForSlot.forEach((m: any) => {
+        const isAlreadyInDb = combinedManuals.some((dbB: any) =>
+          dbB.id === m.id ||
+          (dbB.date === m.date && dbB.startTime === m.startTime && dbB.roomId === m.roomId)
         );
-        if (!isDup) {
-          combinedManuals.push(dbB);
+        if (!isAlreadyInDb) {
+          combinedManuals.push(m);
         }
       });
 
@@ -1073,17 +1328,17 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             const startHour = parseInt(bookingStartTime.split(':')[0]);
             const endHour = parseInt(bookingEndTime.split(':')[0]);
             if (slotHour >= startHour && slotHour < endHour) {
-              const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
               const creatorName = admin 
                 ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
                 : 'Lehrer';
-              const defaultPurpose = bookingPurpose || 'Eigennutzung';
-              
-              let finalPurpose = defaultPurpose;
-              if (isStaff) {
-                if (defaultPurpose === 'Unterricht' || defaultPurpose.startsWith('Unterricht:') || defaultPurpose === 'Eigennutzung') {
-                  finalPurpose = creatorName;
-                }
+              let finalPurpose = '';
+              if (bookingPurpose && bookingPurpose.trim()) {
+                finalPurpose = bookingPurpose.trim();
+              } else if (bookingType === 'lesson') {
+                const studentObj = students.find(s => s.id === bookingStudentId);
+                finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : (isStaff ? creatorName : 'Unterricht');
+              } else {
+                finalPurpose = isStaff ? creatorName : 'Eigennutzung';
               }
               const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
@@ -1270,20 +1525,18 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
     const handleAddBooking = async (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
-      const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
       const creatorName = admin 
         ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
         : 'Lehrer';
 
       const studentObj = students.find(s => s.id === bookingStudentId);
-      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : 'Unterricht';
-      const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
-      
-      let finalPurpose = defaultPurpose;
-      if (isStaff) {
-        if (defaultPurpose === 'Unterricht' || defaultPurpose.startsWith('Unterricht:') || defaultPurpose === 'Eigennutzung') {
-          finalPurpose = creatorName;
-        }
+      let finalPurpose = '';
+      if (bookingPurpose && bookingPurpose.trim()) {
+        finalPurpose = bookingPurpose.trim();
+      } else if (bookingType === 'lesson') {
+        finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : (isStaff ? creatorName : 'Unterricht');
+      } else {
+        finalPurpose = isStaff ? creatorName : 'Eigennutzung';
       }
       const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
@@ -1320,59 +1573,98 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             return;
           }
         } else {
-          // Build the recurring schedule
-          const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          // Persist the recurring schedule to Supabase
+          const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === roomId)?.school_id);
           const parts = bookingDate.split('-');
           const d = parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date(bookingDate);
-          const targetDayName = DAYS_MAP[d.getDay()];
+          const rawDay = d.getDay();
+          const dayOfWeekInt = rawDay === 0 ? 7 : rawDay;
 
-          const [shStr, smStr] = bookingStartTime.split(':');
-          const [ehStr, emStr] = bookingEndTime.split(':');
-          const startMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
-          const endMin = (parseInt(ehStr) || 0) * 60 + (parseInt(emStr) || 0);
-          const durationMin = Math.max(15, endMin - startMin);
+          try {
+            const { data: newSched, error: schedErr } = await supabase
+              .from('schedules')
+              .insert({
+                school_id: resolvedSchoolId,
+                room_id: roomId,
+                teacher_id: userId,
+                student_id: bookingStudentId || null,
+                day_of_week: dayOfWeekInt,
+                time_slot: bookingStartTime,
+                status: 'approved'
+              })
+              .select('*, rooms(*)')
+              .single();
 
-          const newSchedule = {
-            id: 'sched_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-            room_id: roomId,
-            day_of_week: targetDayName,
-            time_slot: bookingStartTime,
-            duration: durationMin,
-            purpose: finalPurpose,
-            teacher_id: userId,
-            teacher: { first_name: finalTeacherName, last_name: '' },
-            status: 'approved',
-            start_date: bookingDate,
-            interval_weeks: recurringInterval
-          };
-
-          setSchedules(prev => [...prev, newSchedule]);
+            if (schedErr) throw schedErr;
+            if (newSched && setSchedules) {
+              setSchedules(prev => [...prev, newSched]);
+            }
+            window.dispatchEvent(new CustomEvent('refresh-bookings'));
+            await fetchData();
+          } catch (dbErr: any) {
+            console.error('Error inserting recurring schedule:', dbErr);
+            alert('Fehler beim Speichern des Serientermins: ' + dbErr.message);
+            return;
+          }
         }
       } else {
         const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === roomId)?.school_id);
-        // Regel: Wenn ein Lehrer einen Raum bucht, muss er immer durch das Sekretariat bestätigt werden.
-        // Dies gilt ausnahmslos auch, wenn der Lehrer eine Doppelrolle als Admin oder Sekretariat hat.
-        const status = 'pending';
         const finalTitle = bookingTargetType === 'external'
           ? `[EXTERN] ${externalInstitutionName}` + (bookingPurpose ? ` | ${bookingPurpose}` : '')
           : finalPurpose;
 
         try {
-          const { error } = await supabase
-            .from('room_bookings')
-            .insert({
-              school_id: resolvedSchoolId,
-              room_id: roomId,
-              booked_by: userId,
-              date: bookingDate,
-              start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
-              end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
-              title: finalTitle,
-              status: status
-            });
-            
-          if (error) throw error;
-          
+          let bookingCreatedId: string | null = null;
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc('book_room_atomic', {
+            p_room_id: roomId,
+            p_date: bookingDate,
+            p_start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+            p_end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+            p_title: finalTitle
+          });
+
+          if (rpcErr) {
+            console.warn('RPC book_room_atomic failed, falling back to direct insert:', rpcErr);
+            const { data: insertData, error: insertErr } = await supabase
+              .from('room_bookings')
+              .insert({
+                school_id: resolvedSchoolId,
+                room_id: roomId,
+                booked_by: userId,
+                date: bookingDate,
+                start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+                end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+                title: finalTitle,
+                status: isStaff ? 'confirmed' : 'pending',
+                is_confirmed: isStaff
+              })
+              .select('id')
+              .single();
+
+            if (insertErr) throw insertErr;
+            bookingCreatedId = insertData?.id || null;
+          } else if (rpcRes) {
+            if (rpcRes.success === false) {
+              if (rpcRes.code === 'ROOM_COLLISION') {
+                alert(rpcRes.error || 'Kollisions-Sperre: Dieser Raum ist zum gewählten Zeitraum bereits belegt.');
+                return;
+              }
+              throw new Error(rpcRes.error || 'Fehler beim Speichern der Raumbuchung.');
+            }
+            bookingCreatedId = rpcRes.booking_id;
+            if (isStaff && bookingCreatedId) {
+              await supabase
+                .from('room_bookings')
+                .update({ status: 'confirmed', is_confirmed: true })
+                .eq('id', bookingCreatedId);
+            } else if (bookingCreatedId) {
+              await supabase
+                .from('room_bookings')
+                .update({ status: 'pending', is_confirmed: false })
+                .eq('id', bookingCreatedId);
+            }
+          }
+
           window.dispatchEvent(new CustomEvent('refresh-bookings'));
           await fetchData();
         } catch (dbErr: any) {
@@ -1399,13 +1691,46 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
     };
 
     const handleApproveBooking = async (bookingId: string) => {
+      if (isTeacherContext) {
+        alert('Im Lehrer-Dashboard können keine Buchungen als Sekretariat freigegeben werden.');
+        return;
+      }
       try {
+        const idsToApprove = (Array.isArray((selectedBooking as any)?.ids) && (selectedBooking as any).ids.length > 0)
+          ? (selectedBooking as any).ids
+          : [bookingId];
+
         const { error } = await supabase
           .from('room_bookings')
-          .update({ status: 'approved' })
-          .eq('id', bookingId);
+          .update({ status: 'confirmed', is_confirmed: true })
+          .in('id', idsToApprove);
 
         if (error) throw error;
+
+        setSelectedBooking((prev: any) => (prev && (prev.id === bookingId || idsToApprove.includes(prev.id)) ? { ...prev, status: 'confirmed', is_confirmed: true, isApproved: true } : prev));
+        
+        setCampusBookings((prev: any[]) => prev.map((b: any) => 
+          idsToApprove.includes(b.id) 
+            ? { ...b, status: 'confirmed', is_confirmed: true, isApproved: true } 
+            : b
+        ));
+
+        try {
+          const sId = admin?.school_id;
+          const key = sId ? `groovelab_campus_bookings_${sId}` : 'groovelab_campus_bookings';
+          const stored = localStorage.getItem(key) || localStorage.getItem('groovelab_campus_bookings');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map((b: any) => 
+                idsToApprove.includes(b.id) 
+                  ? { ...b, status: 'confirmed', is_confirmed: true, isApproved: true } 
+                  : b
+              );
+              localStorage.setItem(key, JSON.stringify(updated));
+            }
+          }
+        } catch (e) {}
 
         window.dispatchEvent(new CustomEvent('refresh-bookings'));
         await fetchData();
@@ -1416,30 +1741,26 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
     };
 
     const handleUpdateBooking = async () => {
-      if (!selectedBooking) return;
+      if (!selectedBooking || selectedBooking.isPreview || selectedBooking.id === 'preview_draft_booking') return;
 
-      const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
       const creatorName = admin 
         ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
         : 'Lehrer';
 
       const studentObj = students.find(s => s.id === bookingStudentId);
-      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : 'Unterricht';
-      const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
-      
-      let finalPurpose = defaultPurpose;
-      if (isStaff) {
-        if (defaultPurpose === 'Unterricht' || defaultPurpose.startsWith('Unterricht:') || defaultPurpose === 'Eigennutzung') {
-          finalPurpose = creatorName;
-        }
+      let finalPurpose = '';
+      if (bookingPurpose && bookingPurpose.trim()) {
+        finalPurpose = bookingPurpose.trim();
+      } else if (bookingType === 'lesson') {
+        finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : (isStaff ? creatorName : 'Unterricht');
+      } else {
+        finalPurpose = isStaff ? creatorName : 'Eigennutzung';
       }
-      const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (selectedBooking.isSchedule) {
         // Schedule blocks are recurring – create a manual booking override for this specific date
         const resolvedSchoolId = admin?.school_id || (rooms.find((r: any) => r.id === selectedBooking.roomId)?.school_id);
-        // Regel: Wenn ein Lehrer einen Raum bucht, muss er immer durch das Sekretariat bestätigt werden.
-        const status = 'pending';
+        const status = isStaff ? 'confirmed' : 'pending';
 
         try {
           const { error } = await supabase
@@ -1452,7 +1773,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
               start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
               end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
               title: finalPurpose,
-              status: status
+              status: status,
+              is_confirmed: isStaff
             });
             
           if (error) throw error;
@@ -1465,29 +1787,46 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           return;
         }
       } else {
-        // Update database booking
-        // Regel: Wenn ein Lehrer einen Raum bucht/anpasst, muss er immer durch das Sekretariat bestätigt werden.
-        const status = 'pending';
-        try {
-          const { error } = await supabase
-            .from('room_bookings')
-            .update({
-              date: bookingDate,
-              start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
-              end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
-              title: finalPurpose,
-              status: status
-            })
-            .eq('id', selectedBooking.id);
+        const isDbBooking = dbRoomBookings.some((b: any) => b.id === selectedBooking.id);
+        if (isDbBooking) {
+          const status = isStaff ? 'confirmed' : 'pending';
+          try {
+            const { error } = await supabase
+              .from('room_bookings')
+              .update({
+                date: bookingDate,
+                start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+                end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+                title: finalPurpose,
+                status: status,
+                is_confirmed: isStaff
+              })
+              .eq('id', selectedBooking.id);
 
-          if (error) throw error;
+            if (error) throw error;
 
-          window.dispatchEvent(new CustomEvent('refresh-bookings'));
-          await fetchData();
-        } catch (dbErr: any) {
-          console.error('Error updating room booking:', dbErr);
-          alert('Fehler beim Aktualisieren der Raumbuchung: ' + dbErr.message);
-          return;
+            window.dispatchEvent(new CustomEvent('refresh-bookings'));
+            await fetchData();
+          } catch (dbErr: any) {
+            console.error('Error updating room booking:', dbErr);
+            alert('Fehler beim Aktualisieren der Raumbuchung: ' + dbErr.message);
+            return;
+          }
+        } else {
+          // Update in-memory campusBookings
+          setCampusBookings(prev => prev.map((b: any) => {
+            if (b.id === selectedBooking.id) {
+              return {
+                ...b,
+                date: bookingDate,
+                startTime: bookingStartTime,
+                endTime: bookingEndTime,
+                purpose: finalPurpose,
+                title: finalPurpose
+              };
+            }
+            return b;
+          }));
         }
       }
 
@@ -1502,25 +1841,31 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
     };
 
     const handleDeleteBooking = async () => {
-      if (!selectedBooking || selectedBooking.isSchedule) return;
+      if (!selectedBooking || selectedBooking.isSchedule || selectedBooking.isPreview || selectedBooking.id === 'preview_draft_booking') return;
       
       const confirmDelete = window.confirm('Möchtest du diesen Termin wirklich löschen?');
       if (!confirmDelete) return;
       
-      try {
-        const { error } = await supabase
-          .from('room_bookings')
-          .delete()
-          .eq('id', selectedBooking.id);
+      const isDbBooking = dbRoomBookings.some((b: any) => b.id === selectedBooking.id);
+      if (isDbBooking) {
+        try {
+          const { error } = await supabase
+            .from('room_bookings')
+            .delete()
+            .eq('id', selectedBooking.id);
+            
+          if (error) throw error;
           
-        if (error) throw error;
-        
-        window.dispatchEvent(new CustomEvent('refresh-bookings'));
-        await fetchData();
-      } catch (dbErr: any) {
-        console.error('Error deleting room booking:', dbErr);
-        alert('Fehler beim Löschen der Raumbuchung: ' + dbErr.message);
-        return;
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          await fetchData();
+        } catch (dbErr: any) {
+          console.error('Error deleting room booking:', dbErr);
+          alert('Fehler beim Löschen der Raumbuchung: ' + dbErr.message);
+          return;
+        }
+      } else {
+        // Remove from in-memory campusBookings
+        setCampusBookings(prev => prev.filter((b: any) => b.id !== selectedBooking.id));
       }
       
       setSelectedBooking(null);
@@ -1534,11 +1879,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
 
     const handleCellClick = (dayIdx: number, hourStr: string, e?: React.MouseEvent<any>) => {
+      setSelectedBooking(null);
       const currentSelectedDate = parseLocalDate(bookingDate);
       const dayOfWeek = currentSelectedDate.getUTCDay();
       const diffToMon = currentSelectedDate.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
       currentSelectedDate.setUTCDate(diffToMon + dayIdx);
-      const targetDateStr = `${currentSelectedDate.getUTCFullYear()}-${String(currentSelectedDate.getUTCMonth() + 1).padStart(2, '0')}-${String(currentSelectedDate.getUTCDate()).padStart(2, '0')}`;
+      const targetDateStr = toBerlinYYYYMMDD(currentSelectedDate);
 
       const startH = parseInt(hourStr.split(':')[0]);
       const startStr = `${String(startH).padStart(2, '0')}:00`;
@@ -1572,54 +1918,86 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         setBookingStartTime(startStr);
         setBookingEndTime(endStr);
       }
-      setIsDateFilterActive(true);
+      // CRITICAL: Do NOT set isDateFilterActive(true) here! It filters out the active room and causes unexpected room jumping.
       setShowMyBookingsOnly(false); // Make sure booking sidebar is shown
       setShowPreviewField(true); // Force preview card to show immediately on first click
     };
 
+    const handleCellClickWithDebounce = (dayIdx: number, hourStr: string, e?: React.MouseEvent<any>) => {
+      const isSameCell = lastClickedCellRef.current && 
+                         lastClickedCellRef.current.dayIdx === dayIdx && 
+                         lastClickedCellRef.current.hour === hourStr;
+
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+
+        if (isSameCell) {
+          lastClickedCellRef.current = null;
+          handleCellDoubleClick(dayIdx, hourStr);
+          return;
+        }
+      }
+
+      lastClickedCellRef.current = { dayIdx, hour: hourStr };
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null;
+        lastClickedCellRef.current = null;
+        handleCellClick(dayIdx, hourStr, e);
+      }, 220);
+    };
 
     const handleCellDoubleClick = (dayIdx: number, hourStr: string) => {
-      if (!selectedRoom) return;
+      const now = Date.now();
+      if (now - lastDblClickTimeRef.current < 400) return;
+      lastDblClickTimeRef.current = now;
+
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
+      lastClickedCellRef.current = null;
+
+      let targetRoom = selectedRoom;
+      if (!targetRoom || targetRoom.id === 'all') {
+        targetRoom = roomsToRender.find(r => r.id !== 'all') || rooms.find(r => r.id !== 'all');
+        if (!targetRoom) {
+          alert('Bitte lege zuerst mindestens einen Raum an.');
+          return;
+        }
+        setSelectedCampusRoomId(targetRoom.id);
+      }
 
       const currentSelectedDate = parseLocalDate(bookingDate);
       const dayOfWeek = currentSelectedDate.getUTCDay();
       const diffToMon = currentSelectedDate.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
       currentSelectedDate.setUTCDate(diffToMon + dayIdx);
-      const targetDateStr = `${currentSelectedDate.getUTCFullYear()}-${String(currentSelectedDate.getUTCMonth() + 1).padStart(2, '0')}-${String(currentSelectedDate.getUTCDate()).padStart(2, '0')}`;
+      const targetDateStr = toBerlinYYYYMMDD(currentSelectedDate);
 
       const startH = parseInt(hourStr.split(':')[0]);
       const startStr = `${String(startH).padStart(2, '0')}:00`;
       const endStr = `${String(startH + 1).padStart(2, '0')}:00`;
 
-      if (showPreviewField && bookingDate === targetDateStr && bookingStartTime && bookingEndTime) {
-        // Second double click on same day: set end time based on the clicked hour slot
-        const parseToMin = (t: string) => {
-          const [h, m] = t.split(':').map(Number);
-          return h * 60 + m;
-        };
-        const formatFromMin = (mins: number) => {
-          const h = Math.floor(mins / 60) % 24;
-          const m = mins % 60;
-          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        };
+      // Set booking form fields as well
+      setBookingDate(targetDateStr);
+      setBookingStartTime(startStr);
+      setBookingEndTime(endStr);
+      setBookingPurpose('');
+      setSelectedBooking(null);
+      setShowPreviewField(false);
+      // CRITICAL: Do NOT set isDateFilterActive(true) to avoid room-jumping!
 
-        const currentStartMin = parseToMin(bookingStartTime);
-        const clickedEndMin = parseToMin(endStr);
-
-        if (clickedEndMin > currentStartMin) {
-          setBookingEndTime(formatFromMin(clickedEndMin));
-        } else {
-          setBookingStartTime(startStr);
-        }
-      } else {
-        // First double click: start preview
-        setBookingDate(targetDateStr);
-        setBookingStartTime(startStr);
-        setBookingEndTime(endStr);
-      }
-      setIsDateFilterActive(true);
-      setShowMyBookingsOnly(false);
-      setShowPreviewField(true);
+      // Open the Quick-Booking modal!
+      setQuickBookingModalData({
+        isOpen: true,
+        roomId: targetRoom.id,
+        roomName: targetRoom.name,
+        date: targetDateStr,
+        startTime: startStr,
+        endTime: endStr,
+        purpose: '',
+        isSubmitting: false
+      });
     };
 
 
@@ -1864,22 +2242,38 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
      // Merge overlapping/consecutive bookings for "Meine Buchungen" sidebar
      const groupedMyBookings: { [key: string]: any[] } = {};
+     // Own manual bookings: Database bookings first (SSOT), supplemented only by non-persisted local bookings
+     const ownDbBookings = dbRoomBookings
+       .filter((b: any) => b.teacherId === userId)
+       .filter((b: any) => !isLessonBooking(b) || !isInsideRegularWindow(userId, b.roomId, b.date, b.startTime, b.endTime, schedules));
+     const ownLocalBookings = campusBookings
+       .filter((b: any) => b.teacherId === userId)
+       .filter((b: any) => !isLessonBooking(b) || !isInsideRegularWindow(userId, b.roomId, b.date, b.startTime, b.endTime, schedules))
+       .filter((lb: any) => !ownDbBookings.some((dbB: any) => dbB.id === lb.id || (dbB.date === lb.date && dbB.startTime === lb.startTime && dbB.roomId === lb.roomId)));
+     const ownManualBookings = [...ownDbBookings, ...ownLocalBookings];
      
-     // Own manual bookings (combining local storage memory and database bookings)
-     const ownManualBookings = [
-       ...campusBookings.filter((b: any) => b.teacherId === userId),
-       ...dbRoomBookings.filter((b: any) => b.teacherId === userId)
-     ];
-     
-     // Own rescheduled occurrences
+     // Own rescheduled occurrences (only outside regular teaching hours in that room)
      const ownRescheduledOccurs = scheduleOccurrences
        .filter((occ: any) => occ.teacher_id === userId && (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed'))
+       .filter((occ: any) => {
+         const startTimeStr = occ.start_time.substring(0, 5);
+         const durationMin = occ.duration || 45;
+         const [shStr, smStr] = startTimeStr.split(':');
+         const sh = parseInt(shStr, 10) || 0;
+         const sm = parseInt(smStr, 10) || 0;
+         const totalMin = sh * 60 + sm + durationMin;
+         const eh = Math.floor(totalMin / 60) % 24;
+         const em = totalMin % 60;
+         const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+         const effectiveRoomId = occ.room_override_id || occ.template_room_id || occ.schedules?.room_id;
+         return !isInsideRegularWindow(userId, effectiveRoomId, occ.date, startTimeStr, endTimeStr, schedules);
+       })
        .map((occ: any) => {
          const startTimeStr = occ.start_time.substring(0, 5);
          const durationMin = occ.duration || 45;
          const [shStr, smStr] = startTimeStr.split(':');
-         const sh = parseInt(shStr) || 0;
-         const sm = parseInt(smStr) || 0;
+         const sh = parseInt(shStr, 10) || 0;
+         const sm = parseInt(smStr, 10) || 0;
          const totalMin = sh * 60 + sm + durationMin;
          const eh = Math.floor(totalMin / 60) % 24;
          const em = totalMin % 60;
@@ -1943,6 +2337,13 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           if (item.startMin <= last.endMin) {
             last.endMin = Math.max(last.endMin, item.endMin);
             last.ids.push(item.id);
+            const isItemConfirmed = (item.status === 'confirmed') && (item.is_confirmed === true);
+            const isLastConfirmed = (last.status === 'confirmed') && (last.is_confirmed === true);
+            if (!isItemConfirmed || !isLastConfirmed) {
+              last.status = 'pending';
+              last.is_confirmed = false;
+              last.isApproved = false;
+            }
             if (last.purpose && item.purpose && last.purpose !== item.purpose) {
               const cleanedPurpose = item.purpose.replace(/^Unterricht:\s*/i, '');
               if (!last.purpose.includes(cleanedPurpose)) {
@@ -1969,6 +2370,13 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           endTime: `${eh}:${em}`
         });
       });
+    });
+
+    // 0,1% Goldstandard: Streng chronologische Sortierung nach Datum und Uhrzeit
+    myBookings.sort((a: any, b: any) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      return a.startTime.localeCompare(b.startTime);
     });
 
     const DAYS_OF_WEEK = [
@@ -2579,7 +2987,9 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                                  (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
                                                  (b.subject_name && b.subject_name.toLowerCase().includes('groovelab')) ||
                                                  (b.subject && b.subject.toLowerCase().includes('groovelab'));
-                        const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
+                        const isBookingConfirmed = !isSchedule && 
+                          (b.status === 'confirmed') && 
+                          (b.is_confirmed === true);
                         const isOwnBooking = b.teacherId === userId;
 
                         let accentColor = '#34a853'; // Campus Green
@@ -2596,20 +3006,21 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           badgeTextColor = '#854d0e';
                         } else if (!isSchedule) {
                           accentColor = isBookingConfirmed ? '#8b5cf6' : '#a855f7';
-                          badgeBg = isBookingConfirmed ? '#ede9fe' : '#fae8ff';
-                          badgeTextColor = isBookingConfirmed ? '#6d28d9' : '#a21caf';
+                          badgeBg = isBookingConfirmed ? '#ede9fe' : '#faf5ff';
+                          badgeTextColor = isBookingConfirmed ? '#6d28d9' : '#7c3aed';
                         }
 
                         return (
                           <div
                             key={b.id || `booking_${seg.startTime}_${seg.endTime}_${sIdx}`}
                             onClick={() => {
+                              if (b.isPreview || b.id === 'preview_draft_booking') return;
                               if (isOwnBooking || !b.isSchedule) {
                                 setSelectedBooking(b);
                                 setBookingDate(b.date || bookingDate);
                                 setBookingStartTime(b.startTime);
                                 setBookingEndTime(b.endTime);
-                                setBookingPurpose(b.purpose || '');
+                                setBookingPurpose(b.purpose || b.title || '');
                                 setShowMyBookingsOnly(false);
                                 setShowMobileRoomSlider(true);
                               }
@@ -2617,15 +3028,19 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                             style={{
                               position: 'relative',
                               borderRadius: '18px',
-                              background: '#ffffff',
-                              border: '1px solid rgba(0, 0, 0, 0.08)',
+                              background: (!isSchedule && !isBookingConfirmed)
+                                ? 'repeating-linear-gradient(-45deg, #f5f3ff 0px, #f5f3ff 8px, #ede9fe 8px, #ede9fe 16px)'
+                                : (!isSchedule && isBookingConfirmed ? '#faf5ff' : '#ffffff'),
+                              border: (!isSchedule && !isBookingConfirmed)
+                                ? '2px dashed #8b5cf6'
+                                : (!isSchedule && isBookingConfirmed ? '1.5px solid #8b5cf6' : '1px solid rgba(0, 0, 0, 0.08)'),
                               boxShadow: '0 4px 18px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
                               overflow: 'hidden',
                               padding: '14px 16px 14px 18px',
                               display: 'flex',
                               flexDirection: 'column',
                               gap: '8px',
-                              cursor: (isOwnBooking || !b.isSchedule) ? 'pointer' : 'default',
+                              cursor: (b.isPreview || b.id === 'preview_draft_booking') ? 'default' : ((isOwnBooking || !b.isSchedule) ? 'pointer' : 'default'),
                               transition: 'all 0.15s ease'
                             }}
                           >
@@ -2668,9 +3083,15 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                 {isSchedule ? (
                                   <Lock size={14} color="#94a3b8" />
                                 ) : isBookingConfirmed ? (
-                                  <CheckCircle2 size={14} color="#22c55e" />
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.62rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 7px', borderRadius: '6px' }}>
+                                    <CheckCircle2 size={12} color="#16a34a" />
+                                    <span>Bestätigt</span>
+                                  </span>
                                 ) : (
-                                  <Hourglass size={14} color="#f59e0b" />
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.62rem', fontWeight: 800, color: '#7c3aed', background: 'rgba(124, 58, 237, 0.10)', border: '1px dashed #8b5cf6', padding: '2px 7px', borderRadius: '6px' }}>
+                                    <Clock size={12} color="#7c3aed" />
+                                    <span>Unter Vorbehalt</span>
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -2704,11 +3125,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (b.isPreview || b.id === 'preview_draft_booking') return;
                                     setSelectedBooking(b);
                                     setBookingDate(b.date || bookingDate);
                                     setBookingStartTime(b.startTime);
                                     setBookingEndTime(b.endTime);
-                                    setBookingPurpose(b.purpose || '');
+                                    setBookingPurpose(b.purpose || b.title || '');
                                     setShowMyBookingsOnly(false);
                                     setShowMobileRoomSlider(true);
                                   }}
@@ -3323,6 +3745,25 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span>Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}</span>
                     </h3>
+                    {/* Visual Status Legend */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '0.69rem', fontWeight: 700, color: '#64748b', marginTop: '6px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#34a853' }} />
+                        <span>Regulärer Unterricht</span>
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#8b5cf6' }} />
+                        <span>Buchung bestätigt (unifarben)</span>
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'repeating-linear-gradient(-45deg, #ede9fe 0px, #ede9fe 2px, #f5f3ff 2px, #f5f3ff 4px)', border: '1.5px dashed #8b5cf6' }} />
+                        <span>Unter Vorbehalt (lila gestrichelt)</span>
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#eab308' }} />
+                        <span>GrooveLab</span>
+                      </span>
+                    </div>
                   </div>
 
                   {/* View Switcher & Week Controls */}
@@ -3464,7 +3905,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                   key={day.value}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleCellClick(dayIdx, hour, e);
+                                    handleCellClickWithDebounce(dayIdx, hour, e);
                                   }}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
@@ -3538,7 +3979,9 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                                              (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
                                                              (b.subject_name && b.subject_name.toLowerCase().includes('groovelab')) ||
                                                              (b.subject && b.subject.toLowerCase().includes('groovelab'));
-                                    const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
+                                    const isBookingConfirmed = !isSchedule && 
+                                      (b.status === 'confirmed') && 
+                                      (b.is_confirmed === true);
 
                                     let cardBg = '#34a853'; // Default Campus Green
                                     let cardBorder = '1px solid rgba(0, 0, 0, 0.08)';
@@ -3557,20 +4000,47 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                       bodyTextColor = '#1e293b';
                                     } else if (!isSchedule) {
                                       // Manual booking
-                                      cardBg = isBookingConfirmed 
-                                        ? '#8b5cf6' 
-                                        : 'repeating-linear-gradient(-45deg, #7c3aed 0px, #7c3aed 10px, #6d28d9 10px, #6d28d9 20px)';
-                                      cardBorder = '1px solid rgba(0, 0, 0, 0.1)';
-                                      headerTimeColor = '#7c3aed';
-                                      bodyTextColor = '#ffffff';
+                                      if (isBookingConfirmed) {
+                                        // Solid purple — confirmed by secretariat (unifarben)
+                                        cardBg = '#8b5cf6';
+                                        cardBorder = '1.5px solid #7c3aed';
+                                        headerTimeColor = '#7c3aed';
+                                        bodyTextColor = '#ffffff';
+                                      } else {
+                                        // Purple dashed — pending approval ("unter Vorbehalt") (lila gestrichelt)
+                                        cardBg = 'repeating-linear-gradient(-45deg, #f5f3ff 0px, #f5f3ff 8px, #ede9fe 8px, #ede9fe 16px)';
+                                        cardBorder = '2px dashed #8b5cf6';
+                                        headerTimeColor = '#7c3aed';
+                                        bodyTextColor = '#5b21b6';
+                                      }
                                     }
 
                                     return (
                                       <div
                                         key={b.id || `${b.startTime}-${b.endTime}-${bIdx}`}
+                                        title={
+                                          b.isPreview 
+                                            ? 'Vorschau' 
+                                            : (!isSchedule 
+                                              ? (isBookingConfirmed ? 'Raumbuchung bestätigt (Sekretariat)' : 'Raumbuchung unter Vorbehalt (Sekretariat prüft)') 
+                                              : undefined)
+                                        }
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          if (clickTimerRef.current) {
+                                            clearTimeout(clickTimerRef.current);
+                                            clickTimerRef.current = null;
+                                          }
+                                          lastClickedCellRef.current = null;
+                                          if (b.isPreview || b.id === 'preview_draft_booking') return;
                                           setSelectedBooking(b);
+                                          setBookingDate(b.date || bookingDate);
+                                          setBookingStartTime(b.startTime || '12:00');
+                                          setBookingEndTime(b.endTime || '13:00');
+                                          setBookingPurpose(b.purpose || b.title || '');
+                                        }}
+                                        onDoubleClick={(e) => {
+                                          e.stopPropagation();
                                         }}
                                         style={{
                                           position: 'absolute',
@@ -3582,23 +4052,24 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                           borderRadius: '12px',
                                           background: cardBg,
                                           border: cardBorder,
-                                          boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
+                                          boxShadow: (!isSchedule && !isBookingConfirmed) ? '0 2px 8px rgba(139, 92, 246, 0.12)' : '0 4px 14px rgba(0, 0, 0, 0.15)',
                                           overflow: 'hidden',
                                           display: 'flex',
                                           flexDirection: 'column',
                                           justifyContent: 'space-between',
-                                          cursor: 'pointer',
+                                          cursor: (b.isPreview || b.id === 'preview_draft_booking') ? 'default' : 'pointer',
                                           transition: 'transform 0.15s ease, box-shadow 0.15s ease'
                                         }}
                                         className="hover-scale"
                                       >
                                         {/* Top Header White Pill/Card */}
                                         <div style={{
-                                          background: '#ffffff',
+                                          background: (!isSchedule && !isBookingConfirmed) ? 'rgba(255, 255, 255, 0.95)' : '#ffffff',
                                           borderRadius: '8px',
                                           padding: '5px 8px',
                                           margin: '3px 3px 0 3px',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                          boxShadow: (!isSchedule && !isBookingConfirmed) ? '0 1px 3px rgba(139, 92, 246, 0.12)' : '0 1px 3px rgba(0,0,0,0.06)',
+                                          border: (!isSchedule && !isBookingConfirmed) ? '1px dashed #c4b5fd' : 'none',
                                           display: 'flex',
                                           flexDirection: 'column',
                                           gap: '2px'
@@ -3606,13 +4077,32 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                           <div style={{
                                             display: 'flex',
                                             alignItems: 'center',
+                                            justifyContent: 'space-between',
                                             gap: '4px',
                                             fontSize: '0.68rem',
                                             fontWeight: 800,
                                             color: headerTimeColor
                                           }}>
-                                            <Clock size={11} color={headerTimeColor} />
-                                            <span>{b.startTime} - {b.endTime}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                              <Clock size={11} color={headerTimeColor} />
+                                              <span>{b.startTime} - {b.endTime}</span>
+                                            </div>
+                                            {!isSchedule && !isBookingConfirmed && (
+                                              <span style={{
+                                                fontSize: '0.55rem',
+                                                fontWeight: 850,
+                                                color: '#7c3aed',
+                                                background: 'rgba(124, 58, 237, 0.10)',
+                                                border: '1px dashed #8b5cf6',
+                                                padding: '1px 5px',
+                                                borderRadius: '4px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.02em',
+                                                whiteSpace: 'nowrap'
+                                              }}>
+                                                Vorbehalt
+                                              </span>
+                                            )}
                                           </div>
                                           <div style={{
                                             fontSize: '0.74rem',
@@ -3647,9 +4137,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                             {isSchedule ? (
                                               <Lock size={12} color={bodyTextColor} style={{ opacity: 0.85 }} />
                                             ) : isBookingConfirmed ? (
-                                              <CheckCircle2 size={12} color={bodyTextColor} style={{ opacity: 0.85 }} />
+                                              <CheckCircle2 size={12} color={bodyTextColor} style={{ opacity: 0.95 }} />
                                             ) : (
-                                              <Hourglass size={12} color={bodyTextColor} style={{ opacity: 0.85 }} />
+                                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.62rem', fontWeight: 800, color: '#6d28d9' }} title="Unter Vorbehalt (Sekretariat prüft)">
+                                                <Hourglass size={12} color="#7c3aed" style={{ opacity: 0.95 }} />
+                                                {cardHeight >= 58 && <span>Unter Vorbehalt</span>}
+                                              </span>
                                             )}
                                           </div>
                                         </div>
@@ -3783,181 +4276,25 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </button>
                 </div>
 
-                {/* Cancel All Button */}
-                {myBookings.length >= 2 && (
-                  <button
-                    onClick={() => {
-                      const allIds = myBookings.flatMap(b => b.ids || [b.id]);
-                      handleCancelBooking(allIds);
-                    }}
-                    style={{
-                      background: '#ff453a15',
-                      color: '#ff453a',
-                      border: 'none',
-                      padding: '8px 14px',
-                      borderRadius: '12px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      marginBottom: '12px',
-                      width: '100%',
-                      textAlign: 'center',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#ff453a25'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#ff453a15'}
-                  >
-                    Alle stornieren
-                  </button>
-                )}
-
-                <div className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}>
-                  {myBookings.length === 0 ? (
-                    <div style={{ fontSize: '0.78rem', color: '#8e8e93', fontWeight: 700, textAlign: 'center', padding: '16px', border: '1.5px dashed #e5e5ea', borderRadius: '14px', background: '#f2f2f7' }}>
-                      Du hast noch keine Buchungen vorgenommen.
-                    </div>
-                  ) : (
-                    myBookings.map((b: any) => {
-                      const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
-
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => {
-                            setBookingDate(b.date);
-                            setSelectedFloor('Alle');
-                            setSelectedCampusRoomId(b.roomId);
-                            setSelectedBooking(b);
-                            setBookingStartTime(b.startTime);
-                            setBookingEndTime(b.endTime);
-                            setBookingPurpose(b.purpose || '');
-                            setIsDateFilterActive(false);
-                            setShowMyBookingsOnly(false);
-                          }}
-                          style={{
-                            padding: '12px 14px',
-                            background: isBookingConfirmed 
-                              ? '#fae8ff' 
-                              : 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)',
-                            border: isBookingConfirmed ? '2px solid #a855f7' : '2px dashed #a855f7',
-                            borderRadius: '14px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            cursor: 'pointer',
-                            transition: 'transform 0.15s ease, border-color 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#9333ea';
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#a855f7';
-                            e.currentTarget.style.transform = 'none';
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
-                              {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
-                            </span>
-                            <div style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
-                              {b.teacherName === 'Schule' ? (
-                                <>
-                                  <strong style={{ fontWeight: 900 }}>Schule</strong> • {b.roomName}
-                                </>
-                              ) : b.roomName}
-                            </div>
-                            {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
-                              <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
-                                {b.purpose.replace(/^Unterricht:\s*/i, '')}
-                              </div>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                            <span style={{
-                              fontSize: '0.64rem',
-                              fontWeight: 800,
-                              padding: '3px 9px',
-                              borderRadius: '100px',
-                              background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.14)' : 'rgba(234, 179, 8, 0.14)',
-                              backdropFilter: 'blur(8px)',
-                              WebkitBackdropFilter: 'blur(8px)',
-                              border: isBookingConfirmed ? '1px solid rgba(34, 197, 94, 0.28)' : '1px solid rgba(234, 179, 8, 0.28)',
-                              color: isBookingConfirmed ? '#15803d' : '#9a3412',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              boxShadow: isBookingConfirmed ? '0 2px 6px rgba(34, 197, 94, 0.12)' : '0 2px 6px rgba(234, 179, 8, 0.1)',
-                              whiteSpace: 'nowrap',
-                              letterSpacing: '-0.01em'
-                            }}>
-                              {isBookingConfirmed ? (
-                                <>
-                                  <CheckCircle2 size={11} strokeWidth={2.6} style={{ color: '#16a34a' }} />
-                                  <span>Bestätigt</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Clock size={11} strokeWidth={2.4} style={{ color: '#9a3412' }} />
-                                  <span>Unter Vorbehalt (Sekretariat prüft)</span>
-                                </>
-                              )}
-                            </span>
-
-                            {!isBookingConfirmed && isStaff && !b.isSchedule && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleApproveBooking(b.id); }}
-                                style={{
-                                  background: '#34c75918',
-                                  color: '#16a34a',
-                                  border: '1px solid #86efac',
-                                  borderRadius: '10px',
-                                  padding: '0 8px',
-                                  height: '32px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '0.70rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'background 0.2s',
-                                  whiteSpace: 'nowrap'
-                                }}
-                                title="Buchung als Sekretariat freigeben"
-                              >
-                                <Check size={13} strokeWidth={3} />
-                                <span>Freigeben</span>
-                              </button>
-                            )}
-
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleCancelBooking(b.ids || b.id); }}
-                              style={{
-                                background: '#ff453a15',
-                                color: '#ff453a',
-                                border: 'none',
-                                borderRadius: '10px',
-                                width: '32px',
-                                height: '32px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                transition: 'background 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#ff453a30'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = '#ff453a15'}
-                              title="Buchung stornieren"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                <CampusMyBookingsList
+                  myBookings={myBookings}
+                  selectedBookingId={selectedBooking?.id}
+                  isStaff={isStaff}
+                  brandColor={brandColor}
+                  onSelectBooking={(b) => {
+                    setBookingDate(b.date);
+                    setSelectedFloor('Alle');
+                    setSelectedCampusRoomId(b.roomId);
+                    setSelectedBooking(b);
+                    setBookingStartTime(b.startTime);
+                    setBookingEndTime(b.endTime);
+                    setBookingPurpose(b.purpose || '');
+                    setIsDateFilterActive(false);
+                    setShowMyBookingsOnly(false);
+                  }}
+                  onCancelBooking={handleCancelBooking}
+                  onApproveBooking={handleApproveBooking}
+                />
               </div>
             ) : (
               /* Booking Form (Shown when showMyBookingsOnly is false) */
@@ -4451,6 +4788,66 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </span>
                 </div>
 
+                {isEditing && !selectedBooking?.isSchedule && (() => {
+                  const isConfirmed = !selectedBooking.isSchedule && 
+                    (selectedBooking.status === 'confirmed') && 
+                    (selectedBooking.is_confirmed === true);
+                  return (
+                    <div style={{
+                      background: isConfirmed ? '#f0fdf4' : '#faf5ff',
+                      border: isConfirmed ? '1.5px solid #86efac' : '2px dashed #8b5cf6',
+                      borderRadius: '12px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      marginTop: '4px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        {isConfirmed ? (
+                          <CheckCircle2 size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                        ) : (
+                          <Clock size={16} color="#7c3aed" style={{ flexShrink: 0 }} />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: isConfirmed ? '#166534' : '#5b21b6' }}>
+                            {isConfirmed ? 'Status: Bestätigt (unifarben)' : 'Status: Unter Vorbehalt (gestrichelt)'}
+                          </span>
+                          <span style={{ fontSize: '0.66rem', color: isConfirmed ? '#15803d' : '#6d28d9', fontWeight: 600 }}>
+                            {isConfirmed ? 'Vom Sekretariat freigegeben.' : 'Wartet auf Freigabe durch das Sekretariat.'}
+                          </span>
+                        </div>
+                      </div>
+                      {!isConfirmed && isStaff && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleApproveBooking(selectedBooking.id); }}
+                          style={{
+                            background: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '5px 10px',
+                            fontSize: '0.70rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0
+                          }}
+                          title="Buchung als Sekretariat freigeben"
+                        >
+                          <Check size={12} strokeWidth={3} />
+                          <span>Freigeben</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {isEditing && !selectedBooking?.isSchedule && (
                   <button
                     onClick={handleDeleteBooking}
@@ -4885,47 +5282,26 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </div>
 
                   {showMyBookingsOnly ? (
-                    /* List of Own Bookings */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {myBookings.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8' }}>
-                          <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>Keine aktiven Raumbuchungen vorhanden.</p>
-                        </div>
-                      ) : (
-                        myBookings.map((b: any) => (
-                          <div key={b.id} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 900, fontSize: '0.90rem', color: '#0f172a' }}>{b.roomName || 'Raum'}</span>
-                              <span style={{ fontSize: '0.70rem', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>{b.date}</span>
-                            </div>
-                            <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
-                              ⏰ {b.startTime} - {b.endTime} Uhr • {b.purpose || 'Eigennutzung'}
-                            </span>
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await handleCancelBooking(b.ids || b.id);
-                                }}
-                                style={{
-                                  flex: 1,
-                                  background: '#fee2e2',
-                                  color: '#dc2626',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  padding: '8px 10px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                🗑️ Stornieren
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                    <CampusMyBookingsList
+                      myBookings={myBookings}
+                      selectedBookingId={selectedBooking?.id}
+                      isStaff={isStaff}
+                      brandColor={brandColor}
+                      onSelectBooking={(b) => {
+                        setBookingDate(b.date);
+                        setSelectedFloor('Alle');
+                        setSelectedCampusRoomId(b.roomId);
+                        setSelectedBooking(b);
+                        setBookingStartTime(b.startTime);
+                        setBookingEndTime(b.endTime);
+                        setBookingPurpose(b.purpose || '');
+                        setIsDateFilterActive(false);
+                        setShowMyBookingsOnly(false);
+                        setShowMobileRoomSlider(false);
+                      }}
+                      onCancelBooking={handleCancelBooking}
+                      onApproveBooking={handleApproveBooking}
+                    />
                   ) : (
                     /* Booking Form */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -5121,6 +5497,65 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       </span>
                     </div>
 
+                    {isEditing && !selectedBooking?.isSchedule && (() => {
+                      const isConfirmed = !selectedBooking.isSchedule && 
+                        (selectedBooking.status === 'confirmed') && 
+                        (selectedBooking.is_confirmed === true);
+                      return (
+                        <div style={{
+                          background: isConfirmed ? '#f0fdf4' : '#faf5ff',
+                          border: isConfirmed ? '1.5px solid #86efac' : '2px dashed #8b5cf6',
+                          borderRadius: '12px',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            {isConfirmed ? (
+                              <CheckCircle2 size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                            ) : (
+                              <Clock size={16} color="#7c3aed" style={{ flexShrink: 0 }} />
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: isConfirmed ? '#166534' : '#5b21b6' }}>
+                                {isConfirmed ? 'Status: Bestätigt (unifarben)' : 'Status: Unter Vorbehalt (gestrichelt)'}
+                              </span>
+                              <span style={{ fontSize: '0.66rem', color: isConfirmed ? '#15803d' : '#6d28d9', fontWeight: 600 }}>
+                                {isConfirmed ? 'Vom Sekretariat freigegeben.' : 'Wartet auf Freigabe durch das Sekretariat.'}
+                              </span>
+                            </div>
+                          </div>
+                          {!isConfirmed && isStaff && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleApproveBooking(selectedBooking.id); }}
+                              style={{
+                                background: '#16a34a',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '5px 10px',
+                                fontSize: '0.70rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0
+                              }}
+                              title="Buchung als Sekretariat freigeben"
+                            >
+                              <Check size={12} strokeWidth={3} />
+                              <span>Freigeben</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {isEditing && (
                       <button
                         type="button"
@@ -5160,6 +5595,213 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Quick-Booking Modal (Doppelklick-Schnellbuchung) */}
+          {quickBookingModalData?.isOpen && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Schnellbuchung für ${quickBookingModalData.roomName}`}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 100000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(15, 23, 42, 0.65)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                padding: '16px',
+                animation: 'fadeIn 0.15s ease-out'
+              }}
+              onClick={() => {
+                if (!quickBookingModalData.isSubmitting) {
+                  setQuickBookingModalData(null);
+                }
+              }}
+            >
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  maxWidth: '460px',
+                  width: '100%',
+                  boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '18px',
+                  position: 'relative'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '14px',
+                      background: `${brandColor}15`,
+                      color: brandColor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Zap size={22} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                        Schnellbuchung
+                      </h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                        {quickBookingModalData.roomName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setQuickBookingModalData(null)}
+                    disabled={quickBookingModalData.isSubmitting}
+                    aria-label="Schließen"
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      minWidth: '44px',
+                      minHeight: '44px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: '#f1f5f9',
+                      color: '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s ease'
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Info Pill / Summary */}
+                <div style={{ background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                    <Calendar size={16} style={{ color: brandColor, flexShrink: 0 }} />
+                    <span>{formatGermanDate(quickBookingModalData.date)}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                    <Clock size={16} style={{ color: brandColor, flexShrink: 0 }} />
+                    <span>{quickBookingModalData.startTime} – {quickBookingModalData.endTime} Uhr</span>
+                  </div>
+                </div>
+
+                {/* Time Slot Adjusters */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Von</label>
+                    <input
+                      type="time"
+                      value={quickBookingModalData.startTime}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setQuickBookingModalData(prev => prev ? { ...prev, startTime: newStart } : null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleConfirmQuickBooking();
+                        }
+                      }}
+                      disabled={quickBookingModalData.isSubmitting}
+                      style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '16px', fontWeight: 600, color: '#0f172a', background: '#ffffff', outline: 'none', fontFamily: 'inherit' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Bis</label>
+                    <input
+                      type="time"
+                      value={quickBookingModalData.endTime}
+                      onChange={(e) => {
+                        const newEnd = e.target.value;
+                        setQuickBookingModalData(prev => prev ? { ...prev, endTime: newEnd } : null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleConfirmQuickBooking();
+                        }
+                      }}
+                      disabled={quickBookingModalData.isSubmitting}
+                      style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '16px', fontWeight: 600, color: '#0f172a', background: '#ffffff', outline: 'none', fontFamily: 'inherit' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Input: Zweck / Notiz */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label htmlFor="quick-booking-purpose-input" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>Verwendungszweck / Notiz</label>
+                  <input
+                    id="quick-booking-purpose-input"
+                    ref={quickBookingInputRef}
+                    type="text"
+                    autoFocus
+                    placeholder="z. B. Bandprobe, Eigenüben, Besprechung..."
+                    value={quickBookingModalData.purpose}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setQuickBookingModalData(prev => prev ? { ...prev, purpose: val } : null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleConfirmQuickBooking();
+                      }
+                    }}
+                    disabled={quickBookingModalData.isSubmitting}
+                    style={{ padding: '12px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '16px', color: '#0f172a', background: '#ffffff', outline: 'none', fontFamily: 'inherit' }}
+                  />
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Tipp: Drücke <kbd style={{ padding: '2px 5px', background: '#e2e8f0', borderRadius: '4px', fontSize: '0.70rem' }}>Enter</kbd> zum sofortigen Buchen.
+                  </span>
+                </div>
+
+                {/* Modal Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setQuickBookingModalData(null)}
+                    disabled={quickBookingModalData.isSubmitting}
+                    style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', minHeight: '44px' }}
+                  >
+                    Abbrechen
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmQuickBooking}
+                    disabled={quickBookingModalData.isSubmitting}
+                    style={{ padding: '10px 22px', borderRadius: '12px', border: 'none', background: quickBookingModalData.isSubmitting ? '#94a3b8' : brandColor, color: '#ffffff', fontWeight: 800, fontSize: '0.88rem', cursor: quickBookingModalData.isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)' }}
+                  >
+                    {quickBookingModalData.isSubmitting ? (
+                      <>
+                        <Hourglass size={16} />
+                        <span>Wird gebucht...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={16} />
+                        <span>Raum buchen</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}

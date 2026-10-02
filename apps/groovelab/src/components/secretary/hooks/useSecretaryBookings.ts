@@ -103,7 +103,7 @@ export function useSecretaryBookings({
     try {
       const { error } = await supabase
         .from('room_bookings')
-        .update({ status: 'approved' })
+        .update({ status: 'confirmed', is_confirmed: true })
         .eq('id', id);
 
       if (error) throw error;

@@ -16,6 +16,7 @@ import {
   Calendar, 
   ShieldCheck, 
   Lock, 
+  Unlock,
   Sparkles, 
   CheckCheck, 
   Loader2, 
@@ -58,7 +59,7 @@ import {
   Award
 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
-import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
+import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName, formatStudentDisplayName } from '../utils/nameHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { 
   validateChatMessageContent, 
@@ -73,51 +74,18 @@ import { CampusTopicCard, CampusTopicReaction } from './CampusTopicCard';
 import { CampusTopicComposer } from './CampusTopicComposer';
 import { logSecurityEvent } from '../services/auditLogService';
 import { primeDecryptedCache } from '../lib/security/messageCrypto';
+import { CompactAppointmentEventCard, parseLocalDate, extractOccurrenceDateFromMessage } from './messages/CompactAppointmentEventCard';
+import { playChatMessageSentSound, triggerChatHapticFeedback } from '../utils/chatSoundAndHaptics';
 
-export const getGroupIconComponent = (iconId: string) => {
-  switch (iconId) {
-    // 1. Instrumente
-    case 'guitar': return Guitar;
-    case 'acoustic_guitar': return Music;
-    case 'piano': return Layers;
-    case 'drums': return Disc;
-    case 'mic': return Mic;
-    case 'violin': return Activity;
-    case 'brass': return Radio;
-    case 'bass': return Volume2;
-    // 2. Bands & Ensembles
-    case 'rockband':
-    case 'flame': return Flame;
-    case 'bigband': return Speaker;
-    case 'orchestra':
-    case 'compass': return Compass;
-    case 'choir':
-    case 'users': return Users;
-    case 'ensemble':
-    case 'sparkles': return Sparkles;
-    case 'jam': return Zap;
-    case 'duo':
-    case 'headphones': return Headphones;
-    case 'percussion': return Repeat;
-    // 3. Klasse & Events
-    case 'klassenchat': return GraduationCap;
-    case 'concert':
-    case 'award': return Award;
-    case 'theory': return BookOpen;
-    case 'masterclass':
-    case 'trophy': return Trophy;
-    case 'competition': return Medal;
-    case 'project': return FolderGit2;
-    case 'parents': return ShieldCheck;
-    case 'archive': return Archive;
-    // Fallbacks
-    case 'radio': return Radio;
-    case 'layers': return Layers;
-    case 'music':
-    default:
-      return Music;
-  }
+const GROUP_ICON_MAP: Record<string, any> = {
+  guitar: Guitar, acoustic_guitar: Music, piano: Layers, drums: Disc, mic: Mic, violin: Activity,
+  brass: Radio, bass: Volume2, rockband: Flame, flame: Flame, bigband: Speaker, orchestra: Compass,
+  compass: Compass, choir: Users, users: Users, ensemble: Sparkles, sparkles: Sparkles, jam: Zap,
+  duo: Headphones, headphones: Headphones, percussion: Repeat, klassenchat: GraduationCap, concert: Award,
+  award: Award, theory: BookOpen, masterclass: Trophy, trophy: Trophy, competition: Medal, project: FolderGit2,
+  parents: ShieldCheck, archive: Archive, radio: Radio, layers: Layers, music: Music
 };
+export const getGroupIconComponent = (iconId: string) => GROUP_ICON_MAP[iconId] || Music;
 
 export const resolveGroupIconAndColor = (group: any) => {
   let iconKey = group?.icon || group?.avatar_icon;
@@ -169,15 +137,44 @@ export const APPLE_AVATAR_GRADIENTS = [
   { bg: 'linear-gradient(135deg, #64748b 0%, #334155 100%)', text: '#ffffff' }  // Slate / Graphit
 ];
 
-export const getDeterministicAvatarGradient = (idOrName: string) => {
-  if (!idOrName) return APPLE_AVATAR_GRADIENTS[0];
-  let hash = 0;
-  for (let i = 0; i < idOrName.length; i++) {
-    hash = (hash << 5) - hash + idOrName.charCodeAt(i);
-    hash |= 0;
+export const getDeterministicAvatarGradient = (userOrNameOrId: any, fallbackInitial?: string) => {
+  let initial = '';
+
+  if (fallbackInitial && /^[a-zA-ZäöüÄÖÜ]/i.test(fallbackInitial)) {
+    initial = fallbackInitial[0].toUpperCase();
+  } else if (typeof userOrNameOrId === 'string') {
+    const cleanLetters = userOrNameOrId.replace(/[^a-zA-ZäöüÄÖÜß]/g, '');
+    if (cleanLetters.length > 0 && !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(userOrNameOrId)) {
+      initial = cleanLetters[0].toUpperCase();
+    }
+  } else if (userOrNameOrId && typeof userOrNameOrId === 'object') {
+    const nameStr = userOrNameOrId.first_name || userOrNameOrId.name || userOrNameOrId.student_name || userOrNameOrId.full_name || '';
+    const cleanLetters = nameStr.replace(/[^a-zA-ZäöüÄÖÜß]/g, '');
+    if (cleanLetters.length > 0) {
+      initial = cleanLetters[0].toUpperCase();
+    }
   }
-  const index = Math.abs(hash) % APPLE_AVATAR_GRADIENTS.length;
-  return APPLE_AVATAR_GRADIENTS[index];
+
+  if (!initial) {
+    initial = 'A';
+  }
+
+  // Anchor 'A' (z. B. Amelia) deterministisch und unverrückbar auf Apple Emerald Smaragdgrün (#10b981 -> #047857)
+  if (initial === 'A') {
+    return {
+      bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+      text: '#ffffff'
+    };
+  }
+
+  const charCode = initial.charCodeAt(0);
+  const letterOffset = (charCode >= 65 && charCode <= 90) ? charCode - 65 : (Math.abs(charCode) % 26);
+  const hue = Math.round((155 + letterOffset * 137.508) % 360);
+
+  return {
+    bg: `linear-gradient(135deg, hsl(${hue}, 72%, 46%) 0%, hsl(${hue}, 76%, 35%) 100%)`,
+    text: '#ffffff'
+  };
 };
 
 export const getContactInitials = (u: any): string => {
@@ -203,6 +200,8 @@ interface CampusDynamicAvatarProps {
   isQuietHours?: boolean;
   style?: React.CSSProperties;
   variant?: 'default' | 'on-dark';
+  customGradient?: { bg: string; text: string };
+  rosterColorMap?: Map<string, { bg: string; text: string }>;
 }
 
 export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
@@ -211,7 +210,9 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
   showPresence = false,
   isQuietHours = false,
   style = {},
-  variant = 'default'
+  variant = 'default',
+  customGradient,
+  rosterColorMap
 }) => {
   // 1. Group avatar: Apple Squircle Badge with resolved icon and color
   if (user?.is_group) {
@@ -270,7 +271,10 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
   const isSecretary = role === 'secretary' || role === 'admin' || roles.includes('secretary') || roles.includes('admin');
 
   const initials = getContactInitials(user);
-  const identifier = user?.id || user?.name || user?.first_name || 'contact';
+  const identifier = user?.first_name || user?.name || user?.student_name || user?.full_name || user?.id || 'contact';
+
+  // 🛡️ 0.1% Goldstandard: Vorrangige Zuweisung des kanonischen Klassen-Farbfächers für Schüler
+  const studentRosterGradient = customGradient || (rosterColorMap && user?.id ? rosterColorMap.get(user.id) : undefined);
   
   // Teachers get signature academic emerald palette; Admins get slate/indigo; Parents blue; Students get deterministic studio palettes
   const gradient = isTeacher 
@@ -281,7 +285,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
     ? { bg: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)', text: '#ffffff' }
     : isParent
     ? { bg: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)', text: '#ffffff' }
-    : getDeterministicAvatarGradient(identifier);
+    : (studentRosterGradient || getDeterministicAvatarGradient(user || identifier, initials[0]));
 
   const fontSize = size >= 44 ? '0.98rem' : size >= 36 ? '0.85rem' : '0.72rem';
   const cornerBadgeSize = Math.max(14, Math.round(size * 0.38));
@@ -419,750 +423,10 @@ const resolveCampusAvatar = (u: any): string => {
   return resolveCampusStudentAvatar(u);
 };
 
-const formatStudentDisplayName = (u: any): string => {
-  if (!u) return '';
-  const role = (u.role || '').toLowerCase();
-  const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
-  const isTeacherRole = role === 'teacher' || roles.includes('teacher');
-
-  if (isTeacherRole) {
-    return formatTeacherFullName(u);
-  }
-
-  const isAdminRole = role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary');
-  if (isAdminRole) {
-    return formatTeacherFullName(u);
-  }
-
-  // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
-  if (role === 'student' || role === 'pupil') {
-    const isStudentViewer = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student';
-    if (isStudentViewer) {
-      return formatStudentPureFirstName(u.first_name);
-    }
-    return formatSingleStudentAnonymized(u.first_name, u.full_last_name || u.last_name, u.id);
-  }
-
-  if (u.first_name && (u.full_last_name || u.last_name)) {
-    return `${u.first_name} ${u.full_last_name || u.last_name}`.trim();
-  }
-  return u.first_name || u.name || 'Benutzer';
-};
-
 export { cleanChatMessageContent };
 
-const parseLocalDate = (dateStr: string): Date => {
-  if (!dateStr) return new Date();
-  const cleanDate = dateStr.split('T')[0];
-  const parts = cleanDate.split('-').map(Number);
-  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
-    return new Date(parts[0], parts[1] - 1, parts[2]);
-  }
-  return new Date(dateStr);
-};
-
-// Helper to extract date from message content if occurrence_id is missing or legacy
-const extractOccurrenceDateFromMessage = (msg: any): string | null => {
-  if (!msg) return null;
-  if (msg.occurrence_id) {
-    const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
-    if (matchVirtual) return matchVirtual[0];
-  }
-  const text = String(msg.content || '');
-  // 1. ISO format: 2026-07-20
-  const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (matchIso) {
-    return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
-  }
-  // 2. German format: 20.07.26 or 20.07.2026
-  const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
-  if (matchFullYear) {
-    const day = matchFullYear[1].padStart(2, '0');
-    const month = matchFullYear[2].padStart(2, '0');
-    let year = matchFullYear[3];
-    if (year.length === 2) year = `20${year}`;
-    return `${year}-${month}-${day}`;
-  }
-  return null;
-};
-
-interface AppleSystemNotificationCardProps {
-  msg: any;
-  selectedRecipient?: any;
-  onSendMessage?: (recipientId: string, content: string) => Promise<void>;
-  isSuperseded?: boolean;
-  currentOcc?: any;
-  onNavigateToSchedule?: (dateStr?: string) => void;
-}
-
-const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = ({ 
-  msg, 
-  selectedRecipient, 
-  onSendMessage,
-  isSuperseded = false,
-  currentOcc,
-  onNavigateToSchedule
-}) => {
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionDoneStatus, setActionDoneStatus] = useState<'confirmed' | 'rejected' | null>(null);
-
-  const content: string = msg.content || '';
-  const cleanContent = String(content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
-  const lowerContent = cleanContent.toLowerCase();
-
-  const isReactivation = msg.message_type === 'cancellation_reset' ||
-    content.includes('🔄') || lowerContent.includes('reaktiviert') || lowerContent.includes('zurückgesetzt') || lowerContent.includes('wiederhergestellt') || lowerContent.includes('regulär statt') || lowerContent.includes('entwarnung') || lowerContent.includes('einsatzbereit');
-
-  const isCancellation = (msg.message_type === 'reschedule_notification' && (content.includes('❌') || lowerContent.includes('abgesagt'))) ||
-    content.includes('❌') || lowerContent.includes('termin abgesagt') || lowerContent.includes('fällt aus') || lowerContent.includes('abgesagt') || lowerContent.includes('storniert') || lowerContent.includes('wurde abgesagt');
-
-  const dateMatch = extractOccurrenceDateFromMessage(msg);
-  const occDateStr = currentOcc?.date || dateMatch;
-  let parsedDate: Date | null = null;
-  if (occDateStr) {
-    try {
-      const p = parseLocalDate(occDateStr);
-      if (!isNaN(p.getTime())) parsedDate = p;
-    } catch (e) {}
-  }
-
-  const handleNavigate = () => {
-    if (typeof window === 'undefined') return;
-    const targetDate = occDateStr;
-    if (targetDate) {
-      localStorage.setItem('campus_calendar_target_date', targetDate);
-      localStorage.setItem('groovelab_selected_schedule_date', targetDate);
-      window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: targetDate } }));
-    }
-    localStorage.setItem('campus_active_tab', 'schedule');
-    localStorage.setItem('groovelab_active_tab', 'schedule');
-    if (onNavigateToSchedule && targetDate) {
-      onNavigateToSchedule(targetDate);
-    } else {
-      window.location.reload();
-    }
-  };
-
-  const stampTimeStr = new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
-  const stampDateStr = new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  // 1. Reaktivierungs-Eventkarte (0.1% Goldstandard Apple Tear-Off Calendar Card)
-  if (isReactivation) {
-    const lines = cleanContent
-      .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
-      .split('\n')
-      .map((l: string) => l.trim())
-      .filter(Boolean);
-    const teacherName = formatStudentDisplayName(selectedRecipient);
-    const cleanHeaderMsg = lines.find(l => l.includes('einsatzbereit') || l.includes('reaktiviert') || l.includes('findet statt')) ||
-      `Lehrkraft ${teacherName} ist wieder einsatzbereit. Der Unterricht findet planmäßig statt.`;
-
-    return (
-      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '6px 0' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 244, 0.95) 100%)',
-          border: '1.5px solid #86efac',
-          borderRadius: '20px',
-          padding: '14px 18px',
-          boxShadow: '0 4px 16px rgba(34, 197, 94, 0.08), 0 1px 3px rgba(0,0,0,0.02)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          {/* Left: Apple Calendar Tear-Off Block + Details */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '220px' }}>
-            {parsedDate ? (
-              <div style={{
-                width: '48px',
-                height: '52px',
-                borderRadius: '12px',
-                background: '#ffffff',
-                border: '1.5px solid #bbf7d0',
-                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                flexShrink: 0,
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  background: '#16a34a',
-                  color: '#ffffff',
-                  fontSize: '0.60rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  padding: '1.5px 0'
-                }}>
-                  {parsedDate.toLocaleDateString('de-DE', { month: 'short' })}
-                </div>
-                <div style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.15rem',
-                  fontWeight: 900,
-                  color: '#15803d',
-                  lineHeight: 1
-                }}>
-                  {parsedDate.getDate()}
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: '#dcfce7',
-                border: '1.5px solid #86efac',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <RotateCcw size={18} color="#15803d" strokeWidth={2.4} />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: '0.68rem',
-                  background: '#dcfce7',
-                  color: '#15803d',
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  fontWeight: 850,
-                  border: '1px solid #86efac',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Check size={11} strokeWidth={3} />
-                  <span>Planmäßiger Unterricht</span>
-                </span>
-                <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
-                  {stampDateStr}, {stampTimeStr}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.86rem', fontWeight: 750, color: '#166534', lineHeight: 1.35, marginTop: '2px' }}>
-                {cleanHeaderMsg}
-              </div>
-              {parsedDate && (
-                <div style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Calendar size={12} color="#16a34a" />
-                  <span>{parsedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Action: Apple Pill Button */}
-          {parsedDate && (
-            <button
-              type="button"
-              onClick={handleNavigate}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '100px',
-                border: 'none',
-                background: '#16a34a',
-                color: '#ffffff',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.22)',
-                transition: 'all 0.15s ease',
-                flexShrink: 0
-              }}
-              className="hover-scale"
-            >
-              <Calendar size={13} color="#ffffff" />
-              <span>Im Stundenplan</span>
-              <ArrowRight size={12} color="#ffffff" strokeWidth={2.4} />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Stornierungs-/Absage-Eventkarte (0.1% Goldstandard Apple Tear-Off Calendar Card)
-  if (isCancellation) {
-    const lines = cleanContent
-      .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
-      .split('\n')
-      .map((l: string) => l.trim())
-      .filter(Boolean);
-    const mainMsg = lines[0] || 'Dieser Unterrichtstermin wurde abgesagt.';
-
-    return (
-      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '6px 0' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(254, 242, 242, 0.95) 100%)',
-          border: '1.5px solid #fca5a5',
-          borderRadius: '20px',
-          padding: '14px 18px',
-          boxShadow: '0 4px 16px rgba(239, 68, 68, 0.06), 0 1px 3px rgba(0,0,0,0.02)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          {/* Left: Apple Calendar Tear-Off Block (Red) + Details */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '220px' }}>
-            {parsedDate ? (
-              <div style={{
-                width: '48px',
-                height: '52px',
-                borderRadius: '12px',
-                background: '#ffffff',
-                border: '1.5px solid #fecaca',
-                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                flexShrink: 0,
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  background: '#dc2626',
-                  color: '#ffffff',
-                  fontSize: '0.60rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  padding: '1.5px 0'
-                }}>
-                  {parsedDate.toLocaleDateString('de-DE', { month: 'short' })}
-                </div>
-                <div style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.15rem',
-                  fontWeight: 900,
-                  color: '#991b1b',
-                  lineHeight: 1
-                }}>
-                  {parsedDate.getDate()}
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: '#fee2e2',
-                border: '1.5px solid #fca5a5',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <X size={18} color="#dc2626" strokeWidth={2.4} />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: '0.68rem',
-                  background: '#fee2e2',
-                  color: '#991b1b',
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  fontWeight: 850,
-                  border: '1px solid #fca5a5',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <X size={11} strokeWidth={3} />
-                  <span>Unterricht abgesagt</span>
-                </span>
-                <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
-                  {stampDateStr}, {stampTimeStr}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.86rem', fontWeight: 750, color: '#991b1b', lineHeight: 1.35, marginTop: '2px' }}>
-                {mainMsg}
-              </div>
-              {parsedDate && (
-                <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Calendar size={12} color="#dc2626" />
-                  <span>{parsedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Action: Apple Pill Button */}
-          {parsedDate && (
-            <button
-              type="button"
-              onClick={handleNavigate}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '100px',
-                border: 'none',
-                background: '#dc2626',
-                color: '#ffffff',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.22)',
-                transition: 'all 0.15s ease',
-                flexShrink: 0
-              }}
-              className="hover-scale"
-            >
-              <Calendar size={13} color="#ffffff" />
-              <span>Im Stundenplan</span>
-              <ArrowRight size={12} color="#ffffff" strokeWidth={2.4} />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  const dateStr = new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + 
-    ', ' + new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-
-  let title = 'Stundenplan-Update';
-  let badgeText = 'Systemnachricht';
-  let isPending = false;
-  let isShift = false;
-  let oldTime = '';
-  let newTime = '';
-  let note = '';
-
-  const arrowIndex = content.indexOf('->');
-  if (arrowIndex !== -1) {
-    title = 'Terminverschiebung angefragt';
-    isShift = true;
-
-    // Check if shift is still active and pending confirmation
-    if (isSuperseded) {
-      badgeText = 'Nicht mehr aktuell';
-      isPending = false;
-    } else if (currentOcc && (currentOcc.status === 'confirmed' || (currentOcc.status === 'scheduled' && !currentOcc.is_rescheduled && !currentOcc.rescheduled_from))) {
-      badgeText = currentOcc.status === 'confirmed' ? 'Bestätigt' : 'Nicht mehr aktuell';
-      isPending = false;
-    } else if (currentOcc && (currentOcc.status === 'cancelled' || currentOcc.status === 'canceled_by_student')) {
-      badgeText = 'Abgesagt';
-      isPending = false;
-    } else {
-      badgeText = 'Bestätigung ausstehend';
-      isPending = true;
-    }
-
-    const leftRaw = content.substring(0, arrowIndex)
-      .replace(/Dein Termin wurde verschoben:/i, '')
-      .replace(/verschoben von:/i, '')
-      .trim();
-    const rightRaw = content.substring(arrowIndex + 2).trim();
-
-    const uhrIndex = rightRaw.toLowerCase().indexOf('uhr');
-    if (uhrIndex !== -1) {
-      newTime = rightRaw.substring(0, uhrIndex + 3).trim();
-      note = rightRaw.substring(uhrIndex + 3).replace(/^[.\s]+/, '').trim();
-    } else {
-      newTime = rightRaw;
-    }
-    oldTime = leftRaw;
-  } else if (content.includes('abgelehnt')) {
-    title = 'Verschiebung abgelehnt';
-    badgeText = 'Abgelehnt';
-    note = content.replace(/❌/g, '').trim();
-  } else if (content.includes('bestätigt')) {
-    title = 'Termin bestätigt';
-    badgeText = 'Bestätigt';
-    note = content;
-  } else {
-    note = content;
-  }
-
-  // Override status if action was taken in this card
-  if (actionDoneStatus === 'confirmed') {
-    badgeText = 'Bestätigt';
-    isPending = false;
-  } else if (actionDoneStatus === 'rejected') {
-    badgeText = 'Abgelehnt';
-    isPending = false;
-  }
-
-  // Unified, Understated Apple Palette (Schlicht & Glassmorphism)
-  let badgeBg = '#f1f5f9';
-  let badgeColor = '#475569';
-  let badgeBorder = '#e2e8f0';
-
-  if (isPending) {
-    // Soft Amber (Pending)
-    badgeBg = '#fffbe6';
-    badgeColor = '#b45309';
-    badgeBorder = '#fde68a';
-  } else if (badgeText === 'Bestätigt' || badgeText === 'Termin regulär' || badgeText === 'Regulär' || badgeText === 'Reaktiviert') {
-    // Soft Muted Green (Confirmed / Regular)
-    badgeBg = '#e6f4ea';
-    badgeColor = '#15803d';
-    badgeBorder = '#bbf7d0';
-  } else if (badgeText === 'Termin zurückgesetzt' || badgeText === 'Nicht mehr aktuell') {
-    // Soft Slate Gray (Reset / Superseded)
-    badgeBg = '#f1f5f9';
-    badgeColor = '#475569';
-    badgeBorder = '#e2e8f0';
-  } else if (badgeText === 'Abgelehnt' || badgeText === 'Abgesagt') {
-    // Soft Muted Rose (Rejected / Canceled)
-    badgeBg = '#fef2f2';
-    badgeColor = '#991b1b';
-    badgeBorder = '#fecaca';
-  }
-
-  const handleConfirm = async () => {
-    try {
-      setActionLoading(true);
-      if (msg.occurrence_id) {
-        await supabase
-          .from('schedule_occurrences')
-          .update({ status: 'confirmed', student_acknowledged: true })
-          .eq('id', msg.occurrence_id);
-      }
-      if (selectedRecipient && onSendMessage) {
-        const text = newTime ? `Unterrichtstermin bestätigt: ${newTime}` : 'Unterrichtstermin bestätigt.';
-        await onSendMessage(selectedRecipient.id, text);
-      }
-      setActionDoneStatus('confirmed');
-    } catch (err) {
-      console.error('Error confirming shift:', err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleReject = async () => {
-    try {
-      setActionLoading(true);
-      if (msg.occurrence_id) {
-        await supabase
-          .from('schedule_occurrences')
-          .update({ status: 'cancelled' })
-          .eq('id', msg.occurrence_id);
-      }
-      if (selectedRecipient && onSendMessage) {
-        const text = oldTime ? `Verschiebung abgelehnt. Belasse Termin bei: ${oldTime}` : 'Verschiebung abgelehnt.';
-        await onSendMessage(selectedRecipient.id, text);
-      }
-      setActionDoneStatus('rejected');
-    } catch (err) {
-      console.error('Error rejecting shift:', err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '18px',
-        padding: '14px 18px',
-        maxWidth: '520px',
-        width: '100%',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-        border: '1px solid #f1f5f9',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        boxSizing: 'border-box'
-      }}>
-        {/* Top bar: Calm Timestamp & Icon */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
-            {title}
-          </span>
-          <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={11} color="#94a3b8" />
-            <span>{dateStr}</span>
-          </div>
-        </div>
-
-        {/* Time Transition Box */}
-        {isShift && oldTime && newTime ? (
-          <div style={{
-            background: '#f8fafc',
-            border: '1px solid #f1f5f9',
-            borderRadius: '10px',
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px',
-            margin: '2px 0',
-            flexWrap: 'wrap',
-            minWidth: 0
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Bisher</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', overflowWrap: 'break-word' }}>{oldTime}</span>
-            </div>
-
-            <div style={{
-              color: '#34a853',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <ArrowRight size={14} strokeWidth={2.6} color="#34a853" />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right', minWidth: 0 }}>
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>Neu</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', overflowWrap: 'break-word' }}>{newTime}</span>
-            </div>
-          </div>
-        ) : (
-          <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5, whiteSpace: 'pre-line', overflowWrap: 'break-word' }}>
-            {note}
-          </p>
-        )}
-
-        {/* Status Line & Action */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-          <span style={{
-            fontSize: '0.68rem',
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: '6px',
-            background: badgeBg,
-            color: badgeColor,
-            border: `1px solid ${badgeBorder}`,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}>
-            {badgeColor === '#991b1b' ? <X size={11} /> : badgeColor === '#b45309' ? <Clock size={11} /> : <Check size={11} />}
-            <span>{badgeText}</span>
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {parsedDate && (
-              <button
-                type="button"
-                onClick={handleNavigate}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#15803d',
-                  fontSize: '0.74rem',
-                  fontWeight: 750,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '2px 6px'
-                }}
-                className="hover-scale"
-              >
-                <Calendar size={12} color="#15803d" />
-                <span>Im Plan</span>
-                <ArrowRight size={11} color="#15803d" />
-              </button>
-            )}
-
-            {note && isShift && (
-              <span style={{ fontSize: '0.70rem', fontWeight: 500, color: '#94a3b8' }}>
-                {note}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Interactive Apple Action Buttons (If Confirmation Pending) */}
-        {isPending && (
-          <div style={{ 
-            display: 'flex', 
-            gap: '8px', 
-            marginTop: '2px', 
-            paddingTop: '8px', 
-            borderTop: '1px solid #f8fafc',
-            flexWrap: 'wrap'
-          }}>
-            <button
-              type="button"
-              disabled={actionLoading}
-              onClick={handleConfirm}
-              style={{
-                flex: 1,
-                minWidth: '120px',
-                minHeight: '44px',
-                padding: '8px 14px',
-                borderRadius: '100px',
-                border: 'none',
-                background: '#34a853',
-                color: '#ffffff',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '5px',
-                boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)',
-                touchAction: 'manipulation'
-              }}
-              className="hover-scale"
-            >
-              <Check size={13} color="#ffffff" strokeWidth={2.5} />
-              <span>{actionLoading ? 'Bestätige...' : 'Bestätigen'}</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={actionLoading}
-              onClick={handleReject}
-              style={{
-                flex: 1,
-                minWidth: '120px',
-                minHeight: '44px',
-                padding: '8px 14px',
-                borderRadius: '100px',
-                border: '1px solid #e2e8f0',
-                background: '#ffffff',
-                color: '#64748b',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '5px',
-                touchAction: 'manipulation'
-              }}
-              className="hover-scale"
-            >
-              <X size={13} color="#64748b" strokeWidth={2.5} />
-              <span>{actionLoading ? 'Lehne ab...' : 'Ablehnen'}</span>
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+// 🎫 WhatsApp 0.1% Goldstandard: CompactAppointmentEventCard, parseLocalDate & extractOccurrenceDateFromMessage
+// are cleanly imported from ./messages/CompactAppointmentEventCard.tsx
 
 interface CampusDirectMessagesProps {
   user: any;
@@ -1445,41 +709,37 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
   const [parentPinError, setParentPinError] = useState('');
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [, setForceUpdateTick] = useState(0);
+  const isParentUnlocked = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+  const handleLockParentMode = () => {
+    sessionStorage.removeItem('groovelab_parent_unlocked_global');
+    if (user?.id) {
+      sessionStorage.removeItem(`groovelab_parent_unlocked_${user.id}`);
+      sessionStorage.removeItem(`groovelab_parent_session_${user.id}`);
+    }
+    setForceUpdateTick(prev => prev + 1);
+    window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
+  };
 
   const handleVerifyParentPin = async (inputPin: string) => {
-    if (!inputPin || inputPin.length < 4) {
-      setParentPinError('Bitte gib die 6-stellige Eltern-Master-PIN ein.');
-      return;
-    }
+    if (!inputPin || inputPin.length < 4) { setParentPinError('Bitte gib die 6-stellige Eltern-Master-PIN ein.'); return; }
     setIsVerifyingPin(true);
     setParentPinError('');
     try {
-      const cleanInput = inputPin.trim();
       let isMatch = false;
-
       if (user?.id) {
-        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-          student_id: user.id,
-          input_pin: cleanInput
-        });
+        const { data: parentOk } = await supabase.rpc('verify_parent_pin', { student_id: user.id, input_pin: inputPin.trim() });
         if (parentOk === true) isMatch = true;
       }
-
       if (isMatch) {
         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
         sessionStorage.setItem(`groovelab_parent_session_${user?.id}`, String(Date.now() + 180 * 1000));
-        setShowParentPinModal(false);
-        setParentPinInput('');
-        setForceUpdateTick(prev => prev + 1);
+        setShowParentPinModal(false); setParentPinInput(''); setForceUpdateTick(prev => prev + 1);
       } else {
-        setParentPinError('Falsche Master-PIN. Bitte versuche es erneut.');
-        setParentPinInput('');
+        setParentPinError('Falsche Master-PIN. Bitte versuche es erneut.'); setParentPinInput('');
       }
     } catch (err: any) {
       setParentPinError('Fehler bei der PIN-Prüfung: ' + (err?.message || 'Unbekannt'));
-    } finally {
-      setIsVerifyingPin(false);
-    }
+    } finally { setIsVerifyingPin(false); }
   };
 
   const handleBiometricUnlock = async () => {
@@ -1487,31 +747,19 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     setIsVerifyingPin(true);
     setParentPinError('');
     try {
-      const authRes = await authenticateParentBiometricPasskey(
-        supabase,
-        user.id,
-        (user as any)?.school_id || null
-      );
-
+      const authRes = await authenticateParentBiometricPasskey(supabase, user.id, (user as any)?.school_id || null);
       if (!authRes.success) {
-        if (authRes.error && !authRes.error.includes('abgebrochen')) {
-          setParentPinError(authRes.error);
-        }
+        if (authRes.error && !authRes.error.includes('abgebrochen')) setParentPinError(authRes.error);
         return;
       }
-
       sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
       sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
-      setShowParentPinModal(false);
-      setParentPinInput('');
-      setForceUpdateTick(prev => prev + 1);
+      setShowParentPinModal(false); setParentPinInput(''); setForceUpdateTick(prev => prev + 1);
     } catch (err: any) {
       if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
         setParentPinError(err.message || 'Passkey-Entsperrung fehlgeschlagen.');
       }
-    } finally {
-      setIsVerifyingPin(false);
-    }
+    } finally { setIsVerifyingPin(false); }
   };
 
   useEffect(() => {
@@ -2439,6 +1687,71 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     if (user?.id) map.set(user.id, user);
     return map;
   }, [schoolUsers, assignedStudents, groupMembersDetails, user]);
+
+  // 🛡️ 0.1% Goldstandard: Revisionssichere Klassen-Farbfächer-Palette (N-teilige Äquidistante Dispersion)
+  const studentRosterColorMap = useMemo(() => {
+    const map = new Map<string, { bg: string; text: string }>();
+
+    // Sammle alle relevanten Schüler (ungefiltertes Basis-Roster)
+    const rawRoster = isStudent 
+      ? (allAvailableUsers || [])
+      : (assignedStudents && assignedStudents.length > 0 ? assignedStudents : allAvailableUsers || []);
+
+    if (!rawRoster || rawRoster.length === 0) return map;
+
+    // 1. Nur Schüler filtern (keine Lehrkräfte, Admins oder Sekretariat)
+    const canonicalRoster = rawRoster
+      .filter((s: any) => {
+        if (!s || !s.id) return false;
+        const role = (s.role || '').toLowerCase();
+        const roles = Array.isArray(s.roles) ? s.roles.map((r: any) => String(r).toLowerCase()) : [];
+        const isStaff = role === 'teacher' || role === 'admin' || role === 'secretary' ||
+                        roles.includes('teacher') || roles.includes('admin') || roles.includes('secretary');
+        return !isStaff && (s.first_name || s.name);
+      })
+      // 2. Kanonische Sortierung (Vorname ASC -> Nachname ASC -> ID)
+      .sort((a, b) => {
+        const nameA = `${a.first_name || a.name || ''} ${a.last_name || a.full_last_name || ''}`.trim();
+        const nameB = `${b.first_name || b.name || ''} ${b.last_name || b.full_last_name || ''}`.trim();
+        const cmp = nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
+        if (cmp !== 0) return cmp;
+        return (a.id || '').localeCompare(b.id || '');
+      });
+
+    const total = canonicalRoster.length;
+    if (total === 0) return map;
+
+    // 3. Deterministische Zuweisung über die chromatische Regenbogen-Tonleiter
+    const stepAngle = 360 / total;
+
+    canonicalRoster.forEach((student, index) => {
+      if (!student?.id) return;
+
+      // Index 0 (z. B. Amelia N.) bleibt unverrückbar auf Apple Emerald Smaragdgrün (155°)
+      if (index === 0) {
+        map.set(student.id, {
+          bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+          text: '#ffffff'
+        });
+        return;
+      }
+
+      // Kontinuierliche chromatische Regenbogen-Wanderung ab 155° Smaragdgrün
+      const hue = Math.round((155 + index * stepAngle) % 360);
+
+      // WCAG AA Kontrast-Optimierung für helle Gelb-/Bernstein-Zonen
+      const isWarmLightZone = hue >= 40 && hue <= 85;
+      const l1 = isWarmLightZone ? 40 : 46;
+      const l2 = isWarmLightZone ? 30 : 35;
+
+      map.set(student.id, {
+        bg: `linear-gradient(135deg, hsl(${hue}, 74%, ${l1}%) 0%, hsl(${hue}, 78%, ${l2}%) 100%)`,
+        text: '#ffffff'
+      });
+    });
+
+    return map;
+  }, [isStudent, assignedStudents, allAvailableUsers]);
 
   // Get potential chat partners
   const chatPartners = useMemo(() => {
@@ -3393,6 +2706,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         selectedRecipient.id, 
         activeChannelId || undefined
       );
+      playChatMessageSentSound();
+      triggerChatHapticFeedback();
       setTimeout(() => scrollToBottom(true), 50);
       return;
     }
@@ -3412,12 +2727,16 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
           primeDecryptedCache(effectiveSchoolId, data.content, content.trim());
         }
+        playChatMessageSentSound();
+        triggerChatHapticFeedback();
         setTimeout(() => scrollToBottom(true), 50);
         return;
       }
     }
 
     await onSendMessage(selectedRecipient.id, content.trim());
+    playChatMessageSentSound();
+    triggerChatHapticFeedback();
     setTimeout(() => scrollToBottom(true), 50);
   };
 
@@ -3437,15 +2756,23 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
   };
 
   return (
-    <div className="animation-slide-up" style={{ 
+    <div className={isMobile && selectedRecipient ? "" : "animation-slide-up"} style={{ 
       padding: isMobile ? '0px' : '24px 10px 10px 10px', 
       display: 'flex', 
       gap: isMobile ? '0' : '24px', 
-      height: isMobile ? 'auto' : 'calc(100vh - 140px)', 
-      minHeight: isMobile ? 'auto' : '700px',
+      position: isMobile && selectedRecipient ? 'fixed' : 'relative',
+      top: isMobile && selectedRecipient ? '-1px' : undefined,
+      left: isMobile && selectedRecipient ? '-1px' : undefined,
+      right: isMobile && selectedRecipient ? '-1px' : undefined,
+      bottom: isMobile && selectedRecipient ? '-1px' : undefined,
+      width: isMobile && selectedRecipient ? 'calc(100% + 2px)' : '100%',
+      height: isMobile ? (selectedRecipient ? 'calc(100% + 2px)' : 'auto') : 'calc(100vh - 140px)', 
+      maxHeight: isMobile ? (selectedRecipient ? 'calc(100% + 2px)' : 'none') : 'none',
+      minHeight: isMobile ? (selectedRecipient ? 'calc(100% + 2px)' : 'auto') : '700px',
+      overflow: isMobile && selectedRecipient ? 'hidden' : 'visible',
       fontFamily: '"Outfit", "Inter", sans-serif',
-      width: '100%',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      zIndex: isMobile && selectedRecipient ? 800 : undefined
     }}>
       {/* Left Pane: Partners / Chats List */}
       <div className="glass-panel" style={{ 
@@ -3926,7 +3253,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <CampusDynamicAvatar user={item} size={42} showPresence isQuietHours={isRecipientInQuietHours} />
+                      <CampusDynamicAvatar user={item} size={42} showPresence isQuietHours={isRecipientInQuietHours} customGradient={studentRosterColorMap.get(item.id)} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -4010,7 +3337,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         boxSizing: 'border-box'
                       }}
                     >
-                      <CampusDynamicAvatar user={partner} size={42} showPresence isQuietHours={isRecipientInQuietHours} />
+                      <CampusDynamicAvatar user={partner} size={42} showPresence isQuietHours={isRecipientInQuietHours} customGradient={studentRosterColorMap.get(partner.id)} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -4070,36 +3397,51 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       </div>
 
       {/* Right Pane: Chat Window */}
-      <div className="glass-panel" style={{ 
+      <div className={isMobile && selectedRecipient ? "" : "glass-panel"} style={{ 
         flex: 1, 
-        background: 'white', 
-        borderRadius: isMobile ? '16px' : '24px', 
+        background: '#ffffff', 
+        borderRadius: isMobile && selectedRecipient ? '0px' : (isMobile ? '16px' : '24px'), 
         display: isMobile && !selectedRecipient ? 'none' : 'flex', 
         flexDirection: 'column', 
         overflow: 'hidden', 
-        border: '1px solid #f1f5f9',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        width: '100%',
+        maxWidth: '100%',
+        border: isMobile && selectedRecipient ? 'none' : '1px solid #f1f5f9',
+        boxShadow: isMobile && selectedRecipient ? 'none' : '0 10px 30px rgba(0,0,0,0.02)',
         transition: isMobile ? 'opacity 0.25s ease' : 'none'
       }}>
         {selectedRecipient ? (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             {/* Header: WhatsApp-Inspired Campus-Green Header (0.1% Goldstandard) */}
             <div style={{ 
-              padding: isMobile ? '12px 16px' : '14px 22px', 
+              paddingTop: isMobile 
+                ? 'calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 10px)' 
+                : '14px',
+              paddingBottom: '12px',
+              paddingLeft: isMobile ? '12px' : '22px',
+              paddingRight: isMobile ? '12px' : '22px',
               background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)', 
               color: '#ffffff',
               borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between', 
-              flexWrap: 'wrap',
-              gap: '12px',
-              borderRadius: isMobile ? '16px 16px 0 0' : '24px 24px 0 0',
+              flexWrap: 'nowrap',
+              gap: isMobile ? '8px' : '12px',
+              borderRadius: isMobile ? '0px' : '24px 24px 0 0',
               position: 'relative',
               zIndex: 30,
+              flexShrink: 0,
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
               boxShadow: '0 4px 16px rgba(21, 128, 61, 0.16)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '14px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 {isMobile && (
                   <button 
                     type="button"
@@ -4111,10 +3453,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       borderRadius: '12px',
                       cursor: 'pointer',
                       color: '#ffffff',
-                      width: '40px',
-                      height: '40px',
-                      minWidth: '40px',
-                      minHeight: '40px',
+                      width: '38px',
+                      height: '38px',
+                      minWidth: '38px',
+                      minHeight: '38px',
                       padding: '0',
                       display: 'flex',
                       alignItems: 'center',
@@ -4128,10 +3470,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 )}
                 {selectedRecipient.is_group ? (
                   <>
-                    <CampusDynamicAvatar user={selectedRecipient} size={44} variant="on-dark" />
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>{selectedRecipient.name}</span>
+                    <CampusDynamicAvatar user={selectedRecipient} size={isMobile ? 38 : 44} variant="on-dark" />
+                    <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                      <h4 style={{ margin: 0, fontSize: isMobile ? '0.96rem' : '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedRecipient.name}</span>
                         {selectedRecipient.admin_only_messaging && (
                           <span style={{
                             fontSize: '0.62rem',
@@ -4143,10 +3485,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             borderRadius: '6px',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '4px',
+                            flexShrink: 0
                           }}>
                             <Lock size={10} color="#ffffff" />
-                            Ankündigungskanal
+                            Ankündigung
                           </span>
                         )}
                       </h4>
@@ -4162,13 +3505,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           alignItems: 'center',
                           gap: '5px',
                           color: 'rgba(255, 255, 255, 0.88)',
-                          fontSize: '0.74rem',
-                          fontWeight: 700
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '100%'
                         }}
                       >
-                        <Users size={12} color="#ffffff" />
-                        <span>{selectedRecipient.members_count || selectedRecipient.members?.length || 0} Teilnehmer • Details &amp; Mitglieder</span>
-                        <Info size={11} color="rgba(255, 255, 255, 0.75)" />
+                        <Users size={12} color="#ffffff" style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedRecipient.members_count || selectedRecipient.members?.length || 0} Teilnehmer • Details</span>
+                        <Info size={11} color="rgba(255, 255, 255, 0.75)" style={{ flexShrink: 0 }} />
                       </button>
                     </div>
                   </>
@@ -4176,14 +3523,15 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   <>
                     <CampusDynamicAvatar 
                       user={selectedRecipient} 
-                      size={44} 
+                      size={isMobile ? 38 : 44} 
                       variant="on-dark" 
                       showPresence 
                       isQuietHours={isRecipientInQuietHours} 
+                      customGradient={studentRosterColorMap.get(selectedRecipient.id)}
                     />
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>{formatStudentDisplayName(selectedRecipient)}</span>
+                    <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                      <h4 style={{ margin: 0, fontSize: isMobile ? '0.96rem' : '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatStudentDisplayName(selectedRecipient)}</span>
                         <span style={{
                           fontSize: '0.64rem',
                           fontWeight: 800,
@@ -4194,42 +3542,101 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           border: '1px solid rgba(255, 255, 255, 0.35)',
                           padding: '2px 8px',
                           borderRadius: '6px',
-                          display: 'inline-block'
+                          display: 'inline-block',
+                          flexShrink: 0
                         }}>
                           {selectedRecipient.role === 'student' ? 'Schüler' : 'Lehrer'}
                         </span>
                       </h4>
-                      <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <MessageSquare size={12} color="#ffffff" />
-                        <span>Direktnachrichten mit {formatStudentDisplayName(selectedRecipient)}</span>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <MessageSquare size={12} color="#ffffff" style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Direktnachrichten mit {formatStudentDisplayName(selectedRecipient)}</span>
                       </p>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Status Badge: DSGVO-konform (OWASP ASVS Level 3 / Art. 32 DSGVO) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {/* Status Badges: Eltern-Governance & DSGVO-konform (OWASP ASVS Level 3 / Art. 32 DSGVO) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {isStudent && (
+                  isParentUnlocked ? (
+                    <button
+                      type="button"
+                      onClick={handleLockParentMode}
+                      title="Elternbereich sperren"
+                      aria-label="Elternbereich sperren"
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '100px',
+                        background: 'rgba(255, 255, 255, 0.22)',
+                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        color: '#ffffff',
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Unlock size={12} color="#ffffff" />
+                      <span>Eltern</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setParentPinInput('');
+                        setParentPinError('');
+                        setShowParentPinModal(true);
+                      }}
+                      title="Elternbereich mit 6-stelliger PIN freischalten"
+                      aria-label="Elternbereich mit 6-stelliger PIN freischalten"
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.18)',
+                        border: '1px solid rgba(255, 255, 255, 0.28)',
+                        color: '#ffffff',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Lock size={13} color="#ffffff" />
+                    </button>
+                  )
+                )}
+
                 <span 
                   title="DSGVO-konform: Transportverschlüsselung via TLS 1.3, Datenbank im Ruhezustand AES-256 geschützt (Art. 32 DSGVO)"
+                  aria-label="DSGVO-konform geschützt"
                   style={{
-                    padding: isMobile ? '4px 10px' : '5px 12px',
-                    borderRadius: '8px',
+                    width: isMobile ? '32px' : 'auto',
+                    height: isMobile ? '32px' : 'auto',
+                    padding: isMobile ? '0' : '5px 12px',
+                    borderRadius: isMobile ? '50%' : '8px',
                     background: 'rgba(255, 255, 255, 0.18)',
                     color: '#ffffff',
-                    fontSize: isMobile ? '0.65rem' : '0.72rem',
+                    fontSize: '0.72rem',
                     fontWeight: 750,
                     border: '1px solid rgba(255, 255, 255, 0.28)',
                     display: 'inline-flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '6px',
-                    whiteSpace: 'nowrap',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     cursor: 'help'
                   }}
                 >
-                  <ShieldCheck size={14} color="#ffffff" style={{ flexShrink: 0 }} />
-                  <span>DSGVO-konform</span>
+                  <ShieldCheck size={isMobile ? 16 : 14} color="#ffffff" />
+                  {!isMobile && <span>DSGVO-konform</span>}
                 </span>
               </div>
             </div>
@@ -4726,13 +4133,18 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               id={selectedRecipient.is_group ? `panel-${activeChannelId || 'default'}` : `panel-${activeSubTab}`}
               aria-labelledby={selectedRecipient.is_group ? `tab-${activeChannelId || 'default'}` : undefined}
               style={{ 
-                flex: 1, 
-                padding: isMobile ? '20px 16px' : '28px', 
+                flex: isMobile ? '1 1 0%' : 1, 
+                minHeight: 0,
+                padding: isMobile ? '14px 10px' : '28px', 
                 overflowY: 'auto', 
+                overflowX: 'hidden', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: '16px',
-                background: '#fafbfc'
+                gap: isMobile ? '12px' : '16px',
+                background: '#fafbfc',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
               }} 
               className="custom-scrollbar"
             >
@@ -4968,14 +4380,19 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           if (targetDate) {
                             localStorage.setItem('campus_calendar_target_date', targetDate);
                             localStorage.setItem('groovelab_selected_schedule_date', targetDate);
+                            sessionStorage.setItem('campus_calendar_target_date', targetDate);
+                            sessionStorage.setItem('groovelab_selected_schedule_date', targetDate);
                             window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: targetDate } }));
                           }
+                          sessionStorage.setItem('campus_active_tab', 'schedule');
+                          sessionStorage.setItem('groovelab_active_tab', 'schedule');
                           localStorage.setItem('campus_active_tab', 'schedule');
                           localStorage.setItem('groovelab_active_tab', 'schedule');
-                          if (onNavigateToSchedule && targetDate) {
-                            onNavigateToSchedule(targetDate);
+                          if (onNavigateToSchedule) {
+                            onNavigateToSchedule(targetDate || undefined);
                           } else {
-                            window.location.reload();
+                            window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: targetDate } }));
+                            window.dispatchEvent(new CustomEvent('campus_navigate_tab', { detail: { tab: 'schedule', date: targetDate } }));
                           }
                         }
                       }}
@@ -5122,19 +4539,29 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   });
                 }
 
+                const pedagogicalTrustBanner = (
+                  <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0 12px 0' }}>
+                    <div style={{
+                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '10px 16px',
+                      maxWidth: '360px', textAlign: 'center', fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+                    }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#15803d', fontWeight: 800 }}>
+                        <ShieldCheck size={14} color="#15803d" />
+                        <span>Didaktischer Schul-Chat</span>
+                      </div>
+                      <div style={{ fontSize: '0.70rem', color: '#64748b' }}>
+                        Für Erziehungsberechtigte transparent einsehbar (Jugendschutz-Standard) • AES-256 geschützt
+                      </div>
+                    </div>
+                  </div>
+                );
+
                 if (displayedMessages.length === 0) {
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
-                      <div style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '50%',
-                        background: '#e6f4ea',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#34a853'
-                      }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '30px 20px', textAlign: 'center' }}>
+                      {pedagogicalTrustBanner}
+                      <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
                         <MessageSquare size={30} strokeWidth={2} />
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
@@ -5148,7 +4575,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 }
 
                 return displayedMessages.map((msg, idx) => {
-                  const isSelf = msg.sender_id === user.id;
+                  const effectiveUserId = currentUserId || user?.id;
+                  const isSelf = msg.sender_id === effectiveUserId;
                   const isSys = isSystemMessage(msg);
 
                   const msgDate = new Date(msg.created_at);
@@ -5184,30 +4612,27 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
                     return (
                       <React.Fragment key={msg.id || `sys-${idx}`}>
+                        {idx === 0 && pedagogicalTrustBanner}
                         {isNewDay && (
                           <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '14px 0 8px 0' }}>
                             <span style={{
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              color: '#64748b',
-                              background: '#f1f5f9',
-                              border: '1px solid #e2e8f0',
-                              padding: '3px 12px',
-                              borderRadius: '100px',
-                              letterSpacing: '0.01em',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              fontSize: '0.68rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0',
+                              padding: '3px 12px', borderRadius: '100px', letterSpacing: '0.01em', boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                             }}>
                               {dateLabel}
                             </span>
                           </div>
                         )}
-                        <AppleSystemNotificationCard 
+                        <CompactAppointmentEventCard 
                           msg={msg} 
                           selectedRecipient={selectedRecipient}
                           onSendMessage={onSendMessage}
                           isSuperseded={isSuperseded}
                           currentOcc={matchedOcc}
                           onNavigateToSchedule={onNavigateToSchedule}
+                          currentUserId={effectiveUserId}
+                          currentUserRole={user?.role}
+                          isSender={isSelf}
                         />
                       </React.Fragment>
                     );
@@ -5225,19 +4650,13 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
                   return (
                     <React.Fragment key={msg.id || `msg-${idx}`}>
+                      {idx === 0 && pedagogicalTrustBanner}
                       {/* Natural Date Separator Badge */}
                       {isNewDay && (
                         <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '14px 0 8px 0' }}>
                           <span style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            color: '#64748b',
-                            background: '#f1f5f9',
-                            border: '1px solid #e2e8f0',
-                            padding: '3px 12px',
-                            borderRadius: '100px',
-                            letterSpacing: '0.01em',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            fontSize: '0.68rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0',
+                            padding: '3px 12px', borderRadius: '100px', letterSpacing: '0.01em', boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                           }}>
                             {dateLabel}
                           </span>
@@ -5262,6 +4681,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                               user={{ ...senderUser, sender_role: msg.sender_role }}
                               size={32}
                               style={{ marginBottom: '2px' }}
+                              customGradient={studentRosterColorMap.get(senderUser?.id || msg.sender_id)}
                             />
                           ) : (
                             <div style={{ width: '32px', flexShrink: 0 }} />
@@ -5547,8 +4967,19 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               <div style={{ 
                 borderTop: '1px solid #f1f5f9', 
                 background: '#ffffff', 
-                padding: isMobile ? '8px 12px max(12px, env(safe-area-inset-bottom)) 12px' : '10px 20px',
-                boxShadow: '0 -2px 10px rgba(0,0,0,0.015)'
+                paddingTop: isMobile ? '5px' : '10px',
+                paddingLeft: isMobile ? '12px' : '20px',
+                paddingRight: isMobile ? '12px' : '20px',
+                paddingBottom: isMobile 
+                  ? 'calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 4px)' 
+                  : '10px',
+                boxShadow: '0 -2px 10px rgba(0,0,0,0.015)',
+                flexShrink: 0,
+                position: 'relative',
+                zIndex: 40,
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
               }}>
                 {/* Quick Replies Pill Bar: Vetted Micro-Chips Suite (100% Harmonized & Monochrome) */}
                 {(() => {
@@ -5760,28 +5191,29 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   </button>
                 </form>
 
-                {/* 🛡️ Unified Trust & Compliance Sub-Footer (1-Line Elegance: § 8a SGB VIII & Art. 32 DSGVO) */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  marginTop: '6px',
-                  padding: '0 4px',
-                  fontSize: '0.67rem',
-                  color: '#94a3b8',
-                  fontWeight: 550,
-                  flexWrap: 'wrap'
-                }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#166534' }}>
-                    <ShieldCheck size={12} color="#16a34a" style={{ flexShrink: 0 }} />
-                    <span>Didaktischer Schul-Chat • Für Erziehungsberechtigte transparent einsehbar (Jugendschutz-Standard)</span>
+                {/* 🛡️ Unified Trust & Compliance Sub-Footer (Desktop Only: § 8a SGB VIII & Art. 32 DSGVO) */}
+                {!isMobile && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    marginTop: '6px',
+                    padding: '0 4px',
+                    fontSize: '0.67rem',
+                    color: '#94a3b8',
+                    fontWeight: 550
+                  }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#166534' }}>
+                      <ShieldCheck size={12} color="#16a34a" style={{ flexShrink: 0 }} />
+                      <span>Didaktischer Schul-Chat • Für Erziehungsberechtigte transparent einsehbar (Jugendschutz-Standard)</span>
+                    </div>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#94a3b8' }}>
+                      <Lock size={10} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <span>AES-256 Datenbankverschlüsselung</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#94a3b8' }}>
-                    <Lock size={10} color="#94a3b8" style={{ flexShrink: 0 }} />
-                    <span>AES-256 Datenbankverschlüsselung</span>
-                  </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -5925,6 +5357,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       <CampusDynamicAvatar 
                         user={partner} 
                         size={40} 
+                        customGradient={studentRosterColorMap.get(partner.id)}
                       />
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -6019,39 +5452,23 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             )}
 
             {/* PIN Display Dots (6-stellig) */}
-            <div style={{
-              display: 'flex',
-              gap: '10px',
-              justifyContent: 'center',
-              margin: '6px 0'
-            }}>
-              {[0, 1, 2, 3, 4, 5].map(idx => {
-                const isFilled = parentPinInput.length > idx;
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      background: isFilled ? '#0284c7' : '#e2e8f0',
-                      border: isFilled ? '2px solid #0284c7' : '2px solid #cbd5e1',
-                      transition: 'all 0.15s ease',
-                      transform: isFilled ? 'scale(1.15)' : 'scale(1)'
-                    }}
-                  />
-                );
-              })}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', margin: '6px 0' }}>
+              {[0, 1, 2, 3, 4, 5].map(idx => (
+                <div
+                  key={idx}
+                  style={{
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    background: parentPinInput.length > idx ? '#0284c7' : '#e2e8f0',
+                    border: `2px solid ${parentPinInput.length > idx ? '#0284c7' : '#cbd5e1'}`,
+                    transition: 'all 0.15s ease',
+                    transform: parentPinInput.length > idx ? 'scale(1.15)' : 'scale(1)'
+                  }}
+                />
+              ))}
             </div>
 
             {/* Touch Keypad */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '10px',
-              width: '100%',
-              marginTop: '4px'
-            }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', width: '100%', marginTop: '4px' }}>
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((key) => {
                 const isClear = key === 'C';
                 const isBack = key === '⌫';
@@ -6061,31 +5478,20 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     type="button"
                     onClick={() => {
                       setParentPinError('');
-                      if (isClear) {
-                        setParentPinInput('');
-                      } else if (isBack) {
-                        setParentPinInput(prev => prev.slice(0, -1));
-                      } else if (parentPinInput.length < 6) {
+                      if (isClear) setParentPinInput('');
+                      else if (isBack) setParentPinInput(prev => prev.slice(0, -1));
+                      else if (parentPinInput.length < 6) {
                         const nextVal = parentPinInput + key;
                         setParentPinInput(nextVal);
-                        if (nextVal.length === 6) {
-                          handleVerifyParentPin(nextVal);
-                        }
+                        if (nextVal.length === 6) handleVerifyParentPin(nextVal);
                       }
                     }}
                     style={{
-                      padding: '14px',
-                      minHeight: '50px',
-                      borderRadius: '16px',
-                      border: '1.5px solid #f1f5f9',
+                      padding: '14px', minHeight: '50px', borderRadius: '16px', border: '1.5px solid #f1f5f9',
                       background: isClear || isBack ? '#f8fafc' : '#ffffff',
                       color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
-                      fontSize: isBack ? '1.1rem' : '1.25rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
-                      transition: 'all 0.12s ease',
-                      touchAction: 'manipulation'
+                      fontSize: isBack ? '1.1rem' : '1.25rem', fontWeight: 800, cursor: 'pointer',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.04)', transition: 'all 0.12s ease', touchAction: 'manipulation'
                     }}
                     className="hover-scale"
                   >
@@ -6102,23 +5508,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 disabled={isVerifyingPin}
                 onClick={handleBiometricUnlock}
                 style={{
-                  marginTop: '6px',
-                  width: '100%',
-                  padding: '12px 16px',
-                  borderRadius: '16px',
-                  border: '1px solid #bae6fd',
-                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                  color: '#0284c7',
-                  fontSize: '0.88rem',
-                  fontWeight: 800,
-                  cursor: isVerifyingPin ? 'not-allowed' : 'pointer',
-                  opacity: isVerifyingPin ? 0.6 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
-                  transition: 'all 0.15s ease'
+                  marginTop: '6px', width: '100%', padding: '12px 16px', borderRadius: '16px', border: '1px solid #bae6fd',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', color: '#0284c7', fontSize: '0.88rem',
+                  fontWeight: 800, cursor: isVerifyingPin ? 'not-allowed' : 'pointer', opacity: isVerifyingPin ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)'
                 }}
                 className="hover-scale"
               >
@@ -6129,21 +5522,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
             <button
               type="button"
-              onClick={() => {
-                setShowParentPinModal(false);
-              }}
+              onClick={() => setShowParentPinModal(false)}
               style={{
-                marginTop: '6px',
-                padding: '12px 24px',
-                minHeight: '44px',
-                borderRadius: '100px',
-                background: '#f1f5f9',
-                color: '#64748b',
-                border: 'none',
-                fontSize: '0.84rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                touchAction: 'manipulation'
+                marginTop: '6px', padding: '12px 24px', minHeight: '44px', borderRadius: '100px', background: '#f1f5f9',
+                color: '#64748b', border: 'none', fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation'
               }}
             >
               Abbrechen
@@ -6361,7 +5743,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                          <CampusDynamicAvatar user={m} size={36} />
+                          <CampusDynamicAvatar user={m} size={36} customGradient={studentRosterColorMap.get(m.id || m.user_id)} />
                           <div style={{ minWidth: 0 }}>
                             <div style={{
                               fontSize: '0.88rem',

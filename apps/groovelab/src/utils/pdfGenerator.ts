@@ -3,6 +3,7 @@ import { capitalizeFirstLetter, formatSongTitleCase } from './nameHelper';
 import { generateLocalQrDataUrl } from './localQrGenerator';
 import { generateEpcGiroCodePayload, formatIbanWithSpaces } from './epcGiroCode';
 import { ACTIVE_LEGAL_VERSION } from '../legal/legalContent';
+import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
 
 export const generateConsentPDF = async (
   schoolName: string, 
@@ -2578,18 +2579,23 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFillColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
   doc.rect(0, 0, 210, 6, 'F');
 
-  // 2. Company / Platform Brand
+  // 2. Company / Platform Brand & § 14 Abs. 4 UStG Mandatory Imprint
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text('Campus-Groovelab', 20, 24);
+  doc.text('Campus-Groovelab', 20, 23);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('Patrick Huber • Softwareentwicklung & Cloud-Dienstleistungen', 20, 28);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(7.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text('Cloud-Hosting & Bereitstellungssysteme für Musikschulen', 20, 29);
-  doc.text('Server-Standort: Deutschland (Hetzner ISO 27001 / BSI TR-03116)', 20, 33);
-  doc.text('Betrieb: Campus-Groovelab Plattformbetrieb • campus-groovelab.de', 20, 37);
+  doc.text('Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden) • Deutschland', 20, 32);
+  doc.text('Steuer-Nr.: 13083/03882 (Finanzamt Lörrach) • Server-Standort: Deutschland (Hetzner ISO 27001)', 20, 36);
+  doc.text('E-Mail: kontakt@campus-groovelab.de • Web: campus-groovelab.de', 20, 40);
 
   // Invoice Details (Right Aligned Column)
   doc.setFontSize(8.5);
@@ -2760,7 +2766,7 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   }
 
   // Pos 10: SLA-Service-Credit Kulanzabzug (if active)
-  const creditPercent = params.serviceCreditPercent ?? (params.school as any).pending_service_credit_percent ?? 0;
+  const creditPercent = params.serviceCreditPercent ?? (params.school as Record<string, unknown>).pending_service_credit_percent as number ?? 0;
   if (creditPercent > 0) {
     const rawSubtotal = lines.reduce((sum, l) => sum + l.totalPrice, 0);
     const creditVal = (rawSubtotal * creditPercent) / 100;
@@ -2822,31 +2828,29 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
     currentY += 10.5;
   });
 
-  // 6. Summary Block
+  // 6. Summary Block (§ 19 UStG Kleinunternehmerregelung)
   currentY += 4;
-  const vatRate = 0.19;
-  const vatAmount = subtotal * vatRate;
-  const grandTotal = subtotal + vatAmount;
+  const grandTotal = subtotal;
 
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(120, currentY, 70, 28, 2, 2, 'F');
+  doc.roundedRect(105, currentY, 85, 28, 2, 2, 'F');
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text('Nettobetrag:', 125, currentY + 7);
+  doc.text('Rechnungsbetrag (Netto):', 110, currentY + 7);
   doc.text(`${subtotal.toFixed(2).replace('.', ',')} €`, 185, currentY + 7, { align: 'right' });
 
-  doc.text('USt. (19%):', 125, currentY + 13);
-  doc.text(`${vatAmount.toFixed(2).replace('.', ',')} €`, 185, currentY + 13, { align: 'right' });
+  doc.text('Umsatzsteuer (0% gem. § 19 UStG):', 110, currentY + 13);
+  doc.text('0,00 €', 185, currentY + 13, { align: 'right' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
-  doc.text('Gesamtbetrag (Brutto):', 125, currentY + 22);
+  doc.text('Gesamtbetrag (Zahlbetrag):', 110, currentY + 22);
   doc.text(`${grandTotal.toFixed(2).replace('.', ',')} €`, 185, currentY + 22, { align: 'right' });
 
-  // 7. Payment Information & Legal Notes
+  // 7. Payment Information & Legal Notes (§ 14 Abs. 4 UStG)
   currentY += 34;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
@@ -2857,10 +2861,17 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFontSize(7.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text(`Bitte überweisen Sie den Rechnungsbetrag von ${grandTotal.toFixed(2).replace('.', ',')} € bis zum ${dueDate.toLocaleDateString('de-DE')} (§ 193 BGB Werktagsfrist).`, 20, currentY + 5);
-  doc.text('Zahlungsempfänger: Campus-Groovelab Plattformbetrieb', 20, currentY + 9);
+  doc.text('Zahlungsempfänger: Patrick Huber (Campus-Groovelab Plattformbetrieb)', 20, currentY + 9);
   doc.text(`IBAN: ${formatIbanWithSpaces('DE89370400440532948211')}   •   BIC: GENODEFFXXX`, 20, currentY + 13);
   doc.text(`Verwendungszweck: ${invoiceNumber} (${params.school.name})`, 20, currentY + 17);
-  doc.text('Hinweis: Die Software-Bereitstellung erfolgt lizenzkaufgebührenfrei. Abgerechnet werden Cloud-Hosting und Server-Ressourcen.', 20, currentY + 22);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('Steuerrechtlicher Hinweis (§ 14 Abs. 4 Nr. 8 UStG):', 20, currentY + 22);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).', 20, currentY + 26);
+  doc.text('Hinweis: Die Software-Bereitstellung erfolgt lizenzkaufgebührenfrei. Abgerechnet werden Cloud-Hosting und Server-Ressourcen.', 20, currentY + 30);
 
   // EPC-GiroCode QR Rendering for instant mobile banking scan
   try {
@@ -2925,8 +2936,8 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
     : Math.max(0, Math.round((100 - uptime) * 432));
   const incidentNotes = typeof params === 'object' ? params.incidentNotes : undefined;
 
-  const isSlaAchieved = uptime >= 99.95;
-  const isMinorBreach = uptime >= 99.00 && !isSlaAchieved;
+  const isSlaAchieved = uptime >= 99.50;
+  const isMinorBreach = uptime >= 98.00 && !isSlaAchieved;
 
   // Staged Service Credits
   let serviceCredit = 0;
@@ -2985,11 +2996,11 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFontSize(8.2);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   if (isSlaAchieved) {
-    doc.text('SLA-Garantie: 99,95% • P95-API-Latenz: < 22 ms • 0 ungeplante Ausfallzeiten', 85, 77);
-    doc.text('Status: 🟢 SLA-Ziel vollständig erfüllt (Keine Service-Gutschrift erforderlich)', 85, 84);
+    doc.text('SLA-Garantie: 99,50% • P95-API-Latenz: < 22 ms • 0 ungeplante Ausfallzeiten', 85, 77);
+    doc.text('Status: [OK] SLA-Ziel vollständig erfüllt (Keine Service-Gutschrift erforderlich)', 85, 84);
   } else {
-    doc.text(`SLA-Garantie: 99,95% • Erfasste Ausfallzeit: ${downtimeMins} Minuten`, 85, 77);
-    doc.text(`Status: ${isMinorBreach ? '🟡' : '🔴'} ${serviceCredit}% Service-Credit wird auf der Folgerechnung gutgeschrieben`, 85, 84);
+    doc.text(`SLA-Garantie: 99,50% • Erfasste Ausfallzeit: ${downtimeMins} Minuten`, 85, 77);
+    doc.text(`Status: [!] ${serviceCredit}% Service-Credit wird auf der Folgerechnung gutgeschrieben`, 85, 84);
   }
 
   // Metrics Table
@@ -2999,11 +3010,11 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.text('1. Infrastruktur- & Latenz-Metriken (Hetzner Sovereign Cluster)', 20, 108);
 
   const metrics = [
-    { label: 'PostgreSQL Datenbank-Cluster Verfügbarkeit', val: `${Math.min(100, uptime).toFixed(2)}%`, status: isSlaAchieved ? '🟢 Exzellent' : '🟡 Überwacht' },
-    { label: 'Supabase PostgREST API P95 Antwortzeit', val: '18,4 ms', status: '🟢 Sub-Millisekunde' },
-    { label: 'Websocket Realtime Push-Latenz', val: '12,1 ms', status: '🟢 Echtzeit' },
-    { label: 'Cloud-Storage Uptime (Audio-Tresor)', val: '99,99%', status: '🟢 Hochverfügbar' },
-    { label: 'Zero-Trust IAM & Passkey Resolver', val: '100,00%', status: '🟢 Fail-Closed Aktiv' },
+    { label: 'PostgreSQL Datenbank-Cluster Verfügbarkeit', val: `${Math.min(100, uptime).toFixed(2)}%`, status: isSlaAchieved ? '[OK] Exzellent' : '[!] Überwacht' },
+    { label: 'Supabase PostgREST API P95 Antwortzeit', val: '18,4 ms', status: '[OK] Sub-Millisekunde' },
+    { label: 'Websocket Realtime Push-Latenz', val: '12,1 ms', status: '[OK] Echtzeit' },
+    { label: 'Cloud-Storage Uptime (Audio-Tresor)', val: '99,99%', status: '[OK] Hochverfügbar' },
+    { label: 'Zero-Trust IAM & Passkey Resolver', val: '100,00%', status: '[OK] Fail-Closed Aktiv' },
   ];
 
   let currentY = 114;
@@ -3039,7 +3050,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
 
   slaClasses.forEach(sc => {
     doc.setFillColor(248, 250, 252);
-    doc.roundedRect(20, currentY, 170, 6, 1, 1, 'F');
+    doc.roundedRect(20, currentY, 170, 11, 1.5, 1.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.2);
     doc.setTextColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
@@ -3053,7 +3064,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
     doc.setFontSize(6.8);
     doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
     doc.text(sc.desc, 23, currentY + 8.5);
-    currentY += 9.5;
+    currentY += 13.5;
   });
 
   // Incident Context Block (if downtime occurred)
@@ -3857,9 +3868,10 @@ export interface B2BContractCertificateParams {
     groovelab?: boolean;
   };
   pricingPlan?: string;
+  returnBlob?: boolean;
 }
 
-export const generateB2BContractCertificatePDF = async (params: B2BContractCertificateParams): Promise<void> => {
+export const generateB2BContractCertificatePDF = async (params: B2BContractCertificateParams): Promise<Blob | void> => {
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -3873,6 +3885,19 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   const contractId = `CG-VTR-${currentYear}-${(params.schoolId || '855992').slice(0, 6).toUpperCase()}`;
   const signee = params.schoolSigneeName || 'Vertretungsberechtigte Schulleitung';
   const signedDateStr = params.avvSignedAt ? new Date(params.avvSignedAt).toLocaleDateString('de-DE') : now.toLocaleDateString('de-DE');
+
+  // Dynamic SHA-256 digest from canonical contract certificate payload
+  const canonicalPayload = {
+    docType: 'B2B_CONTRACT_CERTIFICATE',
+    contractId,
+    schoolName: params.schoolName,
+    schoolId: params.schoolId || '855992',
+    schoolYear: schoolYearLabel,
+    signee,
+    signedDate: signedDateStr,
+    version: ACTIVE_LEGAL_VERSION || '2026.2'
+  };
+  const contractSha256 = await computeCanonicalPayloadHash(canonicalPayload);
 
   doc.setProperties({
     title: `B2B-Infrastrukturvertrag - ${params.schoolName}`,
@@ -3930,7 +3955,7 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text(`Erstelldatum: ${now.toLocaleDateString('de-DE')}`, 125, 56);
   doc.text(`AVV gezeichnet: ${signedDateStr}`, 125, 62);
-  doc.text(`Status: ✅ Rechtsgültig aktiv`, 125, 68);
+  doc.text('Status: Rechtsgültig aktiv', 125, 68);
 
   // Section 1: Vertragsparteien & Gegenstand
   let y = 82;
@@ -4031,7 +4056,7 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.text('Digital autorisiert & siegelbestätigt', 25, y + 17);
   doc.setFont('courier', 'normal');
   doc.setFontSize(6.5);
-  doc.text(`HASH: SHA256-CG-VTR-${(params.schoolId || '855992').slice(0, 8)}`, 25, y + 22);
+  doc.text(`HASH: SHA256-${contractSha256.slice(0, 32)}...`, 25, y + 22);
 
   // Column Right: School Signature
   doc.setFont('helvetica', 'bold');
@@ -4049,9 +4074,12 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text(`Dieses Dokument dient als formeller Nachweis für Rechnungsprüfungsämter, Kommunen und Schulträger. • Gültig ohne händische Unterschrift gem. § 126b BGB • Stand: ${ACTIVE_LEGAL_VERSION || '2026.2'}`, 20, 288);
+  doc.text(`Dieses Dokument dient als formeller Nachweis für Rechnungsprüfungsämter, Kommunen und Schulträger. • Prüf-Hash: SHA256-${contractSha256.slice(0, 16)}... • Gültig ohne händische Unterschrift gem. § 126b BGB • Stand: ${ACTIVE_LEGAL_VERSION || '2026.2'}`, 20, 288);
 
   const cleanName = params.schoolName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  if (params.returnBlob) {
+    return doc.output('blob');
+  }
   doc.save(`Campus_Groovelab_B2B_Vertragszertifikat_${cleanName}.pdf`);
 };
 

@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { CampusDesktopSidebar } from './CampusDesktopSidebar';
 import { CampusDesktopHeader } from './CampusDesktopHeader';
 import { CampusMainContentRouter, CampusMainContentRouterProps } from './CampusMainContentRouter';
-import { MobileTopHeader } from '../ui/MobileTopHeader';
+import { GeminiMobileShell } from '../navigation/GeminiMobileShell';
 import { MobileBottomNav } from '../ui/MobileBottomNav';
 import { PwaInstallationModals } from '../ui/PwaInstallationModals';
+import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 
 export interface CampusAppLayoutProps extends CampusMainContentRouterProps {
   // Toast
@@ -190,8 +191,22 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
   const hasCampusActive = Boolean((isStaff || user?.is_campus_active) && hasCampusSub);
   const hasGrooveLabActive = Boolean((isStaff || user?.is_groovelab_active) && hasGrooveLabSub);
 
+  // Gemini-style collapsible sidebar hook
+  const {
+    isCollapsed: isSidebarRailCollapsed,
+    setIsCollapsed: setIsSidebarRailCollapsed,
+    toggleCollapsed: toggleSidebarRail
+  } = useSidebarCollapse(windowWidth);
+
+  // If parental mode is unlocked, automatically expand the sidebar to prevent accidental clicks
+  useEffect(() => {
+    if (parentUnlocked && isSidebarRailCollapsed) {
+      setIsSidebarRailCollapsed(false);
+    }
+  }, [parentUnlocked, isSidebarRailCollapsed, setIsSidebarRailCollapsed]);
+
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${isSidebarRailCollapsed ? 'sidebar-collapsed' : ''}`}>
       {toastMessage && (
         <div 
           style={{
@@ -288,55 +303,90 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         onOpenAccessibility={() => setShowAccessibility(true)}
         supabase={supabase}
         setParentPermissionsVersion={setParentPermissionsVersion}
+        isCollapsed={isSidebarRailCollapsed}
+        onToggleCollapse={toggleSidebarRail}
+        trialDaysLeft={trialDaysLeft}
+        setShowTrialInfoModal={setShowTrialInfoModal}
+        onSwitchActiveRole={handleSwitchActiveRole}
       />
 
-      <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <MobileTopHeader
-          user={user}
-          school={school}
-          activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
-          setActivePlatform={(p) => {
-            if (p === 'campus') {
-              const isStudent = user?.role === 'student';
-              if (isStudent && locationMode === 'lab' && isKioskMode && !isCampusUnlocked) {
-                setShowCampusPinPrompt(true);
-                return;
-              }
-              if (user?.role === 'teacher') {
-                sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-              }
-              setActivePlatform('campus');
-              const rawCampusTab = sessionStorage.getItem('campus_active_tab');
-              const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
-              setActiveStudentTab(startTab);
-              sessionStorage.setItem('campus_active_tab', startTab);
-            } else if (p === 'groovelab') {
-              if (user?.role === 'teacher') {
-                sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-              }
-              setActivePlatform('groovelab');
-              if (isStaff || user?.role === 'teacher') {
-                setLocationMode('lab');
-                sessionStorage.setItem('groovelab_location_mode', 'lab');
-              }
-              setActiveStudentTab('live');
-              sessionStorage.setItem('groovelab_active_tab', 'live');
-              localStorage.setItem('groovelab_active_tab', 'live');
-            } else {
-              setActivePlatform(p);
-            }
-          }}
-          hasCampusActive={hasCampusActive}
-          hasGrooveLabActive={hasGrooveLabActive}
-          unreadCount={campusUnreadCount}
-        />
+      {/* 📱 WhatsApp 0.1% Goldstandard: Hide global shell & bottom nav when a chat is open on mobile */}
+      {(() => {
+        const isMobileActiveChat = Boolean(isMobile && activeStudentTab === 'messages' && selectedCampusRecipient);
+
+        return (
+          <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''}`} style={{ paddingTop: '0' }}>
+            {!isMobileActiveChat && (
+              <GeminiMobileShell
+                user={user}
+                school={school}
+                activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+                setActivePlatform={(p) => {
+                  if (p === 'campus') {
+                    const isStudent = user?.role === 'student';
+                    if (isStudent && locationMode === 'lab' && isKioskMode && !isCampusUnlocked) {
+                      setShowCampusPinPrompt(true);
+                      return;
+                    }
+                    if (user?.role === 'teacher') {
+                      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                    }
+                    setActivePlatform('campus');
+                    const rawCampusTab = sessionStorage.getItem('campus_active_tab');
+                    const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
+                    setActiveStudentTab(startTab);
+                    sessionStorage.setItem('campus_active_tab', startTab);
+                  } else if (p === 'groovelab') {
+                    if (user?.role === 'teacher') {
+                      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                    }
+                    setActivePlatform('groovelab');
+                    if (isStaff || user?.role === 'teacher') {
+                      setLocationMode('lab');
+                      sessionStorage.setItem('groovelab_location_mode', 'lab');
+                    }
+                    setActiveStudentTab('live');
+                    sessionStorage.setItem('groovelab_active_tab', 'live');
+                    localStorage.setItem('groovelab_active_tab', 'live');
+                  } else {
+                    setActivePlatform(p);
+                  }
+                }}
+                activeTab={activeStudentTab}
+                setActiveTab={setActiveStudentTab}
+                hasCampusActive={hasCampusActive}
+                hasGrooveLabActive={hasGrooveLabActive}
+                unreadCount={campusUnreadCount}
+                parentUnlocked={parentUnlocked}
+                setParentUnlocked={setParentUnlocked}
+                campusStudentUiLevel={campusStudentUiLevel}
+                onLogout={handleLogout}
+                onOpenSettings={() => setActiveStudentTab(isStaff ? 'setup' : 'settings')}
+                onOpenPrivacy={() => setShowPrivacy(true)}
+                onOpenAgb={() => setShowAgb(true)}
+                onOpenImpressum={() => setShowImpressum(true)}
+                onOpenAccessibility={() => setShowAccessibility(true)}
+                onOpenParentPin={() => setShowCampusPinPrompt(true)}
+                onSwitchActiveRole={handleSwitchActiveRole}
+                activeWorkspace={activeWorkspace}
+                teachers={teachers}
+                session={session}
+                studentMessages={studentMessages}
+                showMissionsFeature={showMissionsFeature}
+                isMusicStandMode={isMusicStandMode}
+                toggleMusicStandMode={toggleMusicStandMode}
+                onShowQr={() => setShowQR(true)}
+                trialDaysLeft={trialDaysLeft}
+                setShowTrialInfoModal={setShowTrialInfoModal}
+              />
+            )}
 
         {/* BFSG 2025 / WCAG 2.4.1 Skip-to-Content Navigation Link */}
         <a href="#main-content" className="skip-to-content">
           Zum Hauptinhalt springen
         </a>
 
-        {user?.role?.toLowerCase() !== 'student' && (
+        {user?.role?.toLowerCase() !== 'student' && user?.role?.toLowerCase() !== 'teacher' && (
           <CampusDesktopHeader
             user={user}
             school={school}
@@ -382,6 +432,7 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
           supabase={supabase}
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
+          isSidebarRailCollapsed={isSidebarRailCollapsed}
           setSidebarNotificationsCount={setSidebarNotificationsCount}
           session={session}
           setSession={setSession}
@@ -467,7 +518,7 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         />
 
         {/* Mobile Native Bottom Navigation Bar (Controlled via CSS for Mobile & Simulator) */}
-        {user && (
+        {user && !isMobileActiveChat && (
           <MobileBottomNav
             activeTab={activeStudentTab}
             setActiveTab={setActiveStudentTab}
@@ -495,6 +546,8 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
 
         {children}
       </div>
+    );
+  })()}
     </div>
   );
 });

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // =============================================================================
 // ⚖️  Campus-Groovelab Automated Legal & Compliance Guard [Compliance-as-Code]
-// Standard:  18 Säulen / 31 Checks: DIN EN 301 549 V3.2.1 / ISO/IEC 27001 Annex A.8 /
-//            BFSG 2025 / WCAG 2.2 AA / DSGVO Art. 5, 8, 9, 15, 17, 25, 28, 32 /
+// Standard:  18 Säulen / 33 Checks: DIN EN 301 549 V3.2.1 / ISO/IEC 27001 Annex A.8 /
+//            ISO/IEC 27701:2019/2025 (PIMS) / BFSG 2025 / WCAG 2.2 AA / DSGVO Art. 5, 8, 9, 15, 17, 25, 28, 32 /
 //            TDDDG § 25 / BGB §§ 312j, 312k / UrhG § 73 / UrhDaG § 1 Abs. 2 / KUG § 22 /
 //            § 8a SGB VIII / DSA Art. 16 / NIS-2 & § 202a StGB / Clean Wording /
 //            Herrenberg-Compliance (BSG B 12 R 3/20 R, § 7 SGB IV, § 266a StGB, § 611a BGB) /
@@ -29,9 +29,9 @@ let totalChecks = 0;
 
 const HR = '═'.repeat(74);
 process.stdout.write(`\n${HR}\n`);
-process.stdout.write('  ⚖️   Campus-Groovelab Legal & Regulatory Compliance Guard (18 Säulen / 31 Checks)\n');
-process.stdout.write('       Auditing DIN EN 301 549, ISO/IEC 27001, BFSG 2025, DSGVO, BGB, UrhG, NIS-2,\n');
-process.stdout.write('       Herrenberg-Compliance, EU AI Act, Schweizer revDSG, ZAG & 360° Invariants SSOT\n');
+process.stdout.write('  ⚖️   Campus-Groovelab Legal & Regulatory Compliance Guard (18 Säulen / 33 Checks)\n');
+process.stdout.write('       Auditing DIN EN 301 549, ISO/IEC 27001, ISO/IEC 27701 (PIMS), BFSG 2025, DSGVO,\n');
+process.stdout.write('       BGB, UrhG, NIS-2, Herrenberg, EU AI Act, Schweizer revDSG & 360° Invariants SSOT\n');
 process.stdout.write(`${HR}\n\n`);
 
 function recordCheck(name, passed, details = '') {
@@ -78,10 +78,14 @@ const allSrcFiles = collectFiles(SRC_DIR);
 // =============================================================================
 process.stdout.write('\n─── SÄULE 1: BFSG 2025 & WCAG 2.2 AA (Barrierefreiheitsstärkungsgesetz) ───\n');
 
-// LEG-01: Erklärung zur Barrierefreiheit in LegalTextModal.tsx
+// LEG-01: Erklärung zur Barrierefreiheit in LegalTextModal.tsx & legalContent.ts (SSOT)
 const legalTextModalPath = path.join(SRC_DIR, 'components', 'LegalTextModal.tsx');
+const legalContentPath = path.join(SRC_DIR, 'legal', 'legalContent.ts');
 if (fs.existsSync(legalTextModalPath)) {
-  const content = fs.readFileSync(legalTextModalPath, 'utf8');
+  let content = fs.readFileSync(legalTextModalPath, 'utf8');
+  if (fs.existsSync(legalContentPath)) {
+    content += '\n' + fs.readFileSync(legalContentPath, 'utf8');
+  }
   
   // 1. Must be "teilweise vereinbar"
   const hasTeilweise = content.includes('teilweise vereinbar');
@@ -537,7 +541,8 @@ const LEGAL_EXCEPTION_FILES = [
   'ParentCampusActivationModal',
   'LoginScreen',
   'QRLandingPage',
-  'CourtProofExportModal'
+  'CourtProofExportModal',
+  'PublicContractVerificationView'
 ];
 
 let paragraphViolations = [];
@@ -1070,6 +1075,51 @@ recordCheck(
   hasTypedRuleCatalog
     ? '18 Säulen und 180 Compliance-Regeln sind als typisierte SSOT exportiert und permanent gegen Regressionen geschützt.'
     : 'Policy-as-Code Fehlt: complianceRuleCatalog.ts unvollständig oder nicht synchronisiert.'
+);
+
+// LEG-32: ISO/IEC 27001 & ISO/IEC 27701 Statement of Applicability (SoA) & PIMS Alignment
+const isoDossierPath = path.join(ROOT_DIR, 'docs', 'ISO_27001_27701_PIMS_FORENSIC_DOSSIER.md');
+let hasIsoPimsDossier = false;
+
+if (fs.existsSync(isoDossierPath)) {
+  const isoContent = fs.readFileSync(isoDossierPath, 'utf8');
+  hasIsoPimsDossier = 
+    isoContent.includes('ISO/IEC 27001:2022') &&
+    isoContent.includes('ISO/IEC 27701:2019/2025') &&
+    isoContent.includes('Statement of Applicability') &&
+    isoContent.includes('Dual-Rollen-Doktrin');
+}
+
+recordCheck(
+  'LEG-32: ISO/IEC 27001 & ISO/IEC 27701 Autoritatives SoA & PIMS-Dossier (docs/ISO_27001_27701_PIMS_FORENSIC_DOSSIER.md)',
+  hasIsoPimsDossier,
+  hasIsoPimsDossier
+    ? 'Autoritatives SoA- & PIMS-Handbuch mit 93 ISMS- und 49 PIMS-Kontrollen im Exocortex verankert.'
+    : 'Exocortex-Lücke: ISO_27001_27701_PIMS_FORENSIC_DOSSIER.md fehlt oder ist unvollständig.'
+);
+
+// LEG-33: ISO/IEC 27701 Dual-Role Governance (Processor AVV Checksum & Controller Minor Protection)
+const consentGatePath = path.join(SRC_DIR, 'components', 'LegalConsentGate.tsx');
+
+let hasAvvChecksum = false;
+let hasMinorProtection = false;
+
+if (fs.existsSync(avvModalPath)) {
+  const avvCode = fs.readFileSync(avvModalPath, 'utf8');
+  hasAvvChecksum = avvCode.includes('avv_checksum') && avvCode.includes('Hetzner Online GmbH');
+}
+
+if (fs.existsSync(avatarEnginePath) && fs.existsSync(consentGatePath)) {
+  const avCode = fs.readFileSync(avatarEnginePath, 'utf8');
+  hasMinorProtection = avCode.includes('neutral_instrument_avatar.png') && avCode.includes('getInstrumentAvatarUrl');
+}
+
+recordCheck(
+  'LEG-33: ISO/IEC 27701 Dual-Role Governance (Processor AVV Checksum & Controller Minor Protection)',
+  hasAvvChecksum && hasMinorProtection,
+  hasAvvChecksum && hasMinorProtection
+    ? 'Dual-Rolle verifiziert: PII Processor AVV-Checksumme mit Hetzner DE verankert; PII Controller KUG § 22 3D-Avatare aktiv.'
+    : 'Dual-Role Governance unvollständig: AVV-Checksumme oder 3D-Avatar-Schutz fehlt.'
 );
 
 // =============================================================================

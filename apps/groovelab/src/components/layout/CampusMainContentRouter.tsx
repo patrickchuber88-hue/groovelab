@@ -32,6 +32,7 @@ export interface CampusMainContentRouterProps {
   supabase: any;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean) => void;
+  isSidebarRailCollapsed?: boolean;
   setSidebarNotificationsCount: (count: number) => void;
   session: any;
   setSession: (session: any) => void;
@@ -132,6 +133,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
   supabase,
   isSidebarCollapsed,
   setIsSidebarCollapsed,
+  isSidebarRailCollapsed = false,
   setSidebarNotificationsCount,
   session,
   setSession,
@@ -257,9 +259,37 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
     }
   }, [isMessagesActive, hasVisitedMessages]);
 
+  const handleNavigateToSchedule = React.useCallback((dateStr?: string) => {
+    if (typeof window !== 'undefined') {
+      if (dateStr) {
+        sessionStorage.setItem('campus_calendar_target_date', dateStr);
+        localStorage.setItem('campus_calendar_target_date', dateStr);
+        sessionStorage.setItem('groovelab_selected_schedule_date', dateStr);
+        localStorage.setItem('groovelab_selected_schedule_date', dateStr);
+        window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: dateStr } }));
+      }
+      sessionStorage.setItem('campus_active_tab', 'schedule');
+      localStorage.setItem('campus_active_tab', 'schedule');
+    }
+    setActiveStudentTab('schedule');
+
+    if (dateStr && typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: dateStr } }));
+      }, 50);
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: dateStr } }));
+      }, 150);
+    }
+  }, [setActiveStudentTab]);
+
+  const isMobileActiveChat = Boolean(windowWidth <= 768 && activeStudentTab === 'messages' && selectedCampusRecipient);
+
   return (
-    <main id="main-content" tabIndex={-1} className="main-content" style={{ 
-      overflowY: windowWidth <= 768 ? ((isStudent && activeStudentTab === 'live') ? 'hidden' : 'auto') : ((activeStudentTab !== 'live') ? 'auto' : 'hidden'), 
+    <main id="main-content" tabIndex={-1} className={`main-content ${isSidebarRailCollapsed ? 'sidebar-collapsed' : ''}`} style={{ 
+      overflowY: windowWidth <= 768 
+        ? ((isStudent && activeStudentTab === 'live') || isMobileActiveChat ? 'hidden' : 'auto') 
+        : ((activeStudentTab !== 'live') ? 'auto' : 'hidden'), 
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
       overscrollBehaviorY: 'contain',
@@ -268,10 +298,10 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       display: 'flex', 
       flexDirection: 'column', 
       padding: windowWidth <= 768 
-        ? (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px)) 4px') 
+        ? (isMobileActiveChat ? '0px' : (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px)) 4px')) 
         : (['homework', 'homework_book'].includes(activeStudentTab) ? '12px 16px' : (user?.role?.toLowerCase() === 'student' ? '20px 24px 32px 24px' : '10px')),
-      scrollPaddingTop: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))' : undefined,
-      scrollPaddingBottom: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px))' : undefined,
+      scrollPaddingTop: windowWidth <= 768 ? (isMobileActiveChat ? '0px' : 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))') : undefined,
+      scrollPaddingBottom: windowWidth <= 768 ? (isMobileActiveChat ? '0px' : 'var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px))') : undefined,
       boxSizing: 'border-box',
       minWidth: 0,
       width: '100%'
@@ -635,6 +665,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
               }}
               onDeleteAnnouncement={handleDeleteAnnouncement}
               onAcknowledgeMessage={handleAcknowledgeStudentMessage}
+              onNavigateToSchedule={handleNavigateToSchedule}
             />
           </Suspense>
         </div>

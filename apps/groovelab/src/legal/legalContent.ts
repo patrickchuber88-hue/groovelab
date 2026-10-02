@@ -303,7 +303,7 @@ Da die Bereitstellung des digitalen Zugangs unmittelbar mit der bewussten Freisc
 (2) **Verhältnis zum Musikschulunterrichtsvertrag:** Mitteilungen über die App berühren die zwischen den Erziehungsberechtigten und der Musikschule vereinbarten Unterrichts-, Honorar- und Nachholregelungen nicht.
 (3) **Ausschluss formbedürftiger Erklärungen:** Rechtserhebliche Willenserklärungen, die den Bestand des Unterrichtsvertrags mit der Musikschule betreffen (insbesondere formelle Kündigungen des Musikschulvertrags), können über Campus-Groovelab **nicht** wirksam erklärt werden. Sie sind zwingend auf den herkömmlichen Primärwegen der Musikschule (schriftlich oder per E-Mail an das Sekretariat) einzureichen.
 (4) **Ausschluss von Gesundheitsdaten (Art. 9 DSGVO):** Mitteilungen über Abwesenheiten beschränken sich auf die Angabe „verhindert“. Die Eingabe von Diagnosen, Symptomen oder Attesten ist strengstens untersagt.
-(5) **Zugang von Benachrichtigungen & Unterrichtsmitteilungen (§ 130 BGB):** Elektronische Benachrichtigungen über Unterrichtsänderungen, Vertretungen, Raumverlegungen oder Unterrichtsausfälle gelten dem Nutzer bzw. dessen Erziehungsberechtigten als zugegangen (§ 130 BGB), sobald sie im persönlichen Benutzerbereich (Mitteilungen / Stundenplan) abrufbar bereitgestellt sind oder die Kenntnisnahme elektronisch bestätigt wird.
+(5) **Benachrichtigungen & Unterrichtsmitteilungen:** Elektronische Benachrichtigungen über Unterrichtsänderungen, Vertretungen, Raumverlegungen oder Unterrichtsausfälle werden im persönlichen Benutzerbereich (Mitteilungen / Stundenplan) unverzüglich bereitgestellt. Wichtige rechtserhebliche Erklärungen bedürfen des tatsächlichen Zugangs (§ 130 BGB).
 
 ### 6. Vollständiger Ausschluss von Noten-Uploads & Noten-Sharing (§ 1 Abs. 2 UrhDaG)
 Die Plattform stellt für Schüler und Erziehungsberechtigte zu keinem Zeitpunkt Funktionen zum Hochladen, Speichern, Teilen oder Verbreiten von Noten, Notenblättern, Partituren oder Noten-PDFs bereit. Jegliches Teilen von Noten-Dateien ist technisch ausgeschlossen und untersagt. Didaktische Hausaufgaben verweisen ausnahmslos auf freie bibliografische Metadaten (Titel, Lehrwerk, Seitenzahlen) zur Nutzung mit im Fachhandel legal erworbenen Druckwerken.
@@ -591,7 +591,7 @@ Meldungen über technische Beeinträchtigungen werden während der regulären Su
 | **95,00 % bis 97,99 %** | mehr als 14,4 Stunden Ausfall | **3 Gratismonate** (ein volles Folgequartal beitragsfrei) |
 | **Unter 95,00 %** | mehr als 36,0 Stunden Ausfall | **6 Gratismonate** (ein volles Folgehalbjahr beitragsfrei) |
 
-(2) **Strikte Bemessungsgrundlage:** Die Gratismonate beziehen sich ausschließlich auf die monatliche Netto-Hosting-Basispauschale der Musikschule (Campus 14,90 €, GrooveLab 9,90 € bzw. Kombi 19,90 €). Schüleraktivierungsgebühren, Pädagogenlizenzen und Entgelte Dritter sind von der Bemessungsgrundlage ausdrücklich ausgeschlossen.
+(2) **Strikte Bemessungsgrundlage:** Die Gratismonate beziehen sich ausschließlich auf die monatliche Netto-Hosting-Basispauschale der Musikschule (Campus 14,90 €, GrooveLab 9,90 € bzw. Kombi 19,90 €). Schüleraktivierungsgebühren, Pädagogen- & Administrationspauschalen und Entgelte Dritter sind von der Bemessungsgrundlage ausdrücklich ausgeschlossen.
 (3) **Erfüllung & Anrechnung:** Bei monatlicher Zahlweise wird die Hosting-Basispauschale für die Folgemonate auf 0,00 € gesetzt. Bei jährlicher Vorauszahlung (mit Rabatt) werden die Gratismonate beitragsfrei an das vereinbarte Ende der bezahlten Schuljahresperiode angehängt, sodass sich der nächste Rechnungsstichtag entsprechend nach hinten verschiebt.
 (4) **Barausschluss & Verfall (No Cash Value):** Gratismonate stellen eine reine Sachkompensation dar. Ein Anspruch auf Barauszahlung, Überweisung, Verrechnung mit Drittforderungen oder Konvertierung in Geld ist unwiderruflich ausgeschlossen. Bei Beendigung des Vertragsverhältnisses durch ordentliche Kündigung des Kunden verfallen noch nicht verbrauchte Gratismonate ersatzlos.
 (5) **Antrags- und Nachweispflicht (Ausschlussfrist):** Gratismonate werden nicht automatisch gewährt. Der Kunde hat die Unterschreitung innerhalb einer **harten Ausschlussfrist von 30 Kalendertagen** nach Ablauf des betroffenen Monats in Textform (über das Support-Ticket-System oder an die offizielle Support-Adresse) unter nachvollziehbarer Angabe der festgestellten Ausfallzeiten geltend zu machen. Nach Ablauf dieser Frist ist die Geltendmachung endgültig ausgeschlossen (DSGVO-konforme Log-Rotationsparität nach DIN 66398).
@@ -906,6 +906,258 @@ Sollten Sie auf Ihre Kontaktaufnahme über den Feedback-Mechanismus innerhalb vo
   In der Schweiz erfolgt die Durchsetzung über das **Eidgenössische Büro für die Gleichstellung von Menschen mit Behinderungen (EBGB)**, Inselgasse 1, CH-3003 Bern.  
 
 *Stand der Erklärung: 07. September 2026 • Gutachterlich verifiziert am 08. September 2026 • Letzte Überprüfung und Aktualisierung: Schuljahr 2026/2027.*
+    `.trim()
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 11. IMPRESSUM & ANBIETERKENNZEICHNUNG (§ 5 DDG / ECG / UWG CH / DSA)
+  // ──────────────────────────────────────────────────────────────────────────
+  impressum: {
+    type: 'impressum',
+    title: 'Impressum & Anbieterkennzeichnung',
+    subtitle: 'Angaben gemäß § 5 DDG (DE), § 5 ECG / § 25 MedienG (AT) & Art. 3 Abs. 1 lit. s UWG (CH)',
+    badge: 'Gesetzliche Pflichtangaben',
+    isMandatory: false,
+    version: ACTIVE_LEGAL_VERSION,
+    summaryPoints: [
+      'Diensteanbieter: Patrick Huber, Softwareentwicklung & Cloud-Dienstleistungen (Einzelunternehmen), Rheinfelden (Baden)',
+      'Zuständige Gewerbebehörde: Gewerbeamt der Stadt Rheinfelden (Baden), Kirchplatz 2, 79618 Rheinfelden (Baden)',
+      'Elektronischer 2-Wege-Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14): kontakt@campus-groovelab.de & In-App-Support',
+      'DSA Art. 11, 12 & 16: Zentrale behördliche Kontaktstelle & strukturiertes Meldeverfahren für Urheberrechtsverletzungen (copyright@campus-groovelab.de)',
+      'Umsatzsteuer: Steuerbefreit gem. § 19 UStG (DE) / § 6 Abs. 1 Z 27 UStG 1994 (AT) / Art. 8 MWSTG (CH)',
+      'Redaktionell Verantwortlicher gem. § 18 Abs. 2 MStV / § 25 MedienG: Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)',
+      'EU-Streitschlichtung & Verbraucherstreitbeilegung (§ 36 VSBG): Keine Teilnahme an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle'
+    ],
+    checkboxLabel: 'Ich habe das Impressum und die Anbieterkennzeichnung zur Kenntnis genommen.',
+    fullTextMarkdown: `
+### 1. Diensteanbieter & Betreiber der Plattform Campus-Groovelab
+**Patrick Huber**  
+Softwareentwicklung & Cloud-Dienstleistungen (Einzelunternehmen)  
+Karl-Fürstenberg-Str. 59  
+79618 Rheinfelden (Baden)  
+Deutschland  
+
+**Zuständige Gewerbebehörde:**  
+Gewerbeamt der Stadt Rheinfelden (Baden), Kirchplatz 2, 79618 Rheinfelden (Baden)
+
+---
+
+### 2. Rechtlicher Abgrenzungs- & Kompatibilitäts-Hinweis (§ 23 Abs. 1 Nr. 3 MarkenG / § 4 Nr. 3 & § 5 UWG)
+Das didaktische Konzept und Unterrichtsfach **„GrooveLAB“** (offenes Gruppen- und Bandunterrichtsmodell) wurde maßgeblich an der Städtischen Musikschule Lahr entwickelt. Das Modul **„GrooveLab“** innerhalb der Plattform Campus-Groovelab knüpft als unabhängige digitale Begleit- und Visualisierungs-Software an die methodischen Anforderungen moderner Gruppen- und Bandunterrichtskonzepte an und macht Übefortschritte, Repertoires und Gruppeninteraktionen digital sichtbar.
+
+Campus-Groovelab ist eine eigenständige Softwareentwicklung von Patrick Huber. Es besteht **keinerlei rechtliche, gesellschaftsrechtliche, organisatorische oder behördliche Trägerschaft** der Städtischen Musikschule Lahr oder des Freundeskreises der Städtischen Musikschule Lahr e.V.
+
+---
+
+### 3. Elektronische Kontaktaufnahme & Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07 / Art. 3 UWG CH)
+- **E-Mail:** kontakt@campus-groovelab.de
+- **Support & Schulbetreuung:** support@campus-groovelab.de
+- **In-App-Support & Ticketsystem:** Direkt über das integrierte Hilfe-Zentrum (2-Wege-Schnellkontakt mit protokollierter Ticketnummer)
+- **Website:** https://campus-groovelab.de
+
+**⚡ Effizienter elektronischer 2-Wege-Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14):**  
+Gemäß der Rechtsprechung des Europäischen Gerichtshofs (EuGH, Urteil vom 16.10.2008 – C-298/07) sowie des Bundesgerichtshofs (BGH, Urteil vom 25.02.2010 – I ZR 238/14) erfolgt die unmittelbare und effiziente Kommunikation über zwei vollwertige elektronische Schnellkontaktwege (E-Mail & In-App-Supportsystem mit protokollierter Ticketnummer). Dies gewährleistet eine lückenlose Dokumentation, prioritäre Bearbeitung und eine Antwortzeit an Werktagen **in der Regel innerhalb von 60 Minuten** (Kernzeiten: Mo 09:00–12:00 Uhr • Do 08:00–10:00 Uhr MEZ).
+
+**🛡️ Hinweis zur Zuständigkeit:**  
+Für Auskünfte zu Unterrichtszeiten, Stundenplänen, Raumzuteilungen, Lehrkraft-Vertretungen, Abwesenheitsmeldungen oder Musikschulverträgen wenden Sie sich bitte direkt an das **Sekretariat Ihrer Musikschule vor Ort**. Der Plattform-Support betreut als technischer Infrastrukturdienstleister ausschließlich Software-, Login- und Systemfragen.
+
+---
+
+### 4. Zentrale Kontaktstelle & Meldeverfahren gemäß Art. 11, 12 & 16 Digital Services Act (DSA)
+- **E-Mail für behördliche Anfragen (Art. 11 DSA):** kontakt@campus-groovelab.de
+- **Zentrale Kontaktstelle für Nutzer (Art. 12 DSA):** support@campus-groovelab.de
+- **Meldekanal für rechtswidrige Inhalte & Urheberrechtsverletzungen (Notice-and-Action gem. Art. 16 DSA):** copyright@campus-groovelab.de
+- **Amtssprachen für Anfragen:** Deutsch, Englisch.
+- **Bearbeitungszeit:** Eingehende Meldungen über Urheberrechtsverletzungen oder rechtswidrige Inhalte werden nach den Vorgaben des Art. 16 DSA unverzüglich, spätestens jedoch innerhalb von 24 Stunden gesichtet und bearbeitet.
+
+---
+
+### 5. Umsatzsteuer & Steuerliche Einstufung (§ 5 Abs. 1 Nr. 6 DDG / § 27a UStG / § 6 UStG AT / Art. 8 MWSTG CH)
+- **Deutschland:** Umsatzsteuerbefreit gemäß **§ 19 UStG (Kleinunternehmerregelung)**. Es wird keine Umsatzsteuer erhoben oder gesondert ausgewiesen. Eine gesonderte Umsatzsteuer-Identifikationsnummer (USt-IdNr.) gemäß § 27a UStG wird für den rein inländischen Geschäftsbetrieb nicht benötigt; für den grenzüberschreitenden innergemeinschaftlichen B2B-Dienstleistungsverkehr (Reverse-Charge) sowie nach § 139c AO wird die Wirtschafts-Identifikationsnummer (W-IdNr.) geführt bzw. auf gesonderte behördliche Zuteilung vorgehalten.
+- **Österreich:** Umsatzsteuerbefreit gemäß **§ 6 Abs. 1 Z 27 UStG 1994 (Kleinunternehmerregelung)**.
+- **Schweiz:** Leistungsort Schweiz gemäß **Art. 8 Abs. 1 MWSTG** (nicht im Inland steuerbar).
+
+---
+
+### 6. Verantwortlich für redaktionelle Inhalte (§ 18 Abs. 2 MStV DE / § 25 MedienG AT)
+Patrick Huber  
+Karl-Fürstenberg-Str. 59  
+79618 Rheinfelden (Baden), Deutschland  
+
+**Grundlegende Richtung des Online-Mediums (Blattlinie gem. § 25 Abs. 4 MedienG AT):**  
+Information und Bereitstellung digitaler Werkzeuge zur pädagogischen Organisation und didaktischen Begleitung von Musikschulunterricht, Raum-, Stundenplan- und Terminplanung sowie didaktischem Instrumentalüben.
+
+---
+
+### 7. EU-Streitschlichtung & Verbraucherstreitbeilegung (§ 36 VSBG)
+Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.  
+Unsere E-Mail-Adresse finden Sie oben im Impressum. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+
+---
+
+### 8. Haftung für Inhalte & Hosting-Immunität (DSA / DDG / ECG)
+Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG / § 16 ECG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Für übermittelte oder gespeicherte fremde Informationen sind wir als Host-Provider gemäß Art. 6 Verordnung (EU) 2022/2065 (Digital Services Act – DSA) i. V. m. § 7 Abs. 2 DDG nicht verpflichtet, diese proaktiv zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen ab dem Zeitpunkt der tatsächlichen Kenntnis einer konkreten Rechtsverletzung bleiben hiervon unberührt.
+    `.trim()
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 12. PLATTFORM-DATENSCHUTZERKLÄRUNG (DSGVO / NDSG / TDDDG)
+  // ──────────────────────────────────────────────────────────────────────────
+  platform_privacy: {
+    type: 'platform_privacy',
+    title: 'Plattform-Datenschutzerklärung',
+    subtitle: 'Rechtskonforme Information gem. Art. 13 & 14 DSGVO, Schweizer nDSG & § 25 TDDDG',
+    badge: 'Datenschutz & Sicherheit',
+    isMandatory: true,
+    version: ACTIVE_LEGAL_VERSION,
+    summaryPoints: [
+      'Rollen-Dualität (Art. 4 Nr. 7 vs. Art. 28 DSGVO): Musikschule ist Verantwortliche für Unterrichtsdaten; Betreiber Patrick Huber ist Auftragsverarbeiter',
+      '100 % Zero-User-Mail-Axiom: Keine Speicherung persönlicher E-Mail-Adressen von Schülern, Eltern oder Lehrkräften; passwortloser Login via Schulausweis & PIN',
+      'Keine Speicherung von Bank- oder Zahlungsdaten der Familien auf der Plattform (Zero-Payment-Storage)',
+      '100 % Europäisches Hosting in ISO/IEC-27001 zertifizierten Rechenzentren (Hetzner Nürnberg/Falkenstein, Deutschland)',
+      'Zero-Tracking: Keine Marketing- oder Drittanbieter-Cookies; alle lokalen Speicherungen technisch zwingend gem. § 25 Abs. 2 Nr. 2 TDDDG',
+      'Strikter Ausschluss von Stimmbiometrie (Art. 9 DSGVO): Audio-Aufnahmen dienen rein dem didaktischen Üben',
+      'Kommunales DIN 66398 Löschkonzept mit 5 definierten Löschklassen',
+      'Vollständige Betroffenenrechte gem. Art. 15–21 DSGVO / nDSG (Zuständige Behörde: LfDI Baden-Württemberg / EDÖB Bern)'
+    ],
+    checkboxLabel: 'Ich habe die Plattform-Datenschutzerklärung zur Kenntnis genommen.',
+    fullTextMarkdown: `
+### 1. Rollen-Differenzierung, Verantwortliche Stellen & Auftragsverarbeitung (Art. 4 Nr. 7 vs. Art. 28 DSGVO)
+Im regulären Musikschulbetrieb ist die **jeweilige Musikschule bzw. ihr Schulträger die alleinige Verantwortliche (Controller gem. Art. 4 Nr. 7 DSGVO)** für Schüler-, Lehrkräfte- und Unterrichtsdaten. Campus-Groovelab verarbeitet diese Daten streng weisungsgebunden als **Auftragsverarbeiter (Processor gem. Art. 28 DSGVO)** nach Maßgabe der im Tab „AVV“ verbindlich bereitgestellten Vereinbarung.
+
+**(1) Duale Zuständigkeitsarchitektur:**  
+- **Säule A – Schulbetrieb (B2B):** Soweit Campus-Groovelab von Musikschulen, Akademien oder Trägern zur Stundenplanung, didaktischen Unterrichtsbegleitung und Schülerverwaltung genutzt wird, ist die *jeweilige Musikschule die verantwortliche Stelle* im Sinne von Art. 4 Nr. 7 DSGVO. Die Schule entscheidet über Zwecke und Mittel der Verarbeitung. Der Plattformbetreiber handelt als Auftragsverarbeiter gemäß Art. 28 DSGVO.  
+- **Säule B – Website, System-Infrastruktur & Direktabrechnung (B2C):** Für den technischen Betrieb dieser Website, serverseitige Sicherheits-Logfiles, Direktverträge mit Volljährigen oder Eltern sowie den Plattform-Support ist *Patrick Huber der originäre Verantwortliche* im Sinne der DSGVO, des Schweizer nDSG und des österreichischen DSG:  
+  **Patrick Huber**, Softwareentwicklung & Cloud-Dienstleistungen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), Deutschland.  
+  Zentrale E-Mail: kontakt@campus-groovelab.de • Technischer Support: support@campus-groovelab.de
+
+**(2) Offizielle Datenschutz-Kontaktstelle & DPO-Verbindung:**  
+Für behördliche Datenschutzbeauftragte, Schulleitungen und betroffene Personen unterhalten wir eine dedizierte Ansprechstelle für Datenschutzfragen und Betroffenenrechte: E-Mail: datenschutz@campus-groovelab.de. Behördliche Datenschutzprüfer können zudem über das integrierte DPO-Audit-Portal direkt auf standardisierte Verzeichnisse von Verarbeitungstätigkeiten (VVT gem. Art. 30 DSGVO) und Schwellwertanalysen (DSFA gem. Art. 35 DSGVO) zugreifen.
+
+---
+
+### 2. Grundsatz der Datenminimierung, 100 % Zero-User-Mail-Axiom & Bildschirmfreies Üben (Art. 5 & 8 DSGVO / Art. 6 nDSG)
+**(1) Keine Zahlungs- oder Bankdaten von Familien:**  
+Auf Campus-Groovelab werden keinerlei Bank-, SEPA-, Kreditkarten- oder Abrechnungsvertragsdaten von Schülern oder Eltern gespeichert.
+
+**(2) 100 % Zero-User-Mail-Axiom & Entfall personenbezogener E-Mail-Adressen:**  
+Auf den Servern und Datenbanken von Campus-Groovelab werden zu keinem Zeitpunkt personenbezogene E-Mail-Adressen natürlicher Personen (weder von Schülerinnen und Schülern, Erziehungsberechtigten, Lehrkräften noch von Mitgliedern der Schulleitung oder Verwaltung) erhoben, gespeichert oder verarbeitet. Die Authentifizierung erfolgt passwortlos über physische Schulausweise (QR-Code / Ausweisnummer) in Kombination mit einer serverseitig gehashten PIN oder Passkeys (WebAuthn FIDO2). Als einzige institutionelle Ausnahme wird die zentrale Kontakt- und Abrechnungs-E-Mail der Musikschule als juristischer Person (Träger) für buchhalterische Pflichtbelege (§ 14 UStG) und SLA-Mitteilungen verarbeitet. Plattformfunktionen zum Teilen von Zugängen rufen rein clientseitig das lokale Mailprogramm des Endgeräts auf (mailto:); Empfänger-E-Mail-Adressen werden zu 0 % über unsere Server übertragen oder gespeichert.
+
+**(3) Namensdarstellung & Schutz von Minderjährigen:**  
+Schülernamen werden in Lehrer-Übersichten datenschutzkonform auf „Vorname + N.“ (z. B. „Max M.“) gekürzt. Lehrkräftenamen werden für Schüler und Eltern mit vollem Namen angezeigt, um Verwechslungsfreiheit im Schulbetrieb zu gewährleisten.
+
+**(4) Mindestalter & Bildschirmfreies Üben („Screenless Practice“):**  
+Das Mindestalter beträgt 6 Jahre. Um Bildschirmzeiten bei jüngeren Kindern (6–9 Jahre) zu minimieren, können Übeeinheiten am akustischen Instrument von den Eltern im Elternmodus mit einem Klick quittiert werden (begrenzt auf max. 60 Min./Tag zur Vermeidung von Missbrauch).
+
+**(5) Ausschluss von Gesundheits- und Diagnosedaten (Art. 9 DSGVO / Art. 5 lit. c nDSG):**  
+Die plattforminterne Kommunikations- und Shoutbox-Funktion dient ausschließlich der organisatorischen Unterrichtsabstimmung und Terminabsprache. Die Erfassung, Speicherung oder Übermittlung von sensiblen Gesundheitsdaten, ärztlichen Attesten oder konkreten medizinischen Diagnosen ist untersagt und nicht Gegenstand der Plattformfunktion. Bei Abwesenheiten genügt die allgemeine Angabe „verhindert“.
+
+**(6) Duales Notfall-Zugangs- & Wiederherstellungsmodell:**  
+Da im Gesamtsystem keine Nutzer-E-Mail-Adressen verarbeitet werden, entfallen klassische, durch Phishing und Man-in-the-Middle angreifbare E-Mail-Passwort-Reset-Links vollständig. Bei Verlust von PIN oder Passkey greift das revisionssichere Zwei-Säulen-Modell:  
+(a) *Dezentraler kryptografischer Recovery-Key* (Self-Sovereign Identity, offline bei Ersteinrichtung ausgedruckt / verwahrt; der Server speichert ausschließlich einen irreversiblen kryptografischen Hash); oder  
+(b) *Vor-Ort Schulleitungs-Reset (PostIdent-Standard)* durch persönliche Identitätsprüfung im Schulsekretariat mit autoritativer Vergabe eines neuen Ausweis-Tokens bzw. einer Einmal-PIN via reset_user_credentials_by_admin, sofortiger atomarer Session-Invalidierung und lückenloser Protokollierung im manipulationssicheren WORM-Audit-Trail.
+
+---
+
+### 3. Client-seitige Speicherung, TDDDG-Transparenzmatrix & Zero-Consent-Doktrin (§ 25 Abs. 2 Nr. 2 TDDDG / § 165 TKG / Art. 6 revDSG)
+**(1) Technisch zwingend erforderliche Speicherungen:**  
+Unsere Webanwendung verwendet lokale Speichertechnologien des Browsers (LocalStorage, SessionStorage, IndexedDB), um Kernfunktionen wie den sicheren Sitzungserhalt, Navigationseinstellungen und den Offline-Übebetrieb in Proberäumen bereitzustellen.
+
+**(2) Keine Tracking- oder Werbe-Cookies (Banner-Immunität):**  
+Es werden zu keinem Zeitpunkt Marketing-, Profiling- oder Drittanbieter-Tracking-Cookies gesetzt. Sämtliche client-seitigen Speicherungen sind gemäß **§ 25 Abs. 2 Nr. 2 TDDDG** (DE) sowie **§ 165 Abs. 3 TKG 2021** (AT) technisch unbedingt erforderlich. Ein Cookie-Banner ist daher gesetzlich entbehrlich.
+
+**(3) Transparenzmatrix der lokalen Speicher-Schlüssel:**  
+- \`gl_active_session_lease_id\` (LocalStorage): Kryptografischer Session-Lease-Token zum Schutz vor Session-Hijacking (Dauer: bis Abmeldung / max. 30 Tage; Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`groovelab_active_platform\` (LocalStorage): Beibehaltung des ausgewählten Moduls (Campus vs. GrooveLab) (Dauer: dauerhaft bis Cache-Leerung; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`campus_family_profiles\` (LocalStorage): Verschlüsselte Schnellumschaltung zwischen Geschwistern auf Familien-Geräten (Dauer: bis Abmeldung; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`groovelab_kiosk_token\` (LocalStorage): Hardware-Kopplung der Proberaum-Terminals im Kiosk-Betrieb der Musikschule (Dauer: bis Terminal-Reset; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`cg_tax_mode\` (LocalStorage): Steuer-Konfiguration (Regelbesteuerung vs. Kleinunternehmer; § 25 Abs. 2 Nr. 2 TDDDG)  
+
+**(4) Schutz lokaler Daten:**  
+Es werden keine Klartext-Passwörter im Browser gespeichert. Flüchtige Sitzungs-Identifikatoren verfallen automatisch. Sensible lokale Zwischenspeicher werden auf dem Endgerät über die browser-eigene Web Crypto API kryptografisch geschützt (PBKDF2 mit 100.000 Runden SHA-512 und AES-256-GCM).
+
+**(5) Lokaler Audio-Tresor (IndexedDB):**  
+Zur Gewährleistung eines unterbrechungsfreien Probenbetriebs in schallisolierten Räumen ohne Internetverbindung werden temporäre Übe- und Playback-Audios lokal in geschützten IndexedDB-Datenspeichern des Browsers vorgehalten und bei aktiver Verbindung synchronisiert.
+
+---
+
+### 4. Hardware-Zugriffe (Kamera & Mikrofon), Passkeys & Ausschluss von Biometrie-Verarbeitung (Art. 9 DSGVO)
+**(1) Kamera:**  
+Der Zugriff auf die Kamera erfolgt ausschließlich lokal im Browser des Nutzers, um den Schulausweis-QR-Code zu erfassen. Es werden zu keinem Zeitpunkt Videobilder an Server übertragen.
+
+**(2) Mikrofon & Didaktische Aufnahmen:**  
+Die In-App Loopstation und das Meisterwerk-Protokoll ermöglichen Schülern und Lehrkräften die didaktische Tonaufnahme am Instrument. Ein automatischer Sicherheits-Guard schaltet das Mikrofon bei Modulwechsel, Tab-Inaktivität oder Schließen des Fensters sofort physisch ab (MediaStreamTrack.stop()).
+
+**(3) Strikter Ausschluss von Stimmbiometrie (Art. 9 DSGVO):**  
+Die Audiodaten dienen rein dem musikalischen Playback und der Hausaufgabenkontrolle. Es finden zu keinem Zeitpunkt biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen statt.
+
+**(4) Passkeys & WebAuthn (FIDO2 Standard / Keine Biometrie):**  
+Die optionale passwortlose Anmeldung via Passkey nutzt Face ID, Touch ID oder Windows Hello ausschließlich lokal in der isolierten Hardware-Enclave (Secure Enclave / TPM) des Nutzerendgeräts. Biometrische Rohmerkmale verlassen zu keinem Zeitpunkt das Endgerät und werden niemals an Campus-Groovelab übertragen oder auf unseren Servern verarbeitet (Art. 9 DSGVO). Unser Server empfängt und prüft ausschließlich die kryptografische Public-Key-Signatur.
+
+**(5) Physische Löschung:**  
+Wird eine Tonaufnahme oder ein Schülerprofil gelöscht, wird die zugehörige Audiodatei vollständig und unwiderruflich aus dem Cloud-Speicher gelöscht.
+
+---
+
+### 5. Zivilrechtliche Vertragspartnerschaft bis 18 Jahre (§§ 106 ff. BGB), Datenschutz-Mündigkeit ab 16 Jahren (Art. 8 DSGVO) & Gemeinsames Sorgerecht (§ 1629 BGB)
+**(1) Zivilrechtliche Vertrags- & Kostenträgerschaft bis zur Volljährigkeit (§ 2 & §§ 106 ff. BGB):**  
+Vertragspartner für die Plattformnutzung sowie für etwaige entgeltliche Leistungen (insbesondere Schüler-Jahresbeiträge bei Direktabrechnung) sind bei Minderjährigen bis zur Vollendung des 18. Lebensjahres (gesetzliche Volljährigkeit gem. § 2 BGB) ausnahmslos die Erziehungsberechtigten. Minderjährige können ohne ausdrückliche Genehmigung der gesetzlichen Vertreter keine kostenpflichtigen Verträge eingehen.
+
+**(2) Gemeinsames Sorgerecht & Gesetzliche Vertretungsvermutung (§ 1629 Abs. 1 Satz 2 BGB):**  
+Nimmt ein Elternteil die Registrierung, Freischaltung oder PIN-Verwaltung für ein minderjähriges Kind vor, versichert dieser an Eides statt, zur alleinigen Vertretung berechtigt zu sein oder im ausdrücklichen Einvernehmen mit dem weiteren sorgeberechtigten Elternteil zu handeln. Der anmeldende Elternteil stellt den Betreiber sowie die Musikschule im Innenverhältnis von etwaigen Einwendungen oder Streitigkeiten des anderen Elternteils frei.
+
+**(3) Datenschutzrechtliche Mündigkeit (Art. 8 DSGVO i. V. m. § 16 TDDDG):**  
+Für Schüler bis zum vollendeten 16. Lebensjahr ist für didaktische Audio-Aufnahmen und die Profilnutzung die aktive Freigabe der Erziehungsberechtigten erforderlich. Jugendliche zwischen dem vollendeten 16. und 18. Lebensjahr besitzen die gesetzliche Mündigkeit, ihre datenschutzrechtliche Einwilligung in didaktische Audioaufnahmen selbstständig zu erteilen oder zu widerrufen (die zivilrechtliche Vertragspartnerschaft für das Benutzerkonto verbleibt hiervon unberührt bis zum 18. Lebensjahr bei den Erziehungsberechtigten).
+
+**(4) Kinderschutz & Vier-Augen-Transparenz (§ 8a SGB VIII):**  
+Die Verifikation erfolgt über die physische Ausgabe des Schulausweises durch die Musikschule und die Festlegung einer geheimen Eltern-PIN. Gemäß § 8a SGB VIII und dem institutionellen Kinderschutzkonzept der Schule ist die didaktische Kommunikation zwischen Lehrkräften und Schülern für Erziehungsberechtigte über das Eltern-Portal jederzeit transparent einsehbar (Vier-Augen-Prinzip). Ein unkontrollierter Chatverkehr zwischen Minderjährigen untereinander ist serverseitig ausgeschlossen. Die Einwilligung in didaktische Tonaufnahmen ist freiwillig und kann jederzeit unabhängig vom Unterrichtsvertrag widerrufen werden.
+
+---
+
+### 6. Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Art. 28 & 32 DSGVO)
+Sämtliche Kernsysteme (Webanwendung, API-Gateway, PostgreSQL-Datenbank und Cloud-Audiospeicher) werden in nach ISO/IEC 27001 zertifizierten deutschen Rechenzentren der Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland) betrieben. Mit dem Hosting-Provider besteht ein DSGVO-konformer Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO. Die Datenübertragung erfolgt durchgehend TLS 1.3 verschlüsselt.
+
+---
+
+### 7. Keine Einbindung externer Drittanbieter- oder US-Cloud-Dienste (Zero US Cloud Governance)
+Zur strikten Einhaltung europäischer Datenschutzstandards (Schrems II / DSGVO) verzichtet Campus-Groovelab vollständig auf US-Cloud-Dienste, Tracking-Netzwerke oder externe Hilfsdienste:  
+- Sämtliche QR-Codes für physische Ausweise, Stundenpläne und Kiosk-Stationen werden zu 100 % lokal und offline im Webbrowser des Endgeräts gerendert (Zero-Data-Transmission). Es werden zu keinem Zeitpunkt Daten an externe QR-Dienste übertragen.  
+- Die Protokollierung von Administrator-IPs beim B2B-Onboarding erfolgt ausnahmslos serverintern im ISO 27001-zertifizierten Hetzner-Rechenzentrum in Deutschland. Es werden keine externen IP-Dienste oder US-Abfrage-APIs genutzt.  
+- **Missbrauchsschutz & Abwehr automatisierter Angriffe (Proof-of-Work):** Zur Abwehr von Brute-Force-Angriffen und automatisierten Bot-Attacken beim Anmeldevorgang setzen wir ein vollständig serverseitiges, datensparsames kryptografisches Nachweisverfahren (Proof-of-Work) ein. Hierbei werden weder Cookies gesetzt noch gerätespezifische Merkmale ausgelesen (kein Device-Fingerprinting) und keine Daten an Dritte oder US-Server übertragen (Art. 6 Abs. 1 lit. f DSGVO i. V. m. Art. 32 DSGVO).  
+- Kalendersynchronisationen und Ferienabfragen erfolgen direkt und ohne Zwischenschaltung ungesicherter Drittanbieter-Proxies.
+
+---
+
+### 8. Urheberrechtsfreie Metadaten-Architektur (UrhG & DSA)
+Campus-Groovelab speichert und hostet keine geschützten Notenblätter oder Partituren als PDF. Es werden ausschließlich bibliografische Metadaten (Songtitel, Komponist, Lehrbuchseite) sowie externe Verlinkungen (z. B. Streaming-Dienste) verarbeitet.
+
+---
+
+### 9. Kommunales Löschkonzept nach DIN 66398 (5 definierte Löschklassen)
+Zur Einhaltung des Grundsatzes der Speicherbegrenzung (Art. 5 Abs. 1 lit. e DSGVO) implementiert Campus-Groovelab ein behördliches Löschkonzept gemäß **DIN 66398** mit fünf standardisierten Löschklassen:  
+- **⚡ LK 1 – Flüchtige Sitzungsdaten:** Sofortiger Verfall flüchtiger Token bei Benutzerabmeldung oder Schließen des Browsers.  
+- **🎵 LK 2 – Didaktische Schüler-Audioaufnahmen:** Speicherung auf das laufende Schuljahr befristet (automatischer Stichtag 31.08. mit Vorab-Exportfunktion); sofortige physische Löschung bei manuellem Löschen durch Schüler/Eltern.  
+- **💤 LK 3 – Inaktivitätsstatus (Fair-Play):** Nach 60 aufeinanderfolgenden Tagen ohne Schüler-Login automatische Überführung in den passiven Basis-Status zur Kostenentlastung der Musikschule.  
+- **🎓 LK 4 – Bildungsbiografie & Meisterwerke:** Fortlaufende Bereitstellung während der aktiven Unterrichtszeit an der Musikschule; endgültige physische Löschung 30 Tage nach Vertragsbeendigung des Schülers.  
+- **📑 LK 5 – B2B-Abrechnungsbelege der Musikschule:** 10 Jahre gesetzliche Aufbewahrungsfrist gem. § 147 AO / § 257 HGB (reine Sammelrechnungen an die Schule ohne Klarnamen Minderjähriger).
+
+---
+
+### 10. Betroffenenrechte & Aufsichtsbehörden (Art. 15 bis 22 DSGVO / Art. 25 ff. revDSG)
+**(1) Umfassende Betroffenenrechte:**  
+Sie haben jederzeit das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO).
+
+**(2) Zuständigkeit für Anfragen:**  
+- Bei Fragen zu konkreten Unterrichtsdaten, Noten, Stundenplänen oder Schulverträgen wenden Sie sich bitte direkt an die **Leitung bzw. das Sekretariat Ihrer Musikschule vor Ort** (als verantwortliche Stelle).  
+- Für systemische Plattformanfragen, Auskünfte zu Webseiten-Logs oder die Geltendmachung von Rechten gegenüber dem Plattformbetreiber richten Sie Ihre Anfrage bitte direkt an: datenschutz@campus-groovelab.de.
+
+**(3) Beschwerderecht bei den Aufsichtsbehörden:**  
+Sie haben das Recht auf Beschwerde bei einer zuständigen Datenschutz-Aufsichtsbehörde:  
+- **Deutschland:** Der Landesbeauftragte für den Datenschutz und die Informationsfreiheit Baden-Württemberg (LfDI BW), Lautenschlagerstraße 20, 70173 Stuttgart (www.baden-wuerttemberg.datenschutz.de) sowie die Aufsichtsbehörde Ihres gewöhnlichen Aufenthaltsortes.  
+- **Österreich:** Österreichische Datenschutzbehörde (DSB), Barichgasse 40–42, 1030 Wien (www.dsb.gv.at).  
+- **Schweiz:** Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter (EDÖB), Feldeggweg 1, CH-3003 Bern (www.edoeb.admin.ch).
+
+**Hinweis für Nutzer in der Schweiz:** Deutschland verfügt gemäß Beschluss des Schweizer Bundesrats vom 25. August 2023 über ein angemessenes Schutzniveau (Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 VDSG).
     `.trim()
   }
 };

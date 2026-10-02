@@ -27,3 +27,9 @@ Alle von dir generierten Artefakte müssen dem 1%-Goldstandard (OWASP ASVS Level
 5. STRICT TYPESCRIPT & ZERO DUPLICATION:
    - 100 % TypeScript. Absolutes Verbot von `any`, `@ts-ignore` oder unechten Type-Casts.
    - Inbound-Payloads an Gateways werden strikt mit Zod oder Parameter-Whitelisting validiert.
+
+6. MONOLITH CEILING, ZERO-INLINE-FEATURE & ZERO-SHREDDING AXIOM:
+   - Bestehende Riesen-Monolithen (z. B. `CampusEventsBoard`, `ScheduleCalendarView`, `MeisterwerkDocumentTab`) NIEMALS zersägen, aufsplitten oder zerkleinern!
+   - Pre-Flight Check VOR dem Schreiben: Bei Dateien >= 1.500 Zeilen gilt sofortiger Inlining-Stopp.
+   - Jede neue didaktische/administrative Funktion MUSS als eigenständiger Feature-Monolith (<= 1.500 Zeilen) angelegt werden.
+   - Host-Screens agieren ausschließlich als schlanke Orchestratoren (Mounting per Einzeiler, max. 15 Zeilen Verdrahtungs-Puffer).

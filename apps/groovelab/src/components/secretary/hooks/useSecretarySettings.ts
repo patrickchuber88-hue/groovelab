@@ -8,6 +8,7 @@ import {
   removeBiometricProfile,
   BiometricVaultProfile
 } from '../../../utils/webauthn';
+import { resolveStateFromZipCode } from '../../../utils/schoolHolidayEngine';
 
 export interface UseSecretarySettingsOptions {
   schoolId: string;
@@ -38,6 +39,10 @@ export function useSecretarySettings({
   const [absenceEmail, setAbsenceEmail] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [openingHours, setOpeningHours] = useState<any>(null);
+
+  // 1b. Statutory School Holidays & Feiertage
+  const [showSchoolHolidays, setShowSchoolHolidays] = useState<boolean>(true);
+  const [holidayJurisdiction, setHolidayJurisdiction] = useState<string>('DE_BW');
 
   // 2. Operational & Kiosk Settings
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
@@ -119,13 +124,16 @@ export function useSecretarySettings({
       syncInterval !== initialSettings.syncInterval ||
       schoolYearStartMonth !== initialSettings.schoolYearStartMonth ||
       schoolYearStartDay !== initialSettings.schoolYearStartDay ||
-      autoDeleteExpiredUsers !== initialSettings.autoDeleteExpiredUsers
+      autoDeleteExpiredUsers !== initialSettings.autoDeleteExpiredUsers ||
+      showSchoolHolidays !== initialSettings.showSchoolHolidays ||
+      holidayJurisdiction !== initialSettings.holidayJurisdiction
     );
   }, [
     initialSettings,
     schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail, absenceEmail,
     logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval,
-    schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers
+    schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers,
+    showSchoolHolidays, holidayJurisdiction
   ]);
 
   // 10. Initializer from School Data Record
@@ -144,6 +152,13 @@ export function useSecretarySettings({
 
     const op = schoolData.opening_hours || {};
     setOpeningHours(op);
+
+    const campusSettings = op.campus_settings || {};
+    const loadedShowHolidays = campusSettings.show_school_holidays !== false;
+    const loadedHolidayJurisdiction = campusSettings.holiday_jurisdiction || resolveStateFromZipCode(schoolData.zip_code, schoolData.country);
+
+    setShowSchoolHolidays(loadedShowHolidays);
+    setHolidayJurisdiction(loadedHolidayJurisdiction);
 
     let parsedUrls: string[] = [];
     const rawUrl = schoolData.calendar_url;
@@ -196,7 +211,9 @@ export function useSecretarySettings({
       syncInterval: loadedSyncInterval,
       schoolYearStartMonth: loadedStartMonth,
       schoolYearStartDay: loadedStartDay,
-      autoDeleteExpiredUsers: loadedAutoDelete
+      autoDeleteExpiredUsers: loadedAutoDelete,
+      showSchoolHolidays: loadedShowHolidays,
+      holidayJurisdiction: loadedHolidayJurisdiction
     });
   }, []);
 
@@ -360,6 +377,14 @@ export function useSecretarySettings({
       const effBypassPin = overrides?.bypassPin !== undefined ? overrides.bypassPin : bypassPin;
       const effLogRetention = overrides?.logRetention !== undefined ? overrides.logRetention : logRetention;
       const effSyncInterval = overrides?.syncInterval !== undefined ? overrides.syncInterval : syncInterval;
+      const effShowHolidays = overrides?.showSchoolHolidays !== undefined ? overrides.showSchoolHolidays : showSchoolHolidays;
+      const effHolidayJurisdiction = overrides?.holidayJurisdiction !== undefined ? overrides.holidayJurisdiction : holidayJurisdiction;
+
+      const updatedCampusSettings = {
+        ...((openingHours || {}).campus_settings || {}),
+        show_school_holidays: effShowHolidays,
+        holiday_jurisdiction: effHolidayJurisdiction
+      };
 
       const updatedOp = {
         ...(openingHours || {}),
@@ -369,7 +394,8 @@ export function useSecretarySettings({
         sync_interval: effSyncInterval,
         school_year_start_month: effMonth,
         school_year_start_day: effDay,
-        auto_delete_expired_users: effAutoDelete
+        auto_delete_expired_users: effAutoDelete,
+        campus_settings: updatedCampusSettings
       };
 
       const serializedUrls = JSON.stringify(calendarUrls);
@@ -446,7 +472,9 @@ export function useSecretarySettings({
         syncInterval: effSyncInterval,
         schoolYearStartMonth: effMonth,
         schoolYearStartDay: effDay,
-        autoDeleteExpiredUsers: effAutoDelete
+        autoDeleteExpiredUsers: effAutoDelete,
+        showSchoolHolidays: effShowHolidays,
+        holidayJurisdiction: effHolidayJurisdiction
       });
 
       // Update local storage school profile & groovelab_school_overrides
@@ -951,6 +979,12 @@ export function useSecretarySettings({
     showBackupAlert,
     handleExportBackup,
     handleRestoreBackup,
-    handleResetSchool
+    handleResetSchool,
+
+    // 9. Statutory Holidays & Feiertage
+    showSchoolHolidays,
+    setShowSchoolHolidays,
+    holidayJurisdiction,
+    setHolidayJurisdiction
   };
 }

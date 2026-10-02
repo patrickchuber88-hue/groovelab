@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus, QrCode, Shield, Trash2 } from "lucide-react";
 import { StudioAvatar } from "../StudioAvatar";
+import { resolveUserCampusId } from "../../utils/campusIdHelper";
 
 export interface AdminTeachersViewProps {
   activePlatform: string;
@@ -227,8 +228,8 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
           <form onSubmit={handleUpdateTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}25`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Profil bearbeiten</h3>
-              <div style={{ padding: '6px 12px', background: 'white', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, color: brandColor, border: '1px solid #e2e8f0' }}>
-                ID: {editingTeacher.id?.slice(0,8)}...
+              <div style={{ padding: '6px 12px', background: 'white', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, color: brandColor, border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>
+                ID: {resolveUserCampusId(editingTeacher)}
               </div>
             </div>
 

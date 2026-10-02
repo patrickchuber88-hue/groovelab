@@ -58,6 +58,8 @@ const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocu
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 import { validateChatMessageContent } from '../utils/chatRespectGuard';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
+import { CampusMobileScheduleCard } from './calendar/CampusMobileScheduleCard';
+import { CampusMobileAppointmentActionSheet } from './calendar/CampusMobileAppointmentActionSheet';
 
 const getStudentNameParts = (s: any) => {
   let fn = (s?.first_name || s?.firstName || '').trim();
@@ -886,6 +888,7 @@ export function ScheduleCalendarView({
     y: number;
     visible: boolean;
   } | null>(null);
+  const [mobileActionOcc, setMobileActionOcc] = useState<any | null>(null);
 
   // Toast confirmation with undo action state
   const [actionToast, setActionToast] = useState<{
@@ -5242,6 +5245,45 @@ export function ScheduleCalendarView({
     updateOccurrence(id, { status: 'cancelled' }, 'Unterricht als abgesagt markiert');
   };
 
+  const handleConfirmOccurrence = async (e: React.MouseEvent, occToConfirm: ScheduleOccurrence) => {
+    e.stopPropagation();
+    try {
+      if (occToConfirm.id.startsWith('mock-')) {
+        await supabase.from('schedule_occurrences').upsert({
+          date: occToConfirm.date,
+          original_date: occToConfirm.date,
+          start_time: occToConfirm.start_time,
+          original_start_time: occToConfirm.start_time,
+          duration: occToConfirm.duration || 45,
+          teacher_id: userId,
+          student_id: occToConfirm.student_id === 'vacant' ? null : occToConfirm.student_id,
+          status: 'scheduled',
+          teacher_acknowledged: true,
+          student_acknowledged: true
+        });
+      } else {
+        await supabase.from('schedule_occurrences').update({
+          teacher_acknowledged: true,
+          student_acknowledged: true,
+          status: 'rescheduled_confirmed'
+        }).eq('id', occToConfirm.id);
+      }
+      setPendingChanges(prev => ({
+        ...prev,
+        [occToConfirm.id]: {
+          ...occToConfirm,
+          teacher_acknowledged: true,
+          student_acknowledged: true,
+          status: 'rescheduled_confirmed'
+        }
+      }));
+      await loadOccurrences();
+      await showAlert('Rückmeldung für diesen Termin als gelesen & bestätigt markiert (jetzt grün).');
+    } catch (err) {
+      console.error('Error confirming occurrence:', err);
+    }
+  };
+
   const handleCancelBreak = async (e: React.MouseEvent, breakOcc: ScheduleOccurrence) => {
     e.stopPropagation();
     
@@ -6635,7 +6677,7 @@ export function ScheduleCalendarView({
               background: '#ffffff',
               borderRadius: isMobilePortrait ? '0px' : '24px',
               border: isMobilePortrait ? 'none' : '1px solid #e2e8f0',
-              padding: isMobilePortrait ? '12px 0px 40px 0px' : '20px 8px',
+              padding: isMobilePortrait ? '12px 0px calc(env(safe-area-inset-bottom, 16px) + 90px) 0px' : '20px 8px',
               minHeight: isMobilePortrait ? 'calc(100dvh - 220px)' : 'auto',
               boxShadow: isMobilePortrait ? 'none' : '0 4px 20px rgba(0, 0, 0, 0.02)',
               overflow: isMobilePortrait ? 'visible' : 'hidden',
@@ -6807,29 +6849,61 @@ export function ScheduleCalendarView({
                   const isToday = dateStr === todayStr;
                   return (
                     <>
-                      <div style={{ 
-                        fontSize: '0.7rem', 
-                        fontWeight: 800, 
-                        color: isToday ? textAccentColor : '#86868b', 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.05em' 
-                      }}>
-                        {dayName} ({dayOccurrences.filter(o => o.status !== 'cancelled' && o.student_id).length})
-                      </div>
-                      <div style={{
-                        fontSize: '0.9rem',
-                        fontWeight: 900,
-                        color: isToday ? '#ffffff' : '#1d1d1f',
-                        background: isToday ? brandColor : 'transparent',
-                        padding: isToday ? '3px 10px' : '0px',
-                        borderRadius: isToday ? '12px' : '0px',
-                        boxShadow: isToday ? `0 2px 6px ${brandColor}33` : 'none',
-                        marginTop: isToday ? '2px' : '0px',
-                        display: 'inline-block',
-                        lineHeight: isToday ? '1.4' : 'inherit'
-                      }}>
-                        {dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                      </div>
+                      {isMobilePortrait ? (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.84rem',
+                          fontWeight: 850,
+                          color: isToday ? '#ffffff' : '#1d1d1f',
+                          background: isToday ? brandColor : 'rgba(0, 0, 0, 0.05)',
+                          padding: '4px 14px',
+                          borderRadius: '100px',
+                          boxShadow: isToday ? `0 2px 8px ${brandColor}40` : 'none',
+                          letterSpacing: '-0.01em'
+                        }}>
+                          <span>{dayName}</span>
+                          <span style={{ opacity: isToday ? 0.75 : 0.4 }}>•</span>
+                          <span>{dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            background: isToday ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.08)',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            marginLeft: '2px',
+                            fontWeight: 900
+                          }}>
+                            {dayOccurrences.filter(o => o.status !== 'cancelled' && o.student_id).length}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ 
+                            fontSize: '0.7rem', 
+                            fontWeight: 800, 
+                            color: isToday ? textAccentColor : '#86868b', 
+                            textTransform: 'uppercase', 
+                            letterSpacing: '0.05em' 
+                          }}>
+                            {dayName} ({dayOccurrences.filter(o => o.status !== 'cancelled' && o.student_id).length})
+                          </div>
+                          <div style={{
+                            fontSize: '0.9rem',
+                            fontWeight: 900,
+                            color: isToday ? '#ffffff' : '#1d1d1f',
+                            background: isToday ? brandColor : 'transparent',
+                            padding: isToday ? '3px 10px' : '0px',
+                            borderRadius: isToday ? '12px' : '0px',
+                            boxShadow: isToday ? `0 2px 6px ${brandColor}33` : 'none',
+                            marginTop: isToday ? '2px' : '0px',
+                            display: 'inline-block',
+                            lineHeight: isToday ? '1.4' : 'inherit'
+                          }}>
+                            {dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                          </div>
+                        </>
+                      )}
                     </>
                   );
                 })()}
@@ -7935,6 +8009,58 @@ export function ScheduleCalendarView({
                   const isEnsemble = isGroup && isExplicitMerged;
                   const cardRoomName = occ.room_override_name || (occ.room_id ? rooms.find(r => String(r.id) === String(occ.room_id))?.name : '') || occ.schedules?.room?.name || '';
 
+                  const renderDesktopRoomBadge = (targetOcc: any) => {
+                    const defRId = targetOcc.template_room_id || (targetOcc as any).original_room_id || targetOcc.schedules?.room_id;
+                    const defRName = targetOcc.schedules?.room?.name || (targetOcc as any).original_room_name || (targetOcc.template_room_id ? rooms.find(r => r.id === targetOcc.template_room_id)?.name : null);
+                    const curRId = targetOcc.room_override_id || targetOcc.room_id || targetOcc.schedules?.room_id;
+                    const curRName = targetOcc.room_override_name || (curRId ? rooms.find(r => String(r.id) === String(curRId))?.name : '') || targetOcc.schedules?.room?.name || '';
+                    const isChanged = Boolean(
+                      targetOcc.room_override_id || (targetOcc as any).roomOverrideId || targetOcc.room_override_name || (targetOcc as any).roomOverrideName ||
+                      targetOcc.is_room_changed || (targetOcc as any).isRoomChanged || targetOcc.is_room_booking || (targetOcc as any).isRoomBooking ||
+                      (defRId && curRId && String(defRId) !== String(curRId)) || (defRName && curRName && defRName !== curRName)
+                    );
+                    if (!isChanged || !curRName) return null;
+                    return (
+                      <span style={{ marginLeft: '3px', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: '1px solid #ddd6fe', padding: '0.5px 4px', borderRadius: '4px', fontSize: '0.65rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Raum geändert zu ${curRName}`}>
+                        <MapPin size={10} strokeWidth={2} style={{ opacity: 0.9, flexShrink: 0 }} />
+                        <span>{curRName}</span>
+                      </span>
+                    );
+                  };
+
+                  const renderRescheduledBadge = (targetOcc: any, isResched: boolean, isReset: boolean, isSmall = false) => {
+                    if (!isResched && !isReset) return null;
+                    const isConfirmed = (targetOcc.status === 'rescheduled_confirmed' || targetOcc.student_acknowledged === true) && !isReset;
+                    return (
+                      <span 
+                        onClick={(e) => { if (!isConfirmed) handleConfirmOccurrence(e, targetOcc); }}
+                        onMouseEnter={(e) => onMouseEnterHelper(e, isReset, targetOcc)}
+                        onMouseMove={(e) => { e.stopPropagation(); setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null); }}
+                        onMouseLeave={(e) => { e.stopPropagation(); setHoveredTooltip(null); }}
+                        style={{ 
+                          fontSize: isSmall ? '0.56rem' : '0.58rem',
+                          fontWeight: 800,
+                          padding: isSmall ? '1px 4px' : '1px 5px',
+                          borderRadius: isSmall ? '3px' : '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em',
+                          background: isConfirmed ? '#e6f4ea' : '#fef3c7',
+                          color: isConfirmed ? '#137333' : '#b45309',
+                          border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap',
+                          cursor: isConfirmed ? 'default' : 'pointer'
+                        }} 
+                        title={isConfirmed ? 'Termin ist bestätigt' : 'Klicken, um die Rückmeldung als gelesen & grün zu markieren'}
+                      >
+                        <span>{isConfirmed ? 'Bestätigt' : 'Unbestätigt'}</span>
+                      </span>
+                    );
+                  };
+
                   if (isGap) return null;
 
                   return (
@@ -7964,6 +8090,7 @@ export function ScheduleCalendarView({
                         onTouchEnd={handleTouchEndCard}
                         onTouchCancel={handleTouchEndCard}
                         onMouseEnter={(e) => {
+                          if (isMobilePortrait) return;
                           const text = groupTooltipText;
                           if (text) {
                             setHoveredTooltip({
@@ -7975,6 +8102,7 @@ export function ScheduleCalendarView({
                           }
                         }}
                         onMouseMove={(e) => {
+                          if (isMobilePortrait) return;
                           const text = groupTooltipText;
                           if (text) {
                             setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
@@ -8020,6 +8148,10 @@ export function ScheduleCalendarView({
                           }
                           if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
                             await showAlert('Dieser Stundenplan ist noch ein Entwurf und wurde noch nicht eingereicht. Zuteilung oder Änderungen sind gesperrt.');
+                            return;
+                          }
+                          if (isMobilePortrait && !isSwapModeActive && !isGroupModeActive) {
+                            setMobileActionOcc(occ);
                             return;
                           }
                           if (!isBreak) {
@@ -8106,7 +8238,36 @@ export function ScheduleCalendarView({
                           overflow: 'hidden'
                         }}
                       >
-                        {(() => {
+                        {isMobilePortrait ? (
+                          <CampusMobileScheduleCard
+                            occ={occ}
+                            displayNames={displayNames}
+                            duration={occ.duration || 30}
+                            isGap={isGap}
+                            isBreak={isBreak}
+                            isVacant={isVacant}
+                            isSwap={isSwap}
+                            isSelectedForSwap={isSelectedForSwap}
+                            isRescheduled={isRescheduled}
+                            isConfirmedReschedule={isConfirmedReschedule}
+                            isResetPending={isResetPending}
+                            isParallelConflict={isParallelConflict}
+                            isAbsentSlot={isAbsentSlot}
+                            isExcused={isExcused}
+                            isUnexcused={isUnexcused}
+                            isCancelled={isCancelled}
+                            isCancelledAck={isCancelledAck}
+                            isGroupLesson={isGroupLesson}
+                            currentRoomName={cardRoomName}
+                            isRoomChanged={Boolean(
+                              occ.room_override_id || (occ as any).roomOverrideId || occ.room_override_name || (occ as any).roomOverrideName
+                            )}
+                            finalColors={finalColors}
+                            cardBackground={cardBackground}
+                            brandColor={brandColor}
+                            onOpenActionSheet={(o) => setMobileActionOcc(o)}
+                          />
+                        ) : (() => {
                           const duration = occ.duration || 30;
 
                           // 1. VERY COMPACT HEIGHT (<= 15 Min, height ~29.5px)
@@ -8167,48 +8328,7 @@ export function ScheduleCalendarView({
                                         }}
                                         title="Startzeit manuell anpassen"
                                       />
-                                      {(() => {
-                                        const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
-                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
-                                        
-                                        const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
-                                        const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
-                                        
-                                        const isRoomChanged = Boolean(
-                                          occ.room_override_id || 
-                                          (occ as any).roomOverrideId || 
-                                          occ.room_override_name || 
-                                          (occ as any).roomOverrideName || 
-                                          (occ as any).is_room_changed || 
-                                          (occ as any).isRoomChanged || 
-                                          (occ as any).is_room_booking || 
-                                          (occ as any).isRoomBooking || 
-                                          (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
-                                          (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
-                                        );
-
-                                        if (!isRoomChanged || !currentRoomName) return null;
-
-                                        return (
-                                          <span style={{ 
-                                            marginLeft: '3px',
-                                            fontWeight: 800, 
-                                            color: '#7c3aed',
-                                            background: '#f3e8ff',
-                                            border: '1px solid #ddd6fe',
-                                            padding: '0.5px 4px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.65rem', 
-                                            whiteSpace: 'nowrap',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '2px'
-                                          }} title={`Raum geändert zu ${currentRoomName}`}>
-                                            <MapPin size={10} strokeWidth={2} style={{ opacity: 0.9, flexShrink: 0 }} />
-                                            <span>{currentRoomName}</span>
-                                          </span>
-                                        );
-                                      })()}
+                                      {renderDesktopRoomBadge(occ)}
                                     </span>
                                   </div>
 
@@ -8244,83 +8364,7 @@ export function ScheduleCalendarView({
                                         <ArrowLeftRight size={10} strokeWidth={2.8} />
                                       </button>
                                     )}
-                                    {(isRescheduled || isResetPending) && (() => {
-                                       const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
-                                       return (
-                                         <span 
-                                           onClick={async (e) => {
-                                             e.stopPropagation();
-                                             if (isConfirmed) return;
-                                             try {
-                                               if (occ.id.startsWith('mock-')) {
-                                                 await supabase.from('schedule_occurrences').upsert({
-                                                   date: occ.date,
-                                                   original_date: occ.date,
-                                                   start_time: occ.start_time,
-                                                   original_start_time: occ.start_time,
-                                                   duration: occ.duration || 45,
-                                                   teacher_id: userId,
-                                                   student_id: occ.student_id === 'vacant' ? null : occ.student_id,
-                                                   status: 'scheduled',
-                                                   teacher_acknowledged: true,
-                                                   student_acknowledged: true
-                                                 });
-                                               } else {
-                                                 await supabase.from('schedule_occurrences').update({
-                                                   teacher_acknowledged: true,
-                                                   student_acknowledged: true,
-                                                   status: 'rescheduled_confirmed'
-                                                 }).eq('id', occ.id);
-                                               }
-                                               setPendingChanges(prev => ({
-                                                 ...prev,
-                                                 [occ.id]: {
-                                                   ...occ,
-                                                   teacher_acknowledged: true,
-                                                   student_acknowledged: true,
-                                                   status: 'rescheduled_confirmed'
-                                                 }
-                                               }));
-                                               await loadOccurrences();
-                                               await showAlert('Rückmeldung für diesen Termin als gelesen & bestätigt markiert (jetzt grün).');
-                                             } catch (err) {
-                                               console.error('Error confirming occurrence:', err);
-                                             }
-                                           }}
-                                           onMouseEnter={(e) => {
-                                             onMouseEnterHelper(e, isResetPending, occ);
-                                           }}
-                                           onMouseMove={(e) => {
-                                             e.stopPropagation();
-                                             setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                           }}
-                                           onMouseLeave={(e) => {
-                                             e.stopPropagation();
-                                             setHoveredTooltip(null);
-                                           }}
-                                           style={{ 
-                                             fontSize: '0.56rem',
-                                             fontWeight: 800,
-                                             padding: '1px 4px',
-                                             borderRadius: '3px',
-                                             display: 'inline-flex',
-                                             alignItems: 'center',
-                                             gap: '2px',
-                                             textTransform: 'uppercase',
-                                             letterSpacing: '0.02em',
-                                             background: isConfirmed ? '#e6f4ea' : '#fef3c7',
-                                             color: isConfirmed ? '#137333' : '#b45309',
-                                             border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
-                                             flexShrink: 0,
-                                             whiteSpace: 'nowrap',
-                                             cursor: isConfirmed ? 'default' : 'pointer'
-                                           }} 
-                                           title={isConfirmed ? 'Termin ist bestätigt' : 'Klicken, um die Rückmeldung als gelesen & grün zu markieren'}
-                                         >
-                                           <span>{isConfirmed ? 'Bestätigt' : 'Unbestätigt'}</span>
-                                         </span>
-                                       );
-                                     })()}
+                                    {renderRescheduledBadge(occ, isRescheduled, isResetPending, true)}
 
                                     {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
                                       <button 
@@ -8495,48 +8539,7 @@ export function ScheduleCalendarView({
                                         }}
                                         title="Startzeit manuell anpassen"
                                       />
-                                      {(() => {
-                                        const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
-                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
-                                        
-                                        const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
-                                        const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
-                                        
-                                        const isRoomChanged = Boolean(
-                                          occ.room_override_id || 
-                                          (occ as any).roomOverrideId || 
-                                          occ.room_override_name || 
-                                          (occ as any).roomOverrideName || 
-                                          (occ as any).is_room_changed || 
-                                          (occ as any).isRoomChanged || 
-                                          (occ as any).is_room_booking || 
-                                          (occ as any).isRoomBooking || 
-                                          (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
-                                          (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
-                                        );
-
-                                        if (!isRoomChanged || !currentRoomName) return null;
-
-                                        return (
-                                          <span style={{ 
-                                            marginLeft: '3px', 
-                                            fontWeight: 800, 
-                                            color: '#7c3aed',
-                                            background: '#f3e8ff',
-                                            border: '1px solid #ddd6fe',
-                                            padding: '0.5px 4px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.65rem', 
-                                            whiteSpace: 'nowrap',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '2px'
-                                          }} title={`Raum geändert zu ${currentRoomName}`}>
-                                            <MapPin size={10} strokeWidth={2} style={{ opacity: 0.9, flexShrink: 0 }} />
-                                            <span>{currentRoomName}</span>
-                                          </span>
-                                        );
-                                      })()}
+                                      {renderDesktopRoomBadge(occ)}
                                     </span>
                                   </div>
 
@@ -8634,41 +8637,7 @@ export function ScheduleCalendarView({
                                         )}
                                       </span>
                                     )}
-                                    {(isRescheduled || isResetPending) && (() => {
-                                     const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
-                                     return (
-                                       <span 
-                                         onMouseEnter={(e) => {
-                                           onMouseEnterHelper(e, isResetPending, occ);
-                                         }}
-                                         onMouseMove={(e) => {
-                                           e.stopPropagation();
-                                           setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                         }}
-                                         onMouseLeave={(e) => {
-                                           e.stopPropagation();
-                                           setHoveredTooltip(null);
-                                         }}
-                                         style={{ 
-                                           fontSize: '0.58rem',
-                                           fontWeight: 800,
-                                           padding: '1px 5px',
-                                           borderRadius: '4px',
-                                           display: 'inline-flex',
-                                           alignItems: 'center',
-                                           gap: '2px',
-                                           textTransform: 'uppercase',
-                                           letterSpacing: '0.02em',
-                                           background: isConfirmed ? '#e6f4ea' : '#fef3c7',
-                                           color: isConfirmed ? '#137333' : '#b45309',
-                                           border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
-                                           flexShrink: 0
-                                         }} 
-                                       >
-                                         <span>{isConfirmed ? 'Bestätigt' : 'Unbestätigt'}</span>
-                                       </span>
-                                     );
-                                   })()}
+                                    {renderRescheduledBadge(occ, isRescheduled, isResetPending, false)}
                                    
                                    {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
                                      <button 
@@ -8787,48 +8756,7 @@ return (
                                       }}
                                       title="Startzeit manuell anpassen"
                                     />
-                                    {(() => {
-                                      const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
-                                      const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
-                                      
-                                      const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
-                                      const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
-                                      
-                                      const isRoomChanged = Boolean(
-                                        occ.room_override_id || 
-                                        (occ as any).roomOverrideId || 
-                                        occ.room_override_name || 
-                                        (occ as any).roomOverrideName || 
-                                        (occ as any).is_room_changed || 
-                                        (occ as any).isRoomChanged || 
-                                        (occ as any).is_room_booking || 
-                                        (occ as any).isRoomBooking || 
-                                        (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
-                                        (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
-                                      );
-
-                                      if (!isRoomChanged || !currentRoomName) return null;
-
-                                      return (
-                                        <span style={{ 
-                                          marginLeft: '4px', 
-                                          fontWeight: 800, 
-                                          color: '#7c3aed',
-                                          background: '#f3e8ff',
-                                          border: '1px solid #ddd6fe',
-                                          padding: '1px 5px',
-                                          borderRadius: '4px',
-                                          fontSize: '0.68rem', 
-                                          whiteSpace: 'nowrap',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '2px'
-                                        }} title={`Raum geändert zu ${currentRoomName}`}>
-                                          <MapPin size={10} strokeWidth={2} style={{ opacity: 0.9, flexShrink: 0 }} />
-                                          <span>{currentRoomName}</span>
-                                        </span>
-                                      );
-                                    })()}
+                                    {renderDesktopRoomBadge(occ)}
                                   </span>
                                   {isSwap && (
                                     <button 
@@ -11181,6 +11109,63 @@ return (
     })()}
 
     
+
+    {/* 🏛️ 0,1% Goldstandard: Mobile Appointment Touch-First Action Sheet */}
+    {mobileActionOcc && (
+      <CampusMobileAppointmentActionSheet
+        isOpen={Boolean(mobileActionOcc)}
+        occ={mobileActionOcc}
+        displayNames={(() => {
+          const targetOcc = mobileActionOcc;
+          if (!targetOcc.student_id || targetOcc.student_id === 'vacant') return isBreakOccurrence(targetOcc) ? 'Pause' : 'Freier Slot';
+          const student = targetOcc.student;
+          const firstName = student?.first_name || '';
+          const lastName = student?.last_name || '';
+          return `${firstName} ${maskLastName(lastName, showRealNames)}`.trim() || 'Schüler';
+        })()}
+        currentRoomName={(() => {
+          const targetOcc = mobileActionOcc;
+          const crId = targetOcc.room_override_id || targetOcc.room_id || targetOcc.schedules?.room_id;
+          return targetOcc.room_override_name || (crId ? rooms.find(r => String(r.id) === String(crId))?.name : '') || targetOcc.schedules?.room?.name || '';
+        })()}
+        onClose={() => setMobileActionOcc(null)}
+        onOpenEditModal={(targetOcc) => {
+          setMobileActionOcc(null);
+          setEditOccState({
+            id: targetOcc.id,
+            date: targetOcc.date,
+            start_time: targetOcc.start_time,
+            room_id: targetOcc.schedules?.room_id || null,
+            duration: targetOcc.duration
+          });
+        }}
+        onStartSwap={(targetOcc) => {
+          setMobileActionOcc(null);
+          setIsSwapModeActive(true);
+          setSwapSourceOcc(targetOcc);
+          showActionToast(`✨ ${targetOcc.student?.first_name || 'Schüler'} als 1. Termin gewählt. Klicke nun Termin 2 an.`);
+        }}
+        onCancelAppointment={async (targetOcc) => {
+          setMobileActionOcc(null);
+          if (isBreakOccurrence(targetOcc)) {
+            handleCancelBreak(new MouseEvent('click') as any, targetOcc);
+          } else {
+            handleCancel(new MouseEvent('click') as any, targetOcc.id);
+          }
+        }}
+        onOpenChat={(studentId, occId) => {
+          setMobileActionOcc(null);
+          setEditOccState({
+            id: occId,
+            date: mobileActionOcc.date,
+            start_time: mobileActionOcc.start_time,
+            room_id: mobileActionOcc.schedules?.room_id || null,
+            duration: mobileActionOcc.duration
+          });
+          setEditModalCardIndex(1);
+        }}
+      />
+    )}
 
     {/* Mobile Tools Action Sheet Modal */}
     {showMobileToolsSheet && (

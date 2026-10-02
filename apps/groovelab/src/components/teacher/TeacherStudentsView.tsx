@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Edit3, Eye, EyeOff, FileText, Headphones,
   Search, UserPlus, CameraOff
 } from 'lucide-react';
-import { maskLastName } from '../../utils/nameHelper';
+import { maskLastName, formatDisplaySubjectOrInstrument } from '../../utils/nameHelper';
 import { getInstrumentAvatarUrl } from '../StudioAvatar';
 import { supabase } from '../../lib/supabase';
 
@@ -75,6 +75,46 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
       });
 
     return () => { isMounted = false; };
+  }, [allStudents]);
+
+  // 🛡️ 0.1% Goldstandard: Revisionssichere Klassen-Farbfächer-Palette (Regenbogen-Tonleiter)
+  const studentRosterColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!allStudents || allStudents.length === 0) return map;
+
+    // 1. Kanonische Sortierung über das ungefilterte Basis-Roster (Vorname ASC -> Nachname ASC -> ID)
+    const canonicalRoster = [...allStudents]
+      .filter((s: any) => s && s.id && (s.first_name || s.name))
+      .sort((a, b) => {
+        const nameA = `${a.first_name || a.name || ''} ${a.last_name || a.full_last_name || ''}`.trim();
+        const nameB = `${b.first_name || b.name || ''} ${b.last_name || b.full_last_name || ''}`.trim();
+        const cmp = nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
+        if (cmp !== 0) return cmp;
+        return (a.id || '').localeCompare(b.id || '');
+      });
+
+    const total = canonicalRoster.length;
+    if (total === 0) return map;
+
+    const stepAngle = 360 / total;
+
+    canonicalRoster.forEach((student, index) => {
+      if (!student?.id) return;
+
+      // Index 0 (z. B. Amelia N.) bleibt unverrückbar auf Apple Emerald Smaragdgrün (#10b981)
+      if (index === 0) {
+        map.set(student.id, '#10b981');
+        return;
+      }
+
+      const hue = Math.round((155 + index * stepAngle) % 360);
+      const isWarmLightZone = hue >= 40 && hue <= 85;
+      const l = isWarmLightZone ? 42 : 46;
+
+      map.set(student.id, `hsl(${hue}, 75%, ${l}%)`);
+    });
+
+    return map;
   }, [allStudents]);
 
   return (
@@ -246,13 +286,14 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     const isStudentActive = isGrooveLab 
                       ? (student.is_groovelab_active || student.isGroovelabActive)
                       : (student.is_campus_active || student.isCampusActive);
+                    const studentRainbowColor = studentRosterColorMap.get(student.id) || (activePlatform === 'campus' ? '#34a853' : '#eab308');
 
                     return (
                       <div 
                         key={student.id} 
                         role="button"
                         tabIndex={0}
-                        aria-label={`Schülerprofil öffnen: ${student.first_name} ${maskLastName(student.last_name, showRealNames)}, ${student.instrument || 'Musiker'}`}
+                        aria-label={`Schülerprofil öffnen: ${student.first_name} ${maskLastName(student.last_name, showRealNames)}, ${formatDisplaySubjectOrInstrument(student, teacher)}`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -267,6 +308,8 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           flexDirection: 'column', 
                           gap: '12px',
                           border: isSessionActive ? `2px solid ${isGrooveLab ? '#eab308' : '#34a853'}` : '1px solid #e2e8f0',
+                          borderLeft: `5px solid ${studentRainbowColor}`,
+                          boxShadow: `0 4px 16px rgba(0, 0, 0, 0.02), -2px 0 10px ${studentRainbowColor}25`,
                           cursor: 'pointer',
                           width: '100%',
                           maxWidth: '100%',
@@ -277,7 +320,16 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                         onClick={() => setSelectedStudentProfile(student)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ width: '48px', height: '48px', borderRadius: '16px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', flexShrink: 0 }}>
+                          <div style={{ 
+                            width: '48px', 
+                            height: '48px', 
+                            borderRadius: '16px', 
+                            overflow: 'hidden', 
+                            border: '2px solid white', 
+                            background: `${studentRainbowColor}18`,
+                            boxShadow: `0 4px 10px ${studentRainbowColor}20`, 
+                            flexShrink: 0 
+                          }}>
                             <AvatarImage src={student.photo_url} user={student} activePlatform={activePlatform} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -361,7 +413,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9', fontSize: '0.75rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: '#64748b', fontWeight: 600 }}>Instrument:</span>
-                              <span style={{ fontWeight: 800 }}>{student.instrument || 'Musiker'}</span>
+                              <span style={{ fontWeight: 800 }}>{formatDisplaySubjectOrInstrument(student, teacher)}</span>
                             </div>
                           </div>
                         )}

@@ -357,6 +357,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const notifyHomeworkChange = useCallback(() => {
     window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
+    window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', { detail: { studentId: student.id } }));
+    window.dispatchEvent(new CustomEvent('groovelab_student_prep_updated', { detail: { studentId: student.id } }));
+    window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: student.id } }));
   }, [student.id]);
 
   const getItemWeek = useCallback((item: any): string => {

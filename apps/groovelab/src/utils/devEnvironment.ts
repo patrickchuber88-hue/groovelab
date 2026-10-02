@@ -19,19 +19,21 @@
  * @returns boolean `true` strictly in local development, `false` otherwise.
  */
 export function isLocalDevEnvironment(): boolean {
-  // 🛡️ Axiom 1: Compile-Time Gate (AST Dead-Code Elimination)
-  if (!import.meta?.env?.DEV) {
-    return false;
+  if (typeof window === 'undefined') {
+    return Boolean(import.meta?.env?.DEV);
   }
 
-  // 🛡️ Axiom 2: Browser Context & Hostname Verification
-  if (typeof window === 'undefined' || !window.location || !window.location.hostname) {
-    return false;
+  // 1. Vite DEV mode is authoritative local development
+  if (import.meta?.env?.DEV) {
+    return true;
   }
 
-  const hostname = window.location.hostname.toLowerCase();
+  const hostname = window.location.hostname?.toLowerCase() || '';
+  const port = window.location.port || '';
+  const search = window.location.search || '';
 
-  return (
+  // 2. Standard local hostnames & developer preview ports (5173, 4173, 3000)
+  const isLocalHost = (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname === '0.0.0.0' ||
@@ -40,6 +42,25 @@ export function isLocalDevEnvironment(): boolean {
     hostname.endsWith('.local') ||
     /^192\.168\./.test(hostname) ||
     /^10\./.test(hostname) ||
-    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+    port === '5173' ||
+    port === '4173' ||
+    port === '3000'
   );
+
+  if (isLocalHost) {
+    return true;
+  }
+
+  // 3. Explicit dev query flag or active dev simulation flag in localStorage
+  try {
+    if (search.includes('dev_tools') || search.includes('dev=true')) {
+      return true;
+    }
+    if (localStorage.getItem('groovelab_dev_date_sim_visible') === 'true' || localStorage.getItem('groovelab_simulated_date')) {
+      return true;
+    }
+  } catch {}
+
+  return false;
 }

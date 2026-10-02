@@ -96,7 +96,7 @@ export const OnboardingHelpModalsHub: React.FC<OnboardingHelpModalsHubProps> = (
   return (
     <>
       {/* 1. Modal: QR-Code / Campus- & GrooveLab-Pass */}
-      {showQR && (user?.qr_token || user?.teacher_qr_token) && onCloseQR && (
+      {showQR && Boolean(user?.qr_token || user?.teacher_qr_token || user?.id) && onCloseQR && (
         <ErrorBoundary fallback={null}>
           <Suspense fallback={null}>
             <QRCodeModal

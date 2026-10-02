@@ -6,6 +6,7 @@ import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGe
 import { generateStaffCouncilDeclarationPDF } from '../utils/staffCouncilDeclarationGenerator';
 import { logSecurityEvent } from '../services/auditLogService';
 import { getJurisdictionProfile } from '../constants/jurisdictionRegistry';
+import { ACTIVE_LEGAL_VERSION } from '../legal/legalContent';
 
 interface AVVModalProps {
   isOpen: boolean;
@@ -123,7 +124,8 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
 
       // Revisionssicheres Audit-Logging in public.audit_logs (ISO/IEC 27037 & OWASP ASVS Level 3)
       const canonicalPayload = JSON.stringify({
-        contract: 'AVV_ART_28_DSGVO_V2026.1',
+        contract: `AVV_ART_28_DSGVO_V${ACTIVE_LEGAL_VERSION}`,
+        contractVersion: ACTIVE_LEGAL_VERSION,
         schoolId: String(targetSchoolId),
         signeeName: trimmedName,
         signedAt: signedAt,
@@ -148,7 +150,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
         targetId: String(targetSchoolId),
         metadata: {
           signee_title: trimmedName,
-          contract_version: 'Art. 28 DSGVO / Art. 9 nDSG v2026.1',
+          contract_version: `Art. 28 DSGVO / Art. 9 nDSG v${ACTIVE_LEGAL_VERSION}`,
           audit_checksum: auditChecksum,
           jurisdiction: jurisdiction.code,
           statutory_law: jurisdiction.statutorySchoolLawRef,
@@ -175,30 +177,57 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             size: A4 portrait;
             margin: 15mm;
           }
-          html, body, * {
+          body * {
+            visibility: hidden !important;
+          }
+          .avv-modal-backdrop,
+          .avv-modal-backdrop *,
+          .avv-modal-box,
+          .avv-modal-box * {
+            visibility: visible !important;
+          }
+          html, body {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          header, nav, aside, footer, .tour-step-backdrop, button {
+          header, nav, aside, footer, .tour-step-backdrop, button, .no-print {
             display: none !important;
           }
           .avv-modal-backdrop {
-            position: static !important;
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: auto !important;
             background: #ffffff !important;
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
             padding: 0 !important;
-            z-index: auto !important;
+            margin: 0 !important;
+            z-index: 999999 !important;
             display: block !important;
           }
           .avv-modal-box {
+            position: static !important;
             box-shadow: none !important;
             border: none !important;
+            width: 100% !important;
             max-width: 100% !important;
             max-height: none !important;
             overflow: visible !important;
+            border-radius: 0 !important;
           }
-          .no-print {
+          .avv-modal-box div,
+          .avv-modal-box main,
+          .avv-modal-box section {
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+          }
+          .avv-modal-box button {
             display: none !important;
           }
         }
@@ -225,7 +254,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           style={{
             background: '#ffffff',
             width: '100%',
-            maxWidth: '680px',
+            maxWidth: '860px',
             maxHeight: '90vh',
             borderRadius: '24px',
             boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
@@ -242,12 +271,14 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: '#f8fafc'
+          background: '#f8fafc',
+          gap: '16px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
             <div style={{
-              width: '42px',
-              height: '42px',
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
               borderRadius: '12px',
               background: '#ea4335',
               display: 'flex',
@@ -258,9 +289,17 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             }}>
               <ShieldCheck size={24} />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h3 style={{
+                  margin: 0,
+                  fontSize: '1.12rem',
+                  fontWeight: 900,
+                  color: '#0f172a',
+                  whiteSpace: 'nowrap',
+                  hyphens: 'none',
+                  wordBreak: 'keep-all'
+                }}>
                   Auftragsverarbeitungsvertrag (AVV)
                 </h3>
                 <span style={{
@@ -270,7 +309,8 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                   padding: '2px 8px',
                   borderRadius: '100px',
                   fontSize: '0.64rem',
-                  fontWeight: 800
+                  fontWeight: 800,
+                  whiteSpace: 'nowrap'
                 }}>
                   Art. 28 DSGVO &amp; Art. 9 CH-nDSG
                 </span>
@@ -280,16 +320,16 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             <button
               type="button"
-              onClick={() => generateEnterpriseSecurityWhitepaperPDF()}
-              title="Offizielles BSI A+ / ISO 27001 Sicherheits-Whitepaper als PDF herunterladen"
+              onClick={() => window.print()}
+              title="Auftragsverarbeitungsvertrag als PDF speichern oder drucken"
               style={{
                 background: '#ffffff',
-                border: '1px solid #cbd5e1',
+                border: '1.5px solid #cbd5e1',
                 borderRadius: '10px',
-                padding: '6px 12px',
+                padding: '7px 14px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
@@ -300,10 +340,69 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                 transition: 'all 0.15s'
               }}
             >
-              <FileText size={14} color="#34a853" />
-              Sicherheits-Whitepaper (PDF)
+              <Printer size={15} strokeWidth={2} />
+              AVV Drucken / PDF
             </button>
 
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Modal schließen"
+              style={{
+                border: '1px solid #e2e8f0',
+                background: '#f1f5f9',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.15s'
+              }}
+            >
+              <X size={18} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+
+        {/* Sub-Header Toolbar: Zugehörige Nachweise & Dossiers (Monochrom & Clean) */}
+        <div style={{
+          padding: '8px 24px',
+          background: '#ffffff',
+          borderBottom: '1px solid #f1f5f9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '8px'
+        }}>
+          <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 700 }}>
+            Zugehörige Compliance-Dossiers:
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => generateEnterpriseSecurityWhitepaperPDF()}
+              title="Offizielles BSI A+ / ISO 27001 Sicherheits-Whitepaper als PDF herunterladen"
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '4px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#334155',
+                cursor: 'pointer'
+              }}
+            >
+              <FileText size={13} strokeWidth={2} />
+              Sicherheits-Whitepaper (TOMs)
+            </button>
             <button
               type="button"
               onClick={() => generateDpoComplianceDossierPDF({
@@ -314,24 +413,22 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               })}
               title="Offizielles Behörden-Datenschutz-Dossier (VVT, DSFA, TOMs) als PDF herunterladen"
               style={{
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '6px 12px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '4px 10px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                color: '#0f172a',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
+                gap: '5px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#334155',
+                cursor: 'pointer'
               }}
             >
-              <Download size={14} color="#1d4ed8" />
-              Behörden-Dossier (PDF)
+              <Download size={13} strokeWidth={2} />
+              DSB-Dossier (VVT &amp; DSFA)
             </button>
-
             <button
               type="button"
               onClick={() => generateStaffCouncilDeclarationPDF({
@@ -340,67 +437,23 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                 schoolSigneeName: signeeName || school?.avv_signee_name,
                 schoolId: targetSchoolId
               })}
-              title="Offizielle Bestätigung für Betriebs- und Personalräte (§ 87 BetrVG / Herrenberg) als PDF herunterladen"
+              title="Offizielle Bestätigung für Betriebs- und Personalräte als PDF herunterladen"
               style={{
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '6px 12px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '4px 10px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                color: '#0f172a',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
+                gap: '5px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#334155',
+                cursor: 'pointer'
               }}
             >
-              <ShieldCheck size={14} color="#ea4335" />
-              Personalrats-Attest (§ 87 BetrVG)
-            </button>
-
-            <button
-              type="button"
-              onClick={() => window.print()}
-              title="Auftragsverarbeitungsvertrag als PDF speichern oder drucken"
-              style={{
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '6px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                color: '#0f172a',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              <Printer size={14} color="#0284c7" />
-              AVV Drucken / PDF
-            </button>
-
-            <button
-              onClick={onClose}
-              aria-label="Modal schließen"
-              style={{
-                border: 'none',
-                background: '#f1f5f9',
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748b',
-                transition: 'all 0.15s'
-              }}
-            >
-              <X size={18} />
+              <ShieldCheck size={13} strokeWidth={2} />
+              Personalrats-Attest (BetrVG 87)
             </button>
           </div>
         </div>

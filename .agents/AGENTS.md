@@ -20,7 +20,7 @@
 ## 🌅 Automatischer Guten-Morgen-Sicherheitscheck (Morning Security Routine)
 - **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige Sicherheits-, Compliance-, Layout- und Integritätscheck ausgeführt werden:
   `npm run operator:morning` (bzw. `npm run gate`)
-  - **Parallele Concurrency-Engine (`morning_gate_orchestrator.mjs`, < 800ms):** Führt alle 8 In-Memory-Guards parallel via `Promise.all` aus (Security Drift, Secrets, Legal 18-Checks, Buttons, PWA Mobile, Lizenzen, Zero-Overlap Tier-1, Static Headers).
+  - **Parallele Concurrency-Engine (`morning_gate_orchestrator.mjs`, < 800ms):** Führt alle 9 In-Memory-Guards parallel via `Promise.all` aus (Security Drift, Secrets, Legal 18-Checks, Buttons, PWA Mobile, Lizenzen, Zero-Overlap Tier-1, Static Headers, ISO 27001 & 27701).
   - **Live-Cluster Health-Preflight:** 20ms Live-Cluster Ping auf den Produktions-Ingress mit automatischem Offline-Airgap-Fallback.
   - **Monorepo Typecheck:** Parallelisierter TypeScript-Check über alle 4 Workspaces.
 - **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks), rechtliche Konformität (12/12 Säulen, 18/18 Checks), Layout-Immunität (0 Text-/Container-Kollisionen) und den Status des Live-Systems transparent zusammenfasst.
@@ -83,10 +83,30 @@
   5. *Desktop Layout Immunity*: Bestehende Desktop-Grid-Layouts und Navigationselemente sind unantastbar. Responsive Anpassungen bleiben strikt auf Mobile (`<= 768px`) beschränkt.
   6. *Proportions- & Typografie-Harmonie*: UI-Elemente folgen dem etablierten Goldstandard (Apple Squircle Radien, monochrome Icons, Plus Jakarta Sans Typografie).
   7. *Barrierefreiheits-Integrität & BFSG / WCAG 2.2 AA Parität*: Keine UI-Änderung ohne Tastatur-Vollbedienbarkeit (`role="button"`, `tabIndex={0}`, `onKeyDown` für Enter/Space), Kontrast-Parität (mind. 4,5:1; Marken-KPI-Hintergründe 100% erhalten, Textfarben auf dunkle Kontraste Slate-900 angepasst) und WAI-ARIA Semantik.
+  8. *Monolith Ceiling & Zero-Inline-Feature Axiom (0,1% Enterprise Standard)*: Bestehende Riesen-Monolithen (z. B. `CampusEventsBoard.tsx`, `ScheduleCalendarView.tsx`, `MeisterwerkDocumentTab.tsx`) sind hermetisch für neue Feature- und Business-Logik gesperrt. Jede neue Funktion MUSS als eigenständiger, autarker Feature-Monolith in einer separaten Datei angelegt werden. Bestehende Screens agieren ausschließlich als schlanke Host-Orchestratoren (Mounting per Einzeiler, maximal 15 Zeilen technischer Verdrahtungs-Puffer).
 - **Kompaktes Reporting (Bedarfsgesteuert)**:
   - Wurde aktiv eingegriffen und veredelt: Ausgabe eines kurzen Abschnitts `### 🏛️ Monolith Goldstandard Delta` (Präzise Vorher/Nachher-Stichpunkte).
   - War bereits alles konform: Ein dezenter Vermerk (`🏛️ Monolith Goldstandard: Konform`) genügt.
 - **Verifikations-Abschluss**: Die formale Verifikation (`npm run gate`) erfolgt ausschließlich manuell durch den Entwickler im Host-Terminal oder per Git-Hook beim Commit. Keine automatische Ausführung durch den Agenten.
+
+## 📦 Monolith Ceiling & Zero-Inline-Feature Axiom (0,1% Enterprise Goldstandard)
+- **Absolutes Zersäge- & Shredding-Verbot (Non-Destructive Freeze)**: Bestehende Monolithen (insbesondere die 78 erfassten Baseline-Dateien wie `CampusEventsBoard.tsx`, `ScheduleCalendarView.tsx`, `MeisterwerkDocumentTab.tsx`) dürfen NIEMALS eigenständig, ungefragt oder reflexartig aufgesplittet, refaktorisiert oder in Micro-Dateien zerkleinert werden. Historisch gewachsene Produktionslogik bleibt unberührt stabil (Zero-Regression-Garantie).
+- **Präventiver Pre-Flight Check (Vorab-Prüfung vor dem Coden)**: Bevor der KI-Agent eine Codeänderung vornimmt oder plant, MUSS er in Phase 1 (Reconnaissance) das Dateivolumen prüfen. Befindet sich die Ziel-Datei in `scripts/monolith_baseline.json` oder hat sie bereits $\ge 1.500$ Zeilen, gilt ein **sofortiger Inlining-Stopp**: Jede neue didaktische, administrative oder spielerische Sub-Funktion/Ansicht MUSS zwingend und von vornherein in einer neuen, separaten Datei ausgelagert werden.
+- **Zero-Inline-Feature Doktrin**: In bestehende Monolithen darf KEINE neue Domänen-, UI- oder Feature-Logik inline injiziert werden. Keine neuen States, komplexen Handler oder verschachtelten Sub-Views in Bestandsdateien.
+- **Host Shell & Orchestrator Pattern (Verantwortungsmatrix)**:
+  - *Bestehender Monolith (Host Shell)*: Dient ausschließlich als schlanke Verdrahtungshülle. Er importiert den neuen Feature-Monolithen und rendert ihn als Einzeiler (z. B. `<NewFeatureView schoolId={schoolId} onDone={...} />`). Der erlaubte technische Verdrahtungs-Puffer beträgt maximal 15 Zeilen.
+  - *Neuer Feature-Monolith (Autarker Satellit)*: Kapselt 100% seiner Domänen-Logik, States, Sub-Views und Server-RPCs in einer eigenen neuen Datei.
+- **Autarke Feature-Monolithen (1.500-Zeilen-Budget)**:
+  - Jede neue didaktische, administrative oder spielerische Funktion entsteht in einer eigenständigen, dedizierten Datei im passenden Bounded Context (z. B. `components/campus/`, `components/secretary/`, `components/student/`, `components/groovelab/`).
+  - Ein neuer Feature-Monolith kapselt seinen State, UI-Flow und Backend-RPC autark.
+  - **Strikte Obergrenze**: Maximal 1.500 Zeilen pro Datei (Zielgröße: 300–1.000 Zeilen). Sobald ein Feature komplexer wird, MUSS es in logische Sub-Monolithen (z. B. unter `tabs/` oder `modals/`) aufgeteilt werden, anstatt zu einer Riesen-Datei zu wachsen.
+- **Chirurgischer Bestandsschutz**:
+  - Existierender Code in den Bestands-Monolithen bleibt für maximale Stabilität unangetastet.
+  - Chirurgische Bugfixes an bestehender Logik sind gestattet, dürfen aber das Dateivolumen nicht vergrößern (Netto-Null-Wachstum).
+- **Automatisierte Ratchet-Überwachung (`monolith_growth_guard.mjs`)**:
+  - Revisionssichere Baseline aller 78 Monolithen in `scripts/monolith_baseline.json`.
+  - Ratchet-Down-Mechanismus: Schrumpft eine Bestandsdatei durch Bereinigungen, wird die Obergrenze automatisch und dauerhaft nach unten korrigiert. Ein erneutes Anwachsen ist verboten.
+  - Das Gate (`npm run gate` bzw. `npm run guard:monolith-ceiling`) bricht sofort ab (Exit-Code 1), wenn eine Bestandsdatei um mehr als 15 Zeilen wächst oder eine neue Datei > 1.500 Zeilen umfasst.
 
 ## 🧠 Living Exocortex & Product Bible Governance (Zero-Knowledge-Drift Directive)
 - **Automatische Exocortex-Synchronisationspflicht**: Bei JEDER Implementierung eines neuen Features, einer neuen didaktischen Funktion, einer neuen Subkomponente oder eines neuen DB-RPCs MUSS der KI-Agent zwingend und ohne gesonderte Aufforderung die zentrale Product Bible [`docs/SYSTEM_FEATURE_MATRIX.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/docs/SYSTEM_FEATURE_MATRIX.md) aktualisieren.

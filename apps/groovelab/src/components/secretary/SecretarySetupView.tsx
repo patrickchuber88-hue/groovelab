@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import {
   AlertCircle, Check, CheckCircle, Clock, Copy, Database, Download,
-  Eye, FileCheck, FileText, Fingerprint, KeyRound, Lightbulb, Printer, QrCode, School, ShieldAlert,
+  Eye, FileCheck, FileText, Fingerprint, KeyRound, Lightbulb, Palmtree, Printer, QrCode, School, ShieldAlert,
   ShieldCheck, Sparkles, Trash2, Upload, X, Zap
 } from 'lucide-react';
 import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
 import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTemplate';
 import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 import { AvvCertificateModal } from '../modals/AvvCertificateModal';
+import { SUPPORTED_STATES } from '../../utils/schoolHolidayEngine';
 
 export interface SecretarySetupViewProps {
   schoolId: string;
@@ -96,11 +97,19 @@ export interface SecretarySetupViewProps {
   handleUpdateSchoolYear: (day: number, month: number) => Promise<void>;
   students: any[];
   contractEndsAt?: string | null;
+  showSchoolHolidays?: boolean;
+  setShowSchoolHolidays?: (val: boolean) => void;
+  holidayJurisdiction?: string;
+  setHolidayJurisdiction?: (val: string) => void;
 }
 
 export function SecretarySetupView(props: SecretarySetupViewProps) {
   const {
     schoolId,
+    showSchoolHolidays = true,
+    setShowSchoolHolidays,
+    holidayJurisdiction = 'DE_BW',
+    setHolidayJurisdiction,
     schoolName,
     setSchoolName,
     schoolSubdomain,
@@ -1204,6 +1213,59 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           >
                             Datenbanken jetzt synchronisieren
                           </button>
+                        </div>
+
+                        {/* 🏖️ Gesetzliche Schulferien & Feiertage (KMK-Engine) */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <strong style={{ fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#1e293b' }}>
+                                <Palmtree size={16} color="#16a34a" /> Gesetzliche Schulferien &amp; Feiertage
+                              </strong>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
+                                Zeigt offizielle KMK-Schulferien und gesetzliche Feiertage automatisch als Termine im Kalender an. Eigene Schulkalender-Termine haben stets Vorrang.
+                              </span>
+                            </div>
+                            <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={showSchoolHolidays}
+                                onChange={e => setShowSchoolHolidays?.(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: '#16a34a', cursor: 'pointer' }}
+                              />
+                            </label>
+                          </div>
+
+                          {showSchoolHolidays && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                                Bundesland / Region für Ferienzeiten:
+                              </label>
+                              <select
+                                value={holidayJurisdiction}
+                                onChange={e => setHolidayJurisdiction?.(e.target.value)}
+                                style={{
+                                  padding: '9px 12px',
+                                  borderRadius: '10px',
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 600,
+                                  outline: 'none'
+                                }}
+                              >
+                                {SUPPORTED_STATES.map(s => (
+                                  <option key={s.code} value={s.code}>
+                                    {s.name} ({s.country})
+                                  </option>
+                                ))}
+                              </select>
+                              <span style={{ fontSize: '0.70rem', color: '#64748b' }}>
+                                {props.schoolZipCode ? `Automatisch anhand der Postleitzahl (${props.schoolZipCode}) ermittelt.` : 'Wähle das Bundesland deiner Musikschule.'}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Multiple iCal Feeds Section */}

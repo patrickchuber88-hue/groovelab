@@ -40,7 +40,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
       `- Campus-Modul: ${fmt(priceCampus)} / Mo.\n` +
       `- GrooveLab-Modul: ${fmt(priceGroovelab)} / Mo.\n` +
       `- Kombi-Vorteil Bundle: ${fmt(priceKombi)} / Mo.\n` +
-      `- Pädagogen- & Verwaltungslizenz: ${fmt(priceTeacher)} / Mo.\n` +
+      `- Pädagogen- & Administrationspauschale: ${fmt(priceTeacher)} / Mo.\n` +
       `- Schüleraktivierung: ${fmt(priceStudent)} / Mo.\n\n` +
       `Gesetzliche Belehrung zum Sonderkündigungsrecht (AGB Ziffer 4 & BGB 315):\n` +
       `Gemäß unserer vertraglichen Preisanpassungsklausel kündigen wir diese Änderung mit einer Frist von mindestens zwei (2) Monaten in Textform an. Sie haben das Recht, dieser Vertragsanpassung vor dem Wirksamkeitszeitpunkt in Textform zu widersprechen. Im Falle eines form- und fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens (${effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen.`

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { GdprDeletionRequest } from './hooks/useSecretaryAudit';
 import { downloadIncidentForensicDossier } from '../../services/incidentForensicDossierService';
+import { resolveUserCampusId } from '../../utils/campusIdHelper';
 
 export interface AuditLogItem {
   id: string;
@@ -657,7 +658,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                               {sName}
                             </span>
                             <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontFamily: 'monospace' }}>
-                              ID: {req.student_id ? `${req.student_id.substring(0, 8)}...` : '-'}
+                              ID: {req.student_id ? resolveUserCampusId({ id: req.student_id, role: 'student' }) : '-'}
                             </span>
                           </div>
                           <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 550, marginTop: '2px' }}>

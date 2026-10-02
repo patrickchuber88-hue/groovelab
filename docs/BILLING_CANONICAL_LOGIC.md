@@ -20,10 +20,10 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
 
 | Tarif / Komponente | Monatspreis Netto (EUR) | Monatspreis Netto (CHF) | Leistungsumfang & Bounded Context |
 |---|---|---|---|
-| **Campus Modul** | **19,90 € / Mo.** | **CHF 25.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Schwarzes Brett, Stundenplan & Raumverwaltung (inkl. 10 GB Audio-Tresor) |
-| **GrooveLab Modul** | **12,90 € / Mo.** | **CHF 16.80 / Mo.** | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine (inkl. 10 GB Audio-Tresor) |
-| **Kombi-Vorteil Bundle** | **24,90 € / Mo.** | **CHF 32.50 / Mo.** | Beide Module vollständig gebucht (**7,90 € bzw. CHF 10.20 / Mo. Ersparnis** gegenüber Einzelsumme) |
-| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 0.65 / Mo.** | Pro aktivem Administrator-, Schulleiter- oder Lehrer-Profil |
+| **Campus Modul** | **14,90 € / Mo.** | **CHF 19.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Schwarzes Brett, Stundenplan & Raumverwaltung (inkl. 10 GB Audio-Tresor) |
+| **GrooveLab Modul** | **9,90 € / Mo.** | **CHF 14.90 / Mo.** | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine (inkl. 10 GB Audio-Tresor) |
+| **Kombi-Vorteil Bundle** | **19,90 € / Mo.** | **CHF 29.90 / Mo.** | Beide Module vollständig gebucht (**4,90 € bzw. CHF 4.90 / Mo. Ersparnis** gegenüber Einzelsumme) |
+| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Pro aktivem Administrator-, Schulleiter- oder Lehrer-Profil |
 
 ---
 
@@ -119,15 +119,15 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
 
 ## 6. Währungs- & Ländermatrix (1% Goldstandard - Fairer B2B-Standard)
 
-| Tarif / Komponente | 🇪🇺 Deutschland & Österreich (EUR) | 🇨🇭 Schweiz (CHF) (+30%, auf 5/0 aufgerundet) | Bounded Context & Governance |
+| Tarif / Komponente | 🇪🇺 Deutschland & Österreich (EUR) | 🇨🇭 Schweiz (CHF) (SSOT / pricingEngine.ts) | Bounded Context & Governance |
 |---|---|---|---|
-| **Campus Modul** | **19,90 € / Mo.** | **CHF 25.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Raum- & Stundenplan (inkl. 10 GB Audio-Tresor) |
-| **GrooveLab Modul** | **12,90 € / Mo.** | **CHF 16.80 / Mo.** | WebAudio Synth, Loopstation, Practice Companion & DAW (inkl. 10 GB Audio-Tresor) |
-| **Kombi-Vorteil Bundle** | **24,90 € / Mo.** | **CHF 32.50 / Mo.** | Volles Paket (**7,90 € bzw. CHF 10.20** monatliche Ersparnis) |
-| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 0.65 / Mo.** | Je aktives Pädagogen-Profil (Admin & Sekretariat 0,00 € / CHF 0.00) |
-| **Schülerbeitrag monatlich** | **0,49 € / Mo.** | **CHF 0.65 / Mo.** | Bereitstellung je aktiver Schüler im Monat |
-| **Max. Jahresbeitrag Direkt** | **5,39 € / Schuljahr** | **CHF 7.00 / Schuljahr** | 1 Probemonat gratis + bis zu 11 Monate berechnet |
-| **Passiv-Schüler Hosting** | **0,09 € / Mo.** | **CHF 0.15 / Mo.** | DSGVO/nDSG Datensatz-Hosting & Notenarchiv |
+| **Campus Modul** | **14,90 € / Mo.** | **CHF 19.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Raum- & Stundenplan (inkl. 10 GB Audio-Tresor) |
+| **GrooveLab Modul** | **9,90 € / Mo.** | **CHF 14.90 / Mo.** | WebAudio Synth, Loopstation, Practice Companion & DAW (inkl. 10 GB Audio-Tresor) |
+| **Kombi-Vorteil Bundle** | **19,90 € / Mo.** | **CHF 29.90 / Mo.** | Volles Paket (**4,90 € bzw. CHF 4.90** monatliche Ersparnis) |
+| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Je aktives Pädagogen-Profil (Admin & Sekretariat 0,00 € / CHF 0.00) |
+| **Schülerbeitrag monatlich** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Bereitstellung je aktiver Schüler im Monat |
+| **Max. Jahresbeitrag Direkt** | **5,39 € / Schuljahr** | **CHF 11.00 / Schuljahr** | 1 Probemonat gratis + bis zu 11 Monate berechnet |
+| **Passiv-Schüler Hosting** | **0,09 € / Mo.** | **CHF 0.20 / Mo.** | DSGVO/nDSG Datensatz-Hosting & Notenarchiv |
 | **Inklusiv-Speicher (Hard Cap)**| **10 GB** (0,00 €) | **10 GB** (CHF 0.00) | Zentraler Audio- & Noten-Tresor dauerhaft inklusive |
 | **Storage-Addon (+10 GB)** | **2,90 € / Mo.** | **CHF 3.80 / Mo.** | **Der Verdoppler:** Schneller Einstieg auf 20 GB Gesamtkapazität |
 | **Storage-Addon (+25 GB)** | **4,90 € / Mo.** | **CHF 6.40 / Mo.** | Zusatz-Speicher für Ensembles & Klassen (bis 250 Schüler, 35 GB ges.) |

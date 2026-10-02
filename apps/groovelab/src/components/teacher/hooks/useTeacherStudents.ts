@@ -3,6 +3,7 @@ import { supabase, queryCache } from '../../../lib/supabase';
 import { useRealNamesVisibility, formatTeacherFullName } from '../../../utils/nameHelper';
 import { StudentToDelete } from '../../ConfirmDeleteStudentModal';
 import { fetchSchoolRoster, getTeacherRoster } from '../../../services/studentRosterService';
+import { getInstrumentAvatarUrl } from '../../../utils/avatarResolutionEngine';
 
 export interface UseTeacherStudentsProps {
   userId: string;
@@ -173,7 +174,7 @@ export function useTeacherStudents({
         role: 'student',
         first_name: inviteFirstName.trim(),
         last_name: formattedLast,
-        photo_url: '/avatar_ghost.jpg',
+        photo_url: getInstrumentAvatarUrl(teacher?.instrument || 'Gitarre'),
         qr_token: qrToken,
         instrument: teacher?.instrument || 'Gitarre',
         status: 'invited',

@@ -27,6 +27,7 @@ export interface MessagesTabContainerProps {
   onPostAnnouncement: (title: string, message: string, targetType: string, targetUserIds: string[]) => Promise<void>;
   onDeleteAnnouncement: (id: string) => Promise<void>;
   onAcknowledgeMessage: (messageId: string) => Promise<void>;
+  onNavigateToSchedule?: (dateStr?: string) => void;
 }
 
 /**
@@ -49,7 +50,8 @@ export function MessagesTabContainer({
   onMarkCampusChannelAsRead,
   onPostAnnouncement,
   onDeleteAnnouncement,
-  onAcknowledgeMessage
+  onAcknowledgeMessage,
+  onNavigateToSchedule
 }: MessagesTabContainerProps) {
   const currentUserId = typeof window !== 'undefined' 
     ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || user?.id) 
@@ -71,6 +73,7 @@ export function MessagesTabContainer({
             selectedRecipient={selectedCampusRecipient}
             setSelectedRecipient={setSelectedCampusRecipient}
             studentToTeacherChat={user?.schools?.opening_hours?.campus_settings?.student_to_teacher_chat !== false}
+            onNavigateToSchedule={onNavigateToSchedule}
           />
         </Suspense>
       </ErrorBoundary>

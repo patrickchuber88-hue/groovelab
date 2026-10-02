@@ -288,7 +288,7 @@ export const AdminModalsMasterHub: React.FC<AdminModalsMasterHubProps> = ({
               id: selectedStudentForTageskompass.id,
               first_name: selectedStudentForTageskompass.first_name,
               last_name: selectedStudentForTageskompass.last_name,
-              photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
+              photo_url: (selectedStudentForTageskompass.photo_url && !selectedStudentForTageskompass.photo_url.includes('avatar_ghost')) ? selectedStudentForTageskompass.photo_url : '/avatars/gitarre_avatar_new.png',
               is_campus_active: selectedStudentForTageskompass.is_campus_active,
               school_id: selectedStudentForTageskompass.school_id || admin?.school_id,
               campus_ui_level: selectedStudentForTageskompass.campus_ui_level,

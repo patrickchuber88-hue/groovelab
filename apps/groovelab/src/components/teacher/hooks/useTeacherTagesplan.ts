@@ -349,6 +349,10 @@ export function useTeacherTagesplan({
     setSelectedSlotOverride(slot);
   }, []);
 
+  const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
+  const [unreadChatOccIds, setUnreadChatOccIds] = useState<Set<string>>(new Set());
+  const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
+
   useEffect(() => {
     setSelectedSlotOverride(null);
   }, [briefingData]);
@@ -373,7 +377,8 @@ export function useTeacherTagesplan({
       // 1. Fetch regular recurring schedules for today's weekday
       // 2. Fetch specific schedule_occurrences for today
       // 3. Fetch room_bookings for today
-      const [schedRes, occRes, bookingsRes] = await Promise.all([
+      // 4. Fetch 1:1 Shoutbox Messages for Active & Unread detection
+      const [schedRes, occRes, bookingsRes, msgRes] = await Promise.all([
         supabase
           .from('schedules')
           .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name, nickname, avatar_url, photo_url, instrument, birth_date, day_of_birth, is_active), room:rooms(*)')
@@ -388,8 +393,37 @@ export function useTeacherTagesplan({
           .from('room_bookings')
           .select('*, room:rooms(*)')
           .eq('booked_by', effectiveTeacherId)
-          .eq('date', todayStr)
+          .eq('date', todayStr),
+        supabase
+          .from('campus_direct_messages')
+          .select('id, occurrence_id, sender_id, recipient_id, is_read, content')
+          .or(`sender_id.eq.${effectiveTeacherId},recipient_id.eq.${effectiveTeacherId}`)
       ]);
+
+      if (msgRes.data) {
+        const occIds = new Set<string>();
+        const unreadOccIds = new Set<string>();
+        msgRes.data.forEach((m: any) => {
+          const occId = m.occurrence_id ? String(m.occurrence_id) : null;
+          const text = (m.content || '').trim();
+          if (text.length > 0) {
+            if (occId) {
+              occIds.add(occId);
+              if (m.recipient_id === effectiveTeacherId && m.is_read === false) {
+                unreadOccIds.add(occId);
+              }
+            }
+            if (m.sender_id) {
+              occIds.add(String(m.sender_id));
+              if (m.recipient_id === effectiveTeacherId && m.is_read === false) {
+                unreadOccIds.add(String(m.sender_id));
+              }
+            }
+          }
+        });
+        setActiveChatOccIds(occIds);
+        setUnreadChatOccIds(unreadOccIds);
+      }
 
       const schedules = schedRes.data || [];
       const occurrences = occRes.data || [];
@@ -485,6 +519,8 @@ export function useTeacherTagesplan({
                 last_name: resolvedStudent.last_name,
                 name: `${resolvedStudent.first_name || ''} ${resolvedStudent.last_name || ''}`.trim(),
                 avatar_url: resolvedStudent.avatar_url || resolvedStudent.photo_url,
+                photo_url: resolvedStudent.photo_url || resolvedStudent.avatar_url,
+                role: 'student',
                 instrument: resolvedStudent.instrument
               } : null,
               students: resolvedStudent ? [resolvedStudent] : [],
@@ -521,6 +557,8 @@ export function useTeacherTagesplan({
               last_name: resolvedStudent.last_name,
               name: `${resolvedStudent.first_name || ''} ${resolvedStudent.last_name || ''}`.trim(),
               avatar_url: resolvedStudent.avatar_url || resolvedStudent.photo_url,
+              photo_url: resolvedStudent.photo_url || resolvedStudent.avatar_url,
+              role: 'student',
               instrument: resolvedStudent.instrument,
               birth_date: resolvedStudent.birth_date,
               day_of_birth: resolvedStudent.day_of_birth
@@ -556,6 +594,8 @@ export function useTeacherTagesplan({
                 last_name: resolvedStudent.last_name,
                 name: `${resolvedStudent.first_name || ''} ${resolvedStudent.last_name || ''}`.trim(),
                 avatar_url: resolvedStudent.avatar_url || resolvedStudent.photo_url,
+                photo_url: resolvedStudent.photo_url || resolvedStudent.avatar_url,
+                role: 'student',
                 instrument: resolvedStudent.instrument
               } : null,
               students: resolvedStudent ? [resolvedStudent] : [],
@@ -590,7 +630,60 @@ export function useTeacherTagesplan({
       // Sort chronological
       timelineSlots.sort((a, b) => (a.timeSlot || '00:00').localeCompare(b.timeSlot || '00:00'));
 
-      const newBriefingData = { timeline: timelineSlots };
+      // 🏛️ 0.1% Goldstandard Live Weekly Practice Aggregation from fokus_logs
+      const weeklyFocusMap: Record<string, number> = {};
+      const relevantStudentIds = new Set<string>();
+      timelineSlots.forEach((slot: any) => {
+        if (slot.students && Array.isArray(slot.students)) {
+          slot.students.forEach((st: any) => {
+            const sid = st?.id || st?.student_id;
+            if (sid && !String(sid).startsWith('proj-') && !String(sid).startsWith('group-member-')) {
+              relevantStudentIds.add(String(sid));
+            }
+          });
+        }
+        const singleId = slot.student?.id || slot.student_id;
+        if (singleId && !String(singleId).startsWith('proj-')) {
+          relevantStudentIds.add(String(singleId));
+        }
+      });
+      (allStudents || []).forEach((st: any) => {
+        if (st.id) relevantStudentIds.add(String(st.id));
+      });
+
+      const studentIdList = Array.from(relevantStudentIds);
+      if (studentIdList.length > 0) {
+        try {
+          const nowDt = getSimulatedNow();
+          const dayOfWeek = nowDt.getDay();
+          const diffToMon = (dayOfWeek + 6) % 7;
+          const monDate = new Date(nowDt);
+          monDate.setDate(nowDt.getDate() - diffToMon);
+          monDate.setHours(0, 0, 0, 0);
+          const mondayIso = monDate.toISOString();
+
+          const { data: logsData } = await supabase
+            .from('fokus_logs')
+            .select('user_id, duration_seconds, duration_minutes')
+            .in('user_id', studentIdList)
+            .gte('created_at', mondayIso);
+
+          if (logsData && Array.isArray(logsData)) {
+            logsData.forEach((log: any) => {
+              const uid = log.user_id;
+              if (!uid) return;
+              const mins = (log.duration_seconds && log.duration_seconds > 0)
+                ? Math.round(log.duration_seconds / 60)
+                : (log.duration_minutes || 0);
+              weeklyFocusMap[uid] = (weeklyFocusMap[uid] || 0) + mins;
+            });
+          }
+        } catch (e) {
+          console.warn('[useTeacherTagesplan] Could not query weekly fokus_logs:', e);
+        }
+      }
+
+      const newBriefingData = { timeline: timelineSlots, weeklyFocusMap };
       setBriefingData(newBriefingData);
       try {
         localStorage.setItem(`groovelab_briefing_timeline_${effectiveTeacherId}_${todayStr}`, JSON.stringify(newBriefingData));
@@ -611,15 +704,32 @@ export function useTeacherTagesplan({
 
     window.addEventListener('groovelab_simulated_date_changed', handleSync);
     window.addEventListener('groovelab_schedule_changed', handleSync);
+    window.addEventListener('groovelab_chat_updated', handleSync);
     window.addEventListener('refresh-bookings', handleSync);
     window.addEventListener('storage', handleSync);
+
+    const channel = effectiveTeacherId ? supabase
+      .channel(`tagesplan_chat_${effectiveTeacherId}`)
+      .on('postgres_changes', {
+        schema: 'public',
+        event: '*',
+        table: 'campus_direct_messages'
+      }, () => {
+        loadBriefingTimeline();
+      })
+      .subscribe() : null;
+
     return () => {
       window.removeEventListener('groovelab_simulated_date_changed', handleSync);
       window.removeEventListener('groovelab_schedule_changed', handleSync);
+      window.removeEventListener('groovelab_chat_updated', handleSync);
       window.removeEventListener('refresh-bookings', handleSync);
       window.removeEventListener('storage', handleSync);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [loadBriefingTimeline]);
+  }, [loadBriefingTimeline, effectiveTeacherId]);
 
   // Zoom (Persistent & Validated)
   const [zoomFactor, setZoomFactor] = useState<number>(() => {
@@ -646,8 +756,6 @@ export function useTeacherTagesplan({
 
   // Double confirm slot cancel
   const [confirmCancelSlotId, setConfirmCancelSlotId] = useState<string | null>(null);
-  const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
-  const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
 
   const handleCancelSlotWithDoubleConfirm = useCallback(async (slot: any) => {
     try {
@@ -921,6 +1029,8 @@ export function useTeacherTagesplan({
     setConfirmCancelSlotId,
     activeChatOccIds,
     setActiveChatOccIds,
+    unreadChatOccIds,
+    setUnreadChatOccIds,
     activeChatOcc,
     setActiveChatOcc,
     handleCancelSlotWithDoubleConfirm,

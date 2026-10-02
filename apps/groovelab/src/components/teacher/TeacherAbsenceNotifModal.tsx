@@ -13,6 +13,7 @@ import {
   Check 
 } from 'lucide-react';
 import { maskLastName, formatTeacherFullName } from '../../utils/nameHelper';
+import { resolveUserCampusId } from '../../utils/campusIdHelper';
 import { getSimulatedNow } from '../../hooks/useSimulatedTime';
 
 export interface AbsenceNotifData {
@@ -188,7 +189,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
 
               const studentName = n.student_name || (() => {
                 const student = allStudents.find(s => s.id === n.student_id);
-                return student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
+                return student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : `Schüler: ${resolveUserCampusId({ id: n.student_id, role: 'student' })}`;
               })();
 
               return (

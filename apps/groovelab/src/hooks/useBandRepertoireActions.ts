@@ -339,7 +339,7 @@ export function useBandRepertoireActions({
           id: target.id || target.skill_id || null,
           skill_id: target.skill_id || target.id || null,
           user_id: user.id,
-          instrument: target.instrument || user.instrument || 'Musiker',
+          instrument: target.instrument || user.instrument || 'Gitarre',
           part_number: target.part_number || 1,
           first_name: user.first_name,
           photo_url: user.photo_url,

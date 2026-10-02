@@ -3,8 +3,9 @@ import {
   AlertCircle, BarChart2, Calendar, ChevronRight, Clock, CreditCard,
   Download, FileText, HardDrive, Info, Lock, RefreshCw, ScrollText,
   Search, Sparkles, Cloud, Zap, Rocket, Crown, Database, ShieldCheck,
-  School, Users, Award, CheckCircle2
+  School, Users, Award, CheckCircle2, Eye, Printer
 } from 'lucide-react';
+import { UniversalPdfPreviewModal } from '../modals/UniversalPdfPreviewModal';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../domain/pricingEngine';
 import {
@@ -13,6 +14,7 @@ import {
   downloadUpgradeConfirmationPdf,
   getDynamicAnnualPrice as calcDynamicAnnualPrice
 } from './licenses/licenseUtils';
+import { ACTIVE_LEGAL_VERSION } from '../../legal/legalContent';
 
 export interface SecretaryLicensesViewProps {
   loading?: boolean;
@@ -346,6 +348,76 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<number>(() => new Date().getFullYear());
   const [activationSearchQuery, setActivationSearchQuery] = useState<string>('');
 
+  // 🏛️ Universal High-Fidelity PDF Preview Modal State (0,1% Goldstandard)
+  const [pdfPreviewState, setPdfPreviewState] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    badgeText?: string;
+    filename: string;
+    pdfBlob: Blob | null;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    badgeText: '',
+    filename: 'Dokument.pdf',
+    pdfBlob: null,
+    isLoading: false,
+  });
+
+  const openPdfPreview = async (config: {
+    title: string;
+    subtitle?: string;
+    badgeText?: string;
+    filename: string;
+    generate: () => Promise<Blob | ArrayBuffer | void>;
+  }) => {
+    setPdfPreviewState({
+      isOpen: true,
+      title: config.title,
+      subtitle: config.subtitle,
+      badgeText: config.badgeText || 'DIN A4 • Revisionssicher',
+      filename: config.filename,
+      pdfBlob: null,
+      isLoading: true,
+    });
+
+    try {
+      const result = await config.generate();
+      if (result instanceof Blob) {
+        setPdfPreviewState(prev => ({
+          ...prev,
+          pdfBlob: result,
+          isLoading: false,
+        }));
+      } else if (result instanceof ArrayBuffer) {
+        const blob = new Blob([result], { type: 'application/pdf' });
+        setPdfPreviewState(prev => ({
+          ...prev,
+          pdfBlob: blob,
+          isLoading: false,
+        }));
+      } else {
+        console.warn('[PDF Preview] Generator returned no Blob');
+        setPdfPreviewState(prev => ({ ...prev, isLoading: false }));
+      }
+    } catch (err) {
+      console.error('[PDF Preview] Error generating PDF blob:', err);
+      setPdfPreviewState(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  const closePdfPreview = () => {
+    setPdfPreviewState(prev => ({
+      ...prev,
+      isOpen: false,
+      pdfBlob: null,
+      isLoading: false,
+    }));
+  };
+
   const deMonths = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
   const getDynamicAnnualPrice = (startDateStr: string | null | undefined, discountPercentOrCoFinancing: number | boolean = 0) => {
@@ -353,7 +425,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
   };
 
   return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="google-card" style={{ paddingLeft: '44px' }}>
               <div className="google-kpi-bar bg-google-red" />
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 800, display: 'flex', alignItems: 'center' }}>
@@ -2299,17 +2372,28 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 ) : (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <button
-                                      onClick={() => downloadCancellationReceiptPdf({
-                                        cancellationId: lastCancellationId,
-                                        cancelledAt: new Date(),
-                                        effectiveEndDateFormatted: yearInfo.formattedDate,
-                                        schoolName: schoolName || currentSchoolProfile?.name
+                                      type="button"
+                                      onClick={() => openPdfPreview({
+                                        title: 'Kündigungsbestätigung gem. BGB 312k',
+                                        subtitle: schoolName || currentSchoolProfile?.name || 'Musikschule',
+                                        badgeText: 'DIN A4 • BGB 312k Abs. 4',
+                                        filename: `Kuendigungsbestaetigung_Campus_Groovelab_${(schoolName || currentSchoolProfile?.name || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                        generate: async () => {
+                                          return downloadCancellationReceiptPdf({
+                                            cancellationId: lastCancellationId,
+                                            cancelledAt: new Date(),
+                                            effectiveEndDateFormatted: yearInfo.formattedDate,
+                                            schoolName: schoolName || currentSchoolProfile?.name,
+                                            returnBlob: true
+                                          });
+                                        }
                                       })}
                                       className="hover-scale"
+                                      aria-label="Kündigungsbestätigung in der Vorschau öffnen"
                                       style={{
                                         background: '#ffffff',
-                                        color: '#b45309',
-                                        border: '1px solid #fde68a',
+                                        color: '#0f172a',
+                                        border: '1.5px solid #cbd5e1',
                                         borderRadius: '10px',
                                         padding: '8px 14px',
                                         fontSize: '0.74rem',
@@ -2320,7 +2404,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         gap: '6px'
                                       }}
                                     >
-                                      📄 Kündigungsbeleg (PDF)
+                                      <FileText size={13} strokeWidth={2} />
+                                      Kündigungsbeleg (PDF)
                                     </button>
                                     <button
                                       onClick={async () => {
@@ -4381,34 +4466,42 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                                         <button
                                           type="button"
-                                          onClick={async () => {
-                                            const { generateTariffReceiptPDF } = await import('../../utils/tariffReceiptPdfGenerator');
-                                            generateTariffReceiptPDF({
-                                              receiptNumber: b.receipt_number,
-                                              schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
-                                              schoolAddress: {
-                                                street: currentSchoolProfile?.street || '',
-                                                zipCode: currentSchoolProfile?.zip_code || '',
-                                                city: currentSchoolProfile?.city || '',
-                                                country: currentSchoolProfile?.country || 'DE'
-                                              },
-                                              bookedBy: b.booked_by_name || 'Schulleitung',
-                                              bookingType: b.booking_type,
-                                              hasCampus: b.has_campus_subscription,
-                                              hasGroovelab: b.has_groovelab_subscription,
-                                              studentBillingOption: b.student_billing_option,
-                                              storageAddonGb: b.storage_addon_gb,
-                                              storageAddonFee: Number(b.storage_addon_monthly_fee || 0),
-                                              storageStatus: b.storage_addon_status,
-                                              storagePendingDowngradeGb: b.storage_pending_downgrade_gb,
-                                              storagePendingEffectiveDate: b.storage_pending_effective_date,
-                                              totalMonthlyRateNet: Number(b.total_monthly_rate_net || 0),
-                                              currency: b.currency || 'EUR',
-                                              effectiveDate: b.effective_date,
-                                              createdAt: b.created_at,
-                                              notes: b.notes
-                                            });
-                                          }}
+                                          onClick={() => openPdfPreview({
+                                            title: `Buchungsbeleg #${b.receipt_number}`,
+                                            subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                            badgeText: 'DIN A4 • GoBD-konform',
+                                            filename: `Buchungsbeleg_${b.receipt_number}_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                            generate: async () => {
+                                              const { generateTariffReceiptPDF } = await import('../../utils/tariffReceiptPdfGenerator');
+                                              return generateTariffReceiptPDF({
+                                                receiptNumber: b.receipt_number,
+                                                schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                                schoolAddress: {
+                                                  street: currentSchoolProfile?.street || '',
+                                                  zipCode: currentSchoolProfile?.zip_code || '',
+                                                  city: currentSchoolProfile?.city || '',
+                                                  country: currentSchoolProfile?.country || 'DE'
+                                                },
+                                                bookedBy: b.booked_by_name || 'Schulleitung',
+                                                bookingType: b.booking_type,
+                                                hasCampus: b.has_campus_subscription,
+                                                hasGroovelab: b.has_groovelab_subscription,
+                                                studentBillingOption: b.student_billing_option,
+                                                storageAddonGb: b.storage_addon_gb,
+                                                storageAddonFee: Number(b.storage_addon_monthly_fee || 0),
+                                                storageStatus: b.storage_addon_status,
+                                                storagePendingDowngradeGb: b.storage_pending_downgrade_gb,
+                                                storagePendingEffectiveDate: b.storage_pending_effective_date,
+                                                totalMonthlyRateNet: Number(b.total_monthly_rate_net || 0),
+                                                currency: b.currency || 'EUR',
+                                                effectiveDate: b.effective_date,
+                                                createdAt: b.created_at,
+                                                notes: b.notes,
+                                                returnBlob: true
+                                              });
+                                            }
+                                          })}
+                                          aria-label={`Buchungsbeleg ${b.receipt_number} in der Vorschau öffnen`}
                                           style={{
                                             display: 'flex',
                                             alignItems: 'center',
@@ -4425,16 +4518,16 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                             transition: 'all 0.15s ease'
                                           }}
                                           onMouseEnter={(e) => {
-                                            e.currentTarget.style.borderColor = '#34a853';
-                                            e.currentTarget.style.color = '#166534';
+                                            e.currentTarget.style.borderColor = '#0f172a';
+                                            e.currentTarget.style.color = '#0f172a';
                                           }}
                                           onMouseLeave={(e) => {
                                             e.currentTarget.style.borderColor = '#cbd5e1';
                                             e.currentTarget.style.color = '#0f172a';
                                           }}
                                         >
-                                          <Download size={13} />
-                                          PDF Beleg
+                                          <Eye size={13} strokeWidth={2} />
+                                          Beleg Vorschau
                                         </button>
                                       </div>
                                     </div>
@@ -4525,40 +4618,95 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   Amtliche Vertragsurkunde für Rechnungsprüfungsamt, Gemeinderat und Schulträger mit Gebührenordnung, SLA-Zusagen, Revisions-Hash und Zeichnungsnachweis.
                                 </p>
                               </div>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const { generateB2BContractCertificatePDF } = await import('../../utils/pdfGenerator');
-                                  generateB2BContractCertificatePDF({
-                                    schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
-                                    schoolAddress: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
-                                    schoolCity: `${currentSchoolProfile?.zip_code || schoolZipCode || ''} ${currentSchoolProfile?.city || schoolCity || ''}`.trim(),
-                                    schoolSigneeName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName,
-                                    schoolId: schoolId,
-                                    avvSignedAt: currentSchoolProfile?.avv_signed_at
-                                  });
-                                }}
-                                aria-label="Amtliches B2B-Vertragszertifikat als PDF herunterladen"
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '6px',
-                                  padding: '11px 16px',
-                                  borderRadius: '12px',
-                                  background: '#15803d',
-                                  color: '#ffffff',
-                                  fontSize: '0.80rem',
-                                  fontWeight: 800,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
-                                  transition: 'all 0.15s'
-                                }}
-                              >
-                                <Download size={14} />
-                                B2B-Vertragszertifikat (PDF) herunterladen
-                              </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => openPdfPreview({
+                                    title: 'B2B-SaaS-Mietvertrag & AVV (DIN 5008)',
+                                    subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                    badgeText: '4 Seiten • DIN 5008 • Revisionssicher',
+                                    filename: `Campus-Groovelab_B2B_Vertrag_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}_${ACTIVE_LEGAL_VERSION}.pdf`,
+                                    generate: async () => {
+                                      const { generateB2BContractPackagePDF } = await import('../../utils/b2bContractPdfGenerator');
+                                      return generateB2BContractPackagePDF({
+                                        schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                        schoolId: schoolId,
+                                        adminName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName || 'Schulleitung',
+                                        address: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
+                                        postalCode: currentSchoolProfile?.zip_code || schoolZipCode || '',
+                                        city: currentSchoolProfile?.city || schoolCity || '',
+                                        country: currentSchoolProfile?.country === 'CH' ? 'CH' : 'DE',
+                                        selectedModule: (hasCampusSub && hasGroovelabSub) ? 'kombi' : (hasCampusSub ? 'campus' : (hasGroovelabSub ? 'groovelab' : 'kombi')),
+                                        teacherCount: billableTeachersCount || allTeachers?.length || 0,
+                                        studentDirectBilling: !isSammelzahler,
+                                        confirmationDate: currentSchoolProfile?.avv_signed_at,
+                                        isMunicipalCarrier: Boolean(currentSchoolProfile?.is_municipal || currentSchoolProfile?.carrier_type === 'municipal'),
+                                        returnBlob: true
+                                      });
+                                    }
+                                  })}
+                                  aria-label="Amtliches 4-teiliges B2B-Vertragspaket (DIN 5008 mit AVV & SLA) in der Vorschau öffnen"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '11px 16px',
+                                    borderRadius: '12px',
+                                    background: '#15803d',
+                                    color: '#ffffff',
+                                    fontSize: '0.80rem',
+                                    fontWeight: 800,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  <FileText size={14} strokeWidth={2} />
+                                  B2B-Vollvertrag & AVV (DIN 5008)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openPdfPreview({
+                                    title: 'B2B-SaaS-Vertragszertifikat',
+                                    subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                    badgeText: '1 Seite • Amtliches Zertifikat',
+                                    filename: `Campus_Groovelab_B2B_Vertragszertifikat_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                    generate: async () => {
+                                      const { generateB2BContractCertificatePDF } = await import('../../utils/pdfGenerator');
+                                      return generateB2BContractCertificatePDF({
+                                        schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                        schoolAddress: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
+                                        schoolCity: `${currentSchoolProfile?.zip_code || schoolZipCode || ''} ${currentSchoolProfile?.city || schoolCity || ''}`.trim(),
+                                        schoolSigneeName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName,
+                                        schoolId: schoolId,
+                                        avvSignedAt: currentSchoolProfile?.avv_signed_at,
+                                        returnBlob: true
+                                      });
+                                    }
+                                  })}
+                                  aria-label="Kompakt-Vertragszertifikat (1 Seite) in der Vorschau öffnen"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '8px 12px',
+                                    borderRadius: '10px',
+                                    background: '#f1f5f9',
+                                    color: '#334155',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    border: '1px solid #cbd5e1',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  <Eye size={13} strokeWidth={2} />
+                                  Kompakt-Zertifikat (1 Seite)
+                                </button>
+                              </div>
                             </div>
 
                             {/* Card 1: AVV & TOMs */}
@@ -4635,12 +4783,21 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={async () => {
-                                    const { generateEnterpriseSecurityWhitepaperPDF } = await import('../../utils/securityWhitepaperGenerator');
-                                    generateEnterpriseSecurityWhitepaperPDF();
-                                  }}
-                                  title="Sicherheits-Whitepaper herunterladen"
-                                  aria-label="Enterprise Sicherheits-Whitepaper als PDF herunterladen"
+                                  onClick={() => openPdfPreview({
+                                    title: 'Enterprise Sicherheits-Whitepaper & TOMs',
+                                    subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                    badgeText: 'DIN A4 • ISO 27001 • BSI C5',
+                                    filename: `Campus_Groovelab_Security_Whitepaper_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                    generate: async () => {
+                                      const { generateEnterpriseSecurityWhitepaperPDF } = await import('../../utils/securityWhitepaperGenerator');
+                                      return generateEnterpriseSecurityWhitepaperPDF({
+                                        schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                        returnBlob: true
+                                      });
+                                    }
+                                  })}
+                                  title="Sicherheits-Whitepaper in der Vorschau öffnen"
+                                  aria-label="Enterprise Sicherheits-Whitepaper in der Vorschau öffnen"
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -4655,7 +4812,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     cursor: 'pointer'
                                   }}
                                 >
-                                  <Download size={14} />
+                                  <Eye size={14} strokeWidth={2} />
                                 </button>
                               </div>
                             </div>
@@ -4700,13 +4857,20 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  const { generateStaffCouncilDeclarationPDF } = await import('../../utils/staffCouncilDeclarationGenerator');
-                                  generateStaffCouncilDeclarationPDF({
-                                    schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule'
-                                  });
-                                }}
-                                aria-label="Personalrats- und Mitbestimmungs-Attest als PDF generieren"
+                                onClick={() => openPdfPreview({
+                                  title: 'Personalrats- & Mitbestimmungs-Attest',
+                                  subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                  badgeText: 'DIN A4 • BetrVG 87 • Revisionssicher',
+                                  filename: `Personalrats_Attest_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                  generate: async () => {
+                                    const { generateStaffCouncilDeclarationPDF } = await import('../../utils/staffCouncilDeclarationGenerator');
+                                    return generateStaffCouncilDeclarationPDF({
+                                      schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                      returnBlob: true
+                                    });
+                                  }
+                                })}
+                                aria-label="Personalrats- und Mitbestimmungs-Attest in der Vorschau öffnen"
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -4723,8 +4887,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
-                                <Download size={14} />
-                                PDF Attest generieren
+                                <Eye size={14} strokeWidth={2} />
+                                PDF Attest Vorschau
                               </button>
                             </div>
 
@@ -4769,13 +4933,20 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  const { generateDpoComplianceDossierPDF } = await import('../../utils/dpoComplianceDossierGenerator');
-                                  generateDpoComplianceDossierPDF({
-                                    schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule'
-                                  });
-                                }}
-                                aria-label="Datenschutzbeauftragten Compliance Dossier als PDF herunterladen"
+                                onClick={() => openPdfPreview({
+                                  title: 'DSB / DPO Compliance Dossier',
+                                  subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                  badgeText: 'DIN A4 • Art. 30/35 DSGVO • Revisionssicher',
+                                  filename: `DSB_Compliance_Dossier_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                  generate: async () => {
+                                    const { generateDpoComplianceDossierPDF } = await import('../../utils/dpoComplianceDossierGenerator');
+                                    return generateDpoComplianceDossierPDF({
+                                      schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                      returnBlob: true
+                                    });
+                                  }
+                                })}
+                                aria-label="Datenschutzbeauftragten Compliance Dossier in der Vorschau öffnen"
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -4792,8 +4963,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
-                                <Download size={14} />
-                                PDF Dossier herunterladen
+                                <Eye size={14} strokeWidth={2} />
+                                PDF Dossier Vorschau
                               </button>
                             </div>
 
@@ -4838,13 +5009,20 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  const { generateMessengerSafetyCertificatePDF } = await import('../../utils/messengerSafetyCertificateGenerator');
-                                  generateMessengerSafetyCertificatePDF({
-                                    schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule'
-                                  });
-                                }}
-                                aria-label="Kinderschutz und Safe Space Zertifikat als PDF herunterladen"
+                                onClick={() => openPdfPreview({
+                                  title: 'Kinderschutz- & Safe-Space Zertifikat',
+                                  subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                  badgeText: 'DIN A4 • SGB VIII 8a • Revisionssicher',
+                                  filename: `Kinderschutz_Zertifikat_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                  generate: async () => {
+                                    const { generateMessengerSafetyCertificatePDF } = await import('../../utils/messengerSafetyCertificateGenerator');
+                                    return generateMessengerSafetyCertificatePDF({
+                                      schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                      returnBlob: true
+                                    });
+                                  }
+                                })}
+                                aria-label="Kinderschutz und Safe Space Zertifikat in der Vorschau öffnen"
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -4861,8 +5039,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
-                                <Download size={14} />
-                                PDF Zertifikat herunterladen
+                                <Eye size={14} strokeWidth={2} />
+                                PDF Zertifikat Vorschau
                               </button>
                             </div>
                           </div>
@@ -4879,5 +5057,17 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
             </div>
           </div>
 
+      {/* 🏛️ Universal High-Fidelity PDF Preview Modal (0,1% Goldstandard) */}
+      <UniversalPdfPreviewModal
+        isOpen={pdfPreviewState.isOpen}
+        onClose={closePdfPreview}
+        title={pdfPreviewState.title}
+        subtitle={pdfPreviewState.subtitle}
+        badgeText={pdfPreviewState.badgeText}
+        filename={pdfPreviewState.filename}
+        pdfBlob={pdfPreviewState.pdfBlob}
+        isLoading={pdfPreviewState.isLoading}
+      />
+    </>
   );
 }

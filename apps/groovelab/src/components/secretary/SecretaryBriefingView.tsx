@@ -146,7 +146,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 }) => {
             const [showIntegrityDetails, setShowIntegrityDetails] = useState<boolean>(false);
             const [roomIssuesTab, setRoomIssuesTab] = useState<'open' | 'resolved' | 'all'>('open');
-            const simDate = simulatedToday ? new Date(simulatedToday + 'T12:00:00') : new Date();
+            const simDate = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
             const todayDayNum = simDate.getDay() === 0 ? 7 : simDate.getDay();
             const todayDateStr = simulatedToday || new Date().toISOString().split('T')[0];
 

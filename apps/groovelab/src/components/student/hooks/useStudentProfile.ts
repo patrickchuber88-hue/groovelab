@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { secureVault } from '../../../utils/secureVault';
 import { CampusUiLevel } from '../../campus/CampusLevelSwitcher';
+import { resolveCampusStudentAvatar } from '../../../utils/avatarResolutionEngine';
 
 interface UseStudentProfileProps {
   studentId: string;
@@ -242,7 +243,7 @@ export function useStudentProfile({
       id: studentId,
       first_name: studentUser.first_name || '',
       last_name: '', // 🛡️ Zero-Knowledge: 100% last_name exclusion in student view
-      photo_url: studentUser.photo_url || '/avatar_ghost.jpg',
+      photo_url: (studentUser.photo_url && !studentUser.photo_url.includes('avatar_ghost')) ? studentUser.photo_url : resolveCampusStudentAvatar(studentUser),
       is_campus_active: studentUser.is_campus_active ?? false,
       campus_ui_level: studentUiLevel || studentUser?.campus_ui_level,
       campus_xp: studentUser?.campus_xp ?? studentUser?.xp ?? 0,

@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 const router = Router();
 
 const COOKIE_NAME_PROD = '__Host-cg_site_pass';
+const COOKIE_NAME_WILDCARD = 'cg_site_pass';
 const COOKIE_NAME_DEV = 'cg_site_pass';
 
 // IP-based Rate Limiter against Brute-Force and Credential Stuffing
@@ -93,7 +94,17 @@ router.get('/verify', (req: Request, res: Response) => {
     return res.status(204).end();
   }
 
-  const token = req.cookies?.[COOKIE_NAME_PROD] || req.cookies?.[COOKIE_NAME_DEV];
+  // Exempt official public verification endpoints (§ 371a ZPO / eIDAS)
+  const originalUri = (req.headers['x-original-uri'] as string) || '';
+  if (originalUri.startsWith('/verify-contract') || originalUri.startsWith('/verify?')) {
+    return res.status(204).end();
+  }
+
+  const token =
+    req.cookies?.[COOKIE_NAME_PROD] ||
+    req.cookies?.[COOKIE_NAME_WILDCARD] ||
+    req.cookies?.[COOKIE_NAME_DEV];
+
   if (!token || !verifyToken(token)) {
     return res.status(401).end();
   }
@@ -129,10 +140,20 @@ router.post('/login', gateRateLimiter, async (req: Request, res: Response) => {
 
   // Secure HttpOnly Cookie
   if (isProd) {
+    // 1. Host-specific cookie for current host
     res.cookie(COOKIE_NAME_PROD, token, {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+    // 2. Wildcard domain cookie covering all multi-tenant school subdomains (*.campus-groovelab.de)
+    res.cookie(COOKIE_NAME_WILDCARD, token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      domain: '.campus-groovelab.de',
       path: '/',
       maxAge: 30 * 24 * 60 * 60 * 1000
     });
@@ -155,6 +176,7 @@ router.post('/login', gateRateLimiter, async (req: Request, res: Response) => {
 // ── 3. Logout (Revoke Site-Pass) ──
 router.all('/logout', (_req: Request, res: Response) => {
   res.clearCookie(COOKIE_NAME_PROD, { path: '/' });
+  res.clearCookie(COOKIE_NAME_WILDCARD, { domain: '.campus-groovelab.de', path: '/' });
   res.clearCookie(COOKIE_NAME_DEV, { path: '/' });
   return res.redirect('/gate.html');
 });
@@ -162,7 +184,10 @@ router.all('/logout', (_req: Request, res: Response) => {
 // ── 4. Status Check (Zero Secret Leakage) ──
 router.get('/status', (req: Request, res: Response) => {
   const enabled = isGateEnabled();
-  const token = req.cookies?.[COOKIE_NAME_PROD] || req.cookies?.[COOKIE_NAME_DEV];
+  const token =
+    req.cookies?.[COOKIE_NAME_PROD] ||
+    req.cookies?.[COOKIE_NAME_WILDCARD] ||
+    req.cookies?.[COOKIE_NAME_DEV];
   const isUnlocked = !enabled || (!!token && verifyToken(token));
 
   return res.json({

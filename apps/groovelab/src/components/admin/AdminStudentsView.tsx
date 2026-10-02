@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Calendar, Eye, EyeOff, FileText, Pencil, QrCode, School, Search,
+  Calendar, Eye, EyeOff, FileText, QrCode, School, Search,
   Users
 } from "lucide-react";
 import { maskLastName } from "../../utils/nameHelper";
@@ -115,6 +115,46 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
     const activeStudentsCount = students.filter(s => !s.deleted_at && !(s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now())).length;
     const trashedStudentsCount = students.filter(s => Boolean(s.deleted_at)).length;
 
+    // 🛡️ 0.1% Goldstandard: Revisionssichere Klassen-Farbfächer-Palette (Regenbogen-Tonleiter)
+    const studentRosterColorMap = React.useMemo(() => {
+      const map = new Map<string, string>();
+      if (!students || students.length === 0) return map;
+
+      // 1. Kanonische Sortierung über das ungefilterte Basis-Roster (Vorname ASC -> Nachname ASC -> ID)
+      const canonicalRoster = [...students]
+        .filter((s: any) => s && s.id && (s.first_name || s.name))
+        .sort((a, b) => {
+          const nameA = `${a.first_name || a.name || ''} ${a.last_name || a.full_last_name || ''}`.trim();
+          const nameB = `${b.first_name || b.name || ''} ${b.last_name || b.full_last_name || ''}`.trim();
+          const cmp = nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
+          if (cmp !== 0) return cmp;
+          return (a.id || '').localeCompare(b.id || '');
+        });
+
+      const total = canonicalRoster.length;
+      if (total === 0) return map;
+
+      const stepAngle = 360 / total;
+
+      canonicalRoster.forEach((student, index) => {
+        if (!student?.id) return;
+
+        // Index 0 (z. B. Amelia N.) bleibt unverrückbar auf Apple Emerald Smaragdgrün (#10b981)
+        if (index === 0) {
+          map.set(student.id, '#10b981');
+          return;
+        }
+
+        const hue = Math.round((155 + index * stepAngle) % 360);
+        const isWarmLightZone = hue >= 40 && hue <= 85;
+        const l = isWarmLightZone ? 44 : 48;
+
+        map.set(student.id, `hsl(${hue}, 62%, ${l}%)`);
+      });
+
+      return map;
+    }, [students]);
+
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -221,130 +261,6 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
           </div>
 
 
-          {editingStudent && (
-            <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: activePlatform === 'campus' ? '#e6f4ea' : (activePlatform === 'groovelab' ? '#fefce8' : '#fce8e6'), border: `1px solid ${brandColor}`, borderRadius: '20px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: brandColor }}>Schüler bearbeiten</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
-                <input required aria-label="Vorname" placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-                <input required aria-label={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Instrument</label>
-                  <select 
-                    value={editingStudent.instrument || 'Gitarre'} 
-                    onChange={e => setEditingStudent({...editingStudent, instrument: e.target.value})} 
-                    style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
-                  >
-                    <option value="Gitarre">Gitarre</option>
-                    <option value="Bass">Bass</option>
-                    <option value="Drums">Drums</option>
-                    <option value="Piano / Keys">Piano / Keys</option>
-                    <option value="Vocals">Vocals</option>
-                    <option value="Trompete">Trompete</option>
-                    <option value="Posaune">Posaune</option>
-                    <option value="Horn">Horn</option>
-                    <option value="Cello">Cello</option>
-                    <option value="Geige">Geige</option>
-                    <option value="Klarinette">Klarinette</option>
-                    <option value="Querflöte">Querflöte</option>
-                    <option value="Saxofon">Saxofon</option>
-                  </select>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Genereller Login-Status</label>
-                  <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setEditingStudent({...editingStudent, status: 'active'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: (editingStudent.status || 'active') === 'active' ? '#ffffff' : 'transparent',
-                        color: (editingStudent.status || 'active') === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: (editingStudent.status || 'active') === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      ✅ Aktiv
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingStudent({...editingStudent, status: 'bypass'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: editingStudent.status === 'bypass' ? '#ffffff' : 'transparent',
-                        color: editingStudent.status === 'bypass' ? '#ef4444' : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: editingStudent.status === 'bypass' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      🚫 Gesperrt (Bypass)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Campus app_usage_mode Toggle (Only for Campus) */}
-                {activePlatform === 'campus' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Campus-Nutzungsmodus</label>
-                    <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'student_only'})}
-                        style={{
-                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                          background: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
-                          color: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? brandColor : '#64748b',
-                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                          boxShadow: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                        }}
-                      >
-                        📱 Selbstnutzer (Student)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'parent_hybrid'})}
-                        style={{
-                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                          background: editingStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-                          color: editingStudent.app_usage_mode === 'parent_hybrid' ? brandColor : '#64748b',
-                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                          boxShadow: editingStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                        }}
-                      >
-                        👪 Eltern-Hybrid
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
-                    <input type="checkbox" checked={editingStudent.is_trial || false} onChange={e => setEditingStudent({...editingStudent, is_trial: e.target.checked})} />
-                    In Probezeit
-                  </label>
-                </div>
-
-                {editingStudent.is_trial && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Probezeit Ende</label>
-                    <input aria-label="Probezeit Ende" type="date" value={editingStudent.trial_ends_at ? new Date(editingStudent.trial_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, trial_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Vertragsende</label>
-                  <input aria-label="Vertragsende" type="date" value={editingStudent.contract_ends_at ? new Date(editingStudent.contract_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, contract_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Aktualisieren</button>
-                <button type="button" onClick={() => setEditingStudent(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
-              </div>
-            </form>
-          )}
-
 
           <div style={{ position: 'relative', marginBottom: '4px', width: '100%' }}>
             <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
@@ -428,24 +344,30 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
               }
 
               return displayStudents.map(s => {
+                const studentRainbowColor = studentRosterColorMap.get(s.id) || brandColor;
+
                 return (
                   <div 
                     key={s.id} 
-                    className="glass-panel schueler-card-item" 
+                    className="schueler-card-item" 
                     style={{ 
-                      padding: isMobileLayout ? '14px 12px' : '18px 22px', 
+                      padding: isMobileLayout ? '14px 12px' : '16px 20px', 
                       background: 'white', 
                       display: 'flex', 
                       flexDirection: isMobileLayout ? 'column' : 'row',
                       justifyContent: 'space-between', 
                       alignItems: isMobileLayout ? 'stretch' : 'center', 
-                      gap: isMobileLayout ? '12px' : '8px',
-                      borderRadius: '24px', 
-                      border: '1px solid #e2e8f0', 
-                      borderLeft: `6px solid ${brandColor}`, 
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                      gap: isMobileLayout ? '12px' : '12px',
+                      borderRadius: '20px', 
+                      borderTop: '1px solid #e2e8f0', 
+                      borderRight: '1px solid #e2e8f0', 
+                      borderBottom: '1px solid #e2e8f0', 
+                      borderLeft: `3px solid ${studentRainbowColor}`, 
+                      boxShadow: '0 2px 8px -1px rgba(0, 0, 0, 0.04), 0 1px 3px -1px rgba(0, 0, 0, 0.02)',
                       transition: 'transform 0.2s, box-shadow 0.2s', 
-                      cursor: 'default' 
+                      cursor: 'default',
+                      minHeight: isMobileLayout ? 'auto' : '88px',
+                      boxSizing: 'border-box'
                     }} 
                   >
                     <div 
@@ -459,23 +381,23 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           fetchStudentProfile(s);
                         }
                       }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1, outline: 'none', borderRadius: '16px' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1, minWidth: 0, outline: 'none', borderRadius: '16px' }}
                     >
-                      <div style={{ position: 'relative' }}>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
                         <div style={{ 
-                          width: '56px', 
-                          height: '56px', 
+                          width: '52px', 
+                          height: '52px', 
                           borderRadius: '16px', 
-                          background: `${brandColor}15`,
+                          background: `${studentRainbowColor}14`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           overflow: 'hidden',
-                          border: '2px solid white',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                          border: '1.5px solid white',
+                          boxShadow: `0 0 0 1px #e2e8f0, 0 1px 3px rgba(0,0,0,0.06)`,
                           position: 'relative'
                         }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: studentRainbowColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
                           <img 
                             src={resolveUserAvatar(s, activePlatform)} 
                             style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
@@ -483,13 +405,28 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ fontWeight: 900, color: '#000000', fontSize: '1.1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
+                        <div 
+                          title={s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`}
+                          style={{ 
+                            fontWeight: 900, 
+                            color: '#0f172a', 
+                            fontSize: s.isGroup ? '0.98rem' : '1.05rem', 
+                            letterSpacing: '-0.01em', 
+                            lineHeight: '1.25',
+                            maxHeight: '44px',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'break-word'
+                          }}
+                        >
                           {s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {s.isGroup && (
-                            <div style={{ padding: '2px 6px', background: '#e0f2fe', color: '#0284c7', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
+                            <div style={{ padding: '2px 8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
                               👥 Gruppe
                             </div>
                           )}
@@ -514,40 +451,15 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     style={{ 
                       display: isMobileLayout ? 'grid' : 'flex', 
                       gridTemplateColumns: isMobileLayout 
-                        ? (activePlatform === 'campus' ? (canManageStudents ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)') : '1fr')
+                        ? (activePlatform === 'campus' ? 'repeat(3, 1fr)' : '1fr')
                         : 'none',
                       gap: '8px', 
                       marginLeft: isMobileLayout ? '0px' : '8px',
                       width: isMobileLayout ? '100%' : 'auto',
-                      marginTop: isMobileLayout ? '6px' : '0px'
+                      marginTop: isMobileLayout ? '6px' : '0px',
+                      flexShrink: 0
                     }}
                   >
-                    {canManageStudents && (
-                      <>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
-                          aria-label={`Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} bearbeiten`}
-                          style={{ 
-                            background: "#ffffff", 
-                            border: "1px solid #cbd5e1", 
-                            padding: "10px", 
-                            minHeight: '44px',
-                            borderRadius: "12px", 
-                            cursor: "pointer", 
-                            color: "#475569", 
-                            transition: 'all 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '100%'
-                          }} 
-                          className="hover-scale-mini"
-                          title="Bearbeiten"
-                        >
-                          <Pencil size={18} />
-                        </button>
-                      </>
-                    )}
                     {/* Hausaufgabenheft / Schüler-Protokoll Button (ONLY FOR CAMPUS MODULE) */}
                     {activePlatform === 'campus' && (
                       <button 

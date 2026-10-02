@@ -49,7 +49,7 @@ export function useTeacherAbsence({
   const [submittingAbsence, setSubmittingAbsence] = useState(false);
   const [cancellationsCount, setCancellationsCount] = useState(0);
 
-  // 🏛️ Synchronize absence date defaults whenever the simulation date changes
+  // 🏛️ Synchronize absence date defaults and handle quick ausfall reporting from Gemini mobile shell
   useEffect(() => {
     const handleSimDateSync = () => {
       const simNow = getSimulatedNow();
@@ -57,8 +57,20 @@ export function useTeacherAbsence({
       setAbsenceStartDate(simTodayStr);
       setAbsenceUntilDate(simTodayStr);
     };
+    const handleReportAusfall = () => {
+      const simNow = getSimulatedNow();
+      const simTodayStr = simNow.toLocaleDateString('sv-SE');
+      setAbsenceStartDate(simTodayStr);
+      setAbsenceUntilDate(simTodayStr);
+      setQuickAbsencePreset('today');
+      setShowAbsenceModal(true);
+    };
     window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
-    return () => window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
+    window.addEventListener('campus_report_ausfall', handleReportAusfall);
+    return () => {
+      window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
+      window.removeEventListener('campus_report_ausfall', handleReportAusfall);
+    };
   }, []);
 
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);

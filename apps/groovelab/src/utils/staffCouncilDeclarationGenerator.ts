@@ -1,19 +1,14 @@
-/**
- * Campus-Groovelab Official Staff Council & Employee Data Protection Declaration Generator
- * Standards: § 87 Abs. 1 Nr. 6 BetrVG, LPVG, BPersVG, BDSG § 26, DSGVO Art. 5, 28, 32, BSG B 12 R 3/20 R
- * 
- * Generates an official, print-ready, 2-page legal compliance certificate for school boards,
- * school directors, staff councils (Personalrat / Betriebsrat / Lehrerrat), and trade unions.
- */
+import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
 
 export interface StaffCouncilDeclarationOptions {
   schoolName?: string;
   schoolAddress?: string;
   schoolSigneeName?: string;
   schoolId?: string;
+  returnBlob?: boolean;
 }
 
-export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDeclarationOptions = {}): Promise<void> {
+export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDeclarationOptions = {}): Promise<Blob | void> {
   try {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -36,26 +31,68 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
       year: 'numeric'
     });
 
+    // Compute dynamic SHA-256 verification hash over canonical payload
+    const canonicalPayload = {
+      docType: 'STAFF_COUNCIL_DECLARATION_BETRVG_87',
+      schoolName: cleanSchoolName,
+      schoolId: options.schoolId || 'BETRVG-87',
+      date: currentDateStr,
+      legalNorm: 'BETRVG_87_ABS_1_NR_6_LPVG_BPERSVG',
+      operator: 'Patrick Huber, Rheinfelden'
+    };
+    const sha256Digest = await computeCanonicalPayloadHash(canonicalPayload);
+
+    const drawStaffCouncilHeader = (pageNum: number) => {
+      // Top Brand Accent Bar
+      doc.setFillColor(accentRed[0], accentRed[1], accentRed[2]);
+      doc.rect(0, 0, pageWidth, 5, 'F');
+
+      // Running Header (Two-tier, collision immune)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+      doc.text('CAMPUS-GROOVELAB • MITBESTIMMUNGS- & ARBEITNEHMERSCHUTZ-ATTEST', margin, 11);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Seite ${pageNum} von 2`, pageWidth - margin, 11, { align: 'right' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text('Geltungsbereich: § 87 Abs. 1 Nr. 6 BetrVG / LPVG (Ausschluss Verhaltenskontrolle)', margin, 15);
+
+      const maxRightWidth = contentWidth * 0.42;
+      let cleanSchool = cleanPdfText(cleanSchoolName);
+      const dateSuffix = ` | Stand: ${cleanPdfText(currentDateStr)}`;
+      if (doc.getTextWidth(`${cleanSchool}${dateSuffix}`) > maxRightWidth) {
+        while (cleanSchool.length > 5 && doc.getTextWidth(`${cleanSchool}...${dateSuffix}`) > maxRightWidth) {
+          cleanSchool = cleanSchool.slice(0, -1);
+        }
+        doc.text(`${cleanSchool}...${dateSuffix}`, pageWidth - margin, 15, { align: 'right' });
+      } else {
+        doc.text(`${cleanSchool}${dateSuffix}`, pageWidth - margin, 15, { align: 'right' });
+      }
+
+      doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+      doc.setLineWidth(0.4);
+      doc.line(margin, 18, pageWidth - margin, 18);
+    };
+
+    const drawStaffCouncilFooter = (pageNum: number) => {
+      doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+      doc.setLineWidth(0.4);
+      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+      doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256-${sha256Digest.slice(0, 24)}... • Amtliches Konformitätsattest`, margin, pageHeight - 8);
+      doc.text(`Seite ${pageNum} von 2`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+    };
+
     // ==========================================
     // PAGE 1: MITBESTIMMUNG & BETRVG § 87 COMPLIANCE
     // ==========================================
-
-    // Top Brand Accent Bar
-    doc.setFillColor(accentRed[0], accentRed[1], accentRed[2]);
-    doc.rect(0, 0, pageWidth, 5, 'F');
-
-    // Running Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text('CAMPUS-GROOVELAB • MITBESTIMMUNGS- & ARBEITNEHMERSCHUTZ-ATTEST', margin, 12);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${cleanSchoolName} | Stand: ${currentDateStr}`, pageWidth - margin, 12, { align: 'right' });
-
-    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
-    doc.setLineWidth(0.4);
-    doc.line(margin, 15, pageWidth - margin, 15);
+    drawStaffCouncilHeader(1);
 
     // Main Title Block
     doc.setFont('helvetica', 'bold');
@@ -119,24 +156,26 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     curY += 6;
     section1Points.forEach((p) => {
+      const splitP = doc.splitTextToSize(cleanPdfText(p.desc), contentWidth - 8);
+      const boxHeight = Math.max(23, 12 + splitP.length * 3.4);
+
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.roundedRect(margin, curY, contentWidth, 23, 2, 2, 'F');
+      doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'F');
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, curY, contentWidth, 23, 2, 2, 'S');
+      doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'S');
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.8);
       doc.setTextColor(accentRed[0], accentRed[1], accentRed[2]);
-      doc.text(p.title, margin + 4, curY + 6);
+      doc.text(cleanPdfText(p.title), margin + 4, curY + 6);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.6);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      const splitP = doc.splitTextToSize(p.desc, contentWidth - 8);
       doc.text(splitP, margin + 4, curY + 11.5);
 
-      curY += 27;
+      curY += boxHeight + 3.5;
     });
 
     // Section 2: Herrenberg-Compliance
@@ -159,52 +198,37 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     curY += 6;
     section2Points.forEach((p) => {
+      const splitP = doc.splitTextToSize(cleanPdfText(p.desc), contentWidth - 8);
+      const boxHeight = Math.max(23, 12 + splitP.length * 3.4);
+
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.roundedRect(margin, curY, contentWidth, 23, 2, 2, 'F');
+      doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'F');
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, curY, contentWidth, 23, 2, 2, 'S');
+      doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'S');
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.8);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(p.title, margin + 4, curY + 6);
+      doc.text(cleanPdfText(p.title), margin + 4, curY + 6);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.6);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      const splitP = doc.splitTextToSize(p.desc, contentWidth - 8);
       doc.text(splitP, margin + 4, curY + 11.5);
 
-      curY += 27;
+      curY += boxHeight + 3.5;
     });
 
     // Page 1 Footer
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text('Campus-Groovelab • Personalrats-Attest (§ 87 BetrVG) | Seite 1 von 2', pageWidth / 2, pageHeight - 8, { align: 'center' });
+    // Page 1 Footer
+    drawStaffCouncilFooter(1);
 
     // ==========================================
     // PAGE 2: DATENSCHUTZ, HOSTING & SIEGEL
     // ==========================================
     doc.addPage();
-
-    // Top Accent Bar
-    doc.setFillColor(accentRed[0], accentRed[1], accentRed[2]);
-    doc.rect(0, 0, pageWidth, 5, 'F');
-
-    // Running Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text('CAMPUS-GROOVELAB • MITBESTIMMUNGS- & ARBEITNEHMERSCHUTZ-ATTEST', margin, 12);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${cleanSchoolName} | Stand: ${currentDateStr}`, pageWidth - margin, 12, { align: 'right' });
-
-    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
-    doc.setLineWidth(0.4);
-    doc.line(margin, 15, pageWidth - margin, 15);
+    drawStaffCouncilHeader(2);
 
     curY = 24;
     doc.setFont('helvetica', 'bold');
@@ -283,15 +307,58 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFontSize(7.2);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text('Campus-Groovelab SaaS Operator • Sicherheits- & Betriebsleitung', margin + 6, curY + 45);
-    doc.text(`Rheinfelden (Baden) • Gültig ab Schuljahr 2026/2027 • Prüfsumme: SHA256-BETRVG-87-CG`, margin + 6, curY + 49);
+    doc.text(`Rheinfelden (Baden) • Gültig ab Schuljahr 2026/2027 • Prüfsumme: SHA256-${sha256Digest.slice(0, 32)}...`, margin + 6, curY + 49);
+
+    // Section 6: Audit Proofs & Invariants for Staff Council (harmonizes page 2 whitespace)
+    curY += 57;
+    doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+    doc.roundedRect(margin, curY, contentWidth, 58, 3, 3, 'F');
+    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, curY, contentWidth, 58, 3, 3, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.8);
+    doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+    doc.text('6. Prüfpfade & Kern-Invarianten für die Personalvertretung (§ 87 BetrVG)', margin + 6, curY + 6.5);
+
+    const auditBoxes = [
+      {
+        title: 'Technisches Überwachungsverbot & Telemetrie-Ausschluss',
+        desc: 'Der Produktiv-Quellcode schließt Telemetrie, Arbeitszeitaufzeichnungen und Auswertungen über Onlinezeiten von Lehrkräften systemisch aus. WORM-Audit-Logs protokollieren nur technische Sicherheitsvorgänge.'
+      },
+      {
+        title: 'Schulische Datenhoheit (Art. 28 DSGVO) & ISO 27001 Hosting',
+        desc: 'Ausschließliches Hosting im ISO 27001-zertifizierten deutschen Hetzner-Cluster (Falkenstein/Nürnberg). Keine US-Cloud-Abhängigkeit, kein Drittstaatentransfer (Schrems II konform).'
+      },
+      {
+        title: 'BSG Herrenberg-Schutzschild für Honorarkräfte',
+        desc: 'Die Plattform wahrt die didaktische und zeitliche Autonomie freier Honorarkräfte (§ 7a SGB IV). Raumdispositionen erfolgen zweistufig und ohne arbeitgeberseitige Weisungsbindung.'
+      }
+    ];
+
+    let boxY = curY + 12;
+    auditBoxes.forEach(ab => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.4);
+      doc.setTextColor(accentRed[0], accentRed[1], accentRed[2]);
+      doc.text(`• ${ab.title}:`, margin + 6, boxY);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+      const splitDesc = doc.splitTextToSize(ab.desc, contentWidth - 12);
+      doc.text(splitDesc, margin + 6, boxY + 3.8);
+      boxY += splitDesc.length * 3.2 + 5;
+    });
 
     // Page 2 Footer
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text('Campus-Groovelab • Personalrats-Attest (§ 87 BetrVG) | Seite 2 von 2', pageWidth / 2, pageHeight - 8, { align: 'center' });
+    drawStaffCouncilFooter(2);
 
-    // Download PDF
+    // Download PDF or Return Blob
     const filename = `Campus_Groovelab_Personalrats_Attest_BetrVG87_${new Date().getFullYear()}.pdf`;
+    if (options.returnBlob) {
+      return doc.output('blob');
+    }
     doc.save(filename);
   } catch (error) {
     console.error('Fehler beim Generieren des Personalrats-Attests:', error);

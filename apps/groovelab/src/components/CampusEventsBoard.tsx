@@ -73,6 +73,14 @@ import { isUUID } from '../utils/uuidValidator';
 import { formatGermanDate, formatGermanWeekday } from '../utils/formatters';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 import { CampusCalendarSyncHubModal } from './CampusCalendarSyncHubModal';
+import { CampusHolidayDetailModal } from './modals/CampusHolidayDetailModal';
+import { 
+  StatutoryEventItem, 
+  getStatutoryHolidaysAndFeiertage, 
+  mergeStatutoryWithImportedEvents, 
+  resolveStateFromZipCode,
+  formatPeriodSpanGerman
+} from '../utils/schoolHolidayEngine';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { supabase as defaultSupabase } from '../lib/supabase';
 
@@ -416,6 +424,12 @@ export function CampusEventsBoard({
   const [subscribedEvents, setSubscribedEvents] = useState<any[]>([]);
   const [calendarUrl, setCalendarUrl] = useState<string>(() => initialCache?.calendarUrl || '');
   const [icalActive, setIcalActive] = useState<boolean>(true);
+
+  // 🏛️ 0,1% Goldstandard: Statutory School Holidays & Feiertage State
+  const [showSchoolHolidays, setShowSchoolHolidays] = useState<boolean>(true);
+  const [holidayStateCode, setHolidayStateCode] = useState<string>('DE_BW');
+  const [showHolidayFilter, setShowHolidayFilter] = useState<boolean>(true);
+  const [selectedHolidayModalItem, setSelectedHolidayModalItem] = useState<StatutoryEventItem | null>(null);
   
   // Loaders (instant false if L1-cache is warm!)
   const [loadingLessons, setLoadingLessons] = useState<boolean>(() => !initialCache?.lessons || initialCache.lessons.length === 0);
@@ -2678,13 +2692,14 @@ export function CampusEventsBoard({
     return match ? `${match[1]}:${match[2]}` : '00:00';
   };
 
-  const getEventColors = (ev: any) => {
-    const COLOR_MAP: Record<string, { color: string, bg: string }> = {
-      '#a855f7': { color: '#a855f7', bg: '#f3e8ff' }, // Lila
-      '#f59e0b': { color: '#f59e0b', bg: '#fef3c7' }, // Gelb
-      '#3b82f6': { color: '#3b82f6', bg: '#eff6ff' }, // Blau
-      '#ef4444': { color: '#ef4444', bg: '#fee2e2' }, // Rot
-      '#34a853': { color: '#34a853', bg: '#e6f4ea' }, // Grün
+  const getEventColors = (ev: any): { color: string; bg: string; border?: string; textDark?: string } => {
+    const COLOR_MAP: Record<string, { color: string; bg: string; border: string; textDark: string }> = {
+      '#a855f7': { color: '#8b5cf6', bg: '#faf5ff', border: '#d8b4fe', textDark: '#6d28d9' }, // Violett / Konzert
+      '#f59e0b': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', textDark: '#92400e' }, // Amber / Workshop
+      '#3b82f6': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', textDark: '#1d4ed8' }, // Blau / Vorspiel
+      '#ef4444': { color: '#e11d48', bg: '#fff1f2', border: '#fecdd3', textDark: '#9f1239' }, // Rot / Prüfung
+      '#34a853': { color: '#16a34a', bg: '#f0fdf4', border: '#86efac', textDark: '#166534' }, // Grün / Ferien
+      '#6366f1': { color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe', textDark: '#4338ca' }, // Indigo / Feiertag
     };
 
     if (ev.color && COLOR_MAP[ev.color]) {
@@ -2694,29 +2709,40 @@ export function CampusEventsBoard({
     const tLower = (ev.title || '').toLowerCase();
     const cLower = (ev.category || '').toLowerCase();
 
-    if (cLower.includes('ferien') || cLower.includes('feiertag') || tLower.includes('ferien') || tLower.includes('feiertag') || tLower.includes('schulfrei') || tLower.includes('holiday') || tLower.includes('break')) {
-      return { color: '#34a853', bg: '#e6f4ea' };
+    // 1. 🏖️ Schulferien: Campus-Smaragdgrün (explizite Vorgabe: "Ferien sollen grün sein")
+    if (cLower === 'ferien' || cLower.includes('ferien') || tLower.includes('ferien') || tLower.includes('schulfrei') || tLower.includes('break') || tLower.includes('holiday')) {
+      return { color: '#16a34a', bg: '#f0fdf4', border: '#86efac', textDark: '#166534' };
     }
+
+    // 2. 🏛️ Gesetzliche Feiertage: Hoheitliches Indigo (strikt abgegrenzt von Ferien!)
+    if (cLower === 'feiertag' || cLower.includes('feiertag') || tLower.includes('feiertag') || tLower.includes('einheit') || tLower.includes('allerheiligen') || tLower.includes('neujahr') || tLower.includes('himmelfahrt') || tLower.includes('karfreitag') || tLower.includes('ostermontag') || tLower.includes('fronleichnam')) {
+      return { color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe', textDark: '#4338ca' };
+    }
+
+    // 3. 🎵 Konzerte & Schulfeste: Festliches Violett
+    if (cLower.includes('konzert') || cLower.includes('auftritt') || cLower.includes('fest') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('sommerfest') || tLower.includes('weihnachtsfeier') || tLower.includes('fest') || tLower.includes('show') || tLower.includes('gig')) {
+      return { color: '#8b5cf6', bg: '#faf5ff', border: '#d8b4fe', textDark: '#6d28d9' };
+    }
+
+    // 4. 🎹 Klassenvorspiele & Schülervorspiele: Pädagogisches Saphirblau
     if (cLower.includes('vorspiel') || cLower.includes('klassenvorspiel') || tLower.includes('vorspiel') || tLower.includes('klassenvorspiel') || tLower.includes('schülervorspiel') || tLower.includes('recital')) {
-      return { color: '#3b82f6', bg: '#eff6ff' };
+      return { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', textDark: '#1d4ed8' };
     }
-    if (cLower.includes('fest') || tLower.includes('fest') || tLower.includes('weihnachtsfeier') || tLower.includes('party') || tLower.includes('feier')) {
-      return { color: '#34a853', bg: '#e6f4ea' }; // Grün (was Orange)
+
+    // 5. 🎛️ Workshops, Meisterkurse & Bandproben: GrooveLab-Amber
+    if (cLower.includes('workshop') || cLower.includes('meisterkurs') || cLower.includes('clinic') || cLower.includes('probe') || cLower.includes('ensemble') || tLower.includes('workshop') || tLower.includes('meisterkurs') || tLower.includes('probe') || tLower.includes('bandprobe') || tLower.includes('rehearsal')) {
+      return { color: '#d97706', bg: '#fffbeb', border: '#fde68a', textDark: '#92400e' };
     }
-    if (cLower.includes('konzert') || cLower.includes('auftritt') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig')) {
-      return { color: '#a855f7', bg: '#f3e8ff' };
-    }
-    if (cLower.includes('probe') || cLower.includes('ensemble') || cLower.includes('bandprobe') || tLower.includes('probe') || tLower.includes('bandprobe') || tLower.includes('ensemble') || tLower.includes('rehearsal')) {
-      return { color: '#f59e0b', bg: '#fef3c7' };
-    }
-    if (cLower.includes('konferenz') || cLower.includes('sitzung') || cLower.includes('meeting') || tLower.includes('konferenz') || tLower.includes('sitzung') || tLower.includes('meeting') || tLower.includes('besprechung') || tLower.includes('lehrerkonferenz') || tLower.includes('fortbildung')) {
-      return { color: '#ef4444', bg: '#fee2e2' };
+
+    // 6. 📋 Prüfungen & Interne Termine: Korallenrot
+    if (cLower.includes('prüfung') || cLower.includes('leistungsabzeichen') || cLower.includes('konferenz') || cLower.includes('sitzung') || cLower.includes('meeting') || tLower.includes('prüfung') || tLower.includes('d1') || tLower.includes('d2') || tLower.includes('d3') || tLower.includes('lehrerkonferenz') || tLower.includes('fortbildung')) {
+      return { color: '#e11d48', bg: '#fff1f2', border: '#fecdd3', textDark: '#9f1239' };
     }
 
     if (ev.is_subscribed) {
-      return { color: '#64748b', bg: '#f1f5f9' };
+      return { color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1', textDark: '#334155' };
     }
-    return { color: '#6366f1', bg: '#e0e7ff' };
+    return { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', textDark: '#1d4ed8' };
   };
 
   const handleSelectEvent = (ev: any) => {
@@ -2877,13 +2903,19 @@ export function CampusEventsBoard({
     try {
       const { data, error } = await supabase
         .from('schools')
-        .select('calendar_url, opening_hours')
+        .select('calendar_url, opening_hours, zip_code, country')
         .eq('id', schoolId)
         .single();
       
       if (error) throw error;
       const campusSettings = data?.opening_hours?.campus_settings || {};
       setIcalActive(campusSettings.ical_active !== false);
+      if (campusSettings.show_school_holidays !== undefined) {
+        setShowSchoolHolidays(campusSettings.show_school_holidays !== false);
+      }
+      const determinedState = campusSettings.holiday_jurisdiction || resolveStateFromZipCode(data?.zip_code, data?.country);
+      setHolidayStateCode(determinedState);
+
       if (data?.calendar_url) {
         setCalendarUrl(data.calendar_url);
         // Non-blocking background sync: allow instant Campus internal schedule rendering first
@@ -3203,6 +3235,11 @@ export function CampusEventsBoard({
         if (bootstrapData.calendar_settings) {
           const campusSettings = bootstrapData.calendar_settings.opening_hours?.campus_settings || {};
           setIcalActive(campusSettings.ical_active !== false);
+          if (campusSettings.show_school_holidays !== undefined) {
+            setShowSchoolHolidays(campusSettings.show_school_holidays !== false);
+          }
+          const determinedState = campusSettings.holiday_jurisdiction || resolveStateFromZipCode(bootstrapData.calendar_settings.zip_code, bootstrapData.calendar_settings.country);
+          setHolidayStateCode(determinedState);
           if (bootstrapData.calendar_settings.calendar_url) {
             setCalendarUrl(bootstrapData.calendar_settings.calendar_url);
             setTimeout(() => {
@@ -4955,9 +4992,32 @@ export function CampusEventsBoard({
       return ev.is_public || ev.created_by === userId;
     });
 
+    // 🏛️ 0,1% Goldstandard: Statutory School Holidays & Feiertage (KMK Engine)
+    let statutoryEventsMapped: any[] = [];
+    if (showSchoolHolidays && showHolidayFilter) {
+      const rawStatutory = getStatutoryHolidaysAndFeiertage(holidayStateCode);
+      const deduplicatedStatutory = mergeStatutoryWithImportedEvents(rawStatutory, filteredSubscribed);
+      statutoryEventsMapped = deduplicatedStatutory.map(item => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        event_date: item.event_date,
+        event_end_date: item.event_end_date,
+        start_time: item.start_time || '00:00',
+        end_time: item.end_time || '23:59',
+        category: item.category,
+        is_subscribed: true,
+        is_statutory: true,
+        duration_days: item.duration_days,
+        state_name: item.state_name,
+        raw_holiday: item,
+        visibility: 'all'
+      }));
+    }
 
     const merged = [
       ...filteredSubscribed,
+      ...statutoryEventsMapped,
       ...filteredCustom.map(ev => ({
         id: ev.id,
         title: ev.title,
@@ -6257,36 +6317,36 @@ export function CampusEventsBoard({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '10px 12px',
-            borderRadius: '12px',
+            padding: '12px 14px',
+            borderRadius: '14px',
             background: rowBg,
             border: rowBorder,
             boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
             transition: 'all 0.2s',
-            gap: '10px',
+            gap: '12px',
             boxSizing: 'border-box'
           }}
           className="hover-scale-subtle"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-            {/* Ergonomic Date Block (44x44px for glanceability on music stands and tablets) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+            {/* Ergonomic Date Block (48x48px for glanceability on music stands and tablets) */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               background: dateBlockBg,
-              borderRadius: '10px',
+              borderRadius: '12px',
               padding: '3px',
-              width: '44px',
-              height: '44px',
+              width: '48px',
+              height: '48px',
               border: dateBlockBorder,
               flexShrink: 0
             }}>
-              <span style={{ fontSize: '9.5px', fontWeight: 900, textTransform: 'uppercase', color: subColor, letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', color: subColor, letterSpacing: '0.04em' }}>
                 {formatWeekday(occ.date)}
               </span>
-              <span style={{ fontSize: '15px', fontWeight: 900, color: textColor, marginTop: '-1px', lineHeight: 1 }}>
+              <span style={{ fontSize: '17px', fontWeight: 900, color: textColor, marginTop: '-1px', lineHeight: 1 }}>
                 {occ.date.substring(8, 10)}
               </span>
             </div>
@@ -6295,7 +6355,7 @@ export function CampusEventsBoard({
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ 
-                  fontSize: '13.5px', 
+                  fontSize: '15px', 
                   fontWeight: 800, 
                   color: textColor, 
                   textDecoration: 'none',
@@ -6306,7 +6366,7 @@ export function CampusEventsBoard({
                   {opponentName}
                   {displaySubject && (
                     <span style={{ 
-                      fontSize: '12px', 
+                      fontSize: '13px', 
                       fontWeight: 700, 
                       color: isCanceled ? subColor : brandColor, 
                       marginLeft: '6px' 
@@ -6318,7 +6378,7 @@ export function CampusEventsBoard({
 
                 {isGroupOcc && (
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 800,
                     background: '#eff6ff',
                     color: '#1d4ed8',
@@ -6341,14 +6401,14 @@ export function CampusEventsBoard({
                   if (isRoomChanged) {
                     return (
                       <span style={{
-                        fontSize: '12px',
+                        fontSize: '13px',
                         fontWeight: 700,
                         color: '#7c3aed',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px'
                       }} title={`Raum geändert zu ${rName}`}>
-                        <DoorClosed size={13} color="#7c3aed" style={{ flexShrink: 0 }} />
+                        <DoorClosed size={14} color="#7c3aed" style={{ flexShrink: 0 }} />
                         {rName}
                         <span 
                           style={{
@@ -6369,14 +6429,14 @@ export function CampusEventsBoard({
 
                   return (
                     <span style={{
-                      fontSize: '12px',
+                      fontSize: '13px',
                       fontWeight: 600,
                       color: '#64748b',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px'
                     }}>
-                      <DoorClosed size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <DoorClosed size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
                       {rName}
                     </span>
                   );
@@ -6384,7 +6444,7 @@ export function CampusEventsBoard({
 
                 {isPendingReview && (
                   <span style={{
-                    fontSize: '9px',
+                    fontSize: '10px',
                     fontWeight: 800,
                     background: '#fffbeb',
                     color: '#b45309',
@@ -6402,7 +6462,7 @@ export function CampusEventsBoard({
                 )}
                 {isRescheduled && (
                   <span style={{
-                    fontSize: '9px',
+                    fontSize: '10px',
                     fontWeight: 800,
                     background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
                     color: isGroupOcc ? '#0369a1' : '#b45309',
@@ -6416,7 +6476,7 @@ export function CampusEventsBoard({
                 )}
                 {isCanceled && (
                   <span style={{
-                    fontSize: '9px',
+                    fontSize: '10px',
                     fontWeight: 800,
                     background: '#fee2e2',
                     color: '#991b1b',
@@ -6430,17 +6490,17 @@ export function CampusEventsBoard({
                 )}
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.80rem', color: subColor, fontWeight: 700, marginTop: '3px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', color: subColor, fontWeight: 700, marginTop: '4px', flexWrap: 'wrap' }}>
                 {isRescheduled && occ.original_date && occ.original_date !== occ.date && (
                   <>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#b45309' }}>
-                      <Calendar size={13} /> (Statt {formatDateGerman(occ.original_date)})
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#b45309' }}>
+                      <Calendar size={14} /> (Statt {formatDateGerman(occ.original_date)})
                     </span>
                     <span>•</span>
                   </>
                 )}
-                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Clock size={13} /> {occ.start_time.substring(0, 5)} Uhr
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={14} /> {occ.start_time.substring(0, 5)} Uhr
                 </span>
                 <span>•</span>
                 <span>{occ.duration} Min</span>
@@ -6448,7 +6508,7 @@ export function CampusEventsBoard({
             </div>
           </div>
 
-          {/* Right Status / Actions with 38x38px Touch Targets */}
+          {/* Right Status / Actions with 40x40px Touch Targets */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {/* 1:1 Shoutbox Icon */}
             <button
@@ -6466,8 +6526,8 @@ export function CampusEventsBoard({
               style={{
                 border: hasMessages ? '1px solid #fde047' : '1px solid #f1f5f9',
                 background: hasMessages ? '#fefce8' : '#f8fafc',
-                width: '38px',
-                height: '38px',
+                width: '40px',
+                height: '40px',
                 padding: '0',
                 cursor: 'pointer',
                 display: 'flex',
@@ -6484,7 +6544,7 @@ export function CampusEventsBoard({
               onMouseLeave={(e) => e.currentTarget.style.background = hasMessages ? '#fefce8' : '#f8fafc'}
             >
               <MessageSquare 
-                size={17} 
+                size={18} 
                 color={hasMessages ? '#ca8a04' : '#64748b'}
                 fill={hasMessages ? '#eab308' : 'none'} 
                 style={{
@@ -6523,8 +6583,8 @@ export function CampusEventsBoard({
                 style={{
                   border: isCanceled ? '1px solid #e2e8f0' : (role === 'student' && !isAbsenceAllowed ? '1px solid #e2e8f0' : '1px solid #fee2e2'),
                   background: isCanceled ? '#f1f5f9' : (role === 'student' && !isAbsenceAllowed ? '#f8fafc' : '#fef2f2'),
-                  width: '38px',
-                  height: '38px',
+                  width: '40px',
+                  height: '40px',
                   padding: '0',
                   cursor: 'pointer',
                   display: 'flex',
@@ -6548,7 +6608,7 @@ export function CampusEventsBoard({
                 }}
               >
                 <CalendarX 
-                  size={17} 
+                  size={18} 
                   color={isCanceled ? '#94a3b8' : (role === 'student' && !isAbsenceAllowed ? '#64748b' : '#ef4444')} 
                 />
                 {role === 'student' && !isAbsenceAllowed && !isCanceled && (
@@ -6605,12 +6665,12 @@ export function CampusEventsBoard({
           boxSizing: 'border-box'
         }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              <CalendarDays size={18} color={brandColor} style={{ flexShrink: 0 }} />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <CalendarDays size={20} color={brandColor} style={{ flexShrink: 0 }} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Unterrichtstermine</span>
               <TourStartButton onClick={startTour} platformTheme={isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))} />
             </h3>
-            <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '2px 0 0 0', fontWeight: 550, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <p style={{ color: '#64748b', fontSize: '0.80rem', margin: '3px 0 0 0', fontWeight: 550, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Deine persönlichen Stundenplandaten
             </p>
           </div>
@@ -6649,25 +6709,25 @@ export function CampusEventsBoard({
                 border: 'none',
                 background: brandColor,
                 color: '#ffffff',
-                padding: '8px 14px',
+                padding: '8px 16px',
                 borderRadius: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '7px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                fontSize: '0.82rem',
+                fontSize: '0.84rem',
                 fontWeight: 800,
-                minHeight: '36px',
+                minHeight: '38px',
                 width: isMobilePortrait ? '100%' : 'auto',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
                 boxSizing: 'border-box'
               }}
             >
-              <CalendarPlus size={15} style={{ flexShrink: 0 }} />
+              <CalendarPlus size={16} style={{ flexShrink: 0 }} />
               <span>{isMobilePortrait ? 'Unterrichtstermine abonnieren' : 'Abonnieren'}</span>
             </button>
           )}
@@ -6677,9 +6737,9 @@ export function CampusEventsBoard({
         <div style={{
           display: 'flex',
           background: '#f1f5f9',
-          padding: '4px',
+          padding: '5px',
           borderRadius: '14px',
-          gap: '4px',
+          gap: '5px',
           width: '100%',
           boxSizing: 'border-box'
         }}>
@@ -6696,20 +6756,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'upcoming' ? '#ffffff' : 'transparent',
               color: lessonTab === 'upcoming' ? brandColor : '#64748b',
-              padding: '9px 10px',
+              padding: '10px 12px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.80rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'upcoming' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '7px'
             }}
           >
-            <Calendar size={14} /> Kommende
+            <Calendar size={15} /> Kommende
           </button>
           <button
             onClick={() => {
@@ -6724,20 +6784,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'past' ? '#ffffff' : 'transparent',
               color: lessonTab === 'past' ? brandColor : '#64748b',
-              padding: '9px 10px',
+              padding: '10px 12px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.80rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'past' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '7px'
             }}
           >
-            <History size={14} /> Vergangene
+            <History size={15} /> Vergangene
           </button>
           <button
             onClick={() => {
@@ -6752,20 +6812,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'cancelled' ? '#ffffff' : 'transparent',
               color: lessonTab === 'cancelled' ? '#ef4444' : '#64748b',
-              padding: '9px 10px',
+              padding: '10px 12px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.80rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'cancelled' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '7px'
             }}
           >
-            <FileText size={14} /> Absagen-Log
+            <FileText size={15} /> Absagen-Log
           </button>
         </div>
 
@@ -6819,11 +6879,11 @@ export function CampusEventsBoard({
                       boxShadow: '0 2px 6px rgba(0,0,0,0.01)'
                     }}
                   >
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {isExpanded ? <ChevronDown size={15} color="#64748b" /> : <ChevronRight size={15} color="#64748b" />}
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isExpanded ? <ChevronDown size={16} color="#64748b" /> : <ChevronRight size={16} color="#64748b" />}
                       {getMonthLabel(monthKey)}
                     </span>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 900, color: brandColor, background: `${brandColor}15`, padding: '2px 8px', borderRadius: '6px' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 900, color: brandColor, background: `${brandColor}15`, padding: '3px 8px', borderRadius: '6px' }}>
                       {occs.length} {occs.length === 1 ? 'Termin' : 'Termine'}
                     </span>
                   </div>
@@ -6905,7 +6965,7 @@ export function CampusEventsBoard({
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
-                                        padding: '8px 12px',
+                                        padding: '9px 12px',
                                         background: '#ffffff',
                                         border: '1px solid #f1f5f9',
                                         borderRadius: '10px',
@@ -6916,11 +6976,11 @@ export function CampusEventsBoard({
                                         touchAction: 'manipulation'
                                       }}
                                     >
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        {isWeekExpanded ? <ChevronDown size={13} color="#94a3b8" /> : <ChevronRight size={13} color="#94a3b8" />}
+                                      <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {isWeekExpanded ? <ChevronDown size={14} color="#94a3b8" /> : <ChevronRight size={14} color="#94a3b8" />}
                                         KW {wGroup.weekNum} ({wGroup.rangeStr})
                                       </span>
-                                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '2px 7px', borderRadius: '5px' }}>
                                         {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
                                       </span>
                                     </div>
@@ -6950,6 +7010,19 @@ export function CampusEventsBoard({
   };
 
   const renderTimelineColumn = () => {
+    const getEventMonthLabel = (dateStr: string): string => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length < 2) return '';
+      const year = parts[0];
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const MONTH_NAMES = [
+        'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+      ];
+      return `${MONTH_NAMES[monthIdx] || ''} ${year}`;
+    };
+
     return (
       <div id="tour-timeline-column" style={{
         background: isMobilePortrait ? 'transparent' : '#ffffff',
@@ -6968,223 +7041,355 @@ export function CampusEventsBoard({
       }}>
         {/* Title */}
         <div>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={18} color={brandColor} /> Campus &amp; Schultermine
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Calendar size={20} color={brandColor} /> Campus &amp; Schultermine
             {isAdminOrSecretary && (
               <TourStartButton onClick={startTour} platformTheme={isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))} />
             )}
           </h3>
-          <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
+          <p style={{ color: '#64748b', fontSize: '0.80rem', margin: '3px 0 0 0', fontWeight: 550 }}>
             Konzerte, Klassenvorspiele &amp; Termine
           </p>
+
+          {/* 🏖️ 0,1% Goldstandard: Header Quick-Toggle Button (Apple Pill Minimalism) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+            <button
+              onClick={() => setShowHolidayFilter(prev => !prev)}
+              role="button"
+              tabIndex={0}
+              aria-pressed={showHolidayFilter}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '7px',
+                padding: '6px 13px',
+                borderRadius: '10px',
+                fontSize: '0.80rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: '1px solid #e2e8f0',
+                background: showHolidayFilter ? '#ffffff' : '#f8fafc',
+                color: showHolidayFilter ? '#334155' : '#94a3b8',
+                boxShadow: showHolidayFilter ? '0 1px 3px rgba(0,0,0,0.04)' : 'none',
+                transition: 'all 0.15s ease',
+                touchAction: 'manipulation'
+              }}
+              title={showHolidayFilter ? "Schulferien und gesetzliche Feiertage in der Timeline ausblenden" : "Schulferien und gesetzliche Feiertage in der Timeline einblenden"}
+            >
+              <Palmtree size={14} color={showHolidayFilter ? (brandColor || '#16a34a') : '#94a3b8'} />
+              <span>{showHolidayFilter ? 'Ferien & Feiertage ausblenden' : 'Ferien & Feiertage einblenden'}</span>
+            </button>
+          </div>
         </div>
 
-
-
         {/* Unified Timeline List (Single Source of Scroll on Mobile) */}
-        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : 1, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: isMobilePortrait ? undefined : 'none', msOverflowStyle: isMobilePortrait ? undefined : 'none' }}>
-          {loadingEvents ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-              Termine werden geladen...
-            </div>
-          ) : getMergedTimelineEvents().length === 0 ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-              padding: '20px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '20px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : '1 1 0%', minHeight: 0, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: isMobilePortrait ? undefined : 'none', msOverflowStyle: isMobilePortrait ? undefined : 'none' }}>
+          {(() => {
+            const timelineEvents = getMergedTimelineEvents();
+            if (loadingEvents) {
+              return (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
+                  Termine werden geladen...
+                </div>
+              );
+            }
+
+            if (timelineEvents.length === 0) {
+              return (
                 <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                  flexDirection: 'column',
+                  gap: '14px',
+                  padding: '24px 20px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '20px',
+                  textAlign: 'center',
+                  alignItems: 'center'
                 }}>
-                  <Palmtree size={18} color={brandColor || '#34a853'} />
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                    Unterrichtsfreie Zeiten &amp; Ferien
-                  </h4>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
-                    Schuljahres-Orientierung
-                  </p>
-                </div>
-              </div>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: brandColor || '#34a853',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                  }}>
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                      Keine Termine im aktuellen Zeitraum
+                    </h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45, maxWidth: '340px' }}>
+                      {!showHolidayFilter 
+                        ? 'Der Filter „Ferien & Feiertage“ ist ausgeblendet. Klicke oben auf „Ferien & Feiertage einblenden“, um die Schulferien anzuzeigen.' 
+                        : 'Aktuell stehen keine Termine oder Konzerte an.'}
+                    </p>
+                  </div>
 
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #f1f5f9',
-                borderRadius: '14px',
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                fontSize: '0.74rem',
-                color: '#475569'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', paddingBottom: '6px' }}>
-                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Herbstferien</span>
-                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Ende Oktober / Nov.</span>
+                  {(role === 'admin' || role === 'secretary') && (
+                    <div style={{
+                      padding: '12px 14px',
+                      background: '#ffffff',
+                      border: `1px dashed ${brandColor || '#34a853'}60`,
+                      borderRadius: '12px',
+                      fontSize: '0.73rem',
+                      color: '#475569',
+                      textAlign: 'left',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      lineHeight: 1.4
+                    }}>
+                      💡 <strong>Schulkonzerte &amp; Klassenvorspiele</strong> werden im Sekretariat angelegt oder über den Schulkalender importiert.
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', paddingBottom: '6px' }}>
-                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Weihnachtsferien</span>
-                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Dezember / Januar</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', paddingBottom: '6px' }}>
-                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Osterferien</span>
-                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>März / April</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Pfingst- &amp; Sommerferien</span>
-                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Juni / Juli / August</span>
-                </div>
-              </div>
+              );
+            }
 
-              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45 }}>
-                An gesetzlichen Feiertagen und während der offiziellen Schulferien findet in der Regel kein regulärer Musikschulunterricht statt.
-              </p>
+            let lastMonth = '';
 
-              {(role === 'admin' || role === 'secretary') && (
-                <div style={{
-                  padding: '10px 12px',
-                  background: '#ffffff',
-                  border: `1px dashed ${brandColor || '#34a853'}60`,
-                  borderRadius: '12px',
-                  fontSize: '0.72rem',
-                  color: '#475569'
-                }}>
-                  💡 <strong>Tipp für Verwaltung:</strong> Neue Konzerte oder Klassenvorspiele kannst du oben rechts über <em>„Termin erstellen“</em> anlegen.
-                </div>
-              )}
-            </div>
-          ) : (
-            getMergedTimelineEvents().map((ev: any) => {
+            return timelineEvents.map((ev: any, idx: number) => {
+              const isStatutory = !!ev.is_statutory;
               const isSubscribed = ev.is_subscribed;
               const isMyEvent = ev.created_by === userId;
               const colors = getEventColors(ev);
               const catColor = colors.color;
-              const hasFestInTitle = (ev.title || '').toLowerCase().includes('fest');
+              const spanInfo = formatPeriodSpanGerman(ev.event_date, ev.event_end_date);
+              const isMultiDay = spanInfo.isMultiDay || (ev.duration_days && ev.duration_days > 1);
+
+              const currentMonth = getEventMonthLabel(ev.event_date);
+              const showMonthDivider = currentMonth && currentMonth !== lastMonth;
+              if (showMonthDivider) {
+                lastMonth = currentMonth;
+              }
 
               return (
-                <div
-                  key={ev.id}
-                  onClick={() => handleSelectEvent(ev)}
-                  draggable={role === 'admin' || role === 'secretary'}
-                  onDragStart={e => handleDragStart(e, ev)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    padding: '16px',
-                    borderRadius: '18px',
-                    cursor: (role === 'admin' || role === 'secretary') ? 'grab' : 'pointer',
-                    background: '#ffffff',
-                    border: '1px solid rgba(0, 0, 0, 0.06)',
-                    borderLeft: `4px solid ${catColor}`,
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
-                    position: 'relative'
-                  }}
-                  className="hover-scale-subtle"
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <React.Fragment key={ev.id}>
+                  {/* Apple-Style Monats-Trennlinie (Pure Typography & Subtle Hairline) */}
+                  {showMonthDivider && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      marginTop: idx === 0 ? '2px' : '16px',
+                      marginBottom: '4px',
+                      padding: '0 2px',
+                      flexShrink: 0
+                    }}>
                       <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 650,
-                        color: catColor,
-                        background: `${catColor}14`,
-                        padding: '3px 8px',
-                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        color: '#64748b',
+                        letterSpacing: '0.08em',
                         textTransform: 'uppercase'
                       }}>
-                        {ev.category}
+                        {currentMonth}
                       </span>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 650,
-                        color: ev.visibility === 'teachers' ? '#d97706' : ev.visibility === 'students' ? '#2563eb' : '#64748b',
-                        background: ev.visibility === 'teachers' ? '#fef3c7' : ev.visibility === 'students' ? '#dbeafe' : '#f1f5f9',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        {ev.visibility === 'teachers' ? 'Nur Lehrer' : ev.visibility === 'students' ? 'Nur Schüler' : 'Alle'}
-                      </span>
+                      <div style={{ flex: 1, height: '1px', background: '#f1f5f9' }} />
                     </div>
+                  )}
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      {!isSubscribed && isMyEvent && (
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id); }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '6px'
-                          }}
-                          title="Termin löschen"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${isStatutory ? (ev.category === 'Ferien' ? 'Schulferien' : 'Feiertag') : (ev.category || 'Termin')}: ${ev.title}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (isStatutory) {
+                          setSelectedHolidayModalItem(ev.raw_holiday || ev);
+                        } else {
+                          handleSelectEvent(ev);
+                        }
+                      }
+                    }}
+                    onClick={() => {
+                      if (isStatutory) {
+                        setSelectedHolidayModalItem(ev.raw_holiday || ev);
+                      } else {
+                        handleSelectEvent(ev);
+                      }
+                    }}
+                    draggable={!isStatutory && (role === 'admin' || role === 'secretary')}
+                    onDragStart={e => {
+                      if (!isStatutory) handleDragStart(e, ev);
+                    }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      padding: '14px 16px 14px 20px',
+                      borderRadius: '16px',
+                      cursor: isStatutory ? 'pointer' : ((role === 'admin' || role === 'secretary') ? 'grab' : 'pointer'),
+                      background: '#ffffff',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      boxSizing: 'border-box'
+                    }}
+                    className="hover-scale-subtle"
+                  >
+                    {/* Flush 4px Accent Bar on Left Edge (Zero Corner Distortion) */}
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: '10px',
+                      bottom: '10px',
+                      width: '4px',
+                      borderRadius: '0 3px 3px 0',
+                      background: catColor
+                    }} />
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                      <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1d1d1f', textAlign: 'left' }}>
-                        {ev.title}
-                      </h4>
-                      {!ev.is_planning_active && (role === 'admin' || role === 'secretary') && (
-                        <button
-                          onClick={e => { e.stopPropagation(); handleActivatePlanning(ev); }}
-                          style={{
-                            background: `${brandColor}12`,
-                            border: `1.5px solid ${brandColor}30`,
-                            color: brandColor,
+                    {/* Row 1: Category Badge on Left & Duration/Time on Right */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', minHeight: '20px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          color: catColor,
+                          background: `${catColor}14`,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em'
+                        }}>
+                          {isStatutory 
+                            ? (ev.category === 'Ferien' ? 'Schulferien' : 'Feiertag') 
+                            : (ev.category || 'Termin')}
+                        </span>
+
+                        {!isStatutory && ev.visibility && ev.visibility !== 'all' && (
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: ev.visibility === 'teachers' ? '#d97706' : '#2563eb',
+                            background: ev.visibility === 'teachers' ? '#fef3c7' : '#dbeafe',
                             padding: '3px 8px',
-                            borderRadius: '8px',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.15s',
-                            whiteSpace: 'nowrap'
-                          }}
-                          onMouseOver={e => { e.currentTarget.style.background = `${brandColor}22`; }}
-                          onMouseOut={e => { e.currentTarget.style.background = `${brandColor}12`; }}
-                          title="Für Event-Planung aktivieren"
-                        >
-                          <CalendarPlus size={12} /> Planen
-                        </button>
-                      )}
+                            borderRadius: '6px'
+                          }}>
+                            {ev.visibility === 'teachers' ? 'Nur Kollegium' : 'Nur Schüler'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {isMultiDay ? (
+                          <span style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 650,
+                            color: '#475569'
+                          }}>
+                            {ev.duration_days ? `${ev.duration_days} Tage unterrichtsfrei` : 'Schulfrei'}
+                          </span>
+                        ) : (
+                          ev.start_time ? (
+                            <span style={{
+                              fontSize: '0.78rem',
+                              fontWeight: 650,
+                              color: '#475569'
+                            }}>
+                              {ev.start_time.substring(0, 5)}{ev.end_time ? ` – ${ev.end_time.substring(0, 5)} Uhr` : ' Uhr'}
+                            </span>
+                          ) : null
+                        )}
+
+                        {!isSubscribed && isMyEvent && (
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id); }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#94a3b8',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                              transition: 'color 0.15s'
+                            }}
+                            onMouseOver={e => { e.currentTarget.style.color = '#ef4444'; }}
+                            onMouseOut={e => { e.currentTarget.style.color = '#94a3b8'; }}
+                            title="Termin löschen"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#515154', background: '#f5f5f7', padding: '4px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
-                      {formatDateGerman(ev.event_date)}
-                    </span>
+
+                    {/* Row 2: Event Title on Left & Clean Date Span on Right */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <h4 style={{
+                          margin: 0,
+                          fontSize: '1.02rem',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          textAlign: 'left',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {ev.title}
+                        </h4>
+                        {!isStatutory && !ev.is_planning_active && (role === 'admin' || role === 'secretary') && (
+                          <button
+                            onClick={e => { e.stopPropagation(); handleActivatePlanning(ev); }}
+                            style={{
+                              background: `${brandColor}12`,
+                              border: `1px solid ${brandColor}25`,
+                              color: brandColor,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 750,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s',
+                              whiteSpace: 'nowrap'
+                            }}
+                            onMouseOver={e => { e.currentTarget.style.background = `${brandColor}20`; }}
+                            onMouseOut={e => { e.currentTarget.style.background = `${brandColor}12`; }}
+                            title="Für Event-Planung aktivieren"
+                          >
+                            <CalendarPlus size={12} /> Planen
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Clean Typographic Date (Single-Day or Multi-Day Span) */}
+                      <span style={{
+                        fontSize: '0.84rem',
+                        fontWeight: 700,
+                        color: '#475569',
+                        whiteSpace: 'nowrap',
+                        textAlign: 'right',
+                        flexShrink: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}>
+                        <Calendar size={13} color="#94a3b8" />
+                        {isMultiDay 
+                          ? `${spanInfo.startWeekday ? `${spanInfo.startWeekday}, ` : ''}${spanInfo.startFormatted} – ${spanInfo.endWeekday ? `${spanInfo.endWeekday}, ` : ''}${spanInfo.endFormatted}`
+                          : `${spanInfo.startWeekday ? `${spanInfo.startWeekday}, ` : ''}${spanInfo.startFormatted}`}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
-            })
-          )}
+            });
+          })()}
         </div>
       </div>
     );
@@ -7210,11 +7415,11 @@ export function CampusEventsBoard({
         {/* Header */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={18} color={brandColor} /> Meine Events &amp; Mitwirkungen
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={20} color={brandColor} /> Meine Events &amp; Mitwirkungen
             </h3>
             <span style={{
-              fontSize: '0.66rem',
+              fontSize: '0.72rem',
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
@@ -7226,7 +7431,7 @@ export function CampusEventsBoard({
               In Vorbereitung
             </span>
           </div>
-          <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+          <p style={{ color: '#64748b', fontSize: '0.80rem', margin: '3px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
             Bühnenauftritte, Soundchecks &amp; Mitwirkenden-Abläufe
           </p>
         </div>
@@ -7261,10 +7466,10 @@ export function CampusEventsBoard({
           </div>
 
           <div style={{ maxWidth: '340px' }}>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
               Hier entsteht eine neue Funktion
             </h4>
-            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.55, fontWeight: 550 }}>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', lineHeight: 1.55, fontWeight: 550 }}>
               {isForStudent 
                 ? 'Wir entwickeln deine zentrale Mitwirkungs- & Event-Zentrale. Sobald dich deine Lehrkraft für Konzerte, Schülervorspiele oder Ensemble-Projekte einteilt, findest du deine Soundcheck-Zeiten und deinen Ablaufplan direkt hier.'
                 : 'Wir entwickeln das zentrale Mitwirkungs- & Programmbegleit-Board. Zukünftig planst du hier Schülervorspiele, Konzertbeiträge und Bühnenabläufe nahtlos im Team mit dem Sekretariat.'}
@@ -7290,15 +7495,15 @@ export function CampusEventsBoard({
               'Soundcheck- & Ablaufzeiten auf die Minute genau',
               'Digitales Programmheft & Raum-Übersicht'
             ].map((text, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
-                <Check size={13} color={brandColor} style={{ flexShrink: 0 }} />
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#475569', fontWeight: 650 }}>
+                <Check size={14} color={brandColor} style={{ flexShrink: 0 }} />
                 <span>{text}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Rocket size={13} color="#94a3b8" /> <CampusGroovelabText /> Roadmap
+          <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Rocket size={14} color="#94a3b8" /> <CampusGroovelabText /> Roadmap
           </div>
         </div>
       </div>
@@ -14081,6 +14286,14 @@ export function CampusEventsBoard({
           setShowPinGateModal(true);
         }}
         isParentUnlocked={checkIsParentUnlocked()}
+      />
+
+      {/* 🏛️ 0,1% Goldstandard: Statutory School Holiday Detail Modal (Spalte 3 Schutz) */}
+      <CampusHolidayDetailModal
+        isOpen={!!selectedHolidayModalItem}
+        onClose={() => setSelectedHolidayModalItem(null)}
+        holidayItem={selectedHolidayModalItem}
+        brandColor={brandColor || '#34a853'}
       />
 
       {/* 1:1 Shoutbox Overlay Modal */}

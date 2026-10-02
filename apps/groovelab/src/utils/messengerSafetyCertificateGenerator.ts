@@ -6,17 +6,20 @@
  * school boards, parents, legal counsel, and supervisory school authorities.
  */
 
+import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
+
 export interface MessengerSafetyCertificateOptions {
   schoolName?: string;
   schoolAddress?: string;
   schoolId?: string;
   signeeName?: string;
   schoolSigneeName?: string;
+  returnBlob?: boolean;
 }
 
 export async function generateMessengerSafetyCertificatePDF(
   options: MessengerSafetyCertificateOptions = {}
-): Promise<void> {
+): Promise<Blob | void> {
   try {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -41,22 +44,44 @@ export async function generateMessengerSafetyCertificatePDF(
     });
     const certificateId = `CG-SAFE-HARBOR-${(options.schoolId || 'TENANT').slice(0, 6).toUpperCase()}-${new Date().getFullYear()}`;
 
+    // Cryptographic verification hash calculation over canonical payload
+    const canonicalPayload = {
+      certificateId,
+      docType: 'MESSENGER_CHILD_PROTECTION_SAFETY_CERTIFICATE',
+      schoolName: cleanSchoolName,
+      schoolId: options.schoolId || 'TENANT',
+      date: currentDateStr,
+      legalNorms: 'BGB_832_831_SGB_VIII_8A_JUSCHG_DSA_6'
+    };
+    const sha256Digest = await computeCanonicalPayloadHash(canonicalPayload);
+
     // Top Brand Accent Bar (Emerald)
     doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.rect(0, 0, pageWidth, 5, 'F');
 
-    // Running Header
+    // Running Header (Two-tier, collision immune)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text('CAMPUS-GROOVELAB ENTERPRISE+ • MESSENGER- & KINDERSCHUTZ-SICHERHEITSATTEST', margin, 12);
+    doc.text('CAMPUS-GROOVELAB ENTERPRISE+ • MESSENGER- & KINDERSCHUTZ-SICHERHEITSATTEST', margin, 11);
 
+    const maxRightWidth = contentWidth * 0.42;
+    let cleanSchool = cleanPdfText(cleanSchoolName);
+    const dateSuffix = ` | Stand: ${cleanPdfText(currentDateStr)}`;
     doc.setFont('helvetica', 'normal');
-    doc.text(`${cleanSchoolName} | Stand: ${currentDateStr}`, pageWidth - margin, 12, { align: 'right' });
+    doc.setFontSize(7);
+    if (doc.getTextWidth(`${cleanSchool}${dateSuffix}`) > maxRightWidth) {
+      while (cleanSchool.length > 5 && doc.getTextWidth(`${cleanSchool}...${dateSuffix}`) > maxRightWidth) {
+        cleanSchool = cleanSchool.slice(0, -1);
+      }
+      doc.text(`${cleanSchool}...${dateSuffix}`, pageWidth - margin, 11, { align: 'right' });
+    } else {
+      doc.text(`${cleanSchool}${dateSuffix}`, pageWidth - margin, 11, { align: 'right' });
+    }
 
     doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
     doc.setLineWidth(0.4);
-    doc.line(margin, 15, pageWidth - margin, 15);
+    doc.line(margin, 14, pageWidth - margin, 14);
 
     // Main Title Block
     doc.setFont('helvetica', 'bold');
@@ -91,7 +116,7 @@ export async function generateMessengerSafetyCertificatePDF(
       'gegenüber Aufsichtsbehörden und Erziehungsberechtigten, dass die in der Plattform Campus-Groovelab eingesetzte ' +
       'Kommunikationsinfrastruktur alle technisch-organisatorischen Vorkehrungen (TOMs) erfüllt, um Cybermobbing, ' +
       'Ehrverletzungen und Pflichtverletzungen nach §§ 832, 823 BGB systemisch auszuschließen.';
-    const splitPreambel = doc.splitTextToSize(preambelText, contentWidth - 8);
+    const splitPreambel = doc.splitTextToSize(cleanPdfText(preambelText), contentWidth - 8);
     doc.text(splitPreambel, margin + 4, 48);
 
     // ==========================================
@@ -142,18 +167,18 @@ export async function generateMessengerSafetyCertificatePDF(
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(p.title, margin + 12, yPos + 6.5);
+      doc.text(cleanPdfText(p.title), margin + 12, yPos + 6.5);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(sealAmber[0], sealAmber[1], sealAmber[2]);
-      doc.text(p.legal, margin + 12, yPos + 10.5);
+      doc.text(cleanPdfText(p.legal), margin + 12, yPos + 10.5);
 
       // Description
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      const splitDesc = doc.splitTextToSize(p.desc, contentWidth - 16);
+      const splitDesc = doc.splitTextToSize(cleanPdfText(p.desc), contentWidth - 16);
       doc.text(splitDesc, margin + 12, yPos + 15);
 
       yPos += 35;
@@ -170,7 +195,7 @@ export async function generateMessengerSafetyCertificatePDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('⚖️ RECHTLICHE WIRKUNG & HAFTUNGSAUSSCHLUSS:', margin + 4, yPos + 6);
+    doc.text('RECHTLICHE WIRKUNG & HAFTUNGSAUSSCHLUSS:', margin + 4, yPos + 6);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
@@ -180,7 +205,7 @@ export async function generateMessengerSafetyCertificatePDF(
       'Fachsoftware ein. Durch den systemischen Ausschluss offener Chaträume sowie die Vorab-Filterung beleidigender ' +
       'Inhalte hat die Leitung alle organisatorisch und technisch zumutbaren Sorgfaltspflichten erfüllt (§ 832 BGB). ' +
       'Die Haftung als Störer oder mittelbarer Täter entfällt; für die Plattform greift das Host-Provider-Privileg gem. Art. 6 DSA.';
-    const splitLegal = doc.splitTextToSize(legalNotice, contentWidth - 8);
+    const splitLegal = doc.splitTextToSize(cleanPdfText(legalNotice), contentWidth - 8);
     doc.text(splitLegal, margin + 4, yPos + 11);
 
     // Signatures & Timestamp
@@ -205,14 +230,17 @@ export async function generateMessengerSafetyCertificatePDF(
     doc.setFontSize(6.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text(
-      `Verifikations-Hash (SHA-256): e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 • Dokument gültig ohne handschriftliche Unterschrift`,
+      `Verifikations-Hash (SHA-256): ${sha256Digest} • Dokument gültig ohne handschriftliche Unterschrift`,
       pageWidth / 2,
       pageHeight - 6,
       { align: 'center' }
     );
 
-    // Save PDF
+    // Save PDF or Return Blob
     const filename = `Campus-Groovelab-Messenger-Sicherheitsattest-${options.schoolId || 'Schule'}.pdf`;
+    if (options.returnBlob) {
+      return doc.output('blob');
+    }
     doc.save(filename);
   } catch (err) {
     console.error('[MessengerSafetyCertificateGenerator] Error generating PDF:', err);

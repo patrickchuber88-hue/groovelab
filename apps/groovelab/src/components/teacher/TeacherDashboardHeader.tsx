@@ -123,6 +123,8 @@ export function TeacherDashboardHeader({
 
         {/* Quick Actions & Privacy Eye */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+
           <button
             onClick={toggleRealNames}
             title={showRealNames ? 'Datenschutz-Modus aktivieren (Vorname N.)' : 'Vollständige Schülernamen anzeigen'}

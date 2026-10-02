@@ -21,6 +21,7 @@ export const getNormalizedSongTitle = (s: any) => {
   return (info.artist && info.title) ? `${info.artist} - ${info.title}` : info.canonical;
 };
 import { harmonizeAudioList } from '../../../../utils/audioNamingHelper';
+import { parseHomeworkNotesPayload } from '../../../../utils/homeworkSnapshotHelper';
 
 export interface UseMeisterwerkHomeworkParams {
   student: Student;
@@ -119,6 +120,53 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
   useEffect(() => {
     latestTeacherNotesRef.current = teacherNotes;
   }, [teacherNotes]);
+
+  // 🏛️ Tier-1 Hydration of generalHomeworkNotes from current week's snapshot or local cache
+  useEffect(() => {
+    if (!student?.id) return;
+    if (viewingWeekOffset !== 0) return;
+
+    if (!generalHomeworkNotes.trim()) {
+      const currentIso = getTargetWeekIso(0);
+      const currentWeekNum = currentIso.split('-W')[1] || '';
+
+      // 1. From progressItems (DB SSOT)
+      const curItem = (progressItems || []).find((item: any) => {
+        if (!item?.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+        const itW = getItemWeek(item);
+        if (itW && itW === currentIso) return true;
+        if (item.updated_at && getISOWeek(item.updated_at) === currentIso) return true;
+        if (currentWeekNum && item.topic_name.includes(`KW ${currentWeekNum}`)) return true;
+        return false;
+      });
+
+      if (curItem?.homework_notes) {
+        try {
+          const parsed = parseHomeworkNotesPayload(curItem.homework_notes);
+          if (parsed.didacticNotes.length > 0) {
+            const joined = parsed.didacticNotes.join('\n\n');
+            setGeneralHomeworkNotes(joined);
+            latestGeneralHomeworkNotesRef.current = joined;
+            return;
+          }
+        } catch {}
+      }
+
+      // 2. From L1 Cache (localStorage)
+      try {
+        const raw = localStorage.getItem(`campus_homework_notes_${student.id}`);
+        if (raw) {
+          const parsed = parseHomeworkNotesPayload(raw);
+          if (parsed.didacticNotes.length > 0) {
+            const joined = parsed.didacticNotes.join('\n\n');
+            setGeneralHomeworkNotes(joined);
+            latestGeneralHomeworkNotesRef.current = joined;
+            return;
+          }
+        }
+      } catch {}
+    }
+  }, [student?.id, viewingWeekOffset, progressItems]);
 
   // Autosave and change tracking state
   const [hasChanges, setHasChanges] = useState<boolean>(false);

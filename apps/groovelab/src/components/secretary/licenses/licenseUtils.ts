@@ -39,6 +39,7 @@ export const downloadCancellationReceiptPdf = async (cancellationInfo: {
   effectiveEndDateFormatted: string;
   schoolName?: string;
   schoolNumericId?: number | string;
+  returnBlob?: boolean;
 }) => {
   try {
     const { default: jsPDF } = await import('jspdf');
@@ -107,6 +108,10 @@ export const downloadCancellationReceiptPdf = async (cancellationInfo: {
     doc.text('Dieses Dokument wurde elektronisch erstellt und ist gem. § 312k Abs. 4 BGB i.V.m. § 126b BGB rechtsverbindlich.', 16, 156);
     doc.text('Campus-Groovelab Cloud Services • Hosting & School Management Infrastructure', 16, 161);
 
+    if (cancellationInfo.returnBlob) {
+      return doc.output('blob');
+    }
+
     doc.save(`Kuendigungsbestaetigung_Campus_Groovelab_${sName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   } catch (e) {
     console.error("Error generating cancellation PDF:", e);
@@ -120,6 +125,7 @@ export const downloadUpgradeConfirmationPdf = async (upgradeInfo: {
   schoolName?: string;
   schoolNumericId?: number | string;
   effectiveEndDateFormatted: string;
+  returnBlob?: boolean;
 }) => {
   try {
     const { default: jsPDF } = await import('jspdf');
@@ -186,6 +192,10 @@ export const downloadUpgradeConfirmationPdf = async (upgradeInfo: {
     doc.setTextColor(148, 163, 184);
     doc.text('Dieses Dokument wurde elektronisch erstellt und ist gem. § 311 Abs. 1 BGB i.V.m. § 126b BGB rechtsverbindlich.', 16, 160);
     doc.text('Campus-Groovelab Cloud Services • Hosting & School Management Infrastructure', 16, 165);
+
+    if (upgradeInfo.returnBlob) {
+      return doc.output('blob');
+    }
 
     doc.save(`Vertragsaenderung_Kombi_Paket_${sName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   } catch (e) {

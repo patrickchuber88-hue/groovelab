@@ -31,7 +31,8 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
       return;
     }
     const payload = JSON.stringify({
-      contract: 'AVV_ART_28_DSGVO_V2026.1',
+      contract: `AVV_ART_28_DSGVO_V${ACTIVE_LEGAL_VERSION}`,
+      contractVersion: ACTIVE_LEGAL_VERSION,
       schoolName: schoolName.trim(),
       adminName: adminName.trim(),
       confirmationDate,

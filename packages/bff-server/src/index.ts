@@ -145,7 +145,7 @@ app.use((req, res, next) => {
       }
     }
 
-    // 3. Strict Fail-Closed Origin Verification
+    // 3. Strict Fail-Closed Origin Verification (Supporting Multi-Tenant Subdomains)
     const configuredOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
     const trustedOrigins = new Set([
       configuredOrigin,
@@ -154,17 +154,53 @@ app.use((req, res, next) => {
       'http://localhost:5173',
       'http://localhost:4000',
     ]);
-    if (!requestOrigin || !trustedOrigins.has(requestOrigin)) {
-      dispatchSecurityAlert('CSRF_ORIGIN_MISMATCH', req, { requestOrigin, configuredOrigin });
-      return res.status(403).json({ error: 'CSRF blocked: Untrusted or missing origin' });
+
+    const isAllowedOrigin = (origin: string | undefined): boolean => {
+      if (!origin) return false;
+      if (trustedOrigins.has(origin)) return true;
+      try {
+        const parsed = new URL(origin);
+        // Authoritative verification for all multi-tenant school subdomains (*.campus-groovelab.de)
+        if (
+          parsed.protocol === 'https:' &&
+          (parsed.hostname === 'campus-groovelab.de' || parsed.hostname.endsWith('.campus-groovelab.de'))
+        ) {
+          return true;
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    };
+
+    // 3a. Pre-Auth Site Gate Exception (Allows initial gate unlocks & native form fallbacks)
+    const isGateRoute = req.originalUrl.includes('/gate') || req.path.includes('/gate');
+    if (isGateRoute) {
+      // If an explicit origin is present, ensure it is not malicious/untrusted
+      if (requestOrigin && !isAllowedOrigin(requestOrigin)) {
+        dispatchSecurityAlert('CSRF_GATE_UNTRUSTED_ORIGIN', req, { requestOrigin });
+        return res.status(403).json({ error: 'CSRF blocked: Untrusted gate origin' });
+      }
+      // If request is from browser navigation / same-site form POST without Origin, allow gate check
+      // Gate route is strictly protected by IP-rate limiter & timingSafeEqual password comparison
+    } else {
+      // Standard API & DB endpoints require strict Origin match
+      if (!requestOrigin || !isAllowedOrigin(requestOrigin)) {
+        dispatchSecurityAlert('CSRF_ORIGIN_MISMATCH', req, { requestOrigin, configuredOrigin });
+        return res.status(403).json({ error: 'CSRF blocked: Untrusted or missing origin' });
+      }
     }
 
-    // 4. Host Mismatch Prevention (Host Header Poisoning)
+    // 4. Host Mismatch Prevention (Host Header Poisoning Defense)
     const hostHeader = req.headers.host;
     if (hostHeader && requestOrigin) {
       try {
         const originHost = new URL(requestOrigin).host;
-        if (originHost !== hostHeader) {
+        const isDomainFamily =
+          (originHost === 'campus-groovelab.de' || originHost.endsWith('.campus-groovelab.de')) &&
+          (hostHeader === 'campus-groovelab.de' || hostHeader.endsWith('.campus-groovelab.de'));
+
+        if (originHost !== hostHeader && !isDomainFamily) {
           dispatchSecurityAlert('HOST_HEADER_MISMATCH', req, { originHost, hostHeader });
           return res.status(403).json({ error: 'CSRF blocked: Host mismatch' });
         }

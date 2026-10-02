@@ -6,14 +6,17 @@
  * municipal IT departments, data protection officers (DPO), and state supervisory authorities.
  */
 
+import { cleanPdfText } from './pdfTypographyEngine';
+
 export interface DpoDossierOptions {
   schoolName?: string;
   schoolAddress?: string;
   schoolSigneeName?: string;
   schoolId?: string;
+  returnBlob?: boolean;
 }
 
-export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions = {}): Promise<void> {
+export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions = {}): Promise<Blob | void> {
   try {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -44,18 +47,45 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
       doc.setFillColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
       doc.rect(0, 0, pageWidth, 5, 'F');
 
-      // Top running header
+      // Top running header - 2-tier layout with width bounds
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text('CAMPUS-GROOVELAB • BEHÖRDLICHES DATENSCHUTZ- & COMPLIANCE-DOSSIER', margin, 12);
+      doc.setFontSize(7.5);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text('CAMPUS-GROOVELAB • BEHÖRDLICHES DATENSCHUTZ- & COMPLIANCE-DOSSIER', margin, 11);
 
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Seite ${pageNum} von 5`, pageWidth - margin, 11, { align: 'right' });
+
+      // Sub-line: Section title on left, School name and date on right (collision immune)
       doc.setFont('helvetica', 'normal');
-      doc.text(`${cleanSchoolName} | Stand: ${currentDateStr}`, pageWidth - margin, 12, { align: 'right' });
+      doc.setFontSize(7);
+      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+      const maxLeftWidth = contentWidth * 0.50;
+      const maxRightWidth = contentWidth * 0.46;
+
+      let leftSection = cleanPdfText(titleText);
+      if (doc.getTextWidth(leftSection) > maxLeftWidth) {
+        while (leftSection.length > 5 && doc.getTextWidth(leftSection + '...') > maxLeftWidth) {
+          leftSection = leftSection.slice(0, -1);
+        }
+        leftSection += '...';
+      }
+      doc.text(leftSection, margin, 15);
+
+      let cleanSchool = cleanPdfText(cleanSchoolName);
+      const dateSuffix = ` | Stand: ${cleanPdfText(currentDateStr)}`;
+      if (doc.getTextWidth(`${cleanSchool}${dateSuffix}`) > maxRightWidth) {
+        while (cleanSchool.length > 5 && doc.getTextWidth(`${cleanSchool}...${dateSuffix}`) > maxRightWidth) {
+          cleanSchool = cleanSchool.slice(0, -1);
+        }
+        doc.text(`${cleanSchool}...${dateSuffix}`, pageWidth - margin, 15, { align: 'right' });
+      } else {
+        doc.text(`${cleanSchool}${dateSuffix}`, pageWidth - margin, 15, { align: 'right' });
+      }
 
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.setLineWidth(0.4);
-      doc.line(margin, 15, pageWidth - margin, 15);
+      doc.line(margin, 18, pageWidth - margin, 18);
 
       // Running footer
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
@@ -64,7 +94,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
 
       doc.setFontSize(7.5);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text('Rechtskonform nach DSGVO, DIN 66398, BSI IT-Grundschutz und Schulrecht der Bundesländer', margin, pageHeight - 8);
+      doc.text('Rechtskonform nach DSGVO & DIN 66398 • Sicherheitsarchitektur nach ISO/IEC 27001 & 27701 (PIMS)', margin, pageHeight - 8);
       doc.text(`Seite ${pageNum} von 5`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     };
 
@@ -81,10 +111,10 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     doc.text('Datenschutz- & Compliance-Dossier', margin, curY);
 
     curY += 6;
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
-    doc.text('VERZEICHNIS VON VERARBEITUNGSTÄTIGKEITEN (ART. 30) • DSFA (ART. 35) • T.O.M. (ART. 32 DSGVO)', margin, curY);
+    doc.text('VVT (ART. 30) • DSFA (ART. 35) • T.O.M. (ART. 32 DSGVO) • ISO 27001 / ISO 27701 (PIMS)', margin, curY);
 
     curY += 5;
     doc.setFont('helvetica', 'normal');
@@ -105,34 +135,59 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
     doc.text('STAMMDATEN DER VERARBEITUNG / MANDANT:', margin + 6, curY + 7);
 
+    const maxValWidth = 44;
+    let dispSchool = cleanSchoolName;
+    if (doc.getTextWidth(dispSchool) > maxValWidth) {
+      while (dispSchool.length > 5 && doc.getTextWidth(dispSchool + '...') > maxValWidth) {
+        dispSchool = dispSchool.slice(0, -1);
+      }
+      dispSchool += '...';
+    }
+
+    let dispAddr = cleanAddress;
+    if (doc.getTextWidth(dispAddr) > maxValWidth) {
+      while (dispAddr.length > 5 && doc.getTextWidth(dispAddr + '...') > maxValWidth) {
+        dispAddr = dispAddr.slice(0, -1);
+      }
+      dispAddr += '...';
+    }
+
+    let dispSignee = cleanSignee;
+    if (doc.getTextWidth(dispSignee) > maxValWidth) {
+      while (dispSignee.length > 5 && doc.getTextWidth(dispSignee + '...') > maxValWidth) {
+        dispSignee = dispSignee.slice(0, -1);
+      }
+      dispSignee += '...';
+    }
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text(`Schulträger / Einrichtung:`, margin + 6, curY + 14);
+    doc.text(`Schulträger / Mandant:`, margin + 6, curY + 14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text(cleanSchoolName, margin + 46, curY + 14);
+    doc.text(dispSchool, margin + 44, curY + 14);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text(`Anschrift / Dienstsitz:`, margin + 6, curY + 20);
-    doc.text(cleanAddress, margin + 46, curY + 20);
+    doc.text(dispAddr, margin + 44, curY + 20);
 
     doc.text(`Vertretungsberechtigt:`, margin + 6, curY + 26);
-    doc.text(cleanSignee, margin + 46, curY + 26);
+    doc.text(dispSignee, margin + 44, curY + 26);
 
-    doc.text(`Plattform & Auftragsverarbeiter:`, margin + 105, curY + 14);
+    doc.text(`Auftragsverarbeiter:`, margin + 94, curY + 14);
     doc.setFont('helvetica', 'bold');
-    doc.text('Campus-Groovelab (DE)', margin + 150, curY + 14);
+    doc.text('Campus-Groovelab (DE)', margin + 128, curY + 14);
 
     doc.setFont('helvetica', 'normal');
-    doc.text(`Prüf- & Ausstellungsdatum:`, margin + 105, curY + 20);
-    doc.text(`${currentDateStr} (MESZ)`, margin + 150, curY + 20);
+    doc.text(`Ausstellungsdatum:`, margin + 94, curY + 20);
+    doc.text(`${currentDateStr} (MESZ)`, margin + 128, curY + 20);
 
-    doc.text(`Sicherheitsklassifizierung:`, margin + 105, curY + 26);
+    doc.text(`Sicherheits-Status:`, margin + 94, curY + 26);
     doc.setTextColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
     doc.setFont('helvetica', 'bold');
-    doc.text('ASVS Level 3 / Fail-Closed', margin + 150, curY + 26);
+    doc.text('ISO 27001 / PIMS (ASVS L3)', margin + 128, curY + 26);
 
     // Management Summary Card
     curY += 42;
@@ -163,8 +218,8 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
 
     const pillars = [
       {
-        title: 'A. 100% Rechenzentren in Deutschland',
-        desc: 'Ausschließliche Datenverarbeitung in ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland). 100% autarker, selbst gehosteter Technologie-Stack – 0,00% Drittlandtransfer, vollständige Immunität gegen US-FISA 702 und den US CLOUD Act.'
+        title: 'A. 100% Rechenzentren in Deutschland (ISO 27001)',
+        desc: 'Ausschließliche Datenverarbeitung in ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der Hetzner Online GmbH (Falkenstein & Nürnberg) mit integrierter PIMS-Datenschutzarchitektur nach ISO/IEC 27701. 100% autarker Technologie-Stack – 0,00% Drittlandtransfer, vollständige Immunität gegen US-FISA 702 und den US CLOUD Act.'
       },
       {
         title: 'B. Radikale Datenminimierung Minderjähriger',
@@ -373,31 +428,36 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
 
     curY = 24;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(11);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
     doc.text('5. Technisch-organisatorische Maßnahmen (TOM nach Art. 32 DSGVO)', margin, curY);
 
-    curY += 6;
+    curY += 4.5;
+    doc.setFontSize(9);
+    doc.setTextColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
+    doc.text('Sicherheitsarchitektur nach ISO/IEC 27001:2022 & ISO/IEC 27701 (PIMS)', margin, curY);
+
+    curY += 5.5;
     const toms = [
       {
-        t: '1. Vertraulichkeit & Mandanten-Airgap (Art. 32 Abs. 1 lit. b)',
-        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs; Bcrypt-Hashing (Migration 510) im isolierten Schema private_auth.'
+        t: '1. Vertraulichkeit & Mandanten-Airgap (Art. 32 / ISO 27001 A.8.20 & A.8.24)',
+        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs; PBKDF2/Bcrypt-Hashing im isolierten Schema private_auth.'
       },
       {
-        t: '2. Integrität & Datenhygiene (Art. 32 Abs. 1 lit. b)',
+        t: '2. Integrität & Datenhygiene (Art. 32 / ISO 27001 A.8.28 & ISO 27701 7.4.4)',
         d: 'TLS 1.3 End-to-End Transportverschlüsselung mit HSTS Preload (max-age=63072000). Datei-Uploads mit Magic-Byte-Prüfung, Stripping von EXIF/GPS-Metadaten und SHA-256 Integritätssiegel. Micro-TTL (<= 1800s) für Audio-Streams mit Zero-Heap HTTP 307 Edge Streaming.'
       },
       {
-        t: '3. Verfügbarkeit & 3-2-1 Backup (Art. 32 Abs. 1 lit. b)',
+        t: '3. Verfügbarkeit & 3-2-1 Backup (Art. 32 / ISO 27001 A.8.14)',
         d: '3-2-1 Backup-Strategie: Stündliche Age X25519 verschlüsselte Dumps via rsync/SSH (Port 23) auf geographisch getrennte Hetzner Storage Boxen mit automatisierter Restricted-Shell Vorab-Speicherplatzprüfung (SEC-77). Automatisierte DR-Reconciliation und Art. 17 DSGVO WORM-Tombstone-Scrubbing.'
       },
       {
-        t: '4. WORM-Manipulationsschutz & Auditing (Art. 32 Abs. 1 lit. d)',
+        t: '4. WORM-Manipulationsschutz & Auditing (Art. 32 / ISO 27001 A.5.33 & 27701 8.5)',
         d: 'Revisionssicheres WORM-Logging (Write-Once-Read-Many) mit PostgreSQL-Triggern gegen UPDATE/DELETE auf audit_logs. SHA-256 Merkle-Hash-Chaining nach GoBD- und OWASP ASVS Level 3-Standard. Kontinuierliche Security-Drift-Guards (Zero-Sampling-Axiom).'
       },
       {
-        t: '5. WebAuthn / Passkeys (Keine Biometrie gem. Art. 9 DSGVO)',
-        d: 'Optionale Passkey-Authentifizierung (FIDO2/WebAuthn) nutzt biometrische Sensorik ausschließlich lokal in der Hardware-Enclave (TPM/Secure Enclave) des Endgeräts. Biometrische Rohdaten verlassen niemals das Gerät (Zero Art. 9 Leakage).'
+        t: '5. WebAuthn & Zero-Secrets (Art. 9 DSGVO & ISO 27001 A.8.5 / A.8.28)',
+        d: 'Optionale Passkey-Authentifizierung (FIDO2/WebAuthn) nutzt biometrische Sensorik ausschließlich lokal in der Hardware-Enclave (TPM/Secure Enclave) des Endgeräts. Biometrische Rohdaten verlassen niemals das Gerät. Zero-Client-Secrets Doktrin im Browser.'
       }
     ];
 
@@ -426,7 +486,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('6. Kommunales Löschkonzept nach DIN 66398 (Art. 17 DSGVO)', margin, curY);
+    doc.text('6. Kommunales Löschkonzept nach DIN 66398 & ISO 27701 (Art. 17 DSGVO)', margin, curY);
 
     curY += 5;
     const lks = [
@@ -559,8 +619,11 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     doc.text(`Ort, Datum: ${cleanAddress.split(',')[0] || 'Zentrale'}, den ${currentDateStr}`, margin + 6, curY + 40);
     doc.text(`Für den Betreiber (Campus-Groovelab / Patrick Huber)`, margin + 90, curY + 40);
 
-    // Save and download PDF
+    // Save and download PDF or Return Blob
     const filename = `DSB_Compliance_Dossier_${cleanSchoolName.replace(/[^a-zA-Z0-9_-]/g, '_')}_2026.pdf`;
+    if (options.returnBlob) {
+      return doc.output('blob');
+    }
     doc.save(filename);
   } catch (err) {
     console.error('[dpoComplianceDossierGenerator] Error generating PDF:', err);

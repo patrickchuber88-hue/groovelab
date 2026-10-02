@@ -54,7 +54,7 @@ export function useAdminStudents({
     firstName: '', 
     lastName: '', 
     birthDate: '', 
-    photoUrl: '/avatar_ghost.jpg', 
+    photoUrl: '/avatars/gitarre_avatar_new.png', 
     isExternalVocalist: false, 
     instrument: 'Gitarre', 
     app_usage_mode: 'student_only' 
@@ -106,7 +106,7 @@ export function useAdminStudents({
       first_name: newStudent.firstName, 
       last_name: finalLastName, 
       birth_date: null,
-      photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
+      photo_url: (newStudent.photoUrl && newStudent.photoUrl !== '/avatar_ghost.jpg') ? newStudent.photoUrl : studentAvatarUrl,
       avatar_url: studentAvatarUrl,
       qr_token: qrToken,
       is_external_vocalist: newStudent.isExternalVocalist,
@@ -130,7 +130,7 @@ export function useAdminStudents({
 
       setStudents([...students, data]); 
       setShowAddStudent(false); 
-      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' }); 
+      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatars/gitarre_avatar_new.png', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' }); 
       window.dispatchEvent(new CustomEvent('students_updated'));
       window.dispatchEvent(new CustomEvent('campus_students_updated'));
       window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
@@ -180,7 +180,7 @@ export function useAdminStudents({
         first_name: student.firstName, 
         last_name: finalLastName, 
         birth_date: null,
-        photo_url: '/avatar_ghost.jpg',
+        photo_url: studentAvatarUrl,
         avatar_url: studentAvatarUrl,
         qr_token: qrToken,
         is_external_vocalist: isVocalist,

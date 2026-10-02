@@ -6,7 +6,7 @@
 
 set -e
 
-SERVER="root@178.105.10.2"
+SERVER="${SERVER:-deployuser@178.105.10.2}"
 
 echo "🛡️  Starte Disaster Recovery Verification auf $SERVER..."
 

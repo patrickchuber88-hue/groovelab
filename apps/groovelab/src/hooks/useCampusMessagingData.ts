@@ -392,7 +392,7 @@ export function useCampusMessagingData({
           type: 'band',
           title: `Neuigkeiten aus ${msg.bands?.name || 'deiner Band'}`,
           content: msg.content || '',
-          sender: msg.users || { first_name: 'Mitglied', last_name: '', photo_url: '/avatar_ghost.jpg' },
+          sender: msg.users || { first_name: 'Mitglied', last_name: '', photo_url: '/avatars/gitarre_avatar_new.png' },
           created_at: msg.created_at,
           read_by: msg.read_by || [],
           bandName: msg.bands?.name

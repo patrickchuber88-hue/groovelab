@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../../utils/epcGiroCode';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../domain/pricingEngine';
+import { cleanPdfText } from '../../utils/pdfTypographyEngine';
 
 const InvoicePreviewModal = lazy(() => import('../InvoicePreviewModal').then(m => ({ default: m.InvoicePreviewModal })));
 
@@ -659,20 +660,32 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
 
             let y = 76;
             lines.forEach(line => {
-              if (line.startsWith('•') || line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.') || line.startsWith('4.')) {
+              if (!line) {
+                y += 3.5;
+                return;
+              }
+              const isBullet = line.startsWith('•') || line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.') || line.startsWith('4.');
+              const isHeader = line.startsWith('Die wichtigsten') || line.startsWith('So schalten') || line.startsWith('Härtefall-');
+
+              if (isBullet) {
                 doc.setFont('helvetica', 'bold');
-                doc.text(line, 22, y);
-                doc.setFont('helvetica', 'normal');
-              } else if (line.startsWith('Die wichtigsten') || line.startsWith('So schalten') || line.startsWith('Härtefall-')) {
+                doc.setTextColor(51, 65, 85);
+              } else if (isHeader) {
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(15, 23, 42);
-                doc.text(line, 22, y);
+              } else {
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(51, 65, 85);
-              } else {
-                doc.text(line, 22, y);
               }
-              y += 5.8;
+
+              const wrapped = doc.splitTextToSize(cleanPdfText(line), 166);
+              wrapped.forEach((wrappedLine: string) => {
+                doc.text(wrappedLine, 22, y);
+                y += 4.8;
+              });
+              if (isHeader) {
+                y += 0.8;
+              }
             });
 
             doc.setFontSize(7.5);
@@ -680,8 +693,8 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
             doc.text('Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen (0,00 € Software-Bereitstellung).', 22, 266);
 
             doc.save(`Elternbrief_Campus_Direktabrechnung_${effectiveSchoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-          } catch (e: any) {
-            alert('Fehler beim PDF-Export: ' + e.message);
+          } catch (e: unknown) {
+            alert('Fehler beim PDF-Export: ' + (e instanceof Error ? e.message : 'Unbekannter Fehler'));
           }
         };
 

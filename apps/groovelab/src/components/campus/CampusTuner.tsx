@@ -32,6 +32,7 @@ export interface TuningString {
 
 export interface InstrumentPreset {
   id: string;
+  transpositionOffset?: number;
   name: string;
   shortLabel?: string;
   strings: TuningString[];
@@ -123,9 +124,45 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   },
   {
     id: 'chromatic',
-    name: 'Chromatisch (Alle Töne / Bläser & Klavier)',
-    shortLabel: 'Chromatisch',
-    strings: []
+    name: 'Konzertstimmung (C) / Klavier',
+    shortLabel: 'Chromatisch (C)',
+    strings: [],
+    transpositionOffset: 0
+  },
+  {
+    id: 'trumpet_bb',
+    name: 'Trompete / Klarinette (Bb)',
+    shortLabel: 'Trompete (Bb)',
+    strings: [],
+    transpositionOffset: 2
+  },
+  {
+    id: 'alto_sax_eb',
+    name: 'Altsaxophon (Eb)',
+    shortLabel: 'Altsax (Eb)',
+    strings: [],
+    transpositionOffset: 9
+  },
+  {
+    id: 'tenor_sax_bb',
+    name: 'Tenorsaxophon / Bassklarinette (Bb Tief)',
+    shortLabel: 'Tenorsax (Bb)',
+    strings: [],
+    transpositionOffset: 14
+  },
+  {
+    id: 'bari_sax_eb',
+    name: 'Baritonsaxophon (Eb Tief)',
+    shortLabel: 'Barisax (Eb)',
+    strings: [],
+    transpositionOffset: 21
+  },
+  {
+    id: 'horn_f',
+    name: 'Waldhorn (F)',
+    shortLabel: 'Horn (F)',
+    strings: [],
+    transpositionOffset: 7
   }
 ];
 
@@ -155,72 +192,7 @@ function resolveInitialPresetId(studentInstrument?: string): string {
   return 'guitar_standard';
 }
 
-// 🌟 0,1% Goldstandard 2027: YIN Pitch Detection Algorithm (de Cheveigné & Kawahara)
-function detectPitchYIN(buf: Float32Array, sampleRate: number, threshold: number = 0.12): number {
-  const size = buf.length;
-
-  let rms = 0;
-  for (let i = 0; i < size; i++) {
-    rms += buf[i] * buf[i];
-  }
-  rms = Math.sqrt(rms / size);
-  if (rms < 0.009) return -1;
-
-  const halfSize = Math.floor(size / 2);
-  const yinBuffer = new Float32Array(halfSize);
-
-  for (let tau = 0; tau < halfSize; tau++) {
-    let sum = 0;
-    for (let i = 0; i < halfSize; i++) {
-      const delta = buf[i] - buf[i + tau];
-      sum += delta * delta;
-    }
-    yinBuffer[tau] = sum;
-  }
-
-  yinBuffer[0] = 1;
-  let runningSum = 0;
-  for (let tau = 1; tau < halfSize; tau++) {
-    runningSum += yinBuffer[tau];
-    yinBuffer[tau] = runningSum > 0 ? (yinBuffer[tau] * tau) / runningSum : 1;
-  }
-
-  let tauEstimate = -1;
-  for (let tau = 2; tau < halfSize; tau++) {
-    if (yinBuffer[tau] < threshold) {
-      while (tau + 1 < halfSize && yinBuffer[tau + 1] < yinBuffer[tau]) {
-        tau++;
-      }
-      tauEstimate = tau;
-      break;
-    }
-  }
-
-  if (tauEstimate === -1) {
-    let minVal = 1000;
-    for (let tau = 2; tau < halfSize; tau++) {
-      if (yinBuffer[tau] < minVal) {
-        minVal = yinBuffer[tau];
-        tauEstimate = tau;
-      }
-    }
-    if (minVal > 0.35) return -1;
-  }
-
-  let betterTau = tauEstimate;
-  if (tauEstimate > 0 && tauEstimate < halfSize - 1) {
-    const s0 = yinBuffer[tauEstimate - 1];
-    const s1 = yinBuffer[tauEstimate];
-    const s2 = yinBuffer[tauEstimate + 1];
-    const denominator = 2 * (s0 - 2 * s1 + s2);
-    if (denominator !== 0) {
-      betterTau = tauEstimate + (s0 - s2) / denominator;
-    }
-  }
-
-  if (betterTau <= 0) return -1;
-  return sampleRate / betterTau;
-}
+import { YinAudioWorkletEngine } from '../../services/audio/YinAudioWorkletEngine';
 
 function noteFromPitch(frequency: number, a4: number = 440) {
   const noteNum = 12 * (Math.log(frequency / a4) / Math.log(2));
@@ -232,7 +204,57 @@ function frequencyFromNoteNumber(note: number, a4: number = 440) {
 }
 
 function centsOffFromPitch(frequency: number, note: number, a4: number = 440) {
-  return Math.floor((1200 * Math.log(frequency / frequencyFromNoteNumber(note, a4))) / Math.log(2));
+  return Math.round((1200 * Math.log(frequency / frequencyFromNoteNumber(note, a4))) / Math.log(2));
+}
+
+// 🌟 0,1% Goldstandard: Akustische Harmonische & Saiten-Matching Engine
+// Erkennt Saiten auch bei schwachem Grundton (z.B. MacBook-Mikrofon dämpft tiefe E-Saite bei 82 Hz)
+function findMatchingStringIndex(
+  noteName: string,
+  octave: number,
+  pitch: number,
+  presetStrings: TuningString[],
+  useGerman: boolean
+): number {
+  if (!presetStrings || presetStrings.length === 0) return -1;
+
+  // 1. Exakter Match (Notenname + Oktave)
+  const exactIdx = presetStrings.findIndex(s => {
+    const sName = useGerman ? (s.name === 'B' ? 'H' : s.name) : s.name;
+    return sName === noteName && s.octave === octave;
+  });
+  if (exactIdx !== -1) return exactIdx;
+
+  // 2. Harmonische / Oktav-Tolerante Zuordnung
+  const candidates = presetStrings
+    .map((s, idx) => ({ s, idx }))
+    .filter(({ s }) => {
+      const sName = useGerman ? (s.name === 'B' ? 'H' : s.name) : s.name;
+      return sName === noteName;
+    });
+
+  if (candidates.length === 1) {
+    // Eindeutige Saite (z.B. A2, D3, G3, H3) - es gibt nur eine einzige Saite mit diesem Namen!
+    return candidates[0].idx;
+  }
+
+  if (candidates.length > 1) {
+    // Mehrere Saiten mit gleichem Namen (z.B. tiefe E2 vs. hohe E4 bei der Gitarre)
+    let bestIdx = -1;
+    let minDiff = Infinity;
+    for (const { s, idx } of candidates) {
+      const diff1 = Math.abs(pitch - s.freq);
+      const diff2 = Math.abs(pitch - s.freq * 2);
+      const effectiveDiff = Math.min(diff1, diff2);
+      if (effectiveDiff < minDiff) {
+        minDiff = effectiveDiff;
+        bestIdx = idx;
+      }
+    }
+    return bestIdx;
+  }
+
+  return -1;
 }
 
 interface CampusTunerProps {
@@ -245,42 +267,39 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
   const [isListening, setIsListening] = useState<boolean>(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string>(() => resolveInitialPresetId(studentInstrument));
   const [selectedStringIndex, setSelectedStringIndex] = useState<number | null>(null);
-
-  // 🌟 Feature 1: Individuelle Kammerton-Kalibrierung mit Stepper (430–450 Hz)
   const [a4Reference, setA4Reference] = useState<number>(440);
   const [isPlayingReference, setIsPlayingReference] = useState<boolean>(false);
   const [playingToneFreq, setPlayingToneFreq] = useState<number | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
-
-  // 🌟 Feature 3: Deutsche H / International B Nomenklatur
   const [useGermanNotation, setUseGermanNotation] = useState<boolean>(true);
-
-  // 🌟 Feature 4: Manuelles Target-Lock (Saiten-Anpinnen bei extremer Verstimmung)
   const [lockedStringIndex, setLockedStringIndex] = useState<number | null>(null);
 
   // Live Detektierte Werte
   const [detectedPitch, setDetectedPitch] = useState<number | null>(null);
   const [detectedNote, setDetectedNote] = useState<string>('--');
   const [detectedOctave, setDetectedOctave] = useState<number | null>(null);
+  const [actualNoteHint, setActualNoteHint] = useState<string | null>(null);
   const [centsDeviation, setCentsDeviation] = useState<number>(0);
 
   // 🌟 Feature 5: Glättungs-Filter für Nadel-Physik & Magnetischer Snap
   const smoothedCentsRef = useRef<number>(0);
+  const velocityCentsRef = useRef<number>(0);
   const [smoothedCents, setSmoothedCents] = useState<number>(0);
 
-  // Gestimmte Saiten
   const [tunedStrings, setTunedStrings] = useState<Record<number, boolean>>({});
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const engineRef = useRef<YinAudioWorkletEngine | null>(null);
+  const uiAudioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const oscRef = useRef<OscillatorNode | null>(null);
+  const audioSessionIdRef = useRef<number>(0);
 
   const selectedPreset = INSTRUMENT_PRESETS.find(p => p.id === selectedPresetId) || INSTRUMENT_PRESETS[0];
 
   // Stop Microphone & Hardware Teardown
   const stopListening = useCallback(() => {
+    audioSessionIdRef.current++;
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -289,11 +308,15 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       releaseAudioStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
     }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+    if (engineRef.current) {
+      engineRef.current.destroy();
+      engineRef.current = null;
+    }
+    if (uiAudioContextRef.current && uiAudioContextRef.current.state !== 'closed') {
       try {
-        audioContextRef.current.close();
+        uiAudioContextRef.current.close();
       } catch (err) {}
-      audioContextRef.current = null;
+      uiAudioContextRef.current = null;
     }
     setIsListening(false);
     setDetectedPitch(null);
@@ -301,14 +324,19 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     setDetectedOctave(null);
     setCentsDeviation(0);
     smoothedCentsRef.current = 0;
+    velocityCentsRef.current = 0;
     setSmoothedCents(0);
   }, []);
 
   // Zweistufiger Sinus-Chime (880Hz -> 1760Hz) bei erfolgreichem Stimmen
   const playLockInChime = useCallback(() => {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = audioContextRef.current || new AudioCtx();
+      let ctx = uiAudioContextRef.current;
+      if (!ctx || ctx.state === 'closed') {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        ctx = new AudioCtx();
+        uiAudioContextRef.current = ctx;
+      }
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
@@ -359,9 +387,12 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     }
 
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = audioContextRef.current || new AudioCtx();
-      audioContextRef.current = audioCtx;
+      let audioCtx = uiAudioContextRef.current;
+      if (!audioCtx || audioCtx.state === 'closed') {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        audioCtx = new AudioCtx();
+        uiAudioContextRef.current = audioCtx;
+      }
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
@@ -395,14 +426,10 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
   const inTuneFramesRef = useRef<number>(0);
 
   const updatePitch = useCallback(() => {
-    if (!analyserRef.current || !audioContextRef.current) return;
+    if (!engineRef.current) return;
 
-    const analyser = analyserRef.current;
-    const buf = new Float32Array(analyser.fftSize);
-    analyser.getFloatTimeDomainData(buf);
-
-    // 🌟 YIN Pitch Detection (Oktavsprung-frei)
-    const pitch = detectPitchYIN(buf, audioContextRef.current.sampleRate);
+    // 🌟 YIN AudioWorklet Pitch Detection (Zero-GC, lock-free)
+    const pitch = engineRef.current.getDetectedPitch();
 
     if (pitch !== -1 && pitch > 20 && pitch < 2200) {
       const roundedPitch = Math.round(pitch * 10) / 10;
@@ -410,11 +437,10 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
 
       if (lockedStringIndex !== null && selectedPreset.strings[lockedStringIndex]) {
         const targetString = selectedPreset.strings[lockedStringIndex];
-        const targetFreq = targetString.freq;
-        const targetCents = Math.round(1200 * (Math.log(pitch / targetFreq) / Math.log(2)));
+        const targetCents = Math.round(1200 * (Math.log(pitch / targetString.freq) / Math.log(2)));
         const clampedCents = Math.max(-50, Math.min(50, targetCents));
 
-        const noteNum = noteFromPitch(targetFreq, a4Reference);
+        const noteNum = noteFromPitch(targetString.freq, a4Reference);
         const noteNameList = useGermanNotation ? NOTE_NAMES_GERMAN : NOTE_NAMES_INTL;
         const noteName = noteNameList[noteNum % 12];
 
@@ -423,12 +449,20 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
         setCentsDeviation(clampedCents);
 
         // Magnetischer Snap im Sweet-Spot (±3 Cents)
-        let effectiveCents = clampedCents;
+        let targetCentsPhys = clampedCents;
         if (Math.abs(clampedCents) <= 3) {
-          effectiveCents = clampedCents * 0.4;
+          targetCentsPhys = clampedCents * 0.1; // Starker magnetischer Snap zur 0
         }
 
-        smoothedCentsRef.current = smoothedCentsRef.current * 0.72 + effectiveCents * 0.28;
+        // 🌟 0,1% Goldstandard: Kritisch gedämpfte Masse-Feder-Gleichung (Schwere, langsame Nadel)
+        // stiffness (Federkonstante): Sehr niedrig (0.04), die Nadel ist träge und fühlt sich wie ein schweres analoges Bauteil an.
+        // damping (Dämpfung): Hoch (0.40 = 2 * sqrt(0.04)), verhindert jegliches Überschießen (Critical Damping).
+        const stiffness = 0.04;
+        const damping = 0.40;
+        const force = stiffness * (targetCentsPhys - smoothedCentsRef.current) - damping * velocityCentsRef.current;
+        velocityCentsRef.current += force;
+        smoothedCentsRef.current += velocityCentsRef.current;
+
         setSmoothedCents(Math.round(smoothedCentsRef.current * 10) / 10);
 
         if (Math.abs(clampedCents) <= 3) {
@@ -444,32 +478,41 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           inTuneFramesRef.current = 0;
         }
       } else {
-        const noteNum = noteFromPitch(pitch, a4Reference);
+        // 🌟 Transposition anwenden: Wir verschieben die erkannte MIDI-Note um den Offset des Presets
+        const physicalNoteNum = noteFromPitch(pitch, a4Reference);
+        const activeOffset = selectedPreset.transpositionOffset || 0;
+        const transposedNoteNum = physicalNoteNum + activeOffset;
+        
         const noteNameList = useGermanNotation ? NOTE_NAMES_GERMAN : NOTE_NAMES_INTL;
-        const noteName = noteNameList[noteNum % 12];
-        const octave = Math.floor(noteNum / 12) - 1;
-        const rawCents = centsOffFromPitch(pitch, noteNum, a4Reference);
+        const noteName = noteNameList[transposedNoteNum % 12 < 0 ? (transposedNoteNum % 12) + 12 : transposedNoteNum % 12];
+        const octave = Math.floor(transposedNoteNum / 12) - 1;
+        const rawCents = centsOffFromPitch(pitch, physicalNoteNum, a4Reference);
         const clampedCents = Math.max(-50, Math.min(50, rawCents));
 
         setDetectedNote(noteName);
         setDetectedOctave(octave);
         setCentsDeviation(clampedCents);
 
-        let effectiveCents = clampedCents;
+        let targetCentsPhys = clampedCents;
         if (Math.abs(clampedCents) <= 3) {
-          effectiveCents = clampedCents * 0.35;
+          targetCentsPhys = clampedCents * 0.1;
         }
 
-        smoothedCentsRef.current = smoothedCentsRef.current * 0.72 + effectiveCents * 0.28;
+        // 🌟 0,1% Goldstandard: Kritisch gedämpfte Masse-Feder-Gleichung (Schwere, langsame Nadel)
+        // stiffness (Federkonstante): Sehr niedrig (0.04), die Nadel ist träge und fühlt sich wie ein schweres analoges Bauteil an.
+        // damping (Dämpfung): Hoch (0.40 = 2 * sqrt(0.04)), verhindert jegliches Überschießen (Critical Damping).
+        const stiffness = 0.04;
+        const damping = 0.40;
+        const force = stiffness * (targetCentsPhys - smoothedCentsRef.current) - damping * velocityCentsRef.current;
+        velocityCentsRef.current += force;
+        smoothedCentsRef.current += velocityCentsRef.current;
+
         setSmoothedCents(Math.round(smoothedCentsRef.current * 10) / 10);
 
         if (Math.abs(clampedCents) <= 3) {
           inTuneFramesRef.current += 1;
           if (inTuneFramesRef.current >= 5 && selectedPreset.strings.length > 0) {
-            const bestIdx = selectedPreset.strings.findIndex(
-              s => (useGermanNotation ? (s.name === 'B' ? 'H' : s.name) : s.name) === noteName &&
-                   Math.abs(s.octave - octave) <= 1
-            );
+            const bestIdx = findMatchingStringIndex(noteName, octave, pitch, selectedPreset.strings, useGermanNotation);
             if (bestIdx !== -1) {
               setTunedStrings(prev => {
                 if (prev[bestIdx]) return prev;
@@ -483,10 +526,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
         }
 
         if (selectedPreset.strings.length > 0) {
-          const bestIdx = selectedPreset.strings.findIndex(
-            s => (useGermanNotation ? (s.name === 'B' ? 'H' : s.name) : s.name) === noteName &&
-                 Math.abs(s.octave - octave) <= 1
-          );
+            const bestIdx = findMatchingStringIndex(noteName, octave, pitch, selectedPreset.strings, useGermanNotation);
           if (bestIdx !== -1) {
             setSelectedStringIndex(bestIdx);
           }
@@ -496,6 +536,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       inTuneFramesRef.current = 0;
       smoothedCentsRef.current = smoothedCentsRef.current * 0.90;
       if (Math.abs(smoothedCentsRef.current) < 0.5) smoothedCentsRef.current = 0;
+    velocityCentsRef.current = 0;
       setSmoothedCents(Math.round(smoothedCentsRef.current));
     }
 
@@ -505,6 +546,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
   // Start Microphone mit 4096-Puffer für Bass/Cello
   const startListening = async () => {
     setMicError(null);
+    const sessionId = ++audioSessionIdRef.current;
     try {
       const stream = await acquireAudioStream({
         audio: {
@@ -513,34 +555,47 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           noiseSuppression: false
         }
       });
+      if (sessionId !== audioSessionIdRef.current) {
+        releaseAudioStream(stream);
+        return;
+      }
       mediaStreamRef.current = stream;
 
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioCtx();
-      audioContextRef.current = audioCtx;
+      const engine = new YinAudioWorkletEngine();
+      await engine.initialize();
 
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
+      if (sessionId !== audioSessionIdRef.current) {
+        engine.destroy();
+        if (mediaStreamRef.current) {
+          releaseAudioStream(mediaStreamRef.current);
+          mediaStreamRef.current = null;
+        }
+        return;
+      }
 
       const isBassOrCello = selectedPresetId.startsWith('bass') || selectedPresetId === 'cello';
-      analyser.fftSize = isBassOrCello ? 4096 : 2048;
-      analyserRef.current = analyser;
+      engine.connectMicrophone(stream, isBassOrCello ? 400 : 1800);
 
-      const biquad = audioCtx.createBiquadFilter();
-      biquad.type = 'lowpass';
-      biquad.frequency.setValueAtTime(isBassOrCello ? 900 : 1800, audioCtx.currentTime);
-
-      source.connect(biquad);
-      biquad.connect(analyser);
+      engineRef.current = engine;
 
       setIsListening(true);
       animationFrameRef.current = requestAnimationFrame(updatePitch);
     } catch (err: any) {
-      console.error('Microphone access failed in CampusTuner:', err);
-      setMicError('Mikrofonzugriff wurde verweigert oder ist nicht verfügbar.');
-      setIsListening(false);
+      if (sessionId === audioSessionIdRef.current) {
+        console.error('Microphone access failed in CampusTuner:', err);
+        setMicError('Mikrofonzugriff wurde verweigert oder ist nicht verfügbar.');
+        setIsListening(false);
+      }
     }
   };
+
+  // Dynamische Tiefpassfilter-Nachführung bei Instrumentenwechsel im laufenden Betrieb
+  useEffect(() => {
+    if (engineRef.current && isListening) {
+      const isBassOrCello = selectedPresetId.startsWith('bass') || selectedPresetId === 'cello';
+      engineRef.current.setLowpassCutoff(isBassOrCello ? 400 : 1800);
+    }
+  }, [selectedPresetId, isListening]);
 
   useEffect(() => {
     return () => {
@@ -973,13 +1028,16 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           justifyContent: 'center',
           marginTop: allStringsTuned ? '8px' : '0px'
         }}>
-          <svg
+          {/* MONOPHONE NADEL */}
+            <svg
             viewBox="0 0 440 220"
             width="100%"
             height="100%"
-            style={{ overflow: 'visible', maxWidth: '440px' }}
+            style={{ 
+              overflow: 'visible', 
+              maxWidth: '440px'
+            }}
           >
-            {/* Hintergrund-Bogen (R=160, Sweep von -60° bis +60°) */}
             <path
               d="M 81.4 120 A 160 160 0 0 1 358.6 120"
               fill="none"
@@ -1037,8 +1095,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               <g
                 style={{
                   transformOrigin: '220px 200px',
-                  transform: `rotate(${needleAngle}deg)`,
-                  transition: 'transform 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
+                  transform: `rotate(${needleAngle}deg)`
                 }}
               >
                 <line
@@ -1303,11 +1360,12 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                     onClick={() => {
                       if (lockedStringIndex === idx) {
                         setLockedStringIndex(null);
+                        if (isPegPlaying) playTone(null);
                       } else {
                         setLockedStringIndex(idx);
                         setSelectedStringIndex(idx);
+                        playTone(str.freq);
                       }
-                      playTone(str.freq);
                     }}
                     style={{
                       display: 'flex',
@@ -1361,9 +1419,15 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        if (lockedStringIndex === idx) setLockedStringIndex(null);
-                        else { setLockedStringIndex(idx); setSelectedStringIndex(idx); }
-                        playTone(str.freq);
+                        e.preventDefault(); // Verhindere Scrollen bei Leertaste
+                        if (lockedStringIndex === idx) {
+                          setLockedStringIndex(null);
+                          if (isPegPlaying) playTone(null);
+                        } else {
+                          setLockedStringIndex(idx);
+                          setSelectedStringIndex(idx);
+                          playTone(str.freq);
+                        }
                       }
                     }}
                   >

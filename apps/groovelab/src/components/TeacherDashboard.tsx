@@ -273,6 +273,7 @@ export function TeacherDashboard({
     teacher: data.teacher,
     activePlatform,
     rooms: data.rooms,
+    allStudents: students.allStudents,
     showRealNames: students.showRealNames,
     adminFeedbackRequests: feed.adminFeedbackRequests,
     adminFeedbackResponses: feed.adminFeedbackResponses,
@@ -487,6 +488,8 @@ export function TeacherDashboard({
             setIsMakeupModalOpen={absence.setIsMakeupModalOpen}
             activeChatOcc={tagesplan.activeChatOcc}
             setActiveChatOcc={tagesplan.setActiveChatOcc}
+            activeChatOccIds={tagesplan.activeChatOccIds}
+            unreadChatOccIds={tagesplan.unreadChatOccIds}
             docStudent={students.modalDocStudent}
             setDocStudent={students.setDocStudent}
             allStudents={students.allStudents}
@@ -694,6 +697,8 @@ export function TeacherDashboard({
               activePlatform={activePlatform}
               hideHeader={true}
               onSwitchPlatform={onSwitchPlatform}
+              activeWorkspace="teacher"
+              userRole="teacher"
             />
           </Suspense>
         ) : activeTab === 'settings' ? (

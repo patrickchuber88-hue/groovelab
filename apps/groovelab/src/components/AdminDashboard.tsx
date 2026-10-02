@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useRealNamesVisibility, formatTeacherFullName } from '../utils/nameHelper';
-import { resolveCampusStudentAvatar } from './StudioAvatar';
+import { resolveCampusStudentAvatar, getDefaultMusicianAvatarUrl } from './StudioAvatar';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { PasskeyNudgeBanner } from './admin/PasskeyNudgeBanner';
 import { CourtProofExportModal } from './admin/CourtProofExportModal';
@@ -95,6 +95,7 @@ export function AdminDashboard({
     setSongs,
     kiosks,
     schedules,
+    setSchedules,
     stats,
     submissions,
     setSubmissions,
@@ -154,7 +155,9 @@ export function AdminDashboard({
     stations,
     setStations,
     fetchData,
-    teachers
+    teachers,
+    activeWorkspace,
+    userRole
   });
 
   // UI helpers
@@ -167,11 +170,15 @@ export function AdminDashboard({
   const isMobile = windowWidth <= 768;
 
   const resolveUserAvatarBound = (u: any, platform?: string): string => {
-    if (!u) return '/avatar_ghost.jpg';
+    const isCampus = platform === 'campus' || activePlatform === 'campus';
+    if (!u) return isCampus ? '/avatars/gitarre_avatar_new.png' : '/avatar_ghost.jpg';
     const role = (u.role || '').toLowerCase();
     if (role === 'admin' || role === 'secretary') return '/campus_login_hero.png';
-    if (platform === 'campus' || activePlatform === 'campus') {
+    if (isCampus) {
       return resolveCampusStudentAvatar(u, teachers, schedules);
+    }
+    if (role === 'student') {
+      return (u.photo_url && u.photo_url !== '/avatar_ghost.jpg') ? u.photo_url : getDefaultMusicianAvatarUrl(u.instrument, 'student');
     }
     return u.photo_url || '/avatar_ghost.jpg';
   };
@@ -475,13 +482,15 @@ export function AdminDashboard({
               activePlatform={activePlatform}
               admin={admin}
               userId={userId}
+              activeWorkspace={activeWorkspace}
+              userRole={userRole}
               rooms={rooms}
               setRooms={setRooms}
               schoolObj={schoolObj}
               students={students}
               teachers={teachers}
               schedules={schedules}
-              setSchedules={() => {}}
+              setSchedules={setSchedules}
               campusBookings={roomsState.campusBookings}
               setCampusBookings={roomsState.setCampusBookings}
               dbRoomBookings={roomsState.dbRoomBookings}

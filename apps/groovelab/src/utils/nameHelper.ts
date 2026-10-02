@@ -416,6 +416,40 @@ export function formatTeacherFullName(
 }
 
 /**
+ * Autoritative Anzeige-Namensformatierung für Schüler, Lehrer und Kontakte
+ * Berücksichtigt Workspace, Rollen und DSGVO Art. 25 Pseudonymisierung.
+ */
+export function formatStudentDisplayName(u: any): string {
+  if (!u) return '';
+  const role = (u.role || '').toLowerCase();
+  const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+  const isTeacherRole = role === 'teacher' || roles.includes('teacher');
+
+  if (isTeacherRole) {
+    return formatTeacherFullName(u);
+  }
+
+  const isAdminRole = role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary');
+  if (isAdminRole) {
+    return formatTeacherFullName(u);
+  }
+
+  // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
+  if (role === 'student' || role === 'pupil') {
+    const isStudentViewer = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student';
+    if (isStudentViewer) {
+      return formatStudentPureFirstName(u.first_name);
+    }
+    return formatSingleStudentAnonymized(u.first_name, u.full_last_name || u.last_name, u.id);
+  }
+
+  if (u.first_name && (u.full_last_name || u.last_name)) {
+    return `${u.first_name} ${u.full_last_name || u.last_name}`.trim();
+  }
+  return u.first_name || u.name || 'Benutzer';
+}
+
+/**
  * Helper to sanitize birth date to day-only or clean string
  */
 export function sanitizeBirthDateToDayOnly(dateStr?: string | null): string {

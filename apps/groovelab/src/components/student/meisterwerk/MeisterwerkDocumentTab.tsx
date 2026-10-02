@@ -1723,7 +1723,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     window.addEventListener('campus_open_audio_settings', handleOpenAudioSettings);
     return () => window.removeEventListener('campus_open_audio_settings', handleOpenAudioSettings);
   }, []);
-  const [activeModuleUnlockTab, setActiveModuleUnlockTab] = useState<'restore' | 'extensions'>('restore');
+  const [activeModuleUnlockTab, setActiveModuleUnlockTab] = useState<'restore' | 'extensions'>('extensions');
   const [draggedModuleKey, setDraggedModuleKey] = useState<StudioModuleKey | null>(null);
   const [customModuleLayout, setCustomModuleLayout] = useState<{ order: StudioModuleKey[]; hidden: StudioModuleKey[] }>(() => {
     let parsed: { order: StudioModuleKey[]; hidden: StudioModuleKey[]; isDefault?: boolean; resetAt?: number } | null = null;
@@ -1966,7 +1966,35 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   // 📝 Berechne die aktuell angezeigten Schüler-Hausaufgabennotizen für das aktive Wochen-Offset
   const activeViewingStudentNotes = useMemo(() => {
     if (viewingWeekOffset === 0) {
-      return generalHomeworkNotes || '';
+      if ((generalHomeworkNotes || '').trim()) return generalHomeworkNotes;
+      // Fallback: If generalHomeworkNotes is still empty, resolve from current week's progressItem or L1 cache
+      const curIso = getISOWeek(getSimulatedNow());
+      const curKwNum = curIso.split('-W')[1] || '';
+      const curItem = (progressItems || []).find((item: any) => {
+        return item.topic_name === `Hausaufgabe KW ${curKwNum}` ||
+               (item.created_at && getISOWeek(item.created_at) === curIso) ||
+               (item.updated_at && getISOWeek(item.updated_at) === curIso && item.topic_name.startsWith('Hausaufgabe KW '));
+      });
+      if (curItem?.homework_notes) {
+        try {
+          const parsed = typeof curItem.homework_notes === 'string' ? JSON.parse(curItem.homework_notes) : curItem.homework_notes;
+          if (Array.isArray(parsed)) {
+            const textOnly = parsed.filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n)).join('\n').trim();
+            if (textOnly) return textOnly;
+          }
+        } catch {}
+      }
+      try {
+        const raw = localStorage.getItem(`campus_homework_notes_${student.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const textOnly = parsed.filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n)).join('\n').trim();
+            if (textOnly) return textOnly;
+          }
+        }
+      } catch {}
+      return '';
     }
     const toolboxViewingWeekIso = (() => {
       const d = new Date();
@@ -13349,7 +13377,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
           />
         )}
 
-        {/* 🎛️ MODUL-FREISCHALT-SHEET (ELTERN) */}
+        {/* 🎛️ MODUL-FREISCHALT-SHEET (ELTERN) - 0,1% DESIGN GOLDSTANDARD */}
         {showModuleUnlockModal && (
           <div
             role="dialog"
@@ -13359,7 +13387,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
               position: "fixed",
               inset: 0,
               background: "rgba(15, 23, 42, 0.65)",
-              backdropFilter: "blur(6px)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -13374,38 +13403,44 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 background: "#ffffff",
                 borderRadius: "24px",
                 width: "100%",
-                maxWidth: "520px",
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                maxWidth: "540px",
+                maxHeight: "min(90dvh, 760px)",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)",
                 border: "1px solid #e2e8f0",
                 overflow: "hidden"
               }}
             >
+              {/* 🏛️ ZONE 1: FIXED APPLE CLEAN HEADER */}
               <div style={{
-                padding: "20px 24px",
-                background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-                borderBottom: "1px solid #bfdbfe",
+                padding: "18px 22px",
+                background: "#ffffff",
+                borderBottom: "1px solid #f1f5f9",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between"
+                justifyContent: "space-between",
+                flexShrink: 0
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div style={{
-                    width: "38px",
-                    height: "38px",
+                    width: "40px",
+                    height: "40px",
                     borderRadius: "12px",
-                    background: "#ffffff",
+                    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                    border: "1px solid #bfdbfe",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.08)"
+                    boxShadow: "0 2px 6px rgba(37, 99, 235, 0.12)"
                   }}>
-                    <Sliders size={20} color="#2563eb" />
+                    <Sliders size={20} color="#2563eb" strokeWidth={2.4} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#1e3a8a" }}>
+                    <h3 style={{ margin: 0, fontSize: "1.02rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.02em" }}>
                       Zusatzmodule freischalten
                     </h3>
-                    <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b" }}>
+                    <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#64748b" }}>
                       Eltern-Freigabe für {studentFirstName}
                     </span>
                   </div>
@@ -13415,96 +13450,123 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   onClick={closeAndLockModuleModal}
                   aria-label="Schließen"
                   style={{
-                    background: "rgba(255,255,255,0.8)",
-                    border: "1px solid rgba(0,0,0,0.08)",
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
                     borderRadius: "50%",
-                    width: "30px",
-                    height: "30px",
+                    width: "32px",
+                    height: "32px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    transition: "all 0.15s ease"
                   }}
+                  className="hover-scale"
                 >
-                  <X size={15} color="#475569" />
+                  <X size={16} color="#64748b" strokeWidth={2.2} />
                 </button>
               </div>
 
-                    {/* Tabs: Ausgeblendete Module vs. Erweiterungen */}
+              {/* 🎛️ ZONE 2: APPLE SEGMENTED CONTROL (PILL-SLIDER) - Nur sichtbar wenn tatsächlich Module ausgeblendet sind */}
+              {customModuleLayout.hidden.length > 0 && (
+                <div style={{
+                  padding: "12px 22px 10px 22px",
+                  background: "#ffffff",
+                  borderBottom: "1px solid #f1f5f9",
+                  flexShrink: 0
+                }}>
+                  <div style={{
+                    display: "flex",
+                    background: "#f1f5f9",
+                    padding: "4px",
+                    borderRadius: "12px",
+                    gap: "4px"
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (checkIsParentModuleUnlocked()) {
+                          setActiveModuleUnlockTab('extensions');
+                        } else {
+                          setShowParentPinModalForModules(true);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        border: "none",
+                        borderRadius: "9px",
+                        background: activeModuleUnlockTab === 'extensions' ? "#ffffff" : "transparent",
+                        color: activeModuleUnlockTab === 'extensions' ? "#0f172a" : "#64748b",
+                        fontSize: "0.78rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: activeModuleUnlockTab === 'extensions' ? "0 2px 6px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)"
+                      }}
+                    >
+                      <Lock size={13} color={activeModuleUnlockTab === 'extensions' ? "#2563eb" : "#64748b"} />
+                      <span>Studio-Erweiterungen</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveModuleUnlockTab('restore')}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        border: "none",
+                        borderRadius: "9px",
+                        background: activeModuleUnlockTab === 'restore' ? "#ffffff" : "transparent",
+                        color: activeModuleUnlockTab === 'restore' ? "#0f172a" : "#64748b",
+                        fontSize: "0.78rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: activeModuleUnlockTab === 'restore' ? "0 2px 6px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)"
+                      }}
+                    >
+                      <RotateCcw size={13} color={activeModuleUnlockTab === 'restore' ? "#2563eb" : "#64748b"} />
+                      <span>Ausgeblendet ({customModuleLayout.hidden.length})</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 📜 ZONE 3: SCROLLABLE CONTENT BODY */}
               <div style={{
+                flex: 1,
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                padding: "18px 22px",
                 display: "flex",
-                borderBottom: "1px solid #e2e8f0",
-                background: "#f8fafc"
+                flexDirection: "column",
+                gap: "14px"
               }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveModuleUnlockTab('restore')}
-                  style={{
-                    flex: 1,
-                    padding: "12px 16px",
-                    border: "none",
-                    background: activeModuleUnlockTab === 'restore' ? "#ffffff" : "transparent",
-                    color: activeModuleUnlockTab === 'restore' ? "#0f172a" : "#64748b",
-                    fontSize: "0.80rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    borderBottom: activeModuleUnlockTab === 'restore' ? "2px solid #2563eb" : "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <RotateCcw size={14} color={activeModuleUnlockTab === 'restore' ? "#2563eb" : "#64748b"} />
-                  <span>Ausgeblendet ({customModuleLayout.hidden.length})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (checkIsParentModuleUnlocked()) {
-                      setActiveModuleUnlockTab('extensions');
-                    } else {
-                      setShowParentPinModalForModules(true);
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "12px 16px",
-                    border: "none",
-                    background: activeModuleUnlockTab === 'extensions' ? "#ffffff" : "transparent",
-                    color: activeModuleUnlockTab === 'extensions' ? "#0f172a" : "#64748b",
-                    fontSize: "0.80rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    borderBottom: activeModuleUnlockTab === 'extensions' ? "2px solid #2563eb" : "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <Lock size={13} color={activeModuleUnlockTab === 'extensions' ? "#2563eb" : "#64748b"} />
-                  <span>Studio-Erweiterungen</span>
-                </button>
-              </div>
-
-              <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-                {activeModuleUnlockTab === 'restore' ? (
+                {(activeModuleUnlockTab === 'restore' && customModuleLayout.hidden.length > 0) ? (
                   <>
-                    <p style={{ margin: 0, fontSize: "0.78rem", color: "#475569", lineHeight: 1.45 }}>
-                      Hier siehst du Module, die du auf deiner Leiste ausgeblendet hast. Du kannst sie jederzeit ohne Eltern-PIN wieder einblenden.
+                    <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b", lineHeight: 1.45 }}>
+                      Hier siehst du Module, die auf der Leiste ausgeblendet wurden. Du kannst sie jederzeit ohne Eltern-PIN wieder einblenden.
                     </p>
 
                     {customModuleLayout.hidden.length === 0 ? (
                       <div style={{
-                        padding: "24px 16px",
+                        padding: "32px 16px",
                         textAlign: "center",
                         background: "#f8fafc",
-                        border: "1px dashed #cbd5e1",
-                        borderRadius: "16px",
+                        border: "1.5px dashed #cbd5e1",
+                        borderRadius: "18px",
                         color: "#64748b",
-                        fontSize: "0.82rem",
-                        fontWeight: 650
+                        fontSize: "0.84rem",
+                        fontWeight: 700
                       }}>
                         Aktuell sind alle verfügbaren Module auf deiner Leiste sichtbar! ✨
                       </div>
@@ -13534,23 +13596,24 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "space-between",
-                                padding: "10px 14px",
-                                background: "#f8fafc",
+                                padding: "12px 16px",
+                                background: "#ffffff",
                                 border: "1.5px solid #e2e8f0",
-                                borderRadius: "16px"
+                                borderRadius: "16px",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                               }}
                             >
-                              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                                 <CampusStudioModuleCover
                                   moduleKey={hiddenKey as any}
                                   size="sm"
                                   uiLevel={uiLevel}
                                 />
                                 <div>
-                                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#0f172a" }}>
+                                  <div style={{ fontSize: "0.90rem", fontWeight: 800, color: "#0f172a" }}>
                                     {labelMap[hiddenKey] || hiddenKey}
                                   </div>
-                                  <div style={{ fontSize: "0.68rem", color: "#64748b" }}>
+                                  <div style={{ fontSize: "0.70rem", color: "#64748b" }}>
                                     Auf deiner Studio-Leiste ausgeblendet
                                   </div>
                                 </div>
@@ -13590,7 +13653,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         onClick={handleResetModuleLayout}
                         style={{
                           flex: 1,
-                          background: "#f1f5f9",
+                          background: "#f8fafc",
                           color: "#475569",
                           border: "1px solid #cbd5e1",
                           borderRadius: "12px",
@@ -13601,7 +13664,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: "6px"
+                          gap: "6px",
+                          transition: "all 0.15s ease"
                         }}
                         className="hover-scale"
                       >
@@ -13612,19 +13676,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   </>
                 ) : (
                   <>
-                    <p style={{ margin: 0, fontSize: "0.78rem", color: "#475569", lineHeight: 1.45 }}>
-                      Hier können Erziehungsberechtigte zusätzliche Werkzeuge und didaktische Erweiterungen für {studentFirstName} freischalten oder anpassen.
+                    <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b", lineHeight: 1.45 }}>
+                      Hier können Erziehungsberechtigte zusätzliche Werkzeuge und didaktische Erweiterungen für <strong style={{ color: "#334155" }}>{studentFirstName}</strong> freischalten oder anpassen.
                     </p>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                       {[
                         {
                           key: 'groovetrainer' as StudioModuleKey,
                           title: 'Groove-Trainer',
                           badge: 'TIMING & RHYTHMUS',
                           badgeColor: '#ea580c',
-                          badgeBg: 'rgba(249, 115, 22, 0.10)',
-                          badgeBorder: '1px solid rgba(249, 115, 22, 0.25)',
+                          badgeBg: 'rgba(249, 115, 22, 0.08)',
+                          badgeBorder: '1px solid rgba(249, 115, 22, 0.22)',
                           description: 'Interaktives Rhythmustraining mit Metronom & Feedback',
                           pills: ['🥁 Micro-Timing', '⚡ Tempotraining']
                         },
@@ -13633,8 +13697,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Stimmgerät',
                           badge: 'INTONATION & PITCH',
                           badgeColor: '#0891b2',
-                          badgeBg: 'rgba(6, 182, 212, 0.10)',
-                          badgeBorder: '1px solid rgba(6, 182, 212, 0.25)',
+                          badgeBg: 'rgba(6, 182, 212, 0.08)',
+                          badgeBorder: '1px solid rgba(6, 182, 212, 0.22)',
                           description: 'Präzises Instrumenten-Stimmgerät mit Frequenzerkennung',
                           pills: ['🎯 440 Hz / Kalibrierbar', '🎚️ Echtzeit-Pitch']
                         },
@@ -13643,8 +13707,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
                           badge: 'GEHÖRBILDUNG',
                           badgeColor: '#7c3aed',
-                          badgeBg: 'rgba(139, 92, 246, 0.10)',
-                          badgeBorder: '1px solid rgba(139, 92, 246, 0.25)',
+                          badgeBg: 'rgba(139, 92, 246, 0.08)',
+                          badgeBorder: '1px solid rgba(139, 92, 246, 0.22)',
                           description: uiLevel === 'junior' ? 'Spielerisches Erkennen von Tönen und Melodien' : 'Intervalle, Akkorde & Skalen hören und bestimmen',
                           pills: ['👂 Intervalltraining', '🎶 Melodiediktat']
                         },
@@ -13653,8 +13717,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Loopstation',
                           badge: 'PROFI-STUDIO',
                           badgeColor: '#e11d48',
-                          badgeBg: 'rgba(244, 63, 94, 0.10)',
-                          badgeBorder: '1px solid rgba(244, 63, 94, 0.25)',
+                          badgeBg: 'rgba(244, 63, 94, 0.08)',
+                          badgeBorder: '1px solid rgba(244, 63, 94, 0.22)',
                           description: 'Mehrspur-Aufnahmen & kreatives Jammen',
                           pills: ['🎙️ 4 Spuren', '🎛️ Beat-Pads']
                         },
@@ -13663,8 +13727,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: uiLevel === 'junior' ? 'Musik-Stern' : 'Fähigkeiten-Radar',
                           badge: 'KOMPETENZ-PROFIL',
                           badgeColor: '#d946ef',
-                          badgeBg: 'rgba(217, 70, 239, 0.10)',
-                          badgeBorder: '1px solid rgba(217, 70, 239, 0.25)',
+                          badgeBg: 'rgba(217, 70, 239, 0.08)',
+                          badgeBorder: '1px solid rgba(217, 70, 239, 0.22)',
                           description: 'Visualisierung des didaktischen Fortschritts und aller Meilensteine',
                           pills: ['⭐ 5 Dimensionen', '📈 Langzeit-Entwicklung']
                         },
@@ -13673,8 +13737,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Musik-Weltreise',
                           badge: 'DIDAKTISCHE EXPEDITION',
                           badgeColor: '#0284c7',
-                          badgeBg: 'rgba(2, 132, 199, 0.10)',
-                          badgeBorder: '1px solid rgba(2, 132, 199, 0.25)',
+                          badgeBg: 'rgba(2, 132, 199, 0.08)',
+                          badgeBorder: '1px solid rgba(2, 132, 199, 0.22)',
                           description: 'Musikalische Entdeckungsreise durch Rhythmen und Kulturen der Welt',
                           pills: ['🌍 Kontinente & Stile', '🏆 Reisepass-Sticker']
                         },
@@ -13683,8 +13747,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Unterrichts-Archiv',
                           badge: 'CHRONIK & BACKUP',
                           badgeColor: '#334155',
-                          badgeBg: 'rgba(71, 85, 105, 0.10)',
-                          badgeBorder: '1px solid rgba(71, 85, 105, 0.25)',
+                          badgeBg: 'rgba(71, 85, 105, 0.08)',
+                          badgeBorder: '1px solid rgba(71, 85, 105, 0.22)',
                           description: 'Vergangene Wochen, Notizen & Hausaufgaben-Chronik',
                           pills: ['📅 Alle Wochen', '🎵 Sprachnotizen']
                         }
@@ -13698,44 +13762,55 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               alignItems: "center",
                               justifyContent: "space-between",
                               padding: "12px 16px",
-                              background: isUnlocked ? "#ffffff" : "#f8fafc",
+                              background: "#ffffff",
                               border: isUnlocked ? `1.5px solid ${ext.badgeColor}40` : "1.5px solid #e2e8f0",
                               borderRadius: "18px",
-                              boxShadow: isUnlocked ? `0 4px 14px -2px ${ext.badgeColor}20` : "none",
+                              boxShadow: isUnlocked
+                                ? `0 4px 14px -2px ${ext.badgeColor}22, 0 1px 3px rgba(0,0,0,0.04)`
+                                : "0 1px 3px rgba(0,0,0,0.02)",
                               gap: "14px",
-                              transition: "all 0.2s ease"
+                              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0, flex: 1 }}>
                               <CampusStudioModuleCover
                                 moduleKey={ext.key as any}
                                 size="md"
-                                isUnlocked={isUnlocked}
+                                isUnlocked={true}
                                 uiLevel={uiLevel}
                               />
                               <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                                  <div style={{ fontSize: "0.90rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.01em" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                  <div style={{ fontSize: "0.92rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.01em" }}>
                                     {ext.title}
                                   </div>
                                   <span style={{
                                     fontSize: "0.60rem",
                                     fontWeight: 800,
-                                    color: isUnlocked ? ext.badgeColor : "#64748b",
-                                    background: isUnlocked ? ext.badgeBg : "#f1f5f9",
-                                    padding: "1px 6px",
+                                    color: ext.badgeColor,
+                                    background: ext.badgeBg,
+                                    padding: "1.5px 7px",
                                     borderRadius: "100px",
-                                    border: isUnlocked ? ext.badgeBorder : "1px solid #e2e8f0"
+                                    border: ext.badgeBorder,
+                                    letterSpacing: "0.02em"
                                   }}>
                                     {ext.badge}
                                   </span>
                                 </div>
-                                <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "2px", lineHeight: 1.35 }}>
+                                <div style={{ fontSize: "0.73rem", color: "#64748b", marginTop: "2px", lineHeight: 1.35 }}>
                                   {ext.description}
                                 </div>
-                                <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+                                <div style={{ display: "flex", gap: "5px", marginTop: "6px", flexWrap: "wrap" }}>
                                   {ext.pills.map((pill, pIdx) => (
-                                    <span key={pIdx} style={{ fontSize: "0.62rem", fontWeight: 700, color: "#475569", background: "#f1f5f9", padding: "1px 6px", borderRadius: "4px" }}>
+                                    <span key={pIdx} style={{
+                                      fontSize: "0.62rem",
+                                      fontWeight: 700,
+                                      color: "#475569",
+                                      background: "#f8fafc",
+                                      border: "1px solid #e2e8f0",
+                                      padding: "1px 7px",
+                                      borderRadius: "6px"
+                                    }}>
                                       {pill}
                                     </span>
                                   ))}
@@ -13743,6 +13818,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               </div>
                             </div>
 
+                            {/* Apple WAI-ARIA Switch Toggle (44px Hit Target) */}
                             <button
                               type="button"
                               role="switch"
@@ -13768,7 +13844,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 justifyContent: isUnlocked ? "flex-end" : "flex-start",
                                 transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
                                 boxShadow: isUnlocked ? "0 0 12px rgba(34, 197, 94, 0.40)" : "none",
-                                flexShrink: 0
+                                flexShrink: 0,
+                                outline: "none"
                               }}
                               className="hover-scale-mini"
                             >
@@ -13786,21 +13863,45 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     </div>
                   </>
                 )}
+              </div>
 
+              {/* 🔒 ZONE 4: STICKY AUTO-SYNC FOOTER */}
+              <div style={{
+                padding: "14px 22px",
+                background: "#ffffff",
+                borderTop: "1px solid #f1f5f9",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                flexShrink: 0
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    background: "#22c55e",
+                    boxShadow: "0 0 6px rgba(34, 197, 94, 0.6)"
+                  }} />
+                  <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b" }}>
+                    Live synchronisiert
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowModuleUnlockModal(false)}
                   style={{
-                    marginTop: "4px",
                     background: "#0f172a",
                     color: "#ffffff",
                     border: "none",
                     borderRadius: "12px",
-                    padding: "11px 16px",
-                    fontSize: "0.84rem",
+                    padding: "9px 20px",
+                    fontSize: "0.82rem",
                     fontWeight: 800,
                     cursor: "pointer",
-                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.20)"
+                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.18)",
+                    transition: "all 0.16s ease"
                   }}
                   className="hover-scale"
                 >

@@ -5,6 +5,8 @@
 
 export * from './types';
 export * from './InstrumentAudioWorkletProcessor';
+export * from './YinWorkletProcessor';
+export * from './YinAudioWorkletEngine';
 export * from './AudioCaptureEngine';
 export * from './SpotifyGradeStreamController';
 export * from './DidacticWsolaEngine';

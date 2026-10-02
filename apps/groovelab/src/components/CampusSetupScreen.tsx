@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { resolveUserCampusId } from '../utils/campusIdHelper';
 import { 
   Save, 
   Calendar, 
@@ -1547,7 +1548,7 @@ export function CampusSetupScreen({
                       <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Kopplung &amp; Proberaum-Status</strong>
                       <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.5 }}>
                         Schul-ID: <strong>{sId || 'Aktiv'}</strong><br />
-                        Schulausweis-ID: <strong>{securityOverview?.ausweis_nummer || admin?.ausweis_nummer || currentUserId?.substring(0, 8) || '–'}</strong><br />
+                        Schulausweis-ID: <strong>{resolveUserCampusId(admin || { id: currentUserId, role: 'admin', school_id: sId })}</strong><br />
                         Rolle: <strong>{admin?.role === 'admin' ? 'Schulleitung & Administration' : 'Campus Lehrkraft'}</strong><br />
                         Sperrbildschirm-Schutz: <strong>Aktiviert (45 Min. Inaktivitätssperre)</strong>
                       </span>

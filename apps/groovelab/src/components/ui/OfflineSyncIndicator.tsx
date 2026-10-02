@@ -42,11 +42,19 @@ export const OfflineSyncIndicator: React.FC = () => {
     return null;
   }
 
+  // 🏛️ Stille Exzellenz (Exception-Only nach Gemini/Apple-Standard):
+  // Im Normalzustand (online & synchronisiert) 100% unsichtbar. Keine störenden Dauer-Banner!
+  if (isOnline && !syncSuccess && !isSyncing) {
+    return null;
+  }
+
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         position: 'fixed',
-        top: '20px',
+        top: 'max(14px, env(safe-area-inset-top, 14px))',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 99999,
@@ -81,12 +89,12 @@ export const OfflineSyncIndicator: React.FC = () => {
           <RefreshCw size={15} className="animate-spin" style={{ color: '#3b82f6' }} />
           <span>Verbindung wiederhergestellt • Synchronisiere...</span>
         </>
-      ) : (
+      ) : syncSuccess ? (
         <>
           <CheckCircle2 size={15} style={{ color: '#34a853' }} />
-          <span>100% synchronisiert mit Cloud</span>
+          <span>Wieder online • Änderungen synchronisiert</span>
         </>
-      )}
+      ) : null}
     </div>
   );
 };

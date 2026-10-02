@@ -5,7 +5,7 @@ Dein Maßstab ist kompromissloser B2B-Enterprise+ Goldstandard (OWASP ASVS L3, B
 
 ---
 
-## 1. DIE 6 UNUMSTÖSSLICHEN ARCHITEKTUR-AXIOME (ABBRUCHKRITERIEN)
+## 1. DIE 7 UNUMSTÖSSLICHEN ARCHITEKTUR-AXIOME (ABBRUCHKRITERIEN)
 
 Verstößt eine geplante Aktion gegen eines dieser Axiome, stoppe sofort:
 
@@ -29,6 +29,11 @@ Verstößt eine geplante Aktion gegen eines dieser Axiome, stoppe sofort:
 6. **BARRIEREFREIHEIT (BFSG 2025 / WCAG 2.2 AA) & DESKTOP IMMUNITY:**
    * Jedes interaktive Element besitzt Tastatur-Vollbedienbarkeit (`role="button"`, `tabIndex={0}`, `onKeyDown` für Enter/Space) und sichtbaren Fokus.
    * Desktop-Grid-Layouts (`>= 769px`) sind unantastbar; responsive Optimierungen bleiben strikt auf Mobile (`<= 768px`) beschränkt.
+7. **MONOLITH CEILING, ZERO-INLINE-FEATURE & ZERO-SHREDDING DOKTRIN:**
+   * **Absolutes Zersäge-Verbot**: Bestehende Groß-Monolithen (u. a. `CampusEventsBoard.tsx`, `ScheduleCalendarView.tsx`, `MeisterwerkDocumentTab.tsx`) dürfen NIEMALS eigenständig oder ungefragt refaktorisiert, aufgesplittet oder in Micro-Dateien zerkleinert werden.
+   * **Präventiver Pre-Flight Check**: VOR dem Schreiben prüfen, ob eine Bestandsdatei in `scripts/monolith_baseline.json` steht oder $\ge 1.500$ Zeilen hat. Wenn ja: Sofortiger Inlining-Stopp!
+   * Jede neue didaktische oder administrative Funktion MUSS als eigenständiger Feature-Monolith in einer separaten Datei angelegt werden (Budget: maximal 1.500 Zeilen, darüber zwingend Sub-Monolithen wie `tabs/`).
+   * Bestehende Screens agieren ausschließlich als schlanke Host-Orchestratoren (Mounting per Einzeiler, maximal 15 Zeilen technischer Verdrahtungs-Puffer).
 
 ---
 
@@ -39,6 +44,7 @@ Arbeite streng sequenziell:
 ### Phase 1: Reconnaissance (Erst analysieren, dann planen)
 * Bevor du Code anfasst, suche im Workspace nach existierenden Komponenten, Migrationen und Hilfsfunktionen (`ripgrep` / Antigravity Tools).
 * Prüfe das bestehende Datenbankschema (`supabase/migrations/`) und bestehende Suite-Komponenten.
+* **Monolith Pre-Flight Check**: Prüfe die Zeilenzahl der zu berührenden Datei. Bei Bestands-Monolithen ($\ge 1.500$ Zeilen) plane die neue Funktion zwingend als separate Satelliten-Datei.
 
 ### Phase 2: Planung & Genehmigungsvorbehalt (Zero Auto-Execute)
 * Lege einen präzisen Implementierungsplan (`implementation_plan.md`) vor:

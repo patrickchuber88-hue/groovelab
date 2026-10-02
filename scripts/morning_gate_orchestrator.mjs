@@ -33,7 +33,9 @@ const guards = [
   { id: 'LICENSE_COMPLIANCE', name: 'License Compliance Guard (ISO/IEC 5230 OpenChain)', cmd: 'node', args: ['scripts/license_compliance_guard.mjs'] },
   { id: 'ZERO_OVERLAP', name: '0,1% Zero-Overlap & Fluid-Layout Guard (Tier 1)', cmd: 'node', args: ['scripts/zero_overlap_guard.mjs'] },
   { id: 'STATIC_HEADERS', name: 'Static Security Headers Guard (Mozilla A+)', cmd: 'node', args: ['scripts/verify_static_security_headers.mjs'] },
-  { id: 'SECRET_SCANNER', name: 'Secret Leak & Entropy Scanner', cmd: 'bash', args: ['scripts/pre_commit_secret_scanner.sh'] }
+  { id: 'SECRET_SCANNER', name: 'Secret Leak & Entropy Scanner', cmd: 'bash', args: ['scripts/pre_commit_secret_scanner.sh'] },
+  { id: 'ISO27001_COMPLIANCE', name: 'ISO/IEC 27001 & ISO 27701 Compliance Guard', cmd: 'node', args: ['scripts/iso27001_compliance_guard.mjs'] },
+  { id: 'MONOLITH_CAP_GUARD', name: 'Monolith Ceiling & Zero-Inline-Feature Guard', cmd: 'node', args: ['scripts/monolith_growth_guard.mjs'] }
 ];
 
 function runGuardAsync(guard) {
@@ -127,7 +129,7 @@ function checkLiveClusterHealth(targetUrl = 'https://campus-groovelab.de') {
 // Main Parallel Orchestration
 // -----------------------------------------------------------------------------
 async function main() {
-  process.stdout.write('  ⚡ Starte parallele Concurrency-Engine für 8 Architektur-Guards & Live-Probe...\n\n');
+  process.stdout.write(`  ⚡ Starte parallele Concurrency-Engine für ${guards.length} Architektur-Guards & Live-Probe...\n\n`);
 
   // Launch all guards and live probe concurrently
   const [guardResults, liveHealth] = await Promise.all([

@@ -148,13 +148,13 @@ const deriveStableSequenceFromUuid = (uuid: string, roleCode: CampusRoleCode, us
   const absHash = Math.abs(hash);
 
   if (roleCode === 'V') {
-    return (absHash % 50) + 1; // 1..50
+    return (absHash % 50) + 1; // 1..50 (Verwaltung)
   }
   if (roleCode === 'L') {
-    return (absHash % 250) + 1; // 1..250
+    return (absHash % 80) + 1; // 1..80 (reales Kollegium: 1..80 Dozenten)
   }
-  // Schüler: 1..9999
-  return (absHash % 9000) + 1;
+  // Schüler: 1..2500 (reale Musikschulgröße)
+  return (absHash % 2500) + 1;
 };
 
 /**
@@ -177,19 +177,32 @@ export const resolveUserCampusId = (user?: any, fallbackSchoolId?: string | null
   const rawSchoolId = user.school_id || user.schoolId || fallbackSchoolId || null;
   const schoolNum = user.school_numeric_id || user.schoolNumericId || getSchoolNumericId(rawSchoolId);
 
-  // 3. Bestimme Rollen-Code (V, L, S)
+  // 3. Bestimme Rollen-Code (V, L, S) nach Höchstrang-Prinzip
   const roleCode = getCampusRoleCode(user.role, user.roles);
 
-  // 4. Bestimme Sequenznummer
+  // 4. Bestimme Sequenznummer (0,1% Goldstandard Nummernkreis-Governance):
+  // Filtert temporäre Starter-PINs (z. B. "C-8975", "V-1234", "CG-5678", "G-9999") heraus.
+  // Starter-PINs sind Authentifizierungs-Geheimnisse und dürfen NIEMALS als Ausweis-Nummer herangezogen werden!
   const userName = `${user.first_name || user.vorname || ''} ${user.last_name || user.nachname || user.name || ''}`.trim();
-  
-  // Falls die alte ausweis_nummer reine Ziffern enthält (z. B. "42" aus WinMusik-Import), nutze diese
+  const isStarterPinPattern = /^[A-Z]{1,2}-\d{4}$/i.test(existingAusweis);
   const digitsOnly = existingAusweis.replace(/\D/g, '');
+  const numVal = digitsOnly ? parseInt(digitsOnly, 10) : 0;
+
+  // Plausibilitätsgrenzen für echte Altsystem-Personalnummern (z. B. aus WinMusik/MBS):
+  // - Verwaltung (V): max. 99 Mitarbeiter (Zahlen >= 100 sind PINs, keine Personalnummern)
+  // - Lehrkraft (L): max. 499 Lehrkräfte (Zahlen >= 500 sind PINs, keine Personalnummern)
+  // - Schüler (S): max. 9999 Schüler (sofern kein Starter-PIN Format)
+  const isPlausibleLegacySeq = !isStarterPinPattern && numVal > 0 && (
+    (roleCode === 'V' && numVal < 100) ||
+    (roleCode === 'L' && numVal < 500) ||
+    (roleCode === 'S' && numVal <= 9999)
+  );
+
   let sequence: number;
-  if (!hasLegacyBuggyPrefix && digitsOnly.length > 0 && digitsOnly.length <= 4) {
-    sequence = parseInt(digitsOnly, 10);
+  if (!hasLegacyBuggyPrefix && isPlausibleLegacySeq) {
+    sequence = numVal;
   } else {
-    // Deterministisch aus der User-ID und dem Namen ableiten
+    // Deterministisch aus der User-ID und dem Namen im rollenspezifischen Nummernkreis ableiten
     const userId = user.id || user.user_id || 'default-user';
     sequence = deriveStableSequenceFromUuid(userId, roleCode, userName);
   }

@@ -5,7 +5,9 @@
  * Compliance PDF for music school boards, municipal IT departments, and DPOs.
  */
 
-export async function generateEnterpriseSecurityWhitepaperPDF(options?: { schoolName?: string }): Promise<void> {
+import { cleanPdfText } from './pdfTypographyEngine';
+
+export async function generateEnterpriseSecurityWhitepaperPDF(options?: { schoolName?: string; returnBlob?: boolean }): Promise<Blob | void> {
   try {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -66,7 +68,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     doc.setFontSize(8.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     const summaryText = 'Campus-Groovelab erfüllt die höchsten europäischen Standards für Kinderschutz und Datensicherheit (BSI IT-Grundschutz, ISO/IEC 27001, DSGVO Art. 25/32 und COPPA). Als unterstützendes Convenience-Werkzeug („Fast-Track“) zur didaktischen Unterrichtsbegleitung schützt die Plattform durch Zero-Knowledge- und Zero-Mail-Architektur vor Datenlecks: Keine Speicherung von Schüler-E-Mails, Passwörtern oder Bankdaten.';
-    const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 12);
+    const splitSummary = doc.splitTextToSize(cleanPdfText(summaryText), contentWidth - 12);
     doc.text(splitSummary, margin + 6, 58);
 
     // 5 Core Security Axioms Table
@@ -110,12 +112,12 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
-      doc.text(p.title, margin + 4, curY + 6);
+      doc.text(cleanPdfText(p.title), margin + 4, curY + 6);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      const splitP = doc.splitTextToSize(p.desc, contentWidth - 8);
+      const splitP = doc.splitTextToSize(cleanPdfText(p.desc), contentWidth - 8);
       doc.text(splitP, margin + 4, curY + 12);
 
       curY += 28;
@@ -180,7 +182,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       doc.setFontSize(8);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
       t.items.forEach(item => {
-        const splitItem = doc.splitTextToSize(item, contentWidth);
+        const splitItem = doc.splitTextToSize(cleanPdfText(item), contentWidth);
         doc.text(splitItem, margin + 2, curY);
         curY += (splitItem.length * 4) + 1;
       });
@@ -198,13 +200,13 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('4. Kommunale Träger-Compliance (VVT Art. 30, DSFA Art. 35 & BYOD)', margin + 6, curY + 8);
+    doc.text(cleanPdfText('4. Kommunale Träger-Compliance (VVT Art. 30, DSFA Art. 35 & BYOD)'), margin + 6, curY + 8);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     const hostText = 'Vollständige Konformität für Städte, Gemeinden und Schulämter: Subsidiaritäts-Doktrin (Fast-Track-Werkzeug, offizielle Dienstwege bleiben beim Träger), VVT-Muster nach Art. 30 DSGVO, formelle DSFA-Schwellwertprüfung nach Art. 35 DSGVO (kein hohes Risiko), BYOD-Schutz für Lehrkräfte sowie 100% deutsches ISO 27001 Cloud-Hosting (Hetzner Falkenstein/Nürnberg).';
-    const splitHost = doc.splitTextToSize(hostText, contentWidth - 12);
+    const splitHost = doc.splitTextToSize(cleanPdfText(hostText), contentWidth - 12);
     doc.text(splitHost, margin + 6, curY + 15);
 
     // Official Seal / Signature Area
@@ -231,7 +233,10 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     doc.setTextColor(148, 163, 184);
     doc.text('Campus-Groovelab • Enterprise Security Whitepaper | Seite 2 von 2', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-    // Save and Trigger Download
+    // Save and Trigger Download or Return Blob
+    if (options?.returnBlob) {
+      return doc.output('blob');
+    }
     doc.save('Campus-Groovelab-Enterprise-Security-Whitepaper.pdf');
   } catch (error) {
     console.error('[Whitepaper PDF] Failed to generate Security Whitepaper PDF:', error);

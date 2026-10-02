@@ -187,12 +187,15 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   const isExplicitTeacher = targetUser?.isTeacherContext === true || targetUser?.isTeacher === true || hasTeacherRole || (activeWorkspace === 'teacher' && (role === 'teacher' || roles.includes('teacher')));
   const isVerwaltungContext = (role === 'admin' || role === 'secretary') && !isExplicitTeacher;
 
-  if (isVerwaltungContext) {
+  if (isVerwaltungContext || activePlat === 'secretary') {
     // Pure Admin & Secretariat users in admin context MUST display the briefing chalkboard image across all modules
     displaySrc = '/campus_login_hero.png';
   } else if (isExplicitTeacher && activePlat === 'campus') {
     // Teachers in Campus module must ALWAYS display their Instrumenten-Avatar!
     displaySrc = resolveCampusStudentAvatar(targetUser ? { ...targetUser, role: 'teacher', isTeacherContext: true, resolved_instrument: resolvedInstrument || targetUser.resolved_instrument } : { instrument: resolvedInstrument, role: 'teacher', isTeacherContext: true });
+  } else if (activePlat === 'campus') {
+    // Students in Campus module must ALWAYS display their Instrumenten-Avatar, NEVER ghost avatar!
+    displaySrc = resolveCampusStudentAvatar(targetUser ? { ...targetUser, role: 'student', resolved_instrument: resolvedInstrument || targetUser.resolved_instrument } : { instrument: resolvedInstrument, role: 'student' });
   } else if (activePlat === 'groovelab') {
     if (isExplicitTeacher) {
       displaySrc = resolveGrooveLabTeacherAvatar(targetUser, src);
@@ -214,8 +217,6 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         displaySrc = getDefaultMusicianAvatarUrl(effInst, role);
       }
     }
-  } else if (activePlat === 'campus') {
-    displaySrc = resolveCampusStudentAvatar(targetUser ? { ...targetUser, resolved_instrument: resolvedInstrument || targetUser.resolved_instrument } : { instrument: resolvedInstrument });
   }
 
   const handleClick = (e: React.MouseEvent) => {
@@ -262,7 +263,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
     >
       <img 
-        src={displaySrc || (role === 'student' ? getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, 'student') : '/avatar_ghost.jpg')} 
+        src={displaySrc || (activePlat === 'campus' ? '/avatars/gitarre_avatar_new.png' : (activePlat === 'secretary' || isVerwaltungContext ? '/campus_login_hero.png' : (role === 'student' ? getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, 'student') : '/avatar_ghost.jpg')))} 
         onLoad={() => setIsLoaded(true)}
         loading="lazy"
         decoding="async"
@@ -279,10 +280,14 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         }} 
         onError={(e) => {
           const img = e.target as HTMLImageElement;
-          if (role === 'student') {
+          if (activePlat === 'campus') {
+            img.src = '/avatars/gitarre_avatar_new.png';
+          } else if (activePlat === 'secretary' || isVerwaltungContext) {
+            img.src = '/campus_login_hero.png';
+          } else if (role === 'student') {
             img.src = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, 'student');
           } else {
-            img.src = (activePlat === 'campus' && (role === 'student' || role === 'teacher')) ? '/avatars/gitarre_avatar_new.png' : '/avatar_ghost.jpg';
+            img.src = '/avatar_ghost.jpg';
           }
         }}
       />

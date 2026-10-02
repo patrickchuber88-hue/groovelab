@@ -16,6 +16,7 @@ import { isSubdomainReserved } from '../constants/reservedSubdomains';
 import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
 import { generateHandoverUrl } from '../utils/cryptoAuth';
 import { logSecurityEvent } from '../services/auditLogService';
+import { computeSha256, ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS } from '../legal/legalContent';
 
 
 interface SchoolSelfOnboardingModalProps {
@@ -211,8 +212,10 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         generatedPin: effectivePin
       });
 
-      // Revisionssicheres Audit-Logging der B2B-Unternehmer-Bestätigung gem. § 14 BGB & AGB-Zustimmung
-      const auditChecksum = `SHA256-CG-B2B-ONBOARDING-${String(schoolRecord.id).slice(0, 8).toUpperCase()}-${new Date().getFullYear()}`;
+      // Revisionssicheres Audit-Logging der B2B-Unternehmer-Bestätigung gem. § 14 BGB & AGB-Zustimmung (§ 371a ZPO)
+      const canonicalContractText = LEGAL_DOCUMENTS.terms_b2b_avv?.fullTextMarkdown || 'TERMS_B2B_AVV';
+      const auditPayload = canonicalContractText + String(schoolRecord.id) + String(userRecord.id) + ACTIVE_LEGAL_VERSION;
+      const auditChecksum = await computeSha256(auditPayload);
       await logSecurityEvent({
         action: 'SCHOOL_ONBOARDING_B2B_TERMS_ACCEPTED',
         schoolId: String(schoolRecord.id),
@@ -223,7 +226,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           agb_avv_confirmed: true,
           country: country,
           subdomain: slug,
-          contract_terms: 'AGB Teil A (B2B) & AVV v2026.3',
+          contract_terms: `AGB Teil A (B2B) & AVV v${ACTIVE_LEGAL_VERSION}`,
+          contract_version: ACTIVE_LEGAL_VERSION,
           audit_checksum: auditChecksum,
           signed_at: new Date().toISOString()
         }

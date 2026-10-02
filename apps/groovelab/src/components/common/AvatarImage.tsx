@@ -72,32 +72,51 @@ export const AvatarImage = React.memo(({
     const isExplicitTeacher = targetUser?.isTeacherContext === true || targetUser?.isTeacher === true || hasTeacherRole || (activeWorkspace === "teacher" && (r === "teacher" || roles.includes("teacher")));
     const isVerwaltungContext = (r === "admin" || r === "secretary") && !isExplicitTeacher;
 
+    if (hasError) {
+      if (activePlat === "campus") {
+        return "/avatars/gitarre_avatar_new.png";
+      }
+      if (activePlat === "secretary" || isVerwaltungContext) {
+        return "/campus_login_hero.png";
+      }
+      if (r === "student") {
+        return getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, "student");
+      }
+      return "/avatar_ghost.jpg";
+    }
+
     if (isVerwaltungContext || activePlat === "secretary") {
       return "/campus_login_hero.png";
     }
     
     if (activePlat === "campus") {
-      if (targetUser && (targetUser.role === "student" || isExplicitTeacher)) {
+      // 🏛️ Campus Module SSOT Invariant:
+      // 1. Ghost avatar (/avatar_ghost.jpg) belongs EXCLUSIVELY to GrooveLab and is strictly forbidden in Campus.
+      // 2. Musician avatars (student_*, teen_*, bandstyle_*) are strictly forbidden in Campus.
+      // 3. Admin / Secretary in Campus receive /campus_login_hero.png.
+      // 4. All students and teachers in Campus MUST receive their 3D instrument avatar.
+      if (targetUser) {
         return resolveCampusStudentAvatar({ 
           ...targetUser, 
-          role: isExplicitTeacher ? 'teacher' : targetUser.role,
+          role: isExplicitTeacher ? 'teacher' : (targetUser.role || 'student'),
           isTeacherContext: isExplicitTeacher,
-          resolved_instrument: resolvedInstrument || targetUser.resolved_instrument 
+          resolved_instrument: resolvedInstrument || targetUser.resolved_instrument || targetUser.instrument 
         });
       }
-      if (src) {
-        if (src.includes('avatar') || src.startsWith('data:') || src.startsWith('blob:')) {
+      if (src && !src.includes('avatar_ghost') && !src.includes('campus_login_hero')) {
+        const isMusicianPic = src.includes('student_') || src.includes('bandstyle_') || src.includes('teen_') || src.includes('avatar_boy') || src.includes('avatar_girl');
+        if (!isMusicianPic && (src.includes('_avatar') || src.includes('instrument_avatar') || src.startsWith('data:') || src.startsWith('blob:'))) {
           return src;
         }
-        return "/avatars/gitarre_avatar_new.png";
       }
+      return "/avatars/gitarre_avatar_new.png";
     } else {
       // GrooveLab module: teachers and students MUST display musician avatars, NEVER /campus_login_hero.png
       if (isExplicitTeacher) {
         return resolveGrooveLabTeacherAvatar(targetUser, src);
       }
       if (r === "admin" || r === "secretary") {
-        return (src && src !== "/campus_login_hero.png") ? src : "/avatar_ghost.jpg";
+        return "/campus_login_hero.png";
       }
 
       // Student Resolution in GrooveLab
@@ -165,13 +184,6 @@ export const AvatarImage = React.memo(({
       // Default Didactic Student Musician Avatar
       return getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, r);
     }
-    if (hasError) {
-      if (r === "student") {
-        return getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, "student");
-      }
-      return "/avatar_ghost.jpg";
-    }
-    return src || getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument, r);
   }, [src, hasError, user, resolvedInstrument, activePlatform]);
 
   const handleClick = (e: React.MouseEvent) => {

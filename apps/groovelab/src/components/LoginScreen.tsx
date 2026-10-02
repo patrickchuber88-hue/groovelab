@@ -2231,8 +2231,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       } catch (e) {}
 
-      // 🛡️ Student Safety: Clear stale simulated test dates when logging in as student (Anti-Date-Drift)
-      if (user.role === 'student' || !user.role) {
+      // 🛡️ Student Safety: Clear stale simulated test dates when logging in as student (Anti-Date-Drift, Production only)
+      if (!isLocalDevEnvironment() && (user.role === 'student' || !user.role)) {
         localStorage.removeItem('groovelab_simulated_date');
         localStorage.removeItem('groovelab_simulated_start_timestamp');
       }
@@ -4321,7 +4321,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                         border: '1px solid rgba(255, 255, 255, 0.4)'
                       }}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = isAdminOrSecretary ? '/campus_login_hero.png' : '/avatar_ghost.jpg';
+                        (e.target as HTMLImageElement).src = isAdminOrSecretary ? '/campus_login_hero.png' : (isGroovelabKiosk ? '/avatar_ghost.jpg' : '/avatars/gitarre_avatar_new.png');
                       }}
                     />
                     <span>{p.firstName} {p.lastName ? p.lastName.charAt(0) + '.' : ''}</span>
@@ -4589,7 +4589,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           objectFit: 'cover'
                         }}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/avatar_ghost.jpg';
+                          (e.target as HTMLImageElement).src = isGroovelabKiosk ? '/avatar_ghost.jpg' : '/avatars/gitarre_avatar_new.png';
                         }}
                       />
                     </div>
@@ -7312,9 +7312,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_location_mode', 'home');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
                 sessionStorage.setItem('groovelab_cached_user', JSON.stringify(targetUser));
-                // 🛡️ Anti-Date-Drift: Clear any stale teacher simulation date
-                localStorage.removeItem('groovelab_simulated_date');
-                localStorage.removeItem('groovelab_simulated_start_timestamp');
+                // 🛡️ Anti-Date-Drift: Clear any stale teacher simulation date in production only
+                if (!isLocalDevEnvironment()) {
+                  localStorage.removeItem('groovelab_simulated_date');
+                  localStorage.removeItem('groovelab_simulated_start_timestamp');
+                }
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');

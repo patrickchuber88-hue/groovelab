@@ -188,7 +188,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         const timestamp = new Date().toISOString();
         const updateData: Record<string, any> = {
           parental_consent_given_at: timestamp,
-          consent_version: 'v2.0',
+          consent_version: ACTIVE_LEGAL_VERSION,
           campus_usage_mode: campusUsageMode,
           is_active: true,
           is_pin_activated: true,
@@ -224,7 +224,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
             targetId: String(student.id),
             metadata: {
               consent_type: 'parental_onboarding_activation',
-              consent_version: 'v2.0',
+              consent_version: ACTIVE_LEGAL_VERSION,
               campus_usage_mode: campusUsageMode,
               permissions: permissionsPayload,
               timestamp

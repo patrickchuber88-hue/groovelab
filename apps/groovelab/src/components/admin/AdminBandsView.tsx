@@ -677,7 +677,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                                 style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', textAlign: 'left' }}
                               >
                                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden' }}>
-                                  <img src={s.photo_url || '/avatar_ghost.jpg'} alt={`${s.first_name} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  <img src={(s.photo_url && !s.photo_url.includes('avatar_ghost')) ? s.photo_url : (s.is_external_vocalist ? '/avatars/gesang_avatar.png' : '/avatars/gitarre_avatar_new.png')} alt={`${s.first_name} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 </div>
                                 <div>
                                   <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>

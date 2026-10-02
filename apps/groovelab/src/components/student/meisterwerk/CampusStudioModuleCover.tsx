@@ -10,7 +10,6 @@ import {
   BookOpen,
   History,
   Compass,
-  Lock,
   Plus
 } from 'lucide-react';
 
@@ -104,8 +103,6 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
     lg: { dim: 72, radius: 18, iconSize: 34, strokeWidth: 2.3 },
     xl: { dim: 96, radius: 22, iconSize: 44, strokeWidth: 2.5 }
   }[size];
-
-  const isLocked = !isUnlocked || isGhosted;
 
   // Modul-Spezifische Farbverläufe, Schatten & Icons
   const getModuleConfig = () => {
@@ -207,10 +204,8 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'loopstation':
         return {
           title: 'Loopstation',
-          gradient: isLocked
-            ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
-            : 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
-          boxShadow: isLocked ? 'none' : '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
+          gradient: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
+          boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
           renderIcon: () => (
             <Sliders
               size={dimensions.iconSize}
@@ -265,10 +260,8 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'archive':
         return {
           title: 'Aufgabenheft-Verlauf',
-          gradient: isLocked
-            ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
-            : 'linear-gradient(135deg, #475569 0%, #334155 100%)',
-          boxShadow: isLocked ? 'none' : '0 4px 10px -2px rgba(71, 85, 105, 0.35)',
+          gradient: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+          boxShadow: '0 4px 10px -2px rgba(71, 85, 105, 0.35)',
           renderIcon: () => (
             <History
               size={dimensions.iconSize}
@@ -313,15 +306,13 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: isLocked ? 'none' : config.boxShadow,
+        boxShadow: config.boxShadow,
         border: moduleKey === 'unlock_tile'
-          ? '1px solid rgba(255, 255, 255, 0.5)'
-          : isLocked
-            ? '1.5px dashed #cbd5e1'
-            : 'none',
+          ? '1.5px dashed #94a3b8'
+          : 'none',
         boxSizing: 'border-box',
         flexShrink: 0,
-        filter: isLocked && moduleKey !== 'unlock_tile' ? 'grayscale(0.75)' : 'none',
+        filter: 'none',
         transition: 'transform 0.16s ease, box-shadow 0.16s ease',
         ...style
       }}
@@ -336,26 +327,6 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       }}>
         {config.renderIcon()}
       </div>
-
-      {/* Schloss-Badge bei gesperrten Modulen */}
-      {isLocked && moduleKey !== 'unlock_tile' && (
-        <div style={{
-          position: 'absolute',
-          top: size === 'xs' ? '2px' : '4px',
-          right: size === 'xs' ? '2px' : '4px',
-          width: size === 'xs' ? '12px' : '18px',
-          height: size === 'xs' ? '12px' : '18px',
-          borderRadius: '50%',
-          background: 'rgba(15, 23, 42, 0.85)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: '1px solid rgba(255,255,255,0.3)',
-          zIndex: 4
-        }}>
-          <Lock size={size === 'xs' ? 7 : 10} color="#ffffff" strokeWidth={2.5} />
-        </div>
-      )}
     </div>
   );
 };

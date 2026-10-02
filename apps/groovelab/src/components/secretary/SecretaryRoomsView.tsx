@@ -1620,7 +1620,7 @@ export function SecretaryRoomsView({
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
-                              padding: '8px 12px 8px 34px',
+                              padding: roomSearchQuery ? '8px 32px 8px 34px' : '8px 12px 8px 34px',
                               borderRadius: '8px',
                               border: '1px solid #cbd5e1',
                               fontSize: '0.78rem',
@@ -1629,6 +1629,32 @@ export function SecretaryRoomsView({
                               fontWeight: 700
                             }}
                           />
+                          {roomSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setRoomSearchQuery('')}
+                              aria-label="Suchbegriff löschen"
+                              style={{
+                                position: 'absolute',
+                                right: '8px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: '#e2e8f0',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '20px',
+                                height: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                padding: 0
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
                         </div>
 
                         <div style={{ flex: 1, minWidth: '130px' }}>
@@ -1646,7 +1672,7 @@ export function SecretaryRoomsView({
                         </div>
 
                         <div style={{ flex: 1, minWidth: '130px' }}>
-                          <select
+                          <select 
                             value={roomFilterStatus}
                             aria-label="Nach Raumstatus oder Modul filtern"
                             onChange={(e) => setRoomFilterStatus(e.target.value as any)}
@@ -1684,6 +1710,70 @@ export function SecretaryRoomsView({
                           </button>
                         )}
                       </div>
+
+                      {/* ACTIVE FILTER NOTICE BANNER */}
+                      {(roomSearchQuery || roomFilterFloor !== 'All' || roomFilterStatus !== 'all') && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          background: '#eff6ff',
+                          border: '1.5px solid #bfdbfe',
+                          borderRadius: '14px',
+                          fontSize: '0.76rem',
+                          color: '#1e40af',
+                          flexWrap: 'wrap',
+                          gap: '8px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 800 }}>
+                              {filteredRooms.length} von {buildingRooms.length} Räumen angezeigt
+                            </span>
+                            {roomSearchQuery && (
+                              <span style={{ background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e3a8a', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                Suche: „{roomSearchQuery}“
+                              </span>
+                            )}
+                            {roomFilterFloor !== 'All' && (
+                              <span style={{ background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e3a8a', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                Stockwerk: {roomFilterFloor}
+                              </span>
+                            )}
+                            {roomFilterStatus !== 'all' && (
+                              <span style={{ background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e3a8a', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                Status: {roomFilterStatus}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRoomSearchQuery('');
+                              setRoomFilterFloor('All');
+                              setRoomFilterStatus('all');
+                            }}
+                            aria-label="Alle Filter zurücksetzen und alle Räume anzeigen"
+                            style={{
+                              background: '#ffffff',
+                              border: '1.5px solid #93c5fd',
+                              color: '#1d4ed8',
+                              borderRadius: '8px',
+                              padding: '4px 12px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              boxShadow: '0 1px 2px rgba(29, 78, 216, 0.08)'
+                            }}
+                          >
+                            <X size={12} />
+                            <span>Alle Räume anzeigen</span>
+                          </button>
+                        </div>
+                      )}
 
                       {/* Rooms List Board */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '550px', width: '100%' }}>

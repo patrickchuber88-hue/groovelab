@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
+import { resolveUserCampusId } from '../../utils/campusIdHelper';
 
 // ─── APPLE STYLE TOKEN FIELD ──────────────────────────────────────────────────
 interface AppleStyleTokenFieldProps {
@@ -534,7 +535,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                   </span>
                 </div>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                  Lehrkräfte-Kartei &bull; ID: #{teacher.id?.substring(0, 8)} &bull; {formData.instrument || 'Allgemein'}
+                  Lehrkräfte-Kartei &bull; ID: #{resolveUserCampusId(teacher)} &bull; {formData.instrument || 'Allgemein'}
                 </p>
               </div>
             </div>

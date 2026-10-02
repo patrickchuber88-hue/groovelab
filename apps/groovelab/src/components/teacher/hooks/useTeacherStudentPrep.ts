@@ -8,18 +8,58 @@ import { parseHomeworkNotesPayload } from '../../../utils/homeworkSnapshotHelper
 export const readInitialStudentPrepMirror = (studentId?: string, weekStr?: string) => {
   if (typeof window === 'undefined' || !studentId) return null;
   try {
+    let result: any = null;
     if (weekStr) {
       const raw = localStorage.getItem(`groovelab_student_prep_${studentId}_${weekStr}`);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.studentId === studentId) return parsed;
+        if (parsed && parsed.studentId === studentId) result = parsed;
       }
     }
-    const latestRaw = localStorage.getItem(`groovelab_student_prep_${studentId}_latest`);
-    if (latestRaw) {
-      const parsedLatest = JSON.parse(latestRaw);
-      if (parsedLatest && parsedLatest.studentId === studentId) return parsedLatest;
+    if (!result) {
+      const latestRaw = localStorage.getItem(`groovelab_student_prep_${studentId}_latest`);
+      if (latestRaw) {
+        const parsedLatest = JSON.parse(latestRaw);
+        if (parsedLatest && parsedLatest.studentId === studentId) result = parsedLatest;
+      }
     }
+    // L1-Fallback from campus_homework_notes_${studentId} if currentWeekNotes is empty
+    if (!result || !result.currentWeekNotes || result.currentWeekNotes.length === 0) {
+      const hwNotesRaw = localStorage.getItem(`campus_homework_notes_${studentId}`);
+      if (hwNotesRaw) {
+        const parsedHw = parseHomeworkNotesPayload(hwNotesRaw);
+        if (parsedHw.didacticNotes.length > 0 || parsedHw.audioItems.length > 0) {
+          const notes = [
+            ...parsedHw.audioItems.map(a => a.rawToken),
+            ...parsedHw.loopItems.map(l => l.rawToken),
+            ...parsedHw.didacticNotes
+          ];
+          if (result) {
+            result.currentWeekNotes = notes;
+          } else {
+            result = {
+              studentId,
+              studentName: '',
+              timeSlot: '',
+              streakCount: 0,
+              evolutionLevel: 1,
+              verifiedSongs: [],
+              currentWeekNum: weekStr ? weekStr.split('-W')[1] : '',
+              currentWeekItems: [],
+              currentWeekNotes: notes,
+              prevWeekNum: '',
+              prevWeekItems: [],
+              prevWeekNotes: [],
+              parsedPrevLehrwerke: [],
+              parsedPrevSongs: [],
+              parsedCurrentLehrwerke: parsedHw.lehrwerke,
+              parsedCurrentSongs: parsedHw.songs
+            };
+          }
+        }
+      }
+    }
+    return result;
   } catch (e) {}
   return null;
 };
@@ -221,7 +261,18 @@ export function useTeacherStudentPrep({
         );
 
         // Parse Snapshots, Audios & Didactic Notes via SSOT Engine
-        const currentWeekParsed = parseHomeworkNotesPayload(currentWeekNotesItem?.homework_notes);
+        let currentWeekParsed = parseHomeworkNotesPayload(currentWeekNotesItem?.homework_notes);
+        if (!currentWeekNotesItem || (currentWeekParsed.didacticNotes.length === 0 && currentWeekParsed.audioItems.length === 0)) {
+          try {
+            const rawHw = localStorage.getItem(`campus_homework_notes_${studentId}`);
+            if (rawHw) {
+              const fallbackParsed = parseHomeworkNotesPayload(rawHw);
+              if (fallbackParsed.didacticNotes.length > 0 || fallbackParsed.audioItems.length > 0) {
+                currentWeekParsed = fallbackParsed;
+              }
+            }
+          } catch {}
+        }
         const prevWeekParsed = parseHomeworkNotesPayload(prevWeekNotesItem?.homework_notes);
 
         // 1. Standalone progress items (legacy / direct items)
@@ -296,7 +347,15 @@ export function useTeacherStudentPrep({
           ...prevWeekParsed.didacticNotes
         ];
 
-        const currentWeekNotes = currentWeekNotesItem 
+        const hasCurrentWeekContent = Boolean(
+          currentWeekNotesItem || 
+          currentWeekParsed.didacticNotes.length > 0 || 
+          currentWeekParsed.audioItems.length > 0 || 
+          currentWeekParsed.lehrwerke.length > 0 || 
+          currentWeekParsed.songs.length > 0
+        );
+
+        const currentWeekNotes = hasCurrentWeekContent
           ? [
               ...currentWeekParsed.audioItems.map(a => a.rawToken),
               ...currentWeekParsed.loopItems.map(l => l.rawToken),
@@ -364,10 +423,31 @@ export function useTeacherStudentPrep({
       }
     };
 
+    const handleHomeworkReload = (e?: any) => {
+      const targetStudentId = e?.detail?.studentId;
+      if (!targetStudentId || String(targetStudentId) === String(studentId)) {
+        prepCacheMemoryRef.current.delete(studentId);
+        loadPrepForStudent();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('campus_homework_updated', handleHomeworkReload);
+      window.addEventListener('campus_homework_notes_updated', handleHomeworkReload);
+      window.addEventListener('groovelab_student_prep_updated', handleHomeworkReload);
+      window.addEventListener('homework-updated', handleHomeworkReload);
+    }
+
     loadPrepForStudent();
 
     return () => {
       isCancelled = true;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('campus_homework_updated', handleHomeworkReload);
+        window.removeEventListener('campus_homework_notes_updated', handleHomeworkReload);
+        window.removeEventListener('groovelab_student_prep_updated', handleHomeworkReload);
+        window.removeEventListener('homework-updated', handleHomeworkReload);
+      }
     };
   }, [activeStudent?.id, timeline, activeTimelineSlot?.timeSlot, showRealNames, now]);
 

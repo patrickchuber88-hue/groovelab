@@ -406,6 +406,12 @@ export interface SecretaryVerwaltungTabProps {
   isExporting: boolean;
   isRestoring: boolean;
 
+  // Statutory Holidays & Feiertage
+  showSchoolHolidays?: boolean;
+  setShowSchoolHolidays?: (val: boolean) => void;
+  holidayJurisdiction?: string;
+  setHolidayJurisdiction?: (val: string) => void;
+
   // Announcements Props
   announcementsList: any[];
   announcementsLoading: boolean;
@@ -844,6 +850,10 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
     kioskToken,
     isExporting,
     isRestoring,
+    showSchoolHolidays = true,
+    setShowSchoolHolidays,
+    holidayJurisdiction = 'DE_BW',
+    setHolidayJurisdiction,
 
     // Announcements
     announcementsList,
@@ -1423,6 +1433,10 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             biometricsStatus={biometricsStatus as any}
             biometricsMessage={biometricsMessage || ''}
             kioskToken={kioskToken || ''}
+            showSchoolHolidays={showSchoolHolidays}
+            setShowSchoolHolidays={setShowSchoolHolidays}
+            holidayJurisdiction={holidayJurisdiction}
+            setHolidayJurisdiction={setHolidayJurisdiction}
             hasCampusSub={hasCampusSub}
             hasGroovelabSub={hasGroovelabSub}
             studentBillingOption={studentBillingOption}

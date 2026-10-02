@@ -97,7 +97,12 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
   if (!canCreateTopic) {
     return (
       <div style={{
-        padding: '10px 16px',
+        paddingTop: '10px',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        paddingBottom: isMobile 
+          ? 'calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 12px)' 
+          : '10px',
         background: '#f8fafc',
         borderTop: '1px solid #e2e8f0',
         display: 'flex',
@@ -106,7 +111,9 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
         gap: '8px',
         color: '#64748b',
         fontSize: '0.78rem',
-        fontWeight: 700
+        fontWeight: 700,
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         <Lock size={14} style={{ color: '#94a3b8' }} />
         <span>In diesem Kanal eröffnen Lehrkräfte die Themen. Du kannst auf jedes Thema antworten.</span>
@@ -122,10 +129,17 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
 
     return (
       <div style={{
-        padding: isMobile ? '8px 12px' : '10px 16px',
+        paddingTop: isMobile ? '8px' : '10px',
+        paddingLeft: isMobile ? '12px' : '16px',
+        paddingRight: isMobile ? '12px' : '16px',
+        paddingBottom: isMobile 
+          ? 'calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 12px)' 
+          : '10px',
         background: '#ffffff',
         borderTop: '1px solid #f1f5f9',
-        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)'
+        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         {errorMsg && (
           <div style={{
@@ -259,11 +273,18 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
   // EXPANDED COMPOSER CARD
   return (
     <div style={{
-      padding: isMobile ? '12px' : '16px 20px',
+      paddingTop: isMobile ? '12px' : '16px',
+      paddingLeft: isMobile ? '12px' : '20px',
+      paddingRight: isMobile ? '12px' : '20px',
+      paddingBottom: isMobile 
+        ? 'calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 16px)' 
+        : '16px',
       background: '#ffffff',
       borderTop: '1.5px solid #16a34a',
       boxShadow: '0 -6px 20px rgba(0, 0, 0, 0.08)',
-      animation: 'fadeInScale 0.15s ease'
+      animation: 'fadeInScale 0.15s ease',
+      width: '100%',
+      boxSizing: 'border-box'
     }}>
       <form onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') handleClose(); }}>
         {/* Header with Close */}

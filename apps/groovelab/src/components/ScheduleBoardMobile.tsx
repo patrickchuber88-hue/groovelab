@@ -239,15 +239,30 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     }, 40);
   };
 
+  // 🍏 iPadOS & Touch-Drag-Engine Ref & Event Tracking
+  const touchDragStateRef = useRef<{
+    activeId: string | null;
+    source: 'sidebar' | 'board';
+    sourceBoardId?: string;
+    grabOffsetY: number;
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const draggedDurationRef = useRef<number>(30);
+  const draggedStudentNameRef = useRef<string>('Termin');
+
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (touchDragStateRef.current?.activeId) return;
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchDragStateRef.current?.activeId) return;
     if (touchStartX.current === null || touchStartY.current === null) return;
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
@@ -2444,7 +2459,17 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       return (ah * 60 + am) - (bh * 60 + bm);
     });
 
-    let currentTime = snapTimeToGrid(board.startAnchor || '14:00', gridSnapMinutes || 15);
+    const firstCustom = sortedStudents[0]?.customStartTime || sortedStudents[0]?.assignedTime;
+    let initialAnchor = board.startAnchor || '14:00';
+    if (firstCustom) {
+      const [fch, fcm] = parseTime(firstCustom);
+      const [iah, iam] = parseTime(initialAnchor);
+      if (fch * 60 + fcm < iah * 60 + iam) {
+        initialAnchor = firstCustom;
+      }
+    }
+
+    let currentTime = snapTimeToGrid(initialAnchor, gridSnapMinutes || 15);
     const updatedStudents = sortedStudents.map(s => {
       let assignedStart = currentTime;
       let effectiveCustomTime = s.customStartTime;
@@ -2490,6 +2515,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
     return {
       ...board,
+      startAnchor: initialAnchor,
       students: updatedStudents,
       endAnchor: currentTime
     };
@@ -3290,6 +3316,8 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     }
     setDraggedDuration(dur);
     setDraggedStudentName(name);
+    draggedDurationRef.current = dur;
+    draggedStudentNameRef.current = name;
 
     // Fetch preferences asynchronously in background without blocking drag initialization
     (async () => {
@@ -3458,6 +3486,190 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     setDragSnapState(null);
     if (!selectedStudentId) {
       setSelectedStudentPrefs([]);
+    }
+  };
+
+  const updateDragOverForCoordinates = (clientX: number, clientY: number) => {
+    const elemBelow = document.elementFromPoint(clientX, clientY);
+    if (!elemBelow) return;
+
+    const gridElem = elemBelow.closest('[data-schedule-grid="true"]') as HTMLElement;
+    if (!gridElem || !gridElem.dataset.boardId) {
+      if (dragOverBoardId !== null) {
+        setDragOverBoardId(null);
+        setDragOverIndex(null);
+        setDragSnapState(null);
+      }
+      return;
+    }
+
+    const targetBoardId = gridElem.dataset.boardId;
+    const board = boards.find(b => b.id === targetBoardId);
+    if (!board) return;
+
+    const rect = gridElem.getBoundingClientRect();
+    const grabOffset = (dragSource === 'sidebar' || draggedStudentId === 'sidebar-pause' || touchDragStateRef.current?.source === 'sidebar')
+      ? 0
+      : Math.min(Math.max(0, grabOffsetRef.current || touchDragStateRef.current?.grabOffsetY || 0), 40);
+
+    const columnHeightPx = parseFloat(gridElem.dataset.columnHeight || '600');
+    const startMinutes = parseFloat(gridElem.dataset.startMinutes || '780');
+    const PX_PER_MIN = 2.5;
+
+    const relY = Math.max(0, Math.min(clientY - rect.top - grabOffset, columnHeightPx));
+    const dragMinutes = relY / PX_PER_MIN;
+
+    const rawMinutes = startMinutes + dragMinutes;
+    const snappedTotalMinutes = Math.round(rawMinutes / (gridSnapMinutes || 15)) * (gridSnapMinutes || 15);
+    const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+    const snappedMins = snappedTotalMinutes % 60;
+    const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+    lastSnapTimeRef.current = { boardId: board.id, timeStr: targetTime };
+    const topPx = (snappedTotalMinutes - startMinutes) * PX_PER_MIN;
+
+    let targetIndex = board.students.findIndex(s => {
+      const sTime = s.customStartTime || s.assignedTime;
+      if (!sTime) return false;
+      const [sh, sm] = parseTime(sTime);
+      return (sh * 60 + sm) >= snappedTotalMinutes;
+    });
+    if (targetIndex === -1) targetIndex = board.students.length;
+
+    if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex || dragSnapState?.topPx !== topPx) {
+      if (dragSnapState && dragSnapState.timeStr !== targetTime) {
+        playCubaseSnapClick();
+      }
+      setDragOverBoardId(board.id);
+      setDragOverIndex(targetIndex);
+      setDragSnapState({
+        boardId: board.id,
+        topPx,
+        timeStr: targetTime,
+        duration: draggedDurationRef.current || draggedDuration,
+        studentName: draggedStudentNameRef.current || draggedStudentName
+      });
+    }
+  };
+
+  const handleTouchStartCard = (
+    e: React.TouchEvent,
+    studentId: string,
+    source: 'sidebar' | 'board',
+    boardId?: string
+  ) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const cardRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const grabY = Math.max(0, Math.min(touch.clientY - cardRect.top, 40));
+    grabOffsetRef.current = grabY;
+
+    // Resolve duration and name immediately
+    let dur = 30;
+    let name = 'Termin';
+    if (studentId === 'sidebar-pause' || studentId.startsWith('break-')) {
+      dur = 15;
+      name = 'Pause';
+      if (studentId.startsWith('break-')) {
+        for (const b of boards) {
+          const bs = b.students.find(s => s.id === studentId);
+          if (bs) {
+            dur = bs.duration || 15;
+            break;
+          }
+        }
+      }
+    } else {
+      const foundSidebar = students.find(s => s.id === studentId);
+      if (foundSidebar) {
+        dur = foundSidebar.duration || 30;
+        name = `${foundSidebar.first_name || ''} ${foundSidebar.last_name || ''}`.trim();
+      } else {
+        for (const b of boards) {
+          const bs = b.students.find(s => s.id === studentId);
+          if (bs) {
+            dur = bs.duration || 30;
+            name = `${bs.first_name || ''} ${bs.last_name || ''}`.trim();
+            break;
+          }
+        }
+      }
+    }
+    draggedDurationRef.current = dur;
+    draggedStudentNameRef.current = name;
+
+    touchDragStateRef.current = {
+      activeId: studentId,
+      source,
+      sourceBoardId: boardId,
+      grabOffsetY: grabY,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      hasMoved: false
+    };
+  };
+
+  const handleTouchMoveCard = (e: React.TouchEvent) => {
+    const touchState = touchDragStateRef.current;
+    if (!touchState || !touchState.activeId) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - touchState.startX;
+    const dy = touch.clientY - touchState.startY;
+    const dist = Math.hypot(dx, dy);
+
+    if (!touchState.hasMoved) {
+      // If user is scrolling the sidebar vertically, yield to native scrolling
+      if (touchState.source === 'sidebar' && Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+        touchDragStateRef.current = null;
+        return;
+      }
+
+      // Movement threshold to separate intentional drag from taps
+      if (dist < 6) return;
+
+      touchState.hasMoved = true;
+      handleDragStart(touchState.activeId, touchState.source, touchState.sourceBoardId);
+    }
+
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+
+    updateDragOverForCoordinates(touch.clientX, touch.clientY);
+    handleAutoScrollCheck(touch.clientY);
+  };
+
+  const handleTouchEndCard = async (e: React.TouchEvent) => {
+    const touchState = touchDragStateRef.current;
+    if (!touchState || !touchState.activeId) return;
+
+    const didMove = touchState.hasMoved;
+    const targetBoardId = dragOverBoardId;
+    const snapTime = (dragSnapState && dragSnapState.boardId === targetBoardId)
+      ? dragSnapState.timeStr
+      : (lastSnapTimeRef.current && lastSnapTimeRef.current.boardId === targetBoardId ? lastSnapTimeRef.current.timeStr : null);
+    const targetIdx = dragOverIndex !== null ? dragOverIndex : undefined;
+
+    touchDragStateRef.current = null;
+
+    if (didMove) {
+      handleDragEnd();
+      if (targetBoardId && snapTime) {
+        await handleDropOnBoard(targetBoardId, targetIdx, snapTime, false);
+      }
+    }
+  };
+
+  const handleTouchCancelCard = () => {
+    const touchState = touchDragStateRef.current;
+    const didMove = touchState?.hasMoved;
+    touchDragStateRef.current = null;
+    if (didMove) {
+      handleDragEnd();
     }
   };
 
@@ -6413,6 +6625,33 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
                     {/* ── PROPORTIONAL TIME-GRID ── */}
                     <div
+                      data-schedule-grid="true"
+                      data-board-id={board.id}
+                      data-column-height={columnHeightPx}
+                      data-start-minutes={startMinutes}
+                      onClick={(e) => {
+                        if (!selectedStudentId) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickY = Math.max(0, Math.min(e.clientY - rect.top, columnHeightPx));
+                        const clickMinutes = clickY / PX_PER_MIN;
+                        const rawMinutes = startMinutes + clickMinutes;
+                        const snappedTotalMinutes = Math.round(rawMinutes / (gridSnapMinutes || 15)) * (gridSnapMinutes || 15);
+                        const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+                        const snappedMins = snappedTotalMinutes % 60;
+                        const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+                        let targetIndex = board.students.findIndex(s => {
+                          const sTime = s.customStartTime || s.assignedTime;
+                          if (!sTime) return false;
+                          const [sh, sm] = parseTime(sTime);
+                          return (sh * 60 + sm) >= snappedTotalMinutes;
+                        });
+                        if (targetIndex === -1) targetIndex = board.students.length;
+
+                        executeStandardDrop(selectedStudentId, board.id, targetIndex, 'sidebar', null, undefined, targetTime, false);
+                        setSelectedStudentId(null);
+                        setSelectedStudentPrefs([]);
+                      }}
                       onDragOver={(e) => {
                             e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -6422,9 +6661,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                             const clientY = Math.max(0, Math.min(e.clientY - rect.top - grabOffset, columnHeightPx));
                             const dragMinutes = clientY / PX_PER_MIN;
 
-                            const [bsh, bsm] = parseTime(board.startAnchor);
-                            const boardStartMin = bsh * 60 + bsm;
-                            const rawMinutes = boardStartMin + dragMinutes;
+                            const rawMinutes = startMinutes + dragMinutes;
                             const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
                             const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
                             const snappedMins = snappedTotalMinutes % 60;
@@ -6432,7 +6669,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
                             lastSnapTimeRef.current = { boardId: board.id, timeStr: targetTime };
 
-                            const topPx = (snappedTotalMinutes - boardStartMin) * PX_PER_MIN;
+                            const topPx = (snappedTotalMinutes - startMinutes) * PX_PER_MIN;
 
                             // Calculate targetIndex strictly from snappedTotalMinutes (chronological grid position)
                             let targetIndex = board.students.findIndex(s => {
@@ -6488,8 +6725,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               const clientY = Math.max(0, Math.min(e.clientY - rect.top - grabOffset, columnHeightPx));
                               const dragMinutes = clientY / PX_PER_MIN;
 
-                              const [bsh, bsm] = parseTime(board.startAnchor);
-                              const rawMinutes = bsh * 60 + bsm + dragMinutes;
+                              const rawMinutes = startMinutes + dragMinutes;
                               const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
                               const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
                               const snappedMins = snappedTotalMinutes % 60;
@@ -6511,8 +6747,6 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         >
                        {/* Dynamic Cubase DAW Grid Subdivision Lines */}
                       {(() => {
-                        const [bsh, bsm] = parseTime(board.startAnchor);
-                        const boardStartMin = bsh * 60 + bsm;
                         const colStartMin = startMinutes;
                         const colEndMin = endMinutes;
 
@@ -6521,7 +6755,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         const gridLines = [];
 
                         for (let min = firstGridMin; min <= colEndMin; min += gridSnapMinutes) {
-                          const topPx = (min - boardStartMin) * PX_PER_MIN;
+                          const topPx = (min - startMinutes) * PX_PER_MIN;
                           if (topPx < 0 || topPx > columnHeightPx) continue;
 
                           const h = Math.floor(min / 60) % 24;
@@ -6981,6 +7215,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               draggable={true}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
+                              onTouchStart={(e) => handleTouchStartCard(e, bs.id, 'board', board.id)}
+                              onTouchMove={handleTouchMoveCard}
+                              onTouchEnd={handleTouchEndCard}
+                              onTouchCancel={handleTouchCancelCard}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -7007,7 +7245,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                 cursor: 'grab',
                                 boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
                                 zIndex: 10,
-                                userSelect: 'none'
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                                touchAction: 'manipulation',
+                                WebkitTouchCallout: 'none'
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
@@ -7352,6 +7593,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               draggable={true}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
+                              onTouchStart={(e) => handleTouchStartCard(e, bs.id, 'board', board.id)}
+                              onTouchMove={handleTouchMoveCard}
+                              onTouchEnd={handleTouchEndCard}
+                              onTouchCancel={handleTouchCancelCard}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -7376,6 +7621,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                 zIndex: 2,
                                 visibility: 'visible',
                                 opacity: draggedStudentId === bs.id ? 0.25 : 1,
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                                touchAction: 'none',
+                                WebkitTouchCallout: 'none',
                                 boxShadow: hasConflict ? '0 2px 8px rgba(239, 68, 68, 0.15)' : (isInsideWunsch ? '0 2px 8px rgba(52, 168, 83, 0.18)' : (isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)')),
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                 overflow: 'hidden',
@@ -7549,6 +7798,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               handleDragStart(bs.id, 'board', board.id, e);
                             }}
                             onDragEnd={handleDragEnd}
+                            onTouchStart={(e) => handleTouchStartCard(e, bs.id, 'board', board.id)}
+                            onTouchMove={handleTouchMoveCard}
+                            onTouchEnd={handleTouchEndCard}
+                            onTouchCancel={handleTouchCancelCard}
                             onDragOver={(e) => {
                               e.preventDefault();
                               handleAutoScrollCheck(e.clientY);
@@ -7945,6 +8198,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 draggable
                 onDragStart={(e) => handleDragStart('sidebar-pause', 'sidebar', undefined, e)}
                 onDragEnd={handleDragEnd}
+                onTouchStart={(e) => handleTouchStartCard(e, 'sidebar-pause', 'sidebar', undefined)}
+                onTouchMove={handleTouchMoveCard}
+                onTouchEnd={handleTouchEndCard}
+                onTouchCancel={handleTouchCancelCard}
                 style={{
                   background: 'rgba(254, 243, 199, 0.5)',
                   backdropFilter: 'blur(12px)',
@@ -7957,7 +8214,11 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   alignItems: 'center',
                   gap: '8px',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
-                  transition: 'all 0.15s'
+                  transition: 'all 0.15s',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: 'none',
+                  WebkitTouchCallout: 'none'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b45309' }}>
@@ -8014,6 +8275,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                       }}
                       onDragStart={(e) => handleDragStart(s.id, 'sidebar', undefined, e)}
                       onDragEnd={handleDragEnd}
+                      onTouchStart={(e) => handleTouchStartCard(e, s.id, 'sidebar', undefined)}
+                      onTouchMove={handleTouchMoveCard}
+                      onTouchEnd={handleTouchEndCard}
+                      onTouchCancel={handleTouchCancelCard}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!draggedStudentId) {
@@ -8036,6 +8301,8 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         cursor: 'grab', 
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
+                        touchAction: 'manipulation',
+                        WebkitTouchCallout: 'none',
                         opacity: isSelected ? 1 : (isAssigned ? 0.75 : 1), 
                         display: 'flex', 
                         flexDirection: 'column', 
@@ -9929,7 +10196,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
 
       {/* Hinweis didaktisches Koordinierungsinstrument & ArbZG Höchstarbeitszeit-Transparenz */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '10px 16px', margin: '14px auto calc(env(safe-area-inset-bottom, 16px) + 84px) auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <Scale size={13} strokeWidth={2.4} color="#64748b" aria-hidden="true" />
           <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>

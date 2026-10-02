@@ -12,6 +12,9 @@ import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../domain/s
 import { isUUID } from '../../utils/uuidValidator';
 import { useDictationInput } from '../../hooks/useVoiceToText';
 import { byteFrequencyToDawMeterPercent } from '../../utils/audioVuMeterHelper';
+import { WochenFahrplanAudioPlayer } from '../teacher/tageskompass/wochenfahrplan';
+import { buildHomeworkNotesPayload, parseHomeworkNotesPayload } from '../../utils/homeworkSnapshotHelper';
+import { getSimulatedNow, getISOWeekRaw } from '../teacher/utils/teacherDashboardUtils';
 
 interface RecordedClip {
   id: string;
@@ -80,17 +83,38 @@ const TEMPLATE_CATEGORIES: TemplateCategory[] = [
   }
 ];
 
-const QUICK_PILLS = [
-  { label: 'S. 14 • Takt 1–8', text: 'S. 14: Takt 1–8 wiederholen' },
-  { label: 'Metronom 60 bpm', text: 'Mit Metronom (60 bpm) langsam üben' },
-  { label: 'Fingersatz', text: 'Auf den richtigen Fingersatz achten' },
-  { label: 'Wechselschlag', text: 'Wechselschlag kontrollieren' },
-  { label: 'Auswendig', text: 'Ablauf auswendig versuchen' },
-  { label: 'Dynamik', text: 'Dynamik und saubere Betonung beachten' },
-  { label: 'Handhaltung', text: 'Handhaltung entspannen und locker bleiben' }
+export interface DidacticFocus {
+  id: string;
+  icon: string;
+  label: string;
+  subtitle: string;
+  phrase: string;
+  keywords: string[];
+}
+
+export const DIDACTIC_FOCUS_ITEMS: DidacticFocus[] = [
+  { id: 'fingersatz', icon: '🖐️', label: 'Fingersatz', subtitle: 'Technik & Handhaltung', phrase: 'Auf den richtigen Fingersatz achten', keywords: ['fingersatz', 'handhaltung'] },
+  { id: 'rhythmus', icon: '🥁', label: 'Rhythmus', subtitle: 'Groove & Zählen', phrase: 'Rhythmus laut mitzählen und Groove halten', keywords: ['rhythmus', 'groove', 'takt zählen', 'mitzählen'] },
+  { id: 'slowmo', icon: '🐢', label: 'Slow-Mo', subtitle: 'Langsames Üben & Isolieren', phrase: 'Langsam üben und schwierige Stellen 5x isolieren', keywords: ['slow-mo', 'slowmo', 'slow practice', 'langsam üben', 'schwierige stellen isolieren'] },
+  { id: 'dynamik', icon: '🔊', label: 'Dynamik', subtitle: 'Ausdruck & Klangqualität', phrase: 'Dynamik und saubere Betonung beachten', keywords: ['dynamik', 'klangqualität', 'laut/leise', 'betonung'] },
+  { id: 'auswendig', icon: '🧠', label: 'Auswendig', subtitle: 'Struktur & Gedächtnis', phrase: 'Ablauf auswendig versuchen', keywords: ['auswendig', 'gedächtnis', 'ohne noten'] }
 ];
 
-const METRONOME_PRESETS = [60, 80, 100, 120, 140];
+export interface PassagePill {
+  id: string;
+  label: string;
+  text: string;
+}
+
+export const PASSAGE_PILLS: PassagePill[] = [
+  { id: 'passage_takt', label: 'S. 14 • Takt 1–8', text: 'S. 14: Takt 1–8 wiederholen' },
+  { id: 'passage_intro', label: 'Intro & Strophe', text: 'Intro und erste Strophe flüssig üben' },
+  { id: 'passage_schwer', label: 'Schwierige Stelle 5x', text: 'Schwierige Stellen isoliert 5x wiederholen' },
+  { id: 'passage_metro', label: 'Mit Metronom', text: 'Mit Metronom im Zieltempo üben' },
+  { id: 'passage_refrain', label: 'Refrain & Outro', text: 'Refrain und Outro im Zusammenhang spielen' }
+];
+
+const METRONOME_PRESETS = [60, 80, 100, 120];
 const CLIP_TAGS = ['Tempo 60', 'Originaltempo', 'Play-Along', 'Melodie', 'Begleitung', 'Übung'];
 
 export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> = ({
@@ -110,9 +134,61 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   );
   const maxRecordSeconds = isTresorActive ? 420 : 60;
 
+  // Student Identity Resolution (hoisted above handleTextChange to eliminate TDZ error)
+  const studentFirstName = student?.first_name || (student?.name ? student.name.split(' ')[0] : 'Schüler');
+  const studentLastName = student?.last_name || (student?.name ? student.name.split(' ').slice(1).join(' ') : '');
+
+  const matchedStudentFromAll = allStudents?.find((s: any) => 
+    (student?.id && s.id === student.id) ||
+    (student?.student_id && s.id === student.student_id) ||
+    (student?.studentId && s.id === student.studentId) ||
+    (s.first_name && studentFirstName && s.first_name.trim().toLowerCase() === studentFirstName.trim().toLowerCase() &&
+     (!studentLastName || !s.last_name || s.last_name.trim().toLowerCase().startsWith(studentLastName.trim().toLowerCase()[0]))) ||
+    (s.name && student?.name && s.name.trim().toLowerCase() === student.name.trim().toLowerCase())
+  );
+
+  const effectiveStudentId = 
+    (isUUID(matchedStudentFromAll?.id) ? matchedStudentFromAll.id : null) ||
+    (isUUID(student?.id) ? student.id : null) ||
+    (isUUID(student?.student_id) ? student.student_id : null) ||
+    (isUUID(student?.studentId) ? student.studentId : null) ||
+    matchedStudentFromAll?.id ||
+    student?.id || 
+    student?.student_id || 
+    student?.studentId || 
+    student?.userId || 
+    student?.user_id ||
+    (studentFirstName ? `student_${studentFirstName.trim().toLowerCase()}_${(studentLastName || '').trim().toLowerCase()}`.replace(/[^a-z0-9_]/gi, '_') : 'student_active');
+
+  const allStudentKeys = useMemo(() => {
+    return Array.from(new Set([
+      effectiveStudentId,
+      student?.id,
+      student?.student_id,
+      student?.studentId,
+      (student as any)?.slot_id,
+      matchedStudentFromAll?.id
+    ].filter(Boolean))) as string[];
+  }, [effectiveStudentId, student, matchedStudentFromAll]);
+
+  const studentDisplayName = formatSingleStudentAnonymized(studentFirstName, studentLastName, effectiveStudentId, true);
+
+  const stopHardwareRef = useRef<(includeDictation?: boolean) => void>(() => {});
+
   // --- Dictation / Note State & Canonical Engine ---
   const [dictatedText, setDictatedText] = useState('');
   const stopDictationRef = useRef<(() => void) | null>(null);
+
+  const handleTextChange = useCallback((newText: string) => {
+    setDictatedText(newText);
+    try {
+      if (newText.trim()) {
+        localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, newText);
+      } else {
+        localStorage.removeItem(`cgl_draft_hw_${effectiveStudentId}`);
+      }
+    } catch {}
+  }, [effectiveStudentId]);
 
   const {
     isListening: isDictating,
@@ -120,8 +196,8 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     stopListening: stopDictationHook,
   } = useDictationInput({
     value: dictatedText,
-    onChange: setDictatedText,
-    onStart: () => stopHardware(false)
+    onChange: handleTextChange,
+    onStart: () => stopHardwareRef.current(false)
   });
 
   stopDictationRef.current = stopDictationHook;
@@ -160,6 +236,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
 
   const tapTimesRef = useRef<number[]>([]);
   const metronomeIntervalRef = useRef<any>(null);
+  const countInIntervalRef = useRef<any>(null);
   const currentBeatRef = useRef<number>(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -183,44 +260,6 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     (Boolean((window as any).SpeechRecognition) || Boolean((window as any).webkitSpeechRecognition));
 
   const [hasExistingHomework, setHasExistingHomework] = useState(false);
-
-  const studentFirstName = student?.first_name || (student?.name ? student.name.split(' ')[0] : 'Schüler');
-  const studentLastName = student?.last_name || (student?.name ? student.name.split(' ').slice(1).join(' ') : '');
-
-  const matchedStudentFromAll = allStudents?.find((s: any) => 
-    (student?.id && s.id === student.id) ||
-    (student?.student_id && s.id === student.student_id) ||
-    (student?.studentId && s.id === student.studentId) ||
-    (s.first_name && studentFirstName && s.first_name.trim().toLowerCase() === studentFirstName.trim().toLowerCase() &&
-     (!studentLastName || !s.last_name || s.last_name.trim().toLowerCase().startsWith(studentLastName.trim().toLowerCase()[0]))) ||
-    (s.name && student?.name && s.name.trim().toLowerCase() === student.name.trim().toLowerCase())
-  );
-
-  const effectiveStudentId = 
-    (isUUID(matchedStudentFromAll?.id) ? matchedStudentFromAll.id : null) ||
-    (isUUID(student?.id) ? student.id : null) ||
-    (isUUID(student?.student_id) ? student.student_id : null) ||
-    (isUUID(student?.studentId) ? student.studentId : null) ||
-    matchedStudentFromAll?.id ||
-    student?.id || 
-    student?.student_id || 
-    student?.studentId || 
-    student?.userId || 
-    student?.user_id ||
-    (studentFirstName ? `student_${studentFirstName.trim().toLowerCase()}_${(studentLastName || '').trim().toLowerCase()}`.replace(/[^a-z0-9_]/gi, '_') : 'student_active');
-
-  const allStudentKeys = useMemo(() => {
-    return Array.from(new Set([
-      effectiveStudentId,
-      student?.id,
-      student?.student_id,
-      student?.studentId,
-      (student as any)?.slot_id,
-      matchedStudentFromAll?.id
-    ].filter(Boolean))) as string[];
-  }, [effectiveStudentId, student, matchedStudentFromAll]);
-
-  const studentDisplayName = formatSingleStudentAnonymized(studentFirstName, studentLastName, effectiveStudentId, true);
 
   useEffect(() => {
     if (isOpen && student) {
@@ -383,8 +422,8 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   }, [student, dateStr, isOpen, allStudentKeys, effectiveStudentId]);
 
   // Metronome Web Audio Synthesizer
-  const playMetronomeClick = useCallback((isAccent: boolean) => {
-    if (!metronomeSound) return;
+  const playMetronomeClick = useCallback((isAccent: boolean, forceAudible = false) => {
+    if (!metronomeSound && !forceAudible) return;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
@@ -486,11 +525,29 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     setAudioLevel(0);
   };
 
-  const stopHardware = (includeDictation = true) => {
+  const handleCancelCountIn = useCallback(() => {
+    if (countInIntervalRef.current) {
+      clearInterval(countInIntervalRef.current);
+      countInIntervalRef.current = null;
+    }
+    setCountInRemaining(null);
+    if (streamRef.current) {
+      releaseAudioStream(streamRef.current);
+      streamRef.current = null;
+    }
+    isStartingRecordRef.current = false;
+  }, []);
+
+  const stopHardware = useCallback((includeDictation = true) => {
     isStartingRecordRef.current = false;
     isRecordingRef.current = false;
     hasStoppedCurrentRecordingRef.current = true;
     setIsRecording(false);
+    setMetronomeActive(false);
+    if (countInIntervalRef.current) {
+      clearInterval(countInIntervalRef.current);
+      countInIntervalRef.current = null;
+    }
     setCountInRemaining(null);
 
     stopLevelMeter();
@@ -526,7 +583,38 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     if (includeDictation) {
       stopDictationRef.current?.();
     }
-  };
+  }, []);
+
+  stopHardwareRef.current = stopHardware;
+
+  // Hardware cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopHardware();
+    };
+  }, [stopHardware]);
+
+  // Keyboard accessibility: ESC key handler closes modal fail-safe
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSaving) {
+        if (countInRemaining !== null) {
+          handleCancelCountIn();
+          return;
+        }
+        if (!isRecording && !isDictating) {
+          stopHardware();
+          onClose();
+        }
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isRecording, isDictating, isSaving, countInRemaining, handleCancelCountIn, stopHardware, onClose]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -543,12 +631,110 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
 
   if (!isOpen || !student) return null;
 
+  const appendSentence = (existing: string, addition: string): string => {
+    const cleanExisting = (existing || '').trim();
+    const cleanAddition = capitalizeFirstLetter((addition || '').trim());
+    if (!cleanAddition) return cleanExisting;
+    if (!cleanExisting) return cleanAddition;
+
+    if (/[.!?\n]$/.test(cleanExisting)) {
+      return `${cleanExisting} ${cleanAddition}`;
+    }
+    return `${cleanExisting}. ${cleanAddition}`;
+  };
+
   const handleAppendPhrase = (phrase: string) => {
     setDictatedText(prev => {
-      const clean = prev.trim();
-      if (!clean) return capitalizeFirstLetter(phrase);
-      return `${clean}. ${capitalizeFirstLetter(phrase)}`;
+      const next = appendSentence(prev, phrase);
+      try { localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, next); } catch {}
+      return next;
     });
+  };
+
+  const isFocusActive = (focus: DidacticFocus) => {
+    const lower = dictatedText.toLowerCase();
+    return (
+      lower.includes(focus.phrase.toLowerCase()) ||
+      lower.includes(`fokus: ${focus.label.toLowerCase()}`) ||
+      lower.includes(focus.label.toLowerCase()) ||
+      focus.keywords.some(kw => lower.includes(kw.toLowerCase()))
+    );
+  };
+
+  const handleToggleFocus = (focus: DidacticFocus) => {
+    setDictatedText(prev => {
+      const trimmed = prev.trim();
+      const hasFocus = isFocusActive(focus);
+
+      let nextText = '';
+      if (hasFocus) {
+        // Try removing the standard phrase first
+        const phraseRegex = new RegExp(`(?:[.,;!?]?\\s*)?${focus.phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[.,;!?])?`, 'gi');
+        let stripped = trimmed.replace(phraseRegex, '').trim();
+
+        // Also clean up any focus tag if present
+        const tagRegex = new RegExp(`(?:[.,;!?]?\\s*)?\\[?Fokus:\\s*${focus.label}\\]?(?:[.,;!?])?`, 'gi');
+        stripped = stripped.replace(tagRegex, '').trim();
+
+        // If phrase was not found as exact string, remove only sentences that explicitly mention the focus label or phrase
+        if (stripped === trimmed) {
+          const sentences = trimmed.split(/(?<=[.!?\n])\s+/);
+          const filtered = sentences.filter(s => {
+            const sLower = s.toLowerCase();
+            return !sLower.includes(focus.label.toLowerCase()) && !sLower.includes(focus.phrase.toLowerCase());
+          });
+          stripped = filtered.join(' ').trim();
+        }
+
+        stripped = stripped
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\s+([.,!?])/g, '$1')
+          .replace(/^[.,!?\s]+/, '')
+          .replace(/[.,!?\s]+$/, (match) => match.includes('!') ? '!' : match.includes('?') ? '?' : '.')
+          .trim();
+
+        if (/^[.,!?\s]*$/.test(stripped)) stripped = '';
+        nextText = stripped;
+      } else {
+        nextText = appendSentence(trimmed, focus.phrase);
+      }
+
+      try {
+        if (nextText) {
+          localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, nextText);
+        } else {
+          localStorage.removeItem(`cgl_draft_hw_${effectiveStudentId}`);
+        }
+      } catch {}
+
+      return nextText;
+    });
+  };
+
+  const handleAppendPassage = (text: string) => {
+    setDictatedText(prev => {
+      const clean = prev.trim();
+      const addition = capitalizeFirstLetter(text);
+      if (!clean) {
+        try { localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, addition); } catch {}
+        return addition;
+      }
+      if (clean.toLowerCase().includes(text.toLowerCase())) return clean;
+      const next = appendSentence(clean, addition);
+      try { localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, next); } catch {}
+      return next;
+    });
+  };
+
+  const handleSkipCountIn = () => {
+    if (countInIntervalRef.current) {
+      clearInterval(countInIntervalRef.current);
+      countInIntervalRef.current = null;
+    }
+    setCountInRemaining(null);
+    if (streamRef.current) {
+      startRecordingOnHardwareStream(streamRef.current);
+    }
   };
 
   // Tap Tempo Handler
@@ -566,8 +752,8 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     }
   };
 
-  // 2. AUDIO RECORD LOGIC WITH ATOMIC RE-ENTRANCE LOCK
-  const executeActualRecordingStart = async () => {
+  // 2. AUDIO RECORD LOGIC WITH ATOMIC RE-ENTRANCE LOCK & ZERO-LATENCY PRE-WARMED STREAM
+  const startRecordingOnHardwareStream = (stream: MediaStream) => {
     try {
       if (audioElemRef.current) {
         audioElemRef.current.pause();
@@ -578,9 +764,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       setSaveSuccess(false); 
       audioChunksRef.current = [];
       hasStoppedCurrentRecordingRef.current = false;
-      
-      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
-      streamRef.current = stream;
+
       startLevelMeter(stream);
 
       const mediaRecorder = new MediaRecorder(stream);
@@ -620,7 +804,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         
         const currentCount = recordedClips.length;
         const clipTitle = `Aufnahme ${currentCount + 1} (${todayFormatted})`;
-        const effectiveClipBpm = metronomeActive && metronomeBpm > 0 ? metronomeBpm : undefined;
+        const effectiveClipBpm = metronomeBpm > 0 ? metronomeBpm : undefined;
         const newClip: RecordedClip = {
           id: `clip_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           blob: finalBlob,
@@ -669,26 +853,43 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     if (isStartingRecordRef.current || isRecordingRef.current) return;
     isStartingRecordRef.current = true;
 
-    // If Metronome count-in is active, execute 4-beat countdown
-    if (showMetronome && metronomeCountIn) {
-      let count = 4;
-      setCountInRemaining(count);
-      playMetronomeClick(true);
+    // Stop metronome preview if running
+    setMetronomeActive(false);
 
-      const beatMs = (60 / metronomeBpm) * 1000;
-      const countInterval = setInterval(() => {
-        count -= 1;
-        if (count > 0) {
-          setCountInRemaining(count);
-          playMetronomeClick(false);
-        } else {
-          clearInterval(countInterval);
-          setCountInRemaining(null);
-          executeActualRecordingStart();
-        }
-      }, beatMs);
-    } else {
-      executeActualRecordingStart();
+    try {
+      // 1. Pre-warm hardware audio stream before count-in to eliminate downbeat latency
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      streamRef.current = stream;
+
+      // 2. Count-in countdown
+      if (metronomeCountIn) {
+        let count = 4;
+        setCountInRemaining(count);
+        playMetronomeClick(true, true);
+
+        const beatMs = (60 / metronomeBpm) * 1000;
+        if (countInIntervalRef.current) clearInterval(countInIntervalRef.current);
+        countInIntervalRef.current = setInterval(() => {
+          count -= 1;
+          if (count > 0) {
+            setCountInRemaining(count);
+            playMetronomeClick(false, true);
+          } else {
+            if (countInIntervalRef.current) {
+              clearInterval(countInIntervalRef.current);
+              countInIntervalRef.current = null;
+            }
+            setCountInRemaining(null);
+            // 🎯 Zero-Latency Instant Downbeat
+            startRecordingOnHardwareStream(stream);
+          }
+        }, beatMs);
+      } else {
+        startRecordingOnHardwareStream(stream);
+      }
+    } catch (err) {
+      console.error('[QuickAudioModal] Failed to acquire stream for recording:', err);
+      stopHardware();
     }
   };
 
@@ -896,13 +1097,11 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         }
       }
 
-      // Compute current KW
-      const d = new Date();
-      const startOfYear = new Date(d.getFullYear(), 0, 1);
-      const pastDays = (d.getTime() - startOfYear.getTime()) / 86400000;
-      const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
-      const currentWeek = `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
-      const topicName = `Hausaufgabe KW ${String(weekNum).padStart(2, '0')}`;
+      // Compute current KW respecting simulated time and ISO standard
+      const simNow = getSimulatedNow();
+      const currentWeek = getISOWeekRaw(simNow, 1);
+      const weekNum = currentWeek.split('-W')[1] || String(Math.ceil((((simNow.getTime() - new Date(simNow.getFullYear(), 0, 1).getTime()) / 86400000) + 1) / 7)).padStart(2, '0');
+      const topicName = `Hausaufgabe KW ${weekNum}`;
 
       // Save to primary and all candidate keys in localStorage
       allStudentKeys.forEach(k => {
@@ -930,22 +1129,46 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
           if (vaultChanged) {
             localStorage.setItem(vaultKey, JSON.stringify(currentVault));
           }
+
+          // Also update groovelab_student_prep cache for 0ms instant sync in Tages-Kompass
+          const prepPayload = {
+            studentId: k,
+            currentWeekNum: weekNum,
+            currentWeekNotes: finalNotesList
+          };
+          localStorage.setItem(`groovelab_student_prep_${k}_${currentWeek}`, JSON.stringify(prepPayload));
+          localStorage.setItem(`groovelab_student_prep_${k}_latest`, JSON.stringify(prepPayload));
         } catch {}
       });
 
-      // C) Sync to DB progress_matrix (non-blocking) only if studentId is a valid UUID
+      // C) Sync to DB progress_matrix (authoritative SSOT & WORM audit trail)
       if (isUUID(studentIdToUse)) {
         try {
           const { data: existingMatrix } = await supabase
             .from('progress_matrix')
-            .select('id')
+            .select('id, homework_notes')
             .eq('student_id', studentIdToUse)
-            .eq('topic_name', topicName)
+            .ilike('topic_name', `Hausaufgabe KW %`)
+            .order('updated_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
 
-          if (existingMatrix) {
+          const existingSnapPayload = existingMatrix?.homework_notes
+            ? parseHomeworkNotesPayload(existingMatrix.homework_notes)
+            : null;
+
+          const notesJsonToSave = buildHomeworkNotesPayload({
+            didacticNotes: finalNotesList.filter(n => typeof n === 'string' && !n.startsWith('AUDIO:') && !isInternalMetadataNote(n)),
+            rawSnapshotLwToken: existingSnapPayload?.rawSnapshotLwToken,
+            rawSnapshotSongsToken: existingSnapPayload?.rawSnapshotSongsToken,
+            audioTokens: finalNotesList.filter(n => typeof n === 'string' && n.startsWith('AUDIO:')),
+            loopTokens: finalNotesList.filter(n => typeof n === 'string' && n.startsWith('LOOP:'))
+          });
+
+          if (existingMatrix && existingMatrix.id) {
             await supabase.from('progress_matrix').update({ 
-              homework_notes: JSON.stringify(finalNotesList), 
+              homework_notes: notesJsonToSave, 
+              topic_name: topicName,
               is_current_homework: true,
               updated_at: new Date().toISOString() 
             }).eq('id', existingMatrix.id);
@@ -956,7 +1179,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
               topic_name: topicName, 
               status: 'IN_PROGRESS', 
               is_current_homework: true,
-              homework_notes: JSON.stringify(finalNotesList), 
+              homework_notes: notesJsonToSave, 
               updated_at: new Date().toISOString() 
             });
           }
@@ -969,6 +1192,8 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       if (typeof window !== 'undefined') {
         allStudentKeys.forEach(k => {
           window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: k } }));
+          window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', { detail: { studentId: k } }));
+          window.dispatchEvent(new CustomEvent('groovelab_student_prep_updated', { detail: { studentId: k } }));
           window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: k } }));
         });
 
@@ -1035,6 +1260,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   };
 
   const canSave = Boolean(recordedClips.length > 0 || dictatedText.trim());
+  const activeFocusCount = DIDACTIC_FOCUS_ITEMS.filter(f => isFocusActive(f)).length;
 
   return (
     <div 
@@ -1050,34 +1276,72 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         zIndex: 99999, 
         padding: 'clamp(12px, 3.5vw, 24px)' 
       }} 
-      onClick={(e) => { if (e.target === e.currentTarget && !isRecording && !isDictating && !isSaving && countInRemaining === null) { stopHardware(); onClose(); } }}
+      onClick={(e) => { 
+        if (e.target === e.currentTarget && !isSaving) { 
+          if (countInRemaining !== null) {
+            handleCancelCountIn();
+            return;
+          }
+          if (!isRecording && !isDictating) {
+            stopHardware(); 
+            onClose(); 
+          }
+        } 
+      }}
     >
-      <div role="dialog" aria-modal="true" 
+      <style>{`
+        @keyframes snapshotScaleUp {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes snapshotFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes snapshotPulseDot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.85); }
+        }
+        @keyframes snapshotMicRing {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+          70% { box-shadow: 0 0 0 9px rgba(239, 68, 68, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        button:focus-visible, textarea:focus-visible {
+          outline: 2px solid #059669 !important;
+          outline-offset: 2px !important;
+        }
+      `}</style>
+
+      <div 
+        role="dialog" 
+        aria-modal="true" 
+        aria-label="Hausaufgaben-Snapshot eintragen"
         style={{ 
           background: '#ffffff', 
           borderRadius: '24px', 
-          border: '1px solid rgba(226, 232, 240, 0.9)', 
+          border: '1px solid rgba(226, 232, 240, 0.95)', 
           boxShadow: '0 24px 48px -12px rgba(15, 23, 42, 0.22), 0 0 1px 1px rgba(0,0,0,0.04)', 
-          maxWidth: 'min(480px, 94vw)', 
+          maxWidth: 'min(560px, 94vw)', 
           width: '100%', 
-          maxHeight: '90vh', 
+          maxHeight: '92vh', 
           overflowY: 'auto', 
-          padding: 'clamp(18px, 4vw, 24px)', 
+          padding: 'clamp(16px, 3.5vw, 22px)', 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '14px', 
+          gap: '12px', 
           position: 'relative', 
-          animation: 'scaleUp 0.16s cubic-bezier(0.16, 1, 0.3, 1)' 
+          animation: 'snapshotScaleUp 0.16s cubic-bezier(0.16, 1, 0.3, 1)' 
         }}
       >
         {viewState === 'main' && (
           <>
-            {/* Minimalist 80/20 Header */}
+            {/* 1. MINIMALIST STUDENT ANCHOR HEADER */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ 
-                  width: '38px', 
-                  height: '38px', 
+                  width: '40px', 
+                  height: '40px', 
                   borderRadius: '12px', 
                   background: '#ecfdf5', 
                   display: 'flex', 
@@ -1120,9 +1384,11 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                 type="button" 
                 onClick={() => { stopHardware(); onClose(); }} 
                 disabled={isRecording || isDictating || isSaving || countInRemaining !== null} 
+                aria-label="Dialog schließen"
+                title="Schließen (ESC)"
                 style={{ 
-                  width: '32px', 
-                  height: '32px', 
+                  width: '44px', 
+                  height: '44px', 
                   borderRadius: '50%', 
                   border: 'none', 
                   background: '#f1f5f9', 
@@ -1135,142 +1401,267 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                   transition: 'background 0.12s ease'
                 }}
               >
-                <X size={16} strokeWidth={2.4} />
+                <X size={17} strokeWidth={2.4} />
               </button>
             </div>
 
-            {/* UNIFIED 80/20 MINIMALIST STAGE */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* UNIFIED ULTRA-CLEAN 4-ZONE DIDAKTIK CONTAINER */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               
-              {/* 1. STUDIO RECORDER STAGE (ULTRA-CLEAN) */}
-              <div style={{ 
-                background: isRecording ? '#fef2f2' : (recordedClips.length > 0 ? '#f0fdf4' : '#f8fafc'), 
-                borderRadius: '18px', 
-                border: isRecording ? '2px solid #ef4444' : (recordedClips.length > 0 ? '1.5px solid #86efac' : '1.5px dashed #cbd5e1'),
-                padding: '12px 14px', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '8px',
+              {/* ZONE 1: DIDAKTISCHE FOKUS-LEISTE (5ER-GRID, ZERO-CLUTTER) */}
+              <div 
+                role="group" 
+                aria-label="Didaktischer Schwerpunkt"
+                style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(5, 1fr)', 
+                  gap: '6px',
+                  width: '100%'
+                }}
+              >
+                {DIDACTIC_FOCUS_ITEMS.map((focus) => {
+                  const active = isFocusActive(focus);
+                  return (
+                    <button
+                      key={focus.id}
+                      type="button"
+                      onClick={() => handleToggleFocus(focus)}
+                      title={`${focus.label}: ${focus.subtitle}`}
+                      aria-label={`${focus.label}: ${focus.subtitle}`}
+                      aria-pressed={active}
+                      style={{
+                        padding: '8px 4px',
+                        borderRadius: '12px',
+                        border: active ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+                        background: active ? '#ecfdf5' : '#ffffff',
+                        color: active ? '#059669' : '#334155',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '3px',
+                        minHeight: '48px',
+                        boxShadow: active ? '0 2px 6px rgba(16, 185, 129, 0.14)' : '0 1px 2px rgba(0,0,0,0.02)',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{focus.icon}</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: active ? 850 : 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+                        {focus.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ZONE 2: SMARTES NOTIZFELD & GHOST-CHIPS */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ position: 'relative' }}>
+                  <textarea 
+                    value={dictatedText} 
+                    onChange={(e) => handleTextChange(e.target.value)} 
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        if (canSave && !isSaving && !saveSuccess && countInRemaining === null) {
+                          handleSaveBlitzHomework();
+                        }
+                      }
+                    }}
+                    placeholder="Notiz verfassen, Diktat sprechen oder Bausteine antippen..." 
+                    rows={3} 
+                    aria-label="Hausaufgaben-Notiz"
+                    style={{ 
+                      width: '100%', 
+                      boxSizing: 'border-box', 
+                      padding: '10px 52px 10px 12px', 
+                      borderRadius: '14px', 
+                      border: isDictating ? '1.5px solid #ef4444' : '1px solid #cbd5e1', 
+                      fontSize: '0.86rem', 
+                      fontWeight: 600, 
+                      lineHeight: 1.45, 
+                      color: '#0f172a', 
+                      outline: 'none', 
+                      resize: 'none', 
+                      minHeight: '74px',
+                      fontFamily: 'inherit', 
+                      background: isDictating ? '#fef2f2' : '#ffffff', 
+                      boxShadow: isDictating ? '0 0 0 3px rgba(239, 68, 68, 0.15)' : 'none', 
+                      transition: 'all 0.15s ease' 
+                    }} 
+                  />
+                  {isSpeechSupported && (
+                    <button
+                      type="button"
+                      onClick={isDictating ? handleStopDictation : handleStartDictation}
+                      title={isDictating ? "Sprach-Diktat beenden" : "Sprach-Diktat starten (Deutsch)"}
+                      aria-label={isDictating ? "Sprach-Diktat beenden" : "Sprach-Diktat starten (Deutsch)"}
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '6px',
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isDictating ? '#ef4444' : '#f1f5f9',
+                        color: isDictating ? '#ffffff' : '#64748b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: isDictating ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none',
+                        animation: isDictating ? 'snapshotMicRing 1.4s infinite' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isDictating ? <Square size={14} fill="#ffffff" /> : <Mic size={16} />}
+                    </button>
+                  )}
+                </div>
+
+                {/* GHOST-CHIPS (1 ZEILE, KEIN SCHWERER HEADER) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                  {PASSAGE_PILLS.map((pill) => {
+                    const isSelected = dictatedText.toLowerCase().includes(pill.text.toLowerCase());
+                    return (
+                      <button 
+                        key={pill.id} 
+                        type="button" 
+                        onClick={() => handleAppendPassage(pill.text)} 
+                        aria-label={`Passage hinzufügen: ${pill.label}`}
+                        aria-pressed={isSelected}
+                        style={{ 
+                          padding: '4px 10px', 
+                          borderRadius: '8px', 
+                          border: isSelected ? '1px solid #10b981' : '1px solid #e2e8f0', 
+                          background: isSelected ? '#ecfdf5' : '#f8fafc', 
+                          fontSize: '0.72rem', 
+                          fontWeight: isSelected ? 800 : 650, 
+                          color: isSelected ? '#059669' : '#475569', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '3px', 
+                          cursor: 'pointer', 
+                          minHeight: '44px',
+                          transition: 'all 0.12s ease' 
+                        }}
+                      >
+                        <Plus size={10} color={isSelected ? '#059669' : '#94a3b8'} />
+                        <span>{pill.label}</span>
+                      </button>
+                    );
+                  })}
+                  <button 
+                    type="button" 
+                    onClick={() => setViewState('templates')} 
+                    aria-label="Alle didaktischen Vorlagen öffnen"
+                    style={{ 
+                      padding: '4px 8px', 
+                      borderRadius: '8px', 
+                      border: 'none', 
+                      background: 'transparent', 
+                      fontSize: '0.72rem', 
+                      fontWeight: 750, 
+                      color: '#059669', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '2px', 
+                      cursor: 'pointer', 
+                      minHeight: '44px',
+                      marginLeft: 'auto'
+                    }}
+                  >
+                    <span>Vorlagen</span> <ChevronRight size={11} />
+                  </button>
+                </div>
+              </div>
+
+              {/* ZONE 3: 1-ZEILEN-STUDIO-KAPSEL (METRONOM & AKUSTISCHES VORBILD) */}
+              <div style={{
+                background: isRecording ? '#fef2f2' : '#f8fafc',
+                border: isRecording ? '1.5px solid #ef4444' : '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '6px 10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
                 position: 'relative',
                 transition: 'all 0.15s ease'
               }}>
-
                 {/* COUNT-IN OVERLAY */}
                 {countInRemaining !== null && (
                   <div style={{
                     position: 'absolute',
                     inset: 0,
-                    borderRadius: '16px',
-                    background: 'rgba(5, 150, 105, 0.95)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 10,
-                    color: '#ffffff',
-                    animation: 'fadeIn 0.1s ease'
-                  }}>
-                    <div style={{ fontSize: '3.2rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
-                      {countInRemaining}
-                    </div>
-                    <div style={{ fontSize: '0.80rem', fontWeight: 800, marginTop: '2px', textTransform: 'uppercase' }}>
-                      Bereitmachen... ({metronomeBpm} BPM)
-                    </div>
-                  </div>
-                )}
-
-                {/* Top Metronome Trigger (Discreet & Non-Intrusive) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                  <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isRecording ? '#dc2626' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {isRecording ? '🔴 Aufnahme aktiv' : recordedClips.length > 0 ? (hasExistingHomework ? `✓ ${recordedClips.length} ${recordedClips.length === 1 ? 'Aufnahme hinterlegt' : 'Aufnahmen hinterlegt'}` : `✓ ${recordedClips.length} ${recordedClips.length === 1 ? 'Aufnahme bereit' : 'Aufnahmen bereit'}`) : 'Audio-Aufnahme (optional)'}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowMetronome(prev => !prev)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: showMetronome ? '#ecfdf5' : '#ffffff',
-                      border: showMetronome ? '1px solid #10b981' : '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      padding: '3px 8px',
-                      fontSize: '0.70rem',
-                      fontWeight: 800,
-                      color: showMetronome ? '#059669' : '#64748b',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                    }}
-                  >
-                    <Clock size={11} />
-                    <span>Metronom: {metronomeBpm} BPM</span>
-                  </button>
-                </div>
-
-                {/* EXPANDABLE METRONOME SLIDER (ONLY WHEN TOGGLED) */}
-                {showMetronome && (
-                  <div style={{
-                    width: '100%',
-                    background: '#ffffff',
                     borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    padding: '8px 10px',
+                    background: 'rgba(5, 150, 105, 0.96)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    animation: 'fadeIn 0.12s ease'
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 14px',
+                    zIndex: 20,
+                    color: '#ffffff',
+                    animation: 'snapshotFadeIn 0.12s ease'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {METRONOME_PRESETS.map((bpm) => (
-                          <button
-                            key={bpm}
-                            type="button"
-                            onClick={() => setMetronomeBpm(bpm)}
-                            style={{
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              border: metronomeBpm === bpm ? '1px solid #10b981' : '1px solid #e2e8f0',
-                              background: metronomeBpm === bpm ? '#ecfdf5' : '#f8fafc',
-                              color: metronomeBpm === bpm ? '#059669' : '#334155',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {bpm}
-                          </button>
-                        ))}
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '2.2rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
+                        {countInRemaining}
+                      </span>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        Bereitmachen ({metronomeBpm} BPM)...
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <button
                         type="button"
-                        onClick={() => setMetronomeSound(prev => !prev)}
+                        onClick={handleSkipCountIn}
+                        aria-label="Sofort aufnehmen"
                         style={{
-                          background: metronomeSound ? '#ecfdf5' : '#f1f5f9',
-                          border: metronomeSound ? '1px solid #10b981' : '1px solid #e2e8f0',
-                          borderRadius: '6px',
-                          padding: '2px 6px',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          color: metronomeSound ? '#059669' : '#64748b',
+                          background: 'rgba(255, 255, 255, 0.25)',
+                          border: '1px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          minHeight: '44px',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          cursor: 'pointer'
+                          alignItems: 'center'
                         }}
                       >
-                        {metronomeSound ? <Volume2 size={11} /> : <VolumeX size={11} />}
-                        <span>{metronomeSound ? 'Klick an' : 'Lautlos'}</span>
+                        Sofort ➔
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelCountIn}
+                        aria-label="Aufnahme abbrechen"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'rgba(255, 255, 255, 0.85)',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                          minHeight: '44px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        Abbrechen
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* RECORDING RUNNING VIEW */}
+                {/* KERN-STUDIO-ZEILE */}
                 {isRecording ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '6px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ 
                         width: '10px', 
@@ -1278,30 +1669,25 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                         borderRadius: '50%', 
                         background: '#ef4444', 
                         boxShadow: '0 0 10px rgba(239, 68, 68, 0.8)',
-                        animation: 'pulse 1.2s infinite' 
+                        animation: 'snapshotPulseDot 1.2s infinite' 
                       }} />
-                      <span style={{ 
-                        fontSize: '1.8rem', 
-                        fontWeight: 900, 
-                        color: '#dc2626', 
-                        fontFamily: 'monospace'
-                      }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#dc2626', fontFamily: 'monospace' }}>
                         {formatTime(recordingSeconds)}
                       </span>
                     </div>
 
-                    {/* LIVE AUDIO WAVEFORM DANCE BARS */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '18px', width: '100%', maxWidth: '180px' }}>
-                      {[0.4, 0.8, 1.2, 0.9, 1.5, 0.7, 1.3, 1.0, 0.6, 1.4, 0.9, 0.5].map((multiplier, i) => {
-                        const dynamicHeight = Math.max(3, Math.min(18, Math.round(audioLevel * 18 * multiplier + 3)));
+                    {/* LIVE WAVEFORM BARS */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '18px', flex: 1, maxWidth: '140px', justifyContent: 'center' }}>
+                      {[0.4, 0.9, 1.4, 0.7, 1.3, 0.6, 1.2, 0.5].map((m, i) => {
+                        const h = Math.max(3, Math.min(18, Math.round(audioLevel * 18 * m + 3)));
                         return (
                           <div
                             key={i}
                             style={{
-                              flex: 1,
-                              height: `${dynamicHeight}px`,
-                              borderRadius: '3px',
-                              background: audioLevel > 0.1 ? 'linear-gradient(180deg, #ef4444 0%, #f87171 100%)' : '#cbd5e1',
+                              width: '4px',
+                              height: `${h}px`,
+                              borderRadius: '2px',
+                              background: audioLevel > 0.08 ? '#ef4444' : '#cbd5e1',
                               transition: 'height 0.06s ease'
                             }}
                           />
@@ -1312,335 +1698,272 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                     <button 
                       type="button" 
                       onClick={handleStopRecord} 
+                      aria-label="Aufnahme beenden"
                       style={{ 
-                        padding: '9px 22px', 
-                        borderRadius: '12px', 
+                        padding: '8px 16px', 
+                        borderRadius: '10px', 
                         border: 'none', 
                         background: '#ef4444', 
                         color: '#ffffff', 
-                        fontWeight: 900, 
-                        fontSize: '0.84rem', 
+                        fontWeight: 850, 
+                        fontSize: '0.80rem', 
                         cursor: 'pointer', 
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '6px', 
-                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)', 
-                        transition: 'all 0.12s ease' 
+                        gap: '5px', 
+                        minHeight: '44px',
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
                       }}
-                      className="hover-scale"
                     >
-                      <Square size={14} fill="#ffffff" />
-                      <span>Aufnahme stoppen</span>
+                      <Square size={13} fill="#ffffff" />
+                      <span>Stopp</span>
                     </button>
                   </div>
                 ) : (
-                  <>
-                    {/* LIST OF RECORDED CLIPS (CLEAN & COMPACT) */}
-                    {recordedClips.length > 0 ? (
-                      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {recordedClips.map((clip) => (
-                          <div 
-                            key={clip.id} 
-                            style={{ 
-                              background: '#ffffff', 
-                              borderRadius: '12px', 
-                              border: '1px solid #bbf7d0', 
-                              padding: '8px 12px', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between', 
-                              gap: '8px', 
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.02)' 
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                              <div style={{ 
-                                width: '26px', 
-                                height: '26px', 
-                                borderRadius: '7px', 
-                                background: '#ecfdf5', 
-                                color: '#059669', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                flexShrink: 0 
-                              }}>
-                                <Music size={13} />
-                              </div>
-                              <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {clip.title} ({formatTime(clip.durationSeconds)})
-                              </span>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                              <button 
-                                type="button" 
-                                onClick={() => handleTogglePlayback(clip)} 
-                                style={{ 
-                                  padding: '4px 9px', 
-                                  borderRadius: '8px', 
-                                  border: '1px solid #10b981', 
-                                  color: '#059669', 
-                                  background: activePlayingClipId === clip.id ? '#ecfdf5' : '#ffffff', 
-                                  fontWeight: 800, 
-                                  fontSize: '0.72rem', 
-                                  cursor: 'pointer', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: '3px' 
-                                }}
-                              >
-                                {activePlayingClipId === clip.id ? <Pause size={11} /> : <Play size={11} />}
-                                <span>{activePlayingClipId === clip.id ? 'Pause' : 'Play'}</span>
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={() => handleDeleteClip(clip.id)} 
-                                title="Aufnahme löschen"
-                                style={{ 
-                                  padding: '4px 6px', 
-                                  borderRadius: '8px', 
-                                  border: '1px solid #fecaca', 
-                                  color: '#ef4444', 
-                                  background: '#ffffff', 
-                                  cursor: 'pointer', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center' 
-                                }}
-                              >
-                                <Trash2 size={11} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-
-                        <button 
-                          type="button" 
-                          onClick={handleStartRecord} 
-                          style={{ 
-                            padding: '7px 12px', 
-                            borderRadius: '10px', 
-                            border: '1px dashed #10b981', 
-                            background: '#ffffff', 
-                            color: '#059669', 
-                            fontWeight: 800, 
-                            fontSize: '0.76rem', 
-                            cursor: 'pointer', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            gap: '5px', 
-                            width: '100%', 
-                            transition: 'all 0.12s ease' 
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                    {/* LINKS: TEMPO STEPPER & KLICK */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        background: '#ffffff', 
+                        border: '1px solid #e2e8f0', 
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setMetronomeBpm(b => Math.max(40, b - 5))}
+                          aria-label="BPM verringern"
+                          style={{
+                            width: '44px',
+                            height: '44px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#475569',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                         >
-                          <Plus size={13} />
-                          <span>Weitere Aufnahme hinzufügen</span>
+                          –
                         </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 0' }}>
-                        <button 
-                          type="button" 
-                          onClick={handleStartRecord} 
-                          style={{ 
-                            padding: '10px 24px', 
-                            borderRadius: '12px', 
-                            border: 'none', 
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                            color: '#ffffff', 
-                            fontWeight: 900, 
-                            fontSize: '0.88rem', 
-                            cursor: 'pointer', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '8px', 
-                            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)', 
-                            transition: 'all 0.12s ease' 
+                        <button
+                          type="button"
+                          onClick={handleTapTempo}
+                          title="Tippen für Tap-Tempo"
+                          aria-label={`Tempo ${metronomeBpm} BPM (tippen für Tap Tempo)`}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#0f172a',
+                            fontWeight: 850,
+                            fontSize: '0.78rem',
+                            padding: '0 4px',
+                            cursor: 'pointer',
+                            minHeight: '44px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                          className="hover-scale"
                         >
-                          <Mic size={16} />
-                          <span>Aufnahme starten</span>
+                          ⏱️ {metronomeBpm}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMetronomeBpm(b => Math.min(240, b + 5))}
+                          aria-label="BPM erhöhen"
+                          style={{
+                            width: '44px',
+                            height: '44px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#475569',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          +
                         </button>
                       </div>
-                    )}
-                  </>
+
+                      <button
+                        type="button"
+                        onClick={() => setMetronomeSound(s => !s)}
+                        title={metronomeSound ? 'Klick an' : 'Lautlos'}
+                        aria-label={metronomeSound ? 'Metronom-Klick stumm' : 'Metronom-Klick an'}
+                        style={{
+                          width: '44px',
+                          height: '44px',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                          background: metronomeSound ? '#ecfdf5' : '#ffffff',
+                          color: metronomeSound ? '#059669' : '#64748b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        {metronomeSound ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                      </button>
+                    </div>
+
+                    {/* MITTE: COUNT-IN TOGGLE */}
+                    <button
+                      type="button"
+                      onClick={() => setMetronomeCountIn(c => !c)}
+                      title={metronomeCountIn ? '4-Beat Einzählen aktiv' : 'Sofortige Aufnahme'}
+                      aria-label={metronomeCountIn ? 'Einzählen aktiv' : 'Einzählen aus'}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        border: metronomeCountIn ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                        background: metronomeCountIn ? '#ecfdf5' : '#ffffff',
+                        color: metronomeCountIn ? '#059669' : '#64748b',
+                        fontSize: '0.70rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        minHeight: '44px'
+                      }}
+                    >
+                      <Clock size={12} />
+                      <span>{metronomeCountIn ? '4-Beat' : 'Direkt'}</span>
+                    </button>
+
+                    {/* RECHTS: ROTER STUDIO-RECORD BUTTON (KEINE GRÜNE KONKURRENZ!) */}
+                    <button
+                      type="button"
+                      onClick={handleStartRecord}
+                      aria-label="Audio-Vorbild aufnehmen"
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: '#ffffff',
+                        fontWeight: 850,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        minHeight: '44px',
+                        boxShadow: '0 2px 8px rgba(220, 38, 38, 0.35)',
+                        transition: 'all 0.12s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                      <span>● Rec</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* LIST OF RECORDED CLIPS (100% UNIFIED WOCHEN-FAHRPLAN AUDIO PLAYER) */}
+                {recordedClips.length > 0 && !isRecording && (
+                  <div style={{ marginTop: '4px', borderTop: '1px solid #e2e8f0', paddingTop: '6px' }}>
+                    <WochenFahrplanAudioPlayer
+                      tracks={recordedClips.map((c) => ({
+                        url: c.url || (c.blob ? URL.createObjectURL(c.blob) : ''),
+                        label: c.title,
+                        duration: c.durationSeconds,
+                        bpm: c.metronomeBpm
+                      }))}
+                      readOnly={false}
+                      onDelete={(idx) => {
+                        const targetClip = recordedClips[idx];
+                        if (targetClip) handleDeleteClip(targetClip.id);
+                      }}
+                      topicName="Aufnahme"
+                    />
+                  </div>
                 )}
               </div>
 
-              {/* 2. ESSENTIAL QUICK PILLS & NOTIZ-EINGABE */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Kernaufgabe wählen:
-                  </label>
-                  <button 
-                    type="button" 
-                    onClick={() => setViewState('templates')} 
-                    style={{ 
-                      background: 'transparent', 
-                      border: 'none', 
-                      color: '#059669', 
-                      fontSize: '0.74rem', 
-                      fontWeight: 800, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '3px', 
-                      cursor: 'pointer' 
-                    }}
-                  >
-                    <span>Mehr Vorlagen</span> <ChevronRight size={12} />
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px' }}>
-                  {QUICK_PILLS.slice(0, 4).map((pill) => {
-                    const isSelected = dictatedText.includes(pill.text) || dictatedText === pill.text;
-                    return (
-                      <button 
-                        key={pill.label} 
-                        type="button" 
-                        onClick={() => handleAppendPhrase(pill.text)} 
-                        style={{ 
-                          padding: '6px 10px', 
-                          borderRadius: '8px', 
-                          border: isSelected ? '1.5px solid #10b981' : '1px solid #e2e8f0', 
-                          background: isSelected ? '#ecfdf5' : '#f8fafc', 
-                          fontSize: '0.74rem', 
-                          fontWeight: isSelected ? 850 : 700, 
-                          color: isSelected ? '#059669' : '#334155', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '4px', 
-                          whiteSpace: 'nowrap', 
-                          cursor: 'pointer', 
-                          flexShrink: 0, 
-                          transition: 'all 0.12s ease' 
-                        }}
-                      >
-                        <Plus size={10} /> {pill.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Text Input with integrated Dictate Button */}
-                <div style={{ position: 'relative', marginTop: '2px' }}>
-                  <textarea 
-                    value={dictatedText} 
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDictatedText(val);
-                      try {
-                        if (val.trim()) {
-                          localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, val);
-                        } else {
-                          localStorage.removeItem(`cgl_draft_hw_${effectiveStudentId}`);
-                        }
-                      } catch {}
-                    }} 
-                    placeholder="Notiz ergänzen, oben antippen oder diktieren..." 
-                    rows={2} 
-                    style={{ 
-                      width: '100%', 
-                      boxSizing: 'border-box', 
-                      padding: '8px 38px 8px 12px', 
-                      borderRadius: '12px', 
-                      border: isDictating ? '1.5px solid #ef4444' : '1px solid #cbd5e1', 
-                      fontSize: '0.84rem', 
-                      fontWeight: 600, 
-                      lineHeight: 1.4, 
-                      color: '#0f172a', 
-                      outline: 'none', 
-                      resize: 'none', 
-                      fontFamily: 'inherit', 
-                      background: isDictating ? '#fef2f2' : '#ffffff', 
-                      transition: 'all 0.15s ease' 
-                    }} 
-                  />
-                  {isSpeechSupported && (
-                    <button
-                      type="button"
-                      onClick={isDictating ? handleStopDictation : handleStartDictation}
-                      title={isDictating ? "Diktat stoppen" : "Sprach-Diktat starten"}
-                      style={{
-                        position: 'absolute',
-                        right: '6px',
-                        top: '6px',
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '7px',
-                        border: 'none',
-                        background: isDictating ? '#ef4444' : '#f1f5f9',
-                        color: isDictating ? '#ffffff' : '#64748b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {isDictating ? <Square size={12} fill="#ffffff" /> : <Mic size={13} />}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* 3. SEND CTA BUTTON */}
-              <button 
-                type="button" 
-                onClick={handleSaveBlitzHomework} 
-                disabled={!canSave || isSaving || saveSuccess || countInRemaining !== null} 
-                style={{ 
-                  marginTop: '4px', 
-                  padding: '13px 18px', 
-                  borderRadius: '14px', 
-                  border: 'none', 
-                  background: saveSuccess ? '#059669' : (!canSave ? '#e2e8f0' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'), 
-                  color: !canSave ? '#94a3b8' : '#ffffff', 
-                  fontWeight: 900, 
-                  fontSize: '0.92rem', 
-                  cursor: (!canSave || isSaving || saveSuccess || countInRemaining !== null) ? 'not-allowed' : 'pointer', 
+              {/* ZONE 4: DIDAKTIK-RÜCKVERSICHERUNG & PRIMÄRER SPEICHER-BUTTON */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                {/* STATUS-ZUSAMMENFASSUNG */}
+                <div style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
-                  gap: '8px', 
-                  boxShadow: canSave ? '0 6px 20px -3px rgba(16, 185, 129, 0.4)' : 'none', 
-                  minHeight: '46px', 
-                  transition: 'all 0.15s ease' 
-                }}
-                className={canSave ? "hover-scale" : ""}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                    <span>Wird übertragen...</span>
-                  </>
-                ) : saveSuccess ? (
-                  <>
-                    <Check size={18} strokeWidth={3} />
-                    <span>⚡ Hausaufgabe erfolgreich eingetragen!</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={16} fill="currentColor" />
-                    <span>{hasExistingHomework ? 'Hausaufgabe aktualisieren ➔' : 'Hausaufgabe jetzt senden ➔'}</span>
-                  </>
-                )}
-              </button>
+                  gap: '8px',
+                  fontSize: '0.70rem', 
+                  color: '#64748b', 
+                  fontWeight: 650 
+                }}>
+                  <span>🎯 {activeFocusCount > 0 ? `${activeFocusCount} Fokus aktiv` : 'Notiz verfasst'}</span>
+                  <span>•</span>
+                  <span>⏱️ {metronomeBpm} BPM</span>
+                  <span>•</span>
+                  <span>🎙️ {recordedClips.length > 0 ? `${recordedClips.length} Audio-Clip` : 'Ohne Audio'}</span>
+                </div>
+
+                {/* EINZIGER PRIMÄRER BUTTON IM GESAMTEN MODAL */}
+                <button 
+                  type="button" 
+                  onClick={handleSaveBlitzHomework} 
+                  disabled={!canSave || isSaving || saveSuccess || countInRemaining !== null} 
+                  aria-label={hasExistingHomework ? 'Hausaufgabe aktualisieren' : 'Hausaufgabe speichern'}
+                  style={{ 
+                    padding: '12px 18px', 
+                    borderRadius: '14px', 
+                    border: 'none', 
+                    background: saveSuccess ? '#059669' : (!canSave ? '#e2e8f0' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'), 
+                    color: !canSave ? '#94a3b8' : '#ffffff', 
+                    fontWeight: 900, 
+                    fontSize: '0.90rem', 
+                    cursor: (!canSave || isSaving || saveSuccess || countInRemaining !== null) ? 'not-allowed' : 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px', 
+                    boxShadow: canSave ? '0 4px 14px rgba(16, 185, 129, 0.35)' : 'none', 
+                    minHeight: '48px', 
+                    transition: 'all 0.15s ease' 
+                  }} 
+                  className={canSave ? "hover-scale" : ""}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Wird gespeichert...</span>
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check size={18} strokeWidth={3} />
+                      <span>⚡ Hausaufgabe erfolgreich eingetragen!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={16} fill="currentColor" />
+                      <span>{hasExistingHomework ? 'Hausaufgabe aktualisieren ➔' : '⚡ Hausaufgabe speichern ➔'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </>
         )}
 
         {/* VIEW B: TEMPLATES LIBRARY */}
         {viewState === 'templates' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'fadeIn 0.15s ease' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'snapshotFadeIn 0.15s ease' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button 
                 type="button" 
                 onClick={() => setViewState('main')} 
+                aria-label="Zurück zum Hausaufgaben-Fenster"
                 style={{ 
                   background: 'transparent', 
                   border: 'none', 
@@ -1651,17 +1974,32 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                   alignItems: 'center', 
                   gap: '6px', 
                   cursor: 'pointer', 
-                  padding: 0 
+                  padding: 0,
+                  minHeight: '44px' 
                 }}
               >
-                <ArrowLeft size={16} /> <span>Zurück zum Blitz-Fenster</span>
+                <ArrowLeft size={16} /> <span>Zurück zum Hausaufgaben-Fenster</span>
               </button>
               <button 
                 type="button" 
                 onClick={() => { stopHardware(); onClose(); }} 
-                style={{ width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                aria-label="Dialog schließen"
+                title="Schließen"
+                style={{ 
+                  width: '44px', 
+                  height: '44px', 
+                  borderRadius: '50%', 
+                  border: 'none', 
+                  background: '#f1f5f9', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'background 0.12s ease'
+                }}
               >
-                <X size={15} />
+                <X size={17} strokeWidth={2.4} />
               </button>
             </div>
 
@@ -1678,6 +2016,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                         key={idx} 
                         type="button" 
                         onClick={() => { handleAppendPhrase(item); setViewState('main'); }} 
+                        aria-label={`Vorlage übernehmen: ${item}`}
                         style={{ 
                           textAlign: 'left', 
                           padding: '10px 12px', 
@@ -1691,6 +2030,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'space-between', 
+                          minHeight: '44px',
                           transition: 'all 0.12s ease' 
                         }}
                         className="hover-scale"

@@ -57,17 +57,17 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --touch-target-min: 48px;
-  --bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
-  --mobile-header-height: calc(56px + env(safe-area-inset-top, 0px));
+  --bottom-nav-height: 0px;
+  --mobile-header-height: calc(48px + env(safe-area-inset-top, 0px));
 
   /* Canonical Mobile Architecture Tokens (<= 768px) */
   --mobile-breakpoint: 768px;
   --mobile-vh: 100dvh;
-  --mobile-header-h: calc(56px + env(safe-area-inset-top, 0px));
-  --mobile-bottom-nav-bar-h: 64px;
-  --mobile-bottom-nav-h: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 0px));
+  --mobile-header-h: calc(48px + env(safe-area-inset-top, 0px));
+  --mobile-bottom-nav-bar-h: 0px;
+  --mobile-bottom-nav-h: 0px;
   --mini-player-h: 0px;
-  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-bar-h, 64px) + env(safe-area-inset-bottom, 16px) + 36px);
+  --mobile-scroll-clearance-bottom: calc(env(safe-area-inset-bottom, 12px) + 8px);
   --mobile-scroll-clearance-top: var(--mobile-header-h);
   --mobile-sheet-radius: 28px;
 
@@ -886,6 +886,14 @@ body {
 .glass-panel:hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.schueler-card-item {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.schueler-card-item:hover {
+  transform: translateY(-2px);
 }
 
 @keyframes pulse {
@@ -1821,8 +1829,8 @@ select option {
   display: none !important;
 }
 
-/* 1. Real Smartphone & Tablet Viewports (<= 1024px) */
-@media (max-width: 1024px) {
+/* 1. Real Smartphone Viewports (<= 768px) */
+@media (max-width: 768px) {
   .sidebar-nav,
   .sidebar-container,
   .desktop-only-sidebar,
@@ -1835,33 +1843,6 @@ select option {
   }
 
   .cg-mobile-bottom-nav {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    white-space: nowrap !important;
-    scroll-behavior: smooth !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
-    padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 2px) 12px !important;
-    background: rgba(255, 255, 255, 0.98) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
-    z-index: 10000 !important;
-    box-sizing: border-box !important;
-    gap: 6px !important;
-  }
-
-  .cg-mobile-bottom-nav::-webkit-scrollbar {
     display: none !important;
   }
 
@@ -1902,6 +1883,15 @@ select option {
     padding-bottom: 0 !important;
   }
 
+  /* WhatsApp 0.1% Goldstandard Exception: Fullscreen Mobile Chat (No Scroll, No Clearance) */
+  .main-wrapper.messages-chat-active #main-content,
+  .main-wrapper.messages-chat-active .main-content {
+    overflow-y: hidden !important;
+    padding: 0 !important;
+    padding-bottom: 0 !important;
+    height: 100% !important;
+  }
+
   /* Axiom 4: Apple / Material Touch-Targets & Native-Feel Tap */
   button,
   [role="button"],
@@ -1921,25 +1911,7 @@ select option {
   }
 
   .cg-mobile-bottom-nav {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 6px !important;
-    padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 4px) 12px !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    white-space: nowrap !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-  }
-  .cg-bottom-nav-item {
-    flex: 0 0 auto !important;
-    min-width: 68px !important;
-    width: auto !important;
-    padding: 6px 8px !important;
-    min-height: 44px !important;
+    display: none !important;
   }
 }
 
@@ -1962,13 +1934,13 @@ select option {
 }
 
 /* 2. Simulator Canvas Mobile Overrides (.sim-viewport-mobile) */
-.sim-viewport-mobile .sidebar-nav,
-.sim-viewport-mobile .sidebar-container,
-.sim-viewport-mobile .desktop-only-sidebar,
-.sim-viewport-mobile .desktop-only-header,
-.sim-viewport-mobile .main-sidebar,
-.sim-viewport-mobile .desktop-greeting-banner,
-.sim-viewport-mobile .glass-sidebar {
+.sim-viewport-mobile:not(.sim-viewport-landscape) .sidebar-nav,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .sidebar-container,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .desktop-only-sidebar,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .desktop-only-header,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .main-sidebar,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .desktop-greeting-banner,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .glass-sidebar {
   display: none !important;
 }
 
@@ -1982,83 +1954,37 @@ select option {
   display: none !important;
 }
 
-.sim-viewport-mobile .cg-mobile-top-header,
+.sim-viewport-mobile:not(.sim-viewport-landscape) .cg-mobile-top-header,
 .sim-viewport-portrait .cg-mobile-top-header {
   display: flex !important;
 }
 
+.sim-viewport-landscape .cg-mobile-top-header {
+  display: none !important;
+}
+
+.sim-viewport-landscape .sidebar-nav {
+  display: flex !important;
+  --sidebar-width: var(--sidebar-width-collapsed);
+}
+
 .sim-viewport-mobile .cg-mobile-bottom-nav,
 .sim-viewport-portrait .cg-mobile-bottom-nav {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 6px !important;
-  padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 4px) 12px !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  white-space: nowrap !important;
-  -webkit-overflow-scrolling: touch !important;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
+  display: none !important;
+}
+
+/* Simulator Gemini Fullscreen Drawer Parity */
+[class*="sim-viewport-"] .cg-gemini-drawer,
+.sim-viewport-mobile .cg-gemini-drawer,
+.sim-viewport-portrait .cg-gemini-drawer {
+  position: absolute !important;
   width: 100% !important;
-  height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
-  z-index: 10000 !important;
-  box-sizing: border-box !important;
+  height: 100% !important;
 }
 
 .sim-viewport-mobile,
 .sim-viewport-portrait {
   padding-bottom: 0 !important;
-}
-
-.sim-viewport-mobile .cg-mobile-bottom-nav::-webkit-scrollbar,
-.sim-viewport-portrait .cg-mobile-bottom-nav::-webkit-scrollbar {
-  display: none !important;
-}
-
-.sim-viewport-mobile .cg-bottom-nav-item,
-.sim-viewport-portrait .cg-bottom-nav-item {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex: 0 0 auto !important;
-  min-width: 68px !important;
-  width: auto !important;
-  padding: 6px 8px !important;
-  height: 100% !important;
-  color: #64748b;
-  font-size: 11px !important;
-  font-weight: 750 !important;
-  letter-spacing: 0.01em !important;
-  transition: all 0.2s ease;
-}
-
-.sim-viewport-mobile .cg-bottom-nav-item.active-campus,
-.sim-viewport-portrait .cg-bottom-nav-item.active-campus {
-  color: #34a853 !important;
-  font-weight: 800 !important;
-}
-
-.sim-viewport-mobile .cg-bottom-nav-item.active-groovelab,
-.sim-viewport-portrait .cg-bottom-nav-item.active-groovelab {
-  color: #eab308 !important;
-  font-weight: 800 !important;
-}
-
-.sim-viewport-mobile .cg-bottom-nav-item.active-admin,
-.sim-viewport-portrait .cg-bottom-nav-item.active-admin {
-  color: #ea4335 !important;
-  font-weight: 800 !important;
 }
 
 .sim-viewport-mobile .hero-avatar-container {
@@ -2115,21 +2041,36 @@ select option {
 .sim-viewport-portrait .main-content {
   padding-left: 4px !important;
   padding-right: 4px !important;
-  padding-bottom: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) !important;
-  scroll-padding-top: var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px))) !important;
-  scroll-padding-bottom: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) !important;
+  padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
+  scroll-padding-top: var(--mobile-scroll-clearance-top, calc(48px + env(safe-area-inset-top, 0px))) !important;
+  scroll-padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+}
+
+.sim-viewport-mobile .main-wrapper.messages-chat-active #main-content,
+.sim-viewport-mobile .main-wrapper.messages-chat-active .main-content,
+.sim-viewport-portrait .main-wrapper.messages-chat-active #main-content,
+.sim-viewport-portrait .main-wrapper.messages-chat-active .main-content,
+.main-wrapper.messages-chat-active #main-content,
+.main-wrapper.messages-chat-active .main-content {
+  padding: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+  padding-top: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
 }
 
 @media (max-width: 768px) {
   .main-content {
     padding-left: 4px !important;
     padding-right: 4px !important;
-    padding-bottom: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) !important;
-    scroll-padding-top: var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px))) !important;
-    scroll-padding-bottom: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) !important;
+    padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
+    scroll-padding-top: var(--mobile-scroll-clearance-top, calc(48px + env(safe-area-inset-top, 0px))) !important;
+    scroll-padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
@@ -2138,9 +2079,9 @@ select option {
 
 /* Zero Content Occlusion & Scroll Clearance Utility */
 .mobile-scroll-container {
-  padding-bottom: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) !important;
-  scroll-padding-top: var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px))) !important;
-  scroll-padding-bottom: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) !important;
+  padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
+  scroll-padding-top: var(--mobile-scroll-clearance-top, calc(48px + env(safe-area-inset-top, 0px))) !important;
+  scroll-padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
 }
 
 /* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars across ALL boards on smartphones */
@@ -2214,22 +2155,23 @@ select option {
 /* 3. iPad / Tablet Rail Mode (.sim-viewport-tablet & 769px-1024px) */
 .sim-viewport-tablet .sidebar-nav {
   display: flex !important;
-  width: 80px !important;
-  min-width: 80px !important;
+  --sidebar-width: var(--sidebar-width-collapsed);
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
   .sidebar-nav {
     display: flex !important;
-    width: 80px !important;
-    min-width: 80px !important;
+    --sidebar-width: var(--sidebar-width-collapsed);
+  }
+  .sidebar-nav:not(.is-collapsed) {
+    --sidebar-width: var(--sidebar-width-expanded) !important;
   }
   .sidebar-nav span:not(.badge-count),
   .sidebar-nav .sidebar-logo-text {
     display: none !important;
   }
   .main-wrapper {
-    margin-left: 80px !important;
+    margin-left: 0 !important;
   }
 }
 
@@ -2489,7 +2431,7 @@ a:focus-visible,
   .pwa-mobile-body,
   .dashboard-mobile-wrapper {
     padding-top: var(--mobile-header-height) !important;
-    padding-bottom: calc(var(--bottom-nav-height) + 16px) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 8px) !important;
     padding-left: calc(16px + var(--safe-left)) !important;
     padding-right: calc(16px + var(--safe-right)) !important;
   }
@@ -2521,35 +2463,9 @@ a:focus-visible,
     z-index: 950;
   }
 
-  /* Mobile Fixed Bottom Navbar (4 Tabs + Burger Menu) */
+  /* Mobile Fixed Bottom Navbar (Removed in Gemini Mobile Architecture) */
   .cg-mobile-bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: var(--bottom-nav-height);
-    padding: 0 12px var(--safe-bottom) 12px;
-    background: var(--glass-bg-strong);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    z-index: 1000;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
-    gap: 6px;
-  }
-
-  .cg-mobile-bottom-nav::-webkit-scrollbar {
-    display: none;
+    display: none !important;
   }
 
   .cg-bottom-nav-item {
@@ -2641,9 +2557,9 @@ a:focus-visible,
     min-height: 48px !important;
   }
 
-  /* Bottom Content Padding for Mobile Nav */
+  /* Bottom Content Padding for Mobile Nav (Gemini App Fullscreen Clearance) */
   .pb-mobile-nav {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 8px) !important;
   }
 
   /* Hide Desktop Sidebar and Header on Smartphone */
@@ -3130,22 +3046,10 @@ input[type="range"]::-moz-range-thumb {
       touch-action: pan-y;
     }
 
-    /* 5. Apple Frosted-Glass Fixed Bottom Navigation */
+    /* 5. Mobile Fixed Bottom Navigation (Deinstalled in Gemini Mobile Architecture) */
     .mobile-bottom-nav,
     .mobile-fixed-bottom {
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      height: var(--mobile-bottom-nav-h) !important;
-      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
-      background: rgba(255, 255, 255, 0.88) !important;
-      backdrop-filter: blur(20px) saturate(1.8) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
-      border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
-      z-index: var(--z-mobile-bottom-nav, 1000) !important;
-      transform: translateZ(0);
-      will-change: transform;
+      display: none !important;
     }
 
     /* 6. Apple Bottom-Sheet Modal Drawer */
@@ -3240,7 +3144,7 @@ input[type="range"]::-moz-range-thumb {
       -webkit-overflow-scrolling: touch !important;
       touch-action: pan-y !important;
       box-sizing: border-box !important;
-      padding-bottom: calc(88px + env(safe-area-inset-bottom, 24px)) !important;
+      padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
     }
 
     .mobile-modal-footer {
@@ -3254,7 +3158,7 @@ input[type="range"]::-moz-range-thumb {
     }
 
     .mobile-bottom-clearance-spacer {
-      height: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) !important;
+      height: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
       width: 100% !important;
       flex-shrink: 0 !important;
     }

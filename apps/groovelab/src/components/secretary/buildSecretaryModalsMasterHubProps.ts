@@ -68,6 +68,10 @@ export interface BuildSecretaryModalsMasterHubPropsParams {
   allUniqueTeacherProfiles: any[];
   getEffectiveStorageUsedBytes: (profile: any) => number;
   generateStarterPin: (role: string, isCampus: boolean, isGroovelab: boolean) => string;
+  showOwnQrModal?: boolean;
+  setShowOwnQrModal?: React.Dispatch<React.SetStateAction<boolean>> | ((show: boolean) => void);
+  qrModalUser?: any;
+  setQrModalUser?: React.Dispatch<React.SetStateAction<any>> | ((user: any) => void);
 }
 
 /**
@@ -333,10 +337,10 @@ export function buildSecretaryModalsMasterHubProps(
       setActiveTab: navigation.setActiveTab,
       setSecretarySubTab: navigation.setSecretarySubTab,
       setTrustRefreshToken: extendedSettings.setTrustRefreshToken,
-      showOwnQrModal: settings.showOwnQrModal,
-      setShowOwnQrModal: settings.setShowOwnQrModal,
-      qrModalUser: settings.qrModalUser,
-      setQrModalUser: settings.setQrModalUser,
+      showOwnQrModal: params.showOwnQrModal ?? settings?.showOwnQrModal ?? false,
+      setShowOwnQrModal: params.setShowOwnQrModal ?? settings?.setShowOwnQrModal ?? (() => {}),
+      qrModalUser: params.qrModalUser ?? settings?.qrModalUser ?? null,
+      setQrModalUser: params.setQrModalUser ?? settings?.setQrModalUser ?? (() => {}),
       showAvvModal: params.showAvvModal ?? settings?.showAvvModal ?? false,
       setShowAvvModal: params.setShowAvvModal ?? settings?.setShowAvvModal ?? (() => {}),
       setIsAvvSigned: params.setIsAvvSigned ?? settings?.setIsAvvSigned ?? (() => {}),

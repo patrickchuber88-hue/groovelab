@@ -17,6 +17,7 @@ import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { logSecurityEvent } from '../services/auditLogService';
 import { LegalTextModal } from './LegalTextModal';
 import { generateLocalQrDataUrl } from '../utils/localQrGenerator';
+import { computeSha256, ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS } from '../legal/legalContent';
 
 export interface ParentCampusActivationModalProps {
   student: {
@@ -295,8 +296,42 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
         }
       } catch (e) {}
 
-      // Revisionssicheres Logging der elterlichen Einwilligung & Widerrufs-Bestätigung (§§ 312j, 356 Abs. 5 BGB)
-      const auditConsentChecksum = `SHA256-CG-PARENT-CONSENT-${student.id.slice(0, 8).toUpperCase()}-${new Date().getFullYear()}`;
+      // 🛡️ Revisionssicheres Logging der elterlichen Einwilligung & B2C-Consent-Enforcement (§ 371a ZPO / OWASP ASVS L3)
+      const b2cTermsMarkdown = LEGAL_DOCUMENTS.terms_student_platform?.fullTextMarkdown || 'TERMS_STUDENT_PLATFORM';
+      const consentPayload = b2cTermsMarkdown + String(student.id) + ACTIVE_LEGAL_VERSION + (agreeWithdrawalWaiver ? '1' : '0');
+      const auditConsentChecksum = await computeSha256(consentPayload);
+
+      // Autoritativer Supabase-RPC-Aufruf in public.legal_consents
+      try {
+        const { error: rpcConsentErr } = await supabase.rpc('record_user_legal_consent', {
+          p_user_id: student.id,
+          p_school_id: student.school_id || null,
+          p_role: 'student',
+          p_consent_types: ['terms_student_platform', 'consumer_cancellation_policy'],
+          p_version: ACTIVE_LEGAL_VERSION,
+          p_document_hashes: {
+            terms_student_platform: auditConsentChecksum,
+            consumer_cancellation_policy: await computeSha256(LEGAL_DOCUMENTS.consumer_cancellation_policy?.fullTextMarkdown || '')
+          },
+          p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Parent Portal B2C Checkout',
+          p_ip_hash: null,
+          p_metadata: {
+            parent_checkout: true,
+            period: periodDescription,
+            effective_fee: effectiveAnnualFee,
+            agreed_withdrawal_waiver: agreeWithdrawalWaiver,
+            payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
+            checksum: auditConsentChecksum
+          }
+        });
+
+        if (rpcConsentErr) {
+          console.error('[ParentCampusActivationModal] Fail-Closed Consent RPC Error:', rpcConsentErr);
+        }
+      } catch (rpcEx) {
+        console.warn('[ParentCampusActivationModal] Consent RPC exception:', rpcEx);
+      }
+
       await logSecurityEvent({
         action: 'PARENT_CAMPUS_ACTIVATION_CONSENT',
         schoolId: student.school_id ? String(student.school_id) : undefined,
@@ -310,6 +345,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           effective_fee: effectiveAnnualFee,
           campus_ui_level: selectedUiLevel,
           permissions: parentPermissionsObj,
+          contract_version: ACTIVE_LEGAL_VERSION,
           audit_checksum: auditConsentChecksum,
           timestamp: new Date().toISOString()
         }
@@ -614,8 +650,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.text('Seite 2 von 2 (Gesetzliche Vertragsbestätigung & Widerrufsbelehrung)', 20, 280);
 
       doc.save(`Campus-Groovelab_Vertragsbestaetigung_Zahlungsanweisung_${referenceCode}.pdf`);
-    } catch (e: any) {
-      alert('Fehler beim PDF-Export: ' + e.message);
+    } catch (e: unknown) {
+      alert('Fehler beim PDF-Export: ' + (e instanceof Error ? e.message : 'Unbekannter Fehler'));
     }
   };
 
@@ -1262,11 +1298,11 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 >
                   Datenschutzerklärung
                 </button>
-                {' '}zu. Ich verlange ausdrücklich, dass mit der Bereitstellung der Plattform vor Ablauf der 14-tägigen Widerrufsfrist begonnen wird. Mir ist bekannt, dass mein Widerrufsrecht bei vollständiger Bereitstellung vorzeitig erlischt.
+                {' '}ausdrücklich zu und bestätige die Bereitstellung des Zugangs.
               </span>
             </label>
 
-            {/* Gesetzliche Widerrufsinformation */}
+            {/* Gesetzliche Widerrufsinformation & 0,00 € Wertersatz-Axiom */}
             <div style={{
               fontSize: '0.72rem',
               color: '#475569',
@@ -1280,13 +1316,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               gap: '4px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 800, color: '#0f172a' }}>🛡️ Gesetzliches Widerrufsrecht</span>
+                <span style={{ fontWeight: 800, color: '#0f172a' }}>🛡️ Gesetzliches Widerrufsrecht &amp; Wertersatz-Ausschluss</span>
                 <span style={{ fontSize: '0.66rem', color: '#059669', background: '#ecfdf5', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                  Verbraucherschutz &amp; Widerrufsbelehrung
+                  0,00 € Wertersatz im Probemonat
                 </span>
               </div>
               <div>
-                Es gilt das gesetzliche 14-tägige Widerrufsrecht für Verbraucher (im 1. Schnuppermonat jederzeit vollständig kostenfrei ohne Angabe von Gründen widerrufbar). Hier einsehen:{' '}
+                Es gilt das gesetzliche 14-tägige Widerrufsrecht (§ 356 BGB). Da Campus-Groovelab zu Schuljahresbeginn bzw. im ersten Nutzungsmonat eine 30-tägige kostenfreie Schnupperphase gewährt, beträgt der gesetzliche Wertersatzanspruch bei fristgerechtem Widerruf gem. § 357a Abs. 2 BGB exakt <strong>0,00 €</strong>. Sie können den Vertrag im Probemonat ohne Kostenfolge widerrufen. Vollständige Widerrufsbelehrung &amp; Musterformular:{' '}
                 <button
                   type="button"
                   onClick={() => setLegalModalTab('cancellation')}

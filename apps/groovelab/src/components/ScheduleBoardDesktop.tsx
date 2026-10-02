@@ -46,6 +46,8 @@ import {
   extractStudentTokensFromName
 } from '../utils/nameHelper';
 import { ScheduleCalendarViewDesktop as ScheduleCalendarView } from './ScheduleCalendarViewDesktop';
+import { ScheduleLifecycleHero } from './teacher/designer/ScheduleLifecycleHero';
+import { ScheduleDesignerStudioBar } from './teacher/designer/ScheduleDesignerStudioBar';
 const StudentScheduleSlotsModal = React.lazy(() => import('./StudentScheduleSlotsModal').then(m => ({ default: m.StudentScheduleSlotsModal })));
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
@@ -332,10 +334,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     BLANK_DRAG_IMAGE.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   }
 
-  const resolveInstrument = (inst?: string): string => {
+  const resolveInstrument = (inst?: string | null, overrideTeacher?: any): string => {
     const raw = (inst || '').trim();
     if (!raw || raw.toLowerCase() === 'musiker' || raw.toLowerCase() === 'instrument') {
-      const currentTeacher = teachers.find(t => t.id === selectedTeacherId);
+      const currentTeacher = overrideTeacher || teachers.find(t => t.id === selectedTeacherId);
       if (currentTeacher) {
         if (Array.isArray(currentTeacher.instruments) && currentTeacher.instruments.length > 0 && currentTeacher.instruments[0]?.trim()) {
           const tInst = currentTeacher.instruments[0].trim();
@@ -1239,7 +1241,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               id: st.id,
               first_name: st.first_name || 'Schüler',
               last_name: st.last_name || '',
-              instrument: st.instrument || 'Musiker',
+              instrument: resolveInstrument(st.instrument, teacherProfile),
               duration: st.duration || 30,
               status: (st.status || 'aktiv') as any,
               sibling_group_id: st.sibling_group_id || undefined,
@@ -1438,7 +1440,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             }
             if (cand.isOnboarded) existing.isOnboarded = true;
             if (cand.instrument && cand.instrument !== 'Musiker' && (!existing.instrument || existing.instrument === 'Musiker')) {
-              existing.instrument = cand.instrument;
+              existing.instrument = resolveInstrument(cand.instrument, teacherProfile);
             }
             if (cand.duration && cand.duration > (existing.duration || 0)) {
               existing.duration = cand.duration;
@@ -1466,7 +1468,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             id: canonicalId,
             first_name: fname,
             last_name: lname,
-            instrument: cand.instrument || 'Musiker',
+            instrument: resolveInstrument(cand.instrument, teacherProfile),
             duration: cand.duration || 30,
             status: (cand.status || 'ausstehend') as any,
             sibling_group_id: cand.sibling_group_id || undefined,
@@ -1499,7 +1501,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             userId: (s as any).user_id || (userMatch ? userMatch.id : null),
             fname,
             lname,
-            instrument: s.instrument || (userMatch ? userMatch.instrument : null) || (pendingMatch ? pendingMatch.instrument : 'Musiker'),
+            instrument: resolveInstrument(s.instrument || (userMatch ? userMatch.instrument : null) || (pendingMatch ? pendingMatch.instrument : undefined), teacherProfile),
             duration: s.lesson_duration || 30,
             status: ((s as any).status || 'ausstehend') as any,
             sibling_group_id: s.sibling_group_id,
@@ -1518,7 +1520,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             userId: u.id,
             fname,
             lname,
-            instrument: u.instrument || 'Musiker',
+            instrument: resolveInstrument(u.instrument, teacherProfile),
             duration: u.lesson_duration || 30,
             status: (statusMap[u.id] || 'ausstehend') as any,
             sibling_group_id: u.sibling_group_id,
@@ -1538,7 +1540,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             userId: null,
             fname: pFname,
             lname: pLname,
-            instrument: p.instrument || 'Musiker',
+            instrument: resolveInstrument(p.instrument, teacherProfile),
             duration: p.lesson_duration || 30,
             status: 'ausstehend',
             sibling_group_id: p.sibling_group_id,
@@ -1766,7 +1768,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       ...gs,
                       first_name: gs.first_name || 'Schüler',
                       last_name: gs.last_name || '',
-                      instrument: gs.instrument || 'Musiker',
+                      instrument: resolveInstrument(gs.instrument),
                       duration: gs.duration || 30
                     });
                   }
@@ -1800,7 +1802,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 id: resolved.id,
                 first_name: resolved.first_name,
                 last_name: resolved.last_name,
-                instrument: resolved.instrument || s.instrument,
+                instrument: resolveInstrument(resolved.instrument || s.instrument),
                 duration: resolved.duration || s.duration
               };
             }
@@ -1809,7 +1811,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               ...s,
               first_name: s.first_name || 'Schüler',
               last_name: s.last_name || '',
-              instrument: s.instrument || 'Musiker',
+              instrument: resolveInstrument(s.instrument),
               duration: s.duration || 30
             };
           }).filter(Boolean) as Student[]
@@ -1992,7 +1994,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   id: isBreak ? `break-${crypto.randomUUID()}` : slot.student.id,
                   first_name: isBreak ? 'Pause' : slot.student.first_name,
                   last_name: isBreak ? '' : slot.student.last_name,
-                  instrument: isBreak ? '' : (slot.student.instrument || 'Musiker'),
+                  instrument: isBreak ? '' : resolveInstrument(slot.student?.instrument),
                   duration: slot.duration || (isBreak ? 15 : (slot.student.lesson_duration || 30)),
                   assignedDay: slot.day_of_week,
                   assignedTime: slot.time_slot,
@@ -2011,7 +2013,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     id: isBreak ? `break-${crypto.randomUUID()}` : slot.student.id,
                     first_name: isBreak ? 'Pause' : slot.student.first_name,
                     last_name: isBreak ? '' : slot.student.last_name,
-                    instrument: isBreak ? '' : (slot.student.instrument || 'Musiker'),
+                    instrument: isBreak ? '' : resolveInstrument(slot.student?.instrument),
                     duration: slot.duration || (isBreak ? 15 : (slot.student.lesson_duration || 30)),
                     assignedDay: slot.day_of_week,
                     assignedTime: slot.time_slot,
@@ -2083,7 +2085,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               id: isBreak ? `break-${crypto.randomUUID()}` : slot.student.id,
               first_name: isBreak ? 'Pause' : slot.student.first_name,
               last_name: isBreak ? '' : slot.student.last_name,
-              instrument: isBreak ? '' : (slot.student.instrument || 'Musiker'),
+              instrument: isBreak ? '' : resolveInstrument(slot.student?.instrument),
               duration: slot.duration || (isBreak ? 15 : 45), // default to 45 if not specified
               assignedDay: dayVal,
               assignedTime: slot.time_slot,
@@ -2401,7 +2403,17 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       return (ah * 60 + am) - (bh * 60 + bm);
     });
 
-    let currentTime = snapTimeToGrid(board.startAnchor || '14:00', gridSnapMinutes || 15);
+    const firstCustom = sortedStudents[0]?.customStartTime || sortedStudents[0]?.assignedTime;
+    let initialAnchor = board.startAnchor || '14:00';
+    if (firstCustom) {
+      const [fch, fcm] = parseTime(firstCustom);
+      const [iah, iam] = parseTime(initialAnchor);
+      if (fch * 60 + fcm < iah * 60 + iam) {
+        initialAnchor = firstCustom;
+      }
+    }
+
+    let currentTime = snapTimeToGrid(initialAnchor, gridSnapMinutes || 15);
     const updatedStudents = sortedStudents.map(s => {
       let assignedStart = currentTime;
       let effectiveCustomTime = s.customStartTime;
@@ -2448,6 +2460,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
     return {
       ...board,
+      startAnchor: initialAnchor,
       students: updatedStudents,
       endAnchor: currentTime
     };
@@ -2559,18 +2572,12 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   // Delete a day board and return all its students to the sidebar list
   const handleDeleteBoard = async (boardId: string) => {
     if (!await showConfirm('Möchtest du diesen Unterrichtstag wirklich löschen? Alle zugewiesenen Schüler werden wieder freigegeben.')) return;
-    
     const boardToDelete = boards.find(b => b.id === boardId);
     if (!boardToDelete) return;
 
     // Reset student assignment flags
     const returnedStudentIds = boardToDelete.students.map(s => s.id);
-    setStudents(prev => prev.map(s => {
-      if (returnedStudentIds.includes(s.id)) {
-        return { ...s, assignedDay: undefined, assignedTime: undefined };
-      }
-      return s;
-    }));
+    setStudents(prev => prev.map(s => returnedStudentIds.includes(s.id) ? { ...s, assignedDay: undefined, assignedTime: undefined } : s));
 
     setBoards(prev => {
       const nextBoards = prev.filter(b => b.id !== boardId);
@@ -2583,6 +2590,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       return nextBoards;
     });
     setToast({ message: 'Unterrichtstag gelöscht und Schüler freigegeben', type: 'success' });
+  };
+
+  const handleDeleteAllBoards = async () => {
+    if (!await showConfirm('Möchtest du wirklich alle Unterrichtstage dieses Entwurfs löschen? Alle Schüler werden freigegeben.')) return;
+    setStudents(prev => prev.map(s => ({ ...s, assignedDay: undefined, assignedTime: undefined })));
+    setBoards([]);
+    const currentActiveId = activeDraftIdRef.current || activeDraftId;
+    const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+    const updatedDrafts = currentList.map(d => d.id === currentActiveId ? { ...d, boards: [] } : d);
+    draftsRef.current = updatedDrafts;
+    setDrafts(updatedDrafts);
+    triggerDebouncedAutoSave([]);
+    setToast({ message: 'Alle Unterrichtstage wurden gelöscht.', type: 'success' });
   };
 
   // Select/deselect a student and load their preferences in real-time
@@ -3393,6 +3413,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     }
     setDraggedDuration(dur);
     setDraggedStudentName(name);
+    draggedDurationRef.current = dur;
+    draggedStudentNameRef.current = name;
 
     // Fetch preferences asynchronously in background without blocking drag initialization
     (async () => {
@@ -3566,6 +3588,202 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
+  // 🍏 iPadOS & Touch-Drag-Engine Ref & Event Tracking
+  const touchDragStateRef = useRef<{
+    activeId: string | null;
+    source: 'sidebar' | 'board';
+    sourceBoardId?: string;
+    grabOffsetY: number;
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const draggedDurationRef = useRef<number>(30);
+  const draggedStudentNameRef = useRef<string>('Termin');
+
+  const updateDragOverForCoordinates = (clientX: number, clientY: number) => {
+    const elemBelow = document.elementFromPoint(clientX, clientY);
+    if (!elemBelow) return;
+
+    const gridElem = elemBelow.closest('[data-schedule-grid="true"]') as HTMLElement;
+    if (!gridElem || !gridElem.dataset.boardId) {
+      if (dragOverBoardId !== null) {
+        setDragOverBoardId(null);
+        setDragOverIndex(null);
+        setDragSnapState(null);
+      }
+      return;
+    }
+
+    const targetBoardId = gridElem.dataset.boardId;
+    const board = boards.find(b => b.id === targetBoardId);
+    if (!board) return;
+
+    const rect = gridElem.getBoundingClientRect();
+    const grabOffset = (dragSource === 'sidebar' || draggedStudentId === 'sidebar-pause' || touchDragStateRef.current?.source === 'sidebar')
+      ? 0
+      : Math.min(Math.max(0, grabOffsetRef.current || touchDragStateRef.current?.grabOffsetY || 0), 40);
+
+    const columnHeightPx = parseFloat(gridElem.dataset.columnHeight || '600');
+    const startMinutes = parseFloat(gridElem.dataset.startMinutes || '780');
+    const PX_PER_MIN = 2.5;
+
+    const relY = Math.max(0, Math.min(clientY - rect.top - grabOffset, columnHeightPx));
+    const dragMinutes = relY / PX_PER_MIN;
+
+    const rawMinutes = startMinutes + dragMinutes;
+    const snappedTotalMinutes = Math.round(rawMinutes / (gridSnapMinutes || 15)) * (gridSnapMinutes || 15);
+    const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+    const snappedMins = snappedTotalMinutes % 60;
+    const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+    lastSnapTimeRef.current = { boardId: board.id, timeStr: targetTime };
+    const topPx = (snappedTotalMinutes - startMinutes) * PX_PER_MIN;
+
+    let targetIndex = board.students.findIndex(s => {
+      const sTime = s.customStartTime || s.assignedTime;
+      if (!sTime) return false;
+      const [sh, sm] = parseTime(sTime);
+      return (sh * 60 + sm) >= snappedTotalMinutes;
+    });
+    if (targetIndex === -1) targetIndex = board.students.length;
+
+    if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex || dragSnapState?.topPx !== topPx) {
+      if (dragSnapState && dragSnapState.timeStr !== targetTime) {
+        playCubaseSnapClick();
+      }
+      setDragOverBoardId(board.id);
+      setDragOverIndex(targetIndex);
+      setDragSnapState({
+        boardId: board.id,
+        topPx,
+        timeStr: targetTime,
+        duration: draggedDurationRef.current || draggedDuration,
+        studentName: draggedStudentNameRef.current || draggedStudentName
+      });
+    }
+  };
+
+  const handleTouchStartCard = (
+    e: React.TouchEvent,
+    studentId: string,
+    source: 'sidebar' | 'board',
+    boardId?: string
+  ) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const cardRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const grabY = Math.max(0, Math.min(touch.clientY - cardRect.top, 40));
+    grabOffsetRef.current = grabY;
+
+    // Resolve duration and name immediately
+    let dur = 30;
+    let name = 'Termin';
+    if (studentId === 'sidebar-pause' || studentId.startsWith('break-')) {
+      dur = 15;
+      name = 'Pause';
+      if (studentId.startsWith('break-')) {
+        for (const b of boards) {
+          const bs = b.students.find(s => s.id === studentId);
+          if (bs) {
+            dur = bs.duration || 15;
+            break;
+          }
+        }
+      }
+    } else {
+      const foundSidebar = students.find(s => s.id === studentId);
+      if (foundSidebar) {
+        dur = foundSidebar.duration || 30;
+        name = `${foundSidebar.first_name || ''} ${foundSidebar.last_name || ''}`.trim();
+      } else {
+        for (const b of boards) {
+          const bs = b.students.find(s => s.id === studentId);
+          if (bs) {
+            dur = bs.duration || 30;
+            name = `${bs.first_name || ''} ${bs.last_name || ''}`.trim();
+            break;
+          }
+        }
+      }
+    }
+    draggedDurationRef.current = dur;
+    draggedStudentNameRef.current = name;
+
+    touchDragStateRef.current = {
+      activeId: studentId,
+      source,
+      sourceBoardId: boardId,
+      grabOffsetY: grabY,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      hasMoved: false
+    };
+  };
+
+  const handleTouchMoveCard = (e: React.TouchEvent) => {
+    const touchState = touchDragStateRef.current;
+    if (!touchState || !touchState.activeId) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - touchState.startX;
+    const dy = touch.clientY - touchState.startY;
+    const dist = Math.hypot(dx, dy);
+
+    if (!touchState.hasMoved) {
+      // If user is scrolling the sidebar vertically, yield to native scrolling
+      if (touchState.source === 'sidebar' && Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+        touchDragStateRef.current = null;
+        return;
+      }
+
+      // Movement threshold to separate intentional drag from taps
+      if (dist < 6) return;
+
+      touchState.hasMoved = true;
+      handleDragStart(touchState.activeId, touchState.source, touchState.sourceBoardId);
+    }
+
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+
+    updateDragOverForCoordinates(touch.clientX, touch.clientY);
+    handleAutoScrollCheck(touch.clientY);
+  };
+
+  const handleTouchEndCard = async (e: React.TouchEvent) => {
+    const touchState = touchDragStateRef.current;
+    if (!touchState || !touchState.activeId) return;
+
+    const didMove = touchState.hasMoved;
+    const targetBoardId = dragOverBoardId;
+    const snapTime = (dragSnapState && dragSnapState.boardId === targetBoardId)
+      ? dragSnapState.timeStr
+      : (lastSnapTimeRef.current && lastSnapTimeRef.current.boardId === targetBoardId ? lastSnapTimeRef.current.timeStr : null);
+    const targetIdx = dragOverIndex !== null ? dragOverIndex : undefined;
+
+    touchDragStateRef.current = null;
+
+    if (didMove) {
+      handleDragEnd();
+      if (targetBoardId && snapTime) {
+        await handleDropOnBoard(targetBoardId, targetIdx, snapTime, false);
+      }
+    }
+  };
+
+  const handleTouchCancelCard = () => {
+    const touchState = touchDragStateRef.current;
+    const didMove = touchState?.hasMoved;
+    touchDragStateRef.current = null;
+    if (didMove) {
+      handleDragEnd();
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -3677,7 +3895,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         id: targetStudent.isGroup ? targetStudent.id : `group-${crypto.randomUUID()}`,
         first_name: groupStudentsList[0].first_name,
         last_name: groupStudentsList[0].last_name,
-        instrument: groupStudentsList.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join(', '),
+        instrument: groupStudentsList.map(s => resolveInstrument(s.instrument)).filter((v, i, a) => a.indexOf(v) === i).join(', '),
         duration: targetStudent.duration || 30,
         isGroup: true,
         groupStudents: groupStudentsList.map(s => ({
@@ -4018,11 +4236,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     }
 
     // Instant direct drop without popup interruptions
-    const primaryInstrument = studentObj?.instrument ? studentObj.instrument.split(',')[0].trim() : 'Musiker';
+    const primaryInstrument = resolveInstrument(studentObj?.instrument?.split(',')[0]);
 
     const student = studentObj ? {
       ...studentObj,
-      instrument: chosenInstrument || studentObj.instrument || 'Musiker',
+      instrument: resolveInstrument(chosenInstrument || studentObj.instrument),
       customStartTime: droppedCustomTime || undefined
     } : null;
 
@@ -4856,23 +5074,37 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     setShowNewDraftPromptModal(true);
   };
 
-  const handleConfirmNewDraft = (copyTimes: boolean) => {
+  const handleConfirmNewDraft = (mode: 'duplicate_with_students' | 'duplicate_empty' | 'fresh_setup' | boolean) => {
     setShowNewDraftPromptModal(false);
     const newId = `draft-${crypto.randomUUID()}`;
     const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
     const nextNumber = currentList.length + 1;
-    const draftName = `Entwurf ${nextNumber}`;
-
-    let initialBoards: DayBoard[] = [];
     const currentActiveId = activeDraftIdRef.current || activeDraftId;
     const activeDraft = currentList.find(d => d.id === currentActiveId) || currentList[0];
 
-    if (copyTimes && activeDraft && activeDraft.boards && activeDraft.boards.length > 0) {
-      // Copy existing teaching days & times, but clear student placements
+    const isDuplicateWithStudents = mode === 'duplicate_with_students';
+    const isDuplicateEmpty = mode === 'duplicate_empty' || mode === true;
+    const isFresh = mode === 'fresh_setup' || mode === false;
+
+    const draftName = isDuplicateWithStudents 
+      ? `${activeDraft?.name || 'Entwurf'} (Kopie)` 
+      : `Entwurf ${nextNumber}`;
+
+    let initialBoards: DayBoard[] = [];
+
+    if (isDuplicateWithStudents && activeDraft && activeDraft.boards && activeDraft.boards.length > 0) {
+      // 1:1 Duplicate of days, times AND student placements
       initialBoards = activeDraft.boards.map(b => ({
         ...b,
         id: `board-${crypto.randomUUID()}`,
-        students: (b.students || []).filter(s => s.isBreak) // Keep breaks, clear students
+        students: (b.students || []).map(s => ({ ...s }))
+      }));
+    } else if (isDuplicateEmpty && activeDraft && activeDraft.boards && activeDraft.boards.length > 0) {
+      // Copy existing teaching days & times, but clear student placements (keep breaks)
+      initialBoards = activeDraft.boards.map(b => ({
+        ...b,
+        id: `board-${crypto.randomUUID()}`,
+        students: (b.students || []).filter(s => s.isBreak)
       }));
     } else {
       // Create fresh default boards
@@ -4925,10 +5157,42 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       .eq('id', selectedTeacherId)
       .then();
 
-    if (!copyTimes) {
+    if (isFresh) {
       // Open day & time setup modal for fresh configuration
       handleEditTeacherAvailability();
+    } else {
+      setToast({ message: `„${draftName}“ erfolgreich angelegt!`, type: 'success' });
     }
+  };
+
+  const handleRenameDraft = (draftId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+    const updated = currentList.map(d => d.id === draftId ? { ...d, name: trimmed } : d);
+    draftsRef.current = updated;
+    setDrafts(updated);
+
+    const draftStateToSave = {
+      activeDraftId,
+      submittedDraftId,
+      submittedAt: lastSubmittedTime ? new Date().toISOString() : '',
+      drafts: updated,
+      allTeacherStudentIds: Array.from(new Set((masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students).map(s => s.id))),
+      unassignedStudentIds: students.filter(s => !s.isBreak && !s.assignedDay).map(s => s.id)
+    };
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+    supabase
+      .from('users')
+      .update({
+        planned_boards: draftStateToSave,
+        campus_räume: draftStateToSave,
+        groovelab_räume: draftStateToSave
+      })
+      .eq('id', selectedTeacherId)
+      .then();
+    setToast({ message: `Entwurf umbenannt in „${trimmed}“`, type: 'success' });
   };
 
   const handleDeleteDraft = async (draftId: string) => {
@@ -6320,7 +6584,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               </div>
 
               {/* Right: Didactic Purpose & Secretariat Approval Disclaimer Badge */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                 <div 
                   title="Didaktische Terminplanung • Unverbindlicher Entwurf zur Raumprüfung & Freigabe durch Musikschule"
                   style={{
@@ -6347,266 +6611,54 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     Didaktische Terminplanung • Unverbindlicher Entwurf zur Raumprüfung & Freigabe durch Musikschule
                   </span>
                 </div>
-              </div>
-            </div>
 
-            {/* Divider */}
-            <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
-
-            {/* ── ROW 2: Teacher-Filter | Apple-Btn-Group | Status + Senden ── */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
-
-              {/* Left: Lehrkraft-Filter & Apple Raster Capsule */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px' }}>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    {isSecretaryWorkspace ? 'Stundenplan-Designer (Verwaltung)' : 'Dein Designer'}
-                  </span>
-                </div>
-
-                {/* 🧲 Apple Raster Selector Capsule */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '3px 10px', minHeight: '36px', boxSizing: 'border-box', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }} title="Magnetisches Rastersystem für Unterrichtszeiten">
-                  <Grid3X3 size={13} style={{ color: brandColor }} />
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist, sans-serif' }}>Raster:</span>
-                  <select
-                    value={gridSnapMinutes}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setGridSnapMinutes(val);
-                      localStorage.setItem('groovelab_grid_snap_minutes', String(val));
-                    }}
-                    style={{ border: 'none', fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', background: 'transparent', outline: 'none', cursor: 'pointer', padding: 0 }}
-                  >
-                    <option value={15}>15 Min</option>
-                    <option value={30}>30 Min</option>
-                    <option value={60}>60 Min</option>
-                  </select>
-                </div>
-
-                {/* 🟢 Mini-Legende Wunsch vs Ausweich (D3) */}
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '3px 10px', minHeight: '36px', boxSizing: 'border-box' }} title="Farb-Semantik im Designer: Grün = Wunschtermin erfüllt • Weiß = Ausweichtermin">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.70rem', fontWeight: 700, color: '#15803d' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 4px rgba(34,197,94,0.4)' }} />
-                    ★ Wunsch
-                  </span>
-                  <span style={{ color: '#cbd5e1' }}>•</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.70rem', fontWeight: 700, color: '#64748b' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', border: '1.5px solid #cbd5e1', display: 'inline-block' }} />
-                    ○ Ausweich
-                  </span>
-                </div>
-              </div>
-
-              {/* Center: Apple-Button-Group */}
-              <div className="apple-btn-group">
-
-                {/* Namen / Datenschutz Toggle */}
-                <button
-                  type="button"
-                  onClick={() => toggleRealNames()}
-                  className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                  style={{ color: showRealNames ? brandColor : undefined }}
-                  title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
-                >
-                  {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                  <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
-                </button>
-
-                <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
-
-                {!isSecretaryWorkspace && selectedTeacherId === userId ? (
-                  <button type="button" onClick={handleEditTeacherAvailability} className="apple-btn" title="Unterrichtszeiten & Wunschtage ändern">
-                    <Clock size={13} />
-                    <span>Zeiten ändern</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
-                      if (availableDays.length === 0) { showAlert("Alle Wochentage wurden bereits hinzugefügt."); return; }
-                      setNewBoardDay(availableDays[0].value);
-                      setShowAddBoardForm(true);
-                    }}
-                    className="apple-btn" title="Tag anlegen"
-                  >
-                    <Plus size={13} />
-                    <span>Tag anlegen</span>
-                  </button>
-                )}
-
-                <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
-
-                {/* Options-Dropdown (Mehr) */}
-                <div style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreMenu(prev => !prev)}
-                    className={`apple-btn ${showMoreMenu ? 'active' : ''}`}
-                    title="Weitere Optionen & Aktionen"
-                  >
-                    <MoreVertical size={13} />
-                    <span>Mehr</span>
-                  </button>
-
-                  {showMoreMenu && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 6px)',
-                      right: 0,
-                      background: 'rgba(255, 255, 255, 0.96)',
-                      backdropFilter: 'blur(20px) saturate(190%)',
-                      border: '1px solid rgba(0,0,0,0.1)',
-                      borderRadius: '12px',
-                      padding: '6px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '2px',
-                      zIndex: 1000,
-                      minWidth: '220px'
-                    }}>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setShowMoreMenu(false);
-                          const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
-                          await navigator.clipboard.writeText(inviteLink);
-                          await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 12px',
-                          border: 'none',
-                          background: 'transparent',
-                          borderRadius: '8px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: '#1d1d1f',
-                          cursor: 'pointer',
-                          textAlign: 'left'
-                        }}
-                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <Send size={13} />
-                        <span>Onboarding-Link kopieren</span>
-                      </button>
-
-                      <label
-                        htmlFor="pdf-upload"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 12px',
-                          borderRadius: '8px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: '#1d1d1f',
-                          cursor: 'pointer',
-                          margin: 0
-                        }}
-                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                        onClick={() => setShowMoreMenu(false)}
-                      >
-                        <Upload size={13} />
-                        <span>PDF-Backup wiederherstellen</span>
-                      </label>
-
-                      <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', margin: '4px 0' }} />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMoreMenu(false);
-                          handleHardResetSystem();
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 12px',
-                          border: 'none',
-                          background: 'rgba(239, 68, 68, 0.08)',
-                          borderRadius: '8px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          textAlign: 'left'
-                        }}
-                        onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                        onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                      >
-                        <Trash2 size={13} />
-                        <span>System-Reset</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <input id="pdf-upload" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleRestoreFromPDF} />
-              </div>
-
-              {/* Right: Status + Senden (Rollen-spezifisch) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {isSecretaryWorkspace ? (
-                  <>
-                    {/* Status-Pill für Admin/Sekretariat */}
+                {isSecretaryWorkspace && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     <div style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      gap: '6px', 
+                      gap: '5px', 
                       background: scheduleStatus === 'approved' 
                         ? 'rgba(230, 244, 234, 0.95)' 
                         : (scheduleStatus === 'needs_revision' ? '#fef2f2' : 'rgba(254, 243, 199, 0.95)'), 
                       border: `1.5px solid ${scheduleStatus === 'approved' ? '#34a853' : (scheduleStatus === 'needs_revision' ? '#ef4444' : '#f59e0b')}`, 
                       color: scheduleStatus === 'approved' ? '#064e3b' : (scheduleStatus === 'needs_revision' ? '#991b1b' : '#78350f'), 
-                      padding: '6px 14px', 
-                      borderRadius: '10px', 
-                      fontSize: '0.76rem', 
-                      fontWeight: 800, 
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)' 
+                      padding: '4px 10px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.72rem', 
+                      fontWeight: 800 
                     }}>
                       {scheduleStatus === 'approved' ? (
-                        <CheckCircle size={13} strokeWidth={2.5} style={{ color: 'currentColor', flexShrink: 0 }} />
+                        <CheckCircle size={12} strokeWidth={2.5} style={{ color: 'currentColor' }} />
                       ) : scheduleStatus === 'needs_revision' ? (
-                        <AlertCircle size={13} strokeWidth={2.5} style={{ color: 'currentColor', flexShrink: 0 }} />
+                        <AlertCircle size={12} strokeWidth={2.5} style={{ color: 'currentColor' }} />
                       ) : (
-                        <Clock size={13} strokeWidth={2.5} style={{ color: 'currentColor', flexShrink: 0 }} />
+                        <Clock size={12} strokeWidth={2.5} style={{ color: 'currentColor' }} />
                       )}
                       <span>
                         {scheduleStatus === 'approved' 
                           ? 'Genehmigt & Live' 
                           : (scheduleStatus === 'needs_revision' ? 'Klärungsbedarf' : 'In Prüfung')}
                       </span>
-                      {lastSubmittedTime && <span style={{ opacity: 0.85, fontWeight: 600 }}>({lastSubmittedTime})</span>}
                     </div>
 
-                    {/* Button 1: Genehmigen & Live schalten */}
                     <button
                       type="button"
                       onClick={handleApproveScheduleByAdmin}
                       disabled={submitting || boards.length === 0}
                       style={{
                         background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                        color: 'white', border: 'none', fontWeight: 800, padding: '7px 16px',
-                        borderRadius: '11px', fontSize: '0.8rem', letterSpacing: '-0.01em', minHeight: '32px', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        boxShadow: '0 2px 8px rgba(22,163,74,0.3)',
+                        color: 'white', border: 'none', fontWeight: 800, padding: '5px 12px',
+                        borderRadius: '9px', fontSize: '0.74rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        boxShadow: '0 2px 6px rgba(22,163,74,0.3)',
                         transition: 'all 0.16s ease'
                       }}
-                      onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                      onMouseOut={e => e.currentTarget.style.transform = 'none'}
                     >
-                      <CheckCircle size={13} strokeWidth={2.5} />
-                      <span>{scheduleStatus === 'approved' ? 'Freigabe aktualisieren' : 'Stundenplan genehmigen & Live schalten'}</span>
+                      <CheckCircle size={12} strokeWidth={2.5} />
+                      <span>{scheduleStatus === 'approved' ? 'Aktualisieren' : 'Freigeben'}</span>
                     </button>
 
-                    {/* Button 2: Ablehnen / Klärungsbedarf */}
                     <button
                       type="button"
                       onClick={() => {
@@ -6619,102 +6671,20 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         color: '#b91c1c',
                         border: '1.5px solid #fca5a5',
                         fontWeight: 700,
-                        padding: '7px 14px',
-                        borderRadius: '11px',
-                        fontSize: '0.8rem',
+                        padding: '5px 10px',
+                        borderRadius: '9px',
+                        fontSize: '0.74rem',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '4px',
                         transition: 'all 0.15s ease'
                       }}
-                      onMouseOver={e => e.currentTarget.style.background = '#fef2f2'}
-                      onMouseOut={e => e.currentTarget.style.background = '#ffffff'}
                     >
-                      <AlertCircle size={13} strokeWidth={2.5} />
-                      <span>Ablehnen (Klärungsbedarf)</span>
+                      <AlertCircle size={12} strokeWidth={2.5} />
+                      <span>Ablehnen</span>
                     </button>
-                  </>
-                ) : (
-                  <>
-                    {/* Lehrkraft-Ansicht */}
-                    {scheduleStatus === 'needs_revision' ? (
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px', 
-                        background: '#fef2f2', 
-                        border: '1.5px solid #ef4444', 
-                        color: '#991b1b', 
-                        padding: '6px 14px', 
-                        borderRadius: '10px', 
-                        fontSize: '0.76rem', 
-                        fontWeight: 800, 
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)' 
-                      }}>
-                        <AlertCircle size={13} strokeWidth={2.5} style={{ color: '#ef4444', flexShrink: 0 }} />
-                        <span>Abgelehnt – Bitte im Sekretariat melden</span>
-                      </div>
-                    ) : lastSubmittedTime && !hasUnsubmittedEdits ? (
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px', 
-                        background: scheduleStatus === 'approved' ? 'rgba(230, 244, 234, 0.95)' : 'rgba(254, 243, 199, 0.95)', 
-                        border: `1.5px solid ${scheduleStatus === 'approved' ? '#34a853' : '#f59e0b'}`, 
-                        color: scheduleStatus === 'approved' ? '#064e3b' : '#78350f', 
-                        padding: '6px 14px', 
-                        borderRadius: '10px', 
-                        fontSize: '0.76rem', 
-                        fontWeight: 800, 
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)' 
-                      }}>
-                        {scheduleStatus === 'approved' ? (
-                          <CheckCircle size={13} strokeWidth={2.5} style={{ color: 'currentColor', flexShrink: 0 }} />
-                        ) : (
-                          <Clock size={13} strokeWidth={2.5} style={{ color: 'currentColor', flexShrink: 0 }} />
-                        )}
-                        <span>{scheduleStatus === 'approved' ? 'Genehmigt & Live' : 'In Prüfung durch Schulsekretariat'}</span>
-                        <span style={{ opacity: 0.85, fontWeight: 600 }}>({lastSubmittedTime})</span>
-                      </div>
-                    ) : null}
-
-                    {(!hasSubmittedSchedule || hasUnsubmittedEdits || scheduleStatus === 'needs_revision') && (
-                      <button
-                        id="tour-submit-section"
-                        type="button"
-                        onClick={handleLockAndSend}
-                        disabled={submitting || boards.length === 0}
-                        style={{
-                          background: (hasUnsubmittedEdits || scheduleStatus === 'needs_revision')
-                            ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                            : (isCampus 
-                              ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
-                              : (isGroovelab 
-                                ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
-                                : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)')),
-                          color: 'white', border: 'none', fontWeight: 800, padding: '7px 16px',
-                          borderRadius: '11px', fontSize: '0.8rem', letterSpacing: '-0.01em', minHeight: '32px', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: '6px',
-                          opacity: (submitting || boards.length === 0) ? 0.5 : 1,
-                          pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto',
-                          boxShadow: `0 2px 8px ${(hasUnsubmittedEdits || scheduleStatus === 'needs_revision') ? '#d97706' : brandColor}35, inset 0 1px 0 rgba(255,255,255,0.25)`,
-                          transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)', outline: 'none'
-                        }}
-                        onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                        onMouseOut={e => e.currentTarget.style.transform = 'none'}
-                      >
-                        <Send size={13} />
-                        <span>
-                          {submitting 
-                            ? 'Wird übermittelt...' 
-                            : ((hasUnsubmittedEdits || scheduleStatus === 'needs_revision')
-                              ? 'Änderungen erneut zur Freigabe einreichen' 
-                              : 'Stundenplan zur Freigabe einreichen')}
-                        </span>
-                      </button>
-                    )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -6746,462 +6716,106 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         </div>
           ) : (
             <>
-          {/* Apple HIG Goldstandard Draft Management Toolbar */}
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.75)', 
-            backdropFilter: 'blur(20px) saturate(190%)', 
-            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-            borderRadius: '16px', 
-            padding: '8px 16px', 
-            border: '1px solid rgba(255, 255, 255, 0.8)', 
-            boxShadow: '0 2px 12px rgba(0, 0, 0, 0.03)',
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            gap: '16px',
-            marginTop: '-4px',
-            flexWrap: 'nowrap'
-          }}>
-            {/* Left: Apple Segmented Control for Drafts + Integrated Add Button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist, sans-serif', flexShrink: 0 }}>
-                Entwürfe:
-              </span>
-              <div style={{ 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                background: 'rgba(0, 0, 0, 0.04)', 
-                borderRadius: '10px', 
-                padding: '2px', 
-                border: '1px solid rgba(0, 0, 0, 0.05)',
-                gap: '2px',
-                overflowX: 'auto',
-                scrollbarWidth: 'none',
-                maxWidth: '100%'
-              }}>
-                {drafts.map(d => {
-                  const isActive = d.id === activeDraftId;
-                  const totalLessons = d.boards?.reduce((acc, b) => acc + (b.students?.length || 0), 0) || 0;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => handleSwitchDraft(d.id)}
-                      style={{
-                        background: isActive ? '#ffffff' : 'transparent',
-                        color: isActive ? '#0f172a' : '#64748b',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '5px 10px',
-                        fontSize: '0.75rem',
-                        fontWeight: isActive ? 800 : 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: isActive ? '0 1px 4px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1)' : 'none',
-                        transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
-                      }}
-                      onMouseOver={e => {
-                        if (!isActive) {
-                          e.currentTarget.style.color = '#0f172a';
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.5)';
-                        }
-                      }}
-                      onMouseOut={e => {
-                        if (!isActive) {
-                          e.currentTarget.style.color = '#64748b';
-                          e.currentTarget.style.background = 'transparent';
-                        }
-                      }}
-                    >
-                      <span>{d.name}</span>
-                      {d.id === submittedDraftId && (
-                        <span 
-                          title="Eingereichter Entwurf"
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            background: '#22c55e',
-                            display: 'inline-block',
-                            boxShadow: '0 0 4px rgba(34, 197, 94, 0.5)',
-                            flexShrink: 0
-                          }}
-                        />
-                      )}
-                      <span style={{
-                        background: isActive ? 'rgba(0, 0, 0, 0.06)' : 'rgba(0, 0, 0, 0.04)',
-                        borderRadius: '6px',
-                        padding: '1px 5px',
-                        fontSize: '0.64rem',
-                        fontWeight: 700,
-                        color: isActive ? '#0f172a' : '#94a3b8',
-                        flexShrink: 0
-                      }}>
-                        {totalLessons}
-                      </span>
-                    </button>
-                  );
-                })}
-                {/* Adjacent Apple "+" Icon Button */}
-                <button
-                  type="button"
-                  onClick={() => handleCreateDraft()}
-                  title="Neuen leeren Entwurf anlegen"
-                  aria-label="Neuen leeren Entwurf anlegen"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '5px 8px',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.16s ease',
-                    flexShrink: 0
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
-                    e.currentTarget.style.color = '#0f172a';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#64748b';
-                  }}
-                >
-                  <Plus size={14} strokeWidth={2.4} />
-                </button>
-              </div>
-            </div>
+            {/* ── 0,1% Goldstandard Studio Bar (Entwürfe, Raster, Tools, Actions) ── */}
+            <ScheduleDesignerStudioBar
+              drafts={drafts}
+              activeDraftId={activeDraftId}
+              submittedDraftId={submittedDraftId}
+              isSecretaryWorkspace={isSecretaryWorkspace}
+              selectedTeacherId={selectedTeacherId}
+              userId={userId}
+              gridSnapMinutes={gridSnapMinutes}
+              showRealNames={showRealNames}
+              brandColor={brandColor}
+              undoCount={undoStack.length}
+              unassignedCount={students.filter(s => !s.isBreak && !s.assignedDay).length}
+              assignedCount={students.filter(s => !!s.assignedDay).length}
+              totalBoardsCount={boards.length}
+              onSwitchDraft={handleSwitchDraft}
+              onCreateDraftWithMode={handleConfirmNewDraft}
+              onRenameDraft={handleRenameDraft}
+              onDeleteDraft={handleDeleteDraft}
+              onChangeGridSnap={(val) => {
+                setGridSnapMinutes(val);
+                localStorage.setItem('groovelab_grid_snap_minutes', String(val));
+              }}
+              onToggleRealNames={toggleRealNames}
+              onEditAvailability={handleEditTeacherAvailability}
+              onAddDayBoard={() => {
+                const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
+                if (availableDays.length === 0) { showAlert("Alle Wochentage wurden bereits hinzugefügt."); return; }
+                setNewBoardDay(availableDays[0].value);
+                setShowAddBoardForm(true);
+              }}
+              onAutoAssign={handleAutoAssign}
+              onUndo={handleUndo}
+              onResetAllAssignments={handleResetAllAssignments}
+              onDeleteAllBoards={handleDeleteAllBoards}
+              onCopyOnboardingLink={async () => {
+                const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
+                await navigator.clipboard.writeText(inviteLink);
+                await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
+              }}
+              onRestoreFromPdf={() => {
+                const input = document.getElementById('pdf-upload') as HTMLInputElement | null;
+                if (input) input.click();
+              }}
+              onHardResetSystem={handleHardResetSystem}
+            />
 
-            {/* Right: Flagship Action (Hero) + Apple Toolbar Group */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-              {/* 🌟 HERO FLAGGSCHIFF: Automatisch zuteilen */}
-              <button
-                type="button"
-                onClick={handleAutoAssign}
-                disabled={students.filter(s => !s.assignedDay && !s.isBreak).length === 0}
-                title="Flaggschiff-Algorithmus: Universitäre 4-Phasen-Auto-Zuteilung starten"
-                style={{
-                  background: students.filter(s => !s.assignedDay && !s.isBreak).length === 0
-                    ? 'rgba(0, 0, 0, 0.04)'
-                    : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                  color: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? '#94a3b8' : '#ffffff',
-                  border: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(22, 163, 74, 0.4)',
-                  fontWeight: 800,
-                  padding: '7px 16px',
-                  borderRadius: '10px',
-                  fontSize: '0.78rem',
-                  cursor: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  boxShadow: students.filter(s => !s.assignedDay && !s.isBreak).length === 0
-                    ? 'none'
-                    : '0 4px 14px rgba(22, 163, 74, 0.32), 0 1px 3px rgba(0, 0, 0, 0.08)',
-                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                  letterSpacing: '-0.01em',
-                  pointerEvents: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'none' : 'auto'
-                }}
-                onMouseOver={e => {
-                  if (students.filter(s => !s.assignedDay && !s.isBreak).length > 0) {
-                    e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)';
-                    e.currentTarget.style.boxShadow = '0 6px 18px rgba(22, 163, 74, 0.42), 0 2px 5px rgba(0, 0, 0, 0.1)';
-                  }
-                }}
-                onMouseOut={e => {
-                  if (students.filter(s => !s.assignedDay && !s.isBreak).length > 0) {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(22, 163, 74, 0.32), 0 1px 3px rgba(0, 0, 0, 0.08)';
-                  }
-                }}
-              >
-                <Sparkles size={14} color="currentColor" strokeWidth={2.4} />
-                <span>Automatisch zuteilen</span>
-              </button>
+            <input id="pdf-upload" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleRestoreFromPDF} />
 
-              {/* 🛠️ Apple HIG Button Group (Rückgängig | Zurücksetzen | Löschen) */}
-              <div className="apple-btn-group" style={{ height: '36px' }}>
-                {/* Rückgängig */}
-                <button
-                  type="button"
-                  onClick={handleUndo}
-                  disabled={undoStack.length === 0}
-                  className="apple-btn"
-                  style={{
-                    opacity: undoStack.length > 0 ? 1 : 0.45,
-                    cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-                    color: undoStack.length > 0 ? '#0f172a' : '#94a3b8',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    padding: '0 10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px'
+            {/* ── Contextual Smart Lifecycle Hero (Autopilot Guidance) ── */}
+            {(() => {
+              const { totalGapsMin, gapCount, totalAssigned } = calculateLiveBoardGaps(boards);
+              const unassignedCount = students.filter(s => !s.isBreak && !s.assignedDay).length;
+              const currentActiveDraft = drafts.find(d => d.id === activeDraftId) || drafts[0];
+              return (
+                <ScheduleLifecycleHero
+                  unassignedCount={unassignedCount}
+                  totalStudents={students.filter(s => !s.isBreak).length}
+                  totalAssigned={totalAssigned}
+                  totalGapsMin={totalGapsMin}
+                  gapCount={gapCount}
+                  activeDraftId={activeDraftId}
+                  activeDraftName={currentActiveDraft?.name || 'Entwurf'}
+                  submittedDraftId={submittedDraftId}
+                  scheduleStatus={scheduleStatus}
+                  hasUnsubmittedEdits={hasUnsubmittedEdits}
+                  hasSubmittedSchedule={hasSubmittedSchedule}
+                  lastSubmittedTime={lastSubmittedTime}
+                  rejectionNote={rejectionNote}
+                  isSecretaryWorkspace={isSecretaryWorkspace}
+                  brandColor={brandColor}
+                  submitting={submitting}
+                  onAutoAssign={handleAutoAssign}
+                  onSubmitSchedule={handleLockAndSend}
+                  onOpenReportModal={() => {
+                    const totalStudentsCount = unassignedCount + totalAssigned;
+                    const { wunschHits, studentsWithWunsch } = calculateLiveBoardGaps(boards);
+                    const assignmentPct = totalStudentsCount > 0 ? (totalAssigned / totalStudentsCount) * 50 : 50;
+                    const wunschRatio = studentsWithWunsch > 0 ? (wunschHits / studentsWithWunsch) : 1;
+                    const wunschPct = wunschRatio * 35;
+                    const gapBonus = gapCount === 0 ? 15 : Math.max(0, 15 - gapCount * 5);
+                    const overallScore = Math.min(100, Math.round(assignmentPct + wunschPct + gapBonus));
+                    setAutoScheduleReportData({
+                      totalAssigned,
+                      totalStudents: totalStudentsCount,
+                      totalGapsMin,
+                      gapCount,
+                      wunschHits,
+                      studentsWithWunsch,
+                      siblingHits: 0,
+                      totalSiblings: 0,
+                      overallScore
+                    });
+                    setShowAutoScheduleReportModal(true);
                   }}
-                  title={undoStack.length > 0 ? `Letzte Verschiebung rückgängig machen (⌘Z) – ${undoStack.length} im Speicher` : "Keine Änderungen zum Rückgängig machen"}
-                >
-                  <RotateCcw size={12} strokeWidth={2.4} />
-                  <span>Rückgängig{undoStack.length > 0 ? ` (${undoStack.length})` : ''}</span>
-                </button>
-
-                <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
-
-                {/* Zuteilung zurücksetzen */}
-                <button
-                  type="button"
-                  onClick={handleResetAllAssignments}
-                  disabled={students.filter(s => !!s.assignedDay).length === 0}
-                  className="apple-btn"
-                  style={{
-                    opacity: students.filter(s => !!s.assignedDay).length === 0 ? 0.4 : 1,
-                    cursor: students.filter(s => !!s.assignedDay).length === 0 ? 'not-allowed' : 'pointer',
-                    color: '#64748b',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    padding: '0 10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseOver={e => {
-                    if (students.filter(s => !!s.assignedDay).length > 0) {
-                      e.currentTarget.style.color = '#dc2626';
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                    }
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.color = '#64748b';
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                  title="Zuteilung aller Schüler in diesem Entwurf zurücksetzen"
-                >
-                  <RotateCcw size={12} strokeWidth={2.4} />
-                  <span>Zurücksetzen</span>
-                </button>
-
-                <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
-
-                {/* Entwurf löschen */}
-                <button
-                  type="button"
-                  onClick={() => handleDeleteDraft(activeDraftId)}
-                  disabled={drafts.length <= 1}
-                  className="apple-btn"
-                  style={{
-                    opacity: drafts.length <= 1 ? 0.35 : 1,
-                    cursor: drafts.length <= 1 ? 'not-allowed' : 'pointer',
-                    color: '#64748b',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    padding: '0 10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseOver={e => {
-                    if (drafts.length > 1) {
-                      e.currentTarget.style.color = '#dc2626';
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                    }
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.color = '#64748b';
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                  title={drafts.length <= 1 ? "Der letzte verbleibende Entwurf kann nicht gelöscht werden" : "Diesen Entwurf löschen"}
-                >
-                  <Trash2 size={12} strokeWidth={2.4} />
-                  <span>Löschen</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Teacher Review Pending Banner (ready_for_admin_review / pending) */}
-          {scheduleStatus === 'pending' && (
-            <div className="animation-slide-down" style={{
-              background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-              border: '1.5px solid #f59e0b',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '0.82rem',
-              color: '#78350f',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              marginBottom: '8px',
-              boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Clock size={18} color="#d97706" style={{ flexShrink: 0 }} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontWeight: 800, color: '#92400e' }}>
-                    Stundenplan zur Freigabe eingereicht {lastSubmittedTime ? `(${lastSubmittedTime})` : ''} · In Prüfung beim Schulsekretariat
-                  </span>
-                  <span style={{ fontSize: '0.76rem', color: '#b45309', fontWeight: 500 }}>
-                    Das Schulsekretariat prüft aktuell die Raumverteilung. Sobald die Freigabe erteilt ist, wird der Plan automatisch als Live-Plan aktiv.
-                  </span>
-                </div>
-              </div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                border: '1px solid #fde68a',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                color: '#92400e',
-                whiteSpace: 'nowrap'
-              }}>
-                <Lock size={12} color="#d97706" />
-                <span>Schreibschutz aktiv</span>
-              </div>
-            </div>
-          )}
-
-          {/* Teacher Revision Banner (needs_revision) */}
-          {scheduleStatus === 'needs_revision' && (
-            <div className="animation-slide-down" style={{
-              background: '#fef2f2',
-              border: '1.5px solid #f87171',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '0.82rem',
-              color: '#991b1b',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              marginBottom: '8px',
-              boxShadow: '0 2px 10px rgba(239, 68, 68, 0.08)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontWeight: 800, color: '#991b1b' }}>
-                    Der Stundenplan wurde abgelehnt. Bitte setzen Sie sich mit dem Schulsekretariat in Verbindung.
-                  </span>
-                  {rejectionNote && (
-                    <span style={{ fontSize: '0.76rem', color: '#b91c1c', fontWeight: 500 }}>
-                      Begründung des Sekretariats: „{rejectionNote}“
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span style={{
-                fontSize: '0.72rem',
-                background: 'rgba(239, 68, 68, 0.1)',
-                color: '#dc2626',
-                padding: '4px 10px',
-                borderRadius: '6px',
-                fontWeight: 700,
-                flexShrink: 0
-              }}>
-                Klärungsbedarf
-              </span>
-            </div>
-          )}
-
-          {/* Unsubmitted edits warning banner */}
-          {hasUnsubmittedEdits && (
-            <div className="animation-slide-down" style={{
-              background: '#fef3c7',
-              border: '1px solid #f59e0b',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              fontSize: '0.78rem',
-              color: '#92400e',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              marginBottom: '6px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0 }} />
-                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Stundenplan zur Freigabe einreichen"</strong>, um deinen Terminvorschlag an das Schulsekretariat zu übermitteln.</span>
-              </div>
-            </div>
-          )}
-
-          {/* Unassigned students warning banner */}
-          {(() => {
-            const currentUnassigned = students.filter(s => !s.isBreak && !s.assignedDay);
-            if (currentUnassigned.length === 0) return null;
-            return (
-              <div className="animation-slide-down" style={{
-                background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(253, 230, 138, 0.7) 100%)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1.5px solid rgba(245, 158, 11, 0.5)',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                fontSize: '0.78rem',
-                color: '#92400e',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                marginBottom: '6px',
-                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle size={16} color="#d97706" style={{ flexShrink: 0 }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                    <span style={{ fontWeight: 800, color: '#78350f' }}>
-                      {currentUnassigned.length === 1
-                        ? `Achtung: Es ist noch 1 Schüler nicht auf deine Unterrichtstage eingeteilt!`
-                        : `Achtung: Es sind noch ${currentUnassigned.length} Schüler nicht auf deine Unterrichtstage eingeteilt!`}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 500 }}>
-                      Du kannst den Stundenplan trotzdem einreichen. Nicht eingeteilte Schüler verbleiben sicher in deinem Schüler-Pool.
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSidebarTab('unassigned')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    background: 'white',
-                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    color: '#92400e',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                  onMouseOut={e => e.currentTarget.style.transform = 'none'}
-                >
-                  <span>Offene Schüler im Pool ({currentUnassigned.length})</span>
-                  <span>➔</span>
-                </button>
-              </div>
-            );
-          })()}
+                  onOpenAvailability={handleEditTeacherAvailability}
+                  onDuplicateCurrentDraft={() => handleConfirmNewDraft('duplicate_with_students')}
+                />
+              );
+            })()}
 
           {/* Apple Pro Tip Showcase Callout */}
           {showTipBanner && (
@@ -7706,16 +7320,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                   style={{
                                     background: '#fef08a',
                                     border: '1px solid #facc15',
-                                    borderRadius: '5px',
-                                    padding: '2px 7px',
-                                    fontSize: '0.62rem',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    minHeight: '34px',
+                                    fontSize: '0.68rem',
                                     fontWeight: 800,
                                     color: '#854d0e',
                                     cursor: 'pointer',
                                     whiteSpace: 'nowrap',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '2px'
+                                    gap: '4px',
+                                    touchAction: 'manipulation',
+                                    WebkitTapHighlightColor: 'transparent'
                                   }}
                                   title="15-Minuten-Pause automatisch einschieben und Folgetermine verschieben"
                                 >
@@ -7730,6 +7347,34 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
                     {/* ── PROPORTIONAL TIME-GRID ── */}
                     <div
+                      data-schedule-grid="true"
+                      data-board-id={board.id}
+                      data-column-height={columnHeightPx}
+                      data-start-minutes={startMinutes}
+                      onClick={(e) => {
+                        if (selectedStudentId) {
+                          e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clientY = Math.max(0, Math.min(e.clientY - rect.top, columnHeightPx));
+                          const dragMinutes = clientY / PX_PER_MIN;
+
+                          const rawMinutes = startMinutes + dragMinutes;
+                          const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
+                          const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+                          const snappedMins = snappedTotalMinutes % 60;
+                          const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+                          let targetIndex = board.students.findIndex(s => {
+                            const sTime = s.customStartTime || s.assignedTime;
+                            if (!sTime) return false;
+                            const [sh, sm] = parseTime(sTime);
+                            return (sh * 60 + sm) >= snappedTotalMinutes;
+                          });
+                          if (targetIndex === -1) targetIndex = board.students.length;
+
+                          handleDropOnBoard(board.id, targetIndex, targetTime);
+                        }
+                      }}
                       onDragOver={(e) => {
                             e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -7739,9 +7384,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                             const clientY = Math.max(0, Math.min(e.clientY - rect.top - grabOffset, columnHeightPx));
                             const dragMinutes = clientY / PX_PER_MIN;
 
-                            const [bsh, bsm] = parseTime(board.startAnchor);
-                            const boardStartMin = bsh * 60 + bsm;
-                            const rawMinutes = boardStartMin + dragMinutes;
+                            const rawMinutes = startMinutes + dragMinutes;
                             const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
                             const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
                             const snappedMins = snappedTotalMinutes % 60;
@@ -7749,7 +7392,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
                             lastSnapTimeRef.current = { boardId: board.id, timeStr: targetTime };
 
-                            const topPx = (snappedTotalMinutes - boardStartMin) * PX_PER_MIN;
+                            const topPx = (snappedTotalMinutes - startMinutes) * PX_PER_MIN;
 
                             // Calculate targetIndex strictly from snappedTotalMinutes (chronological grid position)
                             let targetIndex = board.students.findIndex(s => {
@@ -7805,8 +7448,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               const clientY = Math.max(0, Math.min(e.clientY - rect.top - grabOffset, columnHeightPx));
                               const dragMinutes = clientY / PX_PER_MIN;
 
-                              const [bsh, bsm] = parseTime(board.startAnchor);
-                              const rawMinutes = bsh * 60 + bsm + dragMinutes;
+                              const rawMinutes = startMinutes + dragMinutes;
                               const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
                               const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
                               const snappedMins = snappedTotalMinutes % 60;
@@ -7828,8 +7470,6 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         >
                        {/* Dynamic Cubase DAW Grid Subdivision Lines */}
                       {(() => {
-                        const [bsh, bsm] = parseTime(board.startAnchor);
-                        const boardStartMin = bsh * 60 + bsm;
                         const colStartMin = startMinutes;
                         const colEndMin = endMinutes;
 
@@ -7838,7 +7478,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         const gridLines = [];
 
                         for (let min = firstGridMin; min <= colEndMin; min += gridSnapMinutes) {
-                          const topPx = (min - boardStartMin) * PX_PER_MIN;
+                          const topPx = (min - startMinutes) * PX_PER_MIN;
                           if (topPx < 0 || topPx > columnHeightPx) continue;
 
                           const h = Math.floor(min / 60) % 24;
@@ -8334,6 +7974,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               draggable={!isCurrentlyResizingThis}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
+                              onTouchStart={(e) => !isCurrentlyResizingThis && handleTouchStartCard(e, bs.id, 'board', board.id)}
+                              onTouchMove={handleTouchMoveCard}
+                              onTouchEnd={handleTouchEndCard}
+                              onTouchCancel={handleTouchCancelCard}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -8361,6 +8005,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 boxShadow: isCurrentlyResizingThis ? '0 6px 18px rgba(245, 158, 11, 0.28)' : '0 2px 6px rgba(245, 158, 11, 0.08)',
                                 zIndex: isCurrentlyResizingThis ? 30 : 10,
                                 userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                                touchAction: isCurrentlyResizingThis ? 'none' : 'manipulation',
+                                WebkitTouchCallout: 'none',
                                 transform: isCardShifted ? `translateY(${shiftPx}px)` : 'none',
                                 transition: isCurrentlyResizingThis ? 'none' : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease',
                                 willChange: 'transform, top'
@@ -8832,6 +8479,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               draggable={true}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
+                              onTouchStart={(e) => handleTouchStartCard(e, bs.id, 'board', board.id)}
+                              onTouchMove={handleTouchMoveCard}
+                              onTouchEnd={handleTouchEndCard}
+                              onTouchCancel={handleTouchCancelCard}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -8883,6 +8534,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 zIndex: 2,
                                 visibility: 'visible',
                                 opacity: draggedStudentId === bs.id ? 0.25 : 1,
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                                touchAction: 'none',
+                                WebkitTouchCallout: 'none',
                                 boxShadow: hasConflict ? '0 2px 8px rgba(239, 68, 68, 0.15)' : (isInsideWunsch ? '0 2px 8px rgba(52, 168, 83, 0.18)' : (isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)')),
                                 transform: (dragTargetIntent === 'swap' && dragTargetStudentId === bs.id) 
                                   ? 'scale(0.98)' 
@@ -9068,6 +8723,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               handleDragStart(bs.id, 'board', board.id, e);
                             }}
                             onDragEnd={handleDragEnd}
+                            onTouchStart={(e) => handleTouchStartCard(e, bs.id, 'board', board.id)}
+                            onTouchMove={handleTouchMoveCard}
+                            onTouchEnd={handleTouchEndCard}
+                            onTouchCancel={handleTouchCancelCard}
                             onDragOver={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -9770,6 +9429,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 draggable
                 onDragStart={(e) => handleDragStart('sidebar-pause', 'sidebar', undefined, e)}
                 onDragEnd={handleDragEnd}
+                onTouchStart={(e) => handleTouchStartCard(e, 'sidebar-pause', 'sidebar', undefined)}
+                onTouchMove={handleTouchMoveCard}
+                onTouchEnd={handleTouchEndCard}
+                onTouchCancel={handleTouchCancelCard}
                 style={{
                   background: 'rgba(254, 243, 199, 0.5)',
                   backdropFilter: 'blur(12px)',
@@ -9783,7 +9446,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   gap: '6px',
                   boxShadow: '0 2px 8px rgba(245, 158, 11, 0.02)',
                   transition: 'all 0.2s',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: 'none',
+                  WebkitTouchCallout: 'none'
                 }}
               >
                 <Coffee size={13} color="#b45309" style={{ flexShrink: 0 }} />
@@ -9873,6 +9539,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       }}
                       onDragStart={(e) => handleDragStart(s.id, 'sidebar', undefined, e)}
                       onDragEnd={handleDragEnd}
+                      onTouchStart={(e) => handleTouchStartCard(e, s.id, 'sidebar', undefined)}
+                      onTouchMove={handleTouchMoveCard}
+                      onTouchEnd={handleTouchEndCard}
+                      onTouchCancel={handleTouchCancelCard}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!draggedStudentId) {
@@ -9895,6 +9565,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         cursor: 'grab', 
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
+                        touchAction: 'manipulation',
+                        WebkitTouchCallout: 'none',
                         opacity: isSelected ? 1 : (isAssigned ? 0.75 : 1), 
                         display: 'flex', 
                         flexDirection: 'column', 
@@ -10899,7 +10571,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                           {s.first_name} {maskLastName(s.last_name, showRealNames)}
                         </div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                          {s.instrument || 'Musiker'} • {s.duration || 30} Min
+                          {resolveInstrument(s.instrument)} • {s.duration || 30} Min
                         </div>
                       </div>
                     </div>

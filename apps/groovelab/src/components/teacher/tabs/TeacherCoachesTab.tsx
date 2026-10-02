@@ -1,6 +1,7 @@
 import React from 'react';
 import { GraduationCap } from 'lucide-react';
 import { AvatarImage } from '../../common/AvatarImage';
+import { resolveUserCampusId } from '../../../utils/campusIdHelper';
 
 export interface TeacherCoachesTabProps {
   coaches: any[];
@@ -62,7 +63,7 @@ export const TeacherCoachesTab: React.FC<TeacherCoachesTabProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Ausweis-ID:</span>
                   <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#1e293b' }}>
-                    {coach.ausweis_nummer || (coach.id ? `#${coach.id.slice(0, 8)}` : 'Aktiv')}
+                    {resolveUserCampusId(coach)}
                   </span>
                 </div>
               </div>

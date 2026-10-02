@@ -31,14 +31,16 @@ const DeviceSimulator = isDevEnvironment()
   ? lazy(() => import('./components/ui/DeviceSimulator').then(m => ({ default: m.DeviceSimulator })))
   : ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
+const DateSimulationDevWidget = lazy(() => 
+  import('./components/ui/DateSimulationDevWidget').then(m => ({ default: m.DateSimulationDevWidget }))
+);
+
 function App() {
   const orchestrator = useCampusAppOrchestrator();
 
-  if (orchestrator.startupGate) {
-    return orchestrator.startupGate;
-  }
-
-  return (
+  const appBody = orchestrator.startupGate ? (
+    orchestrator.startupGate
+  ) : (
     <LegalConsentGate user={orchestrator.user}>
       <Suspense fallback={<DashboardLoader />}>
         <SecurityHoneyTrap />
@@ -51,6 +53,17 @@ function App() {
         </DeviceSimulator>
       </Suspense>
     </LegalConsentGate>
+  );
+
+  return (
+    <>
+      {appBody}
+      {(isDevEnvironment() || (typeof window !== 'undefined' && localStorage.getItem('groovelab_dev_date_sim_visible') === 'true')) && (
+        <Suspense fallback={null}>
+          <DateSimulationDevWidget />
+        </Suspense>
+      )}
+    </>
   );
 }
 

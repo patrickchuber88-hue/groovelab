@@ -3,14 +3,16 @@ import { supabase } from '../../../lib/supabase';
 import { areArraysEqualFast } from '../../../utils/fastCompare';
 import { fetchHolidaysCached, HolidayRange } from '../../../utils/holidayHelper';
 import { isTeacherCurrentlyAbsent } from '../../../utils/teacherAbsenceHelper';
-import { maskLastName } from '../../../utils/nameHelper';
-import { getSimulatedNow } from '../utils/teacherDashboardUtils';
+import { maskLastName, formatSingleStudentAnonymized } from '../../../utils/nameHelper';
+import { getTeacherActiveBoards } from './useTeacherTagesplan';
+import { getSimulatedNow, parseDayNumber, resolveStudentInstrument } from '../utils/teacherDashboardUtils';
 
 export interface UseTeacherBookingsProps {
   userId: string;
   teacher: any;
   activePlatform: 'campus' | 'groovelab';
   rooms?: any[];
+  allStudents?: any[];
   showRealNames?: boolean;
   adminFeedbackRequests?: any[];
   adminFeedbackResponses?: any[];
@@ -32,6 +34,7 @@ export function useTeacherBookings({
   teacher,
   activePlatform,
   rooms = [],
+  allStudents = [],
   showRealNames = false,
   adminFeedbackRequests = [],
   adminFeedbackResponses = [],
@@ -79,7 +82,23 @@ export function useTeacherBookings({
       const stored = (sId ? localStorage.getItem(`groovelab_campus_bookings_${sId}`) : null) || localStorage.getItem('groovelab_campus_bookings');
       if (stored) {
         try {
-          allBookings = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            allBookings = parsed.map((b: any) => {
+              if (!b.isSchedule) {
+                const isConfirmed = (b.status === 'confirmed') && (b.is_confirmed === true);
+                if (!isConfirmed) {
+                  return {
+                    ...b,
+                    status: 'pending',
+                    is_confirmed: false,
+                    isApproved: false
+                  };
+                }
+              }
+              return b;
+            });
+          }
         } catch (e) {}
       }
 
@@ -89,17 +108,7 @@ export function useTeacherBookings({
         return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
       };
 
-      let teacherBoards: any[] = [];
-      try {
-        const storedBoards = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${userId}`) || 
-                             localStorage.getItem(`groovelab_teacher_boards_${userId}`) ||
-                             localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${userId}`) ||
-                             localStorage.getItem(`groovelab_teacher_draft_state_campus_${userId}`);
-        if (storedBoards) {
-          const parsed = JSON.parse(storedBoards);
-          teacherBoards = Array.isArray(parsed) ? parsed : (parsed.boards || []);
-        }
-      } catch (e) {}
+      const teacherBoards: any[] = getTeacherActiveBoards(userId, teacher);
 
       const [{ data: dbBookings }, { data: teacherSchedules }] = await Promise.all([
         supabase
@@ -111,6 +120,8 @@ export function useTeacherBookings({
             start_time,
             end_time,
             title,
+            status,
+            is_confirmed,
             rooms (
               id,
               name
@@ -119,21 +130,27 @@ export function useTeacherBookings({
           .eq('booked_by', userId),
         supabase
           .from('schedules')
-          .select('room_id, time_slot, duration, day_of_week')
+          .select('id, room_id, time_slot, duration, day_of_week, student_id')
           .eq('teacher_id', userId)
       ]);
 
       const getTeacherRegularWindow = (dayOfWeek: number) => {
-        let regularRoomId: string | null = null;
+        const regularRoomIds = new Set<string>();
         let regMin = Infinity;
         let regMax = -Infinity;
 
         if (teacherBoards && teacherBoards.length > 0) {
-          const mb = teacherBoards.find((b: any) => b.dayOfWeek === dayOfWeek);
-          if (mb) {
-            if (mb.roomId) regularRoomId = mb.roomId;
+          const mbList = teacherBoards.filter((b: any) => {
+            const d = parseDayNumber(b.dayOfWeek ?? b.day_of_week);
+            return d === dayOfWeek;
+          });
+          mbList.forEach((mb: any) => {
+            if (mb.roomId) regularRoomIds.add(String(mb.roomId));
+            if (mb.room_id) regularRoomIds.add(String(mb.room_id));
+            if (mb.roomName) regularRoomIds.add(String(mb.roomName));
+            if (mb.room) regularRoomIds.add(String(mb.room));
             (mb.students || []).forEach((st: any) => {
-              const tStr = st.assignedTime || '';
+              const tStr = st.assignedTime || st.customStartTime || st.time || '';
               if (tStr) {
                 const s = toMinutes(tStr);
                 const dur = st.duration || 30;
@@ -142,13 +159,13 @@ export function useTeacherBookings({
                 if (e > regMax) regMax = e;
               }
             });
-          }
+          });
         }
 
         if (teacherSchedules && teacherSchedules.length > 0) {
           teacherSchedules.forEach((s: any) => {
-            if (s.day_of_week === dayOfWeek) {
-              if (!regularRoomId && s.room_id) regularRoomId = s.room_id;
+            if (parseDayNumber(s.day_of_week) === dayOfWeek) {
+              if (s.room_id) regularRoomIds.add(String(s.room_id));
               if (s.time_slot) {
                 const sStart = toMinutes(s.time_slot);
                 const sEnd = sStart + (s.duration || 45);
@@ -159,7 +176,7 @@ export function useTeacherBookings({
           });
         }
 
-        return { regularRoomId, regMin, regMax };
+        return { regularRoomIds, regMin, regMax };
       };
 
       const spuriousBookingIds: string[] = [];
@@ -169,15 +186,15 @@ export function useTeacherBookings({
           const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
           const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
 
-          if (db.title && db.title.startsWith('Unterricht: ') && !db.title.includes('(Verschoben)') && db.date) {
+          if (db.date) {
             const bDate = new Date(db.date + 'T00:00:00');
             const bDayOfWeek = bDate.getDay() || 7;
-            const { regularRoomId, regMin, regMax } = getTeacherRegularWindow(bDayOfWeek);
+            const { regularRoomIds, regMin, regMax } = getTeacherRegularWindow(bDayOfWeek);
             const bStart = toMinutes(startTimeStr);
             const bEnd = toMinutes(endTimeStr);
 
             const isInsideRegular = regMin !== Infinity && bStart >= regMin && bEnd <= regMax;
-            const isSameRoom = !regularRoomId || db.room_id === regularRoomId;
+            const isSameRoom = regularRoomIds.size === 0 || regularRoomIds.has(String(db.room_id));
 
             if (isInsideRegular && isSameRoom) {
               spuriousBookingIds.push(db.id);
@@ -185,42 +202,93 @@ export function useTeacherBookings({
             }
           }
 
-          const isDup = allBookings.some((b: any) => 
-            b.date === db.date && 
-            b.startTime === startTimeStr && 
-            b.roomId === db.room_id
+          const existingIdx = allBookings.findIndex((b: any) => 
+            b.id === db.id || (b.date === db.date && b.startTime === startTimeStr && b.roomId === db.room_id)
           );
 
-          if (!isDup) {
-            const studentName = db.title && db.title.startsWith('Unterricht: ') 
-              ? db.title.substring('Unterricht: '.length) 
-              : null;
+          const studentName = db.title && db.title.startsWith('Unterricht: ') 
+            ? db.title.substring('Unterricht: '.length) 
+            : null;
 
-            allBookings.push({
-              id: db.id,
-              roomId: db.room_id,
-              roomName: db.rooms?.name || 'Raum',
-              date: db.date,
-              startTime: startTimeStr,
-              endTime: endTimeStr,
-              purpose: db.title || 'Unterricht',
-              teacherId: userId,
-              teacherName: '',
-              isSchedule: false,
-              status: 'approved',
-              studentName: studentName
-            });
+          const isConfirmed = db.status === 'confirmed' && db.is_confirmed === true;
+
+          const mappedBooking = {
+            id: db.id,
+            roomId: db.room_id,
+            roomName: db.rooms?.name || 'Raum',
+            date: db.date,
+            startTime: startTimeStr,
+            endTime: endTimeStr,
+            purpose: db.title || 'Unterricht',
+            teacherId: userId,
+            teacherName: '',
+            isSchedule: false,
+            status: isConfirmed ? 'confirmed' : 'pending',
+            is_confirmed: isConfirmed,
+            isApproved: isConfirmed,
+            studentName: studentName
+          };
+
+          if (existingIdx >= 0) {
+            allBookings[existingIdx] = mappedBooking;
+          } else {
+            allBookings.push(mappedBooking);
           }
         });
-
-        if (spuriousBookingIds.length > 0) {
-          supabase.from('room_bookings').delete().in('id', spuriousBookingIds).then(({ error }) => {
-            if (!error) {
-              window.dispatchEvent(new CustomEvent('refresh-bookings'));
-            }
-          });
-        }
       }
+
+      // Filter out spurious bookings from localStorage allBookings as well (runs unconditionally)
+      allBookings = allBookings.filter((b: any) => {
+        if (!b.date) return false;
+        const bDate = new Date(b.date + 'T00:00:00');
+        const bDayOfWeek = bDate.getDay() || 7;
+        const { regularRoomIds, regMin, regMax } = getTeacherRegularWindow(bDayOfWeek);
+        const bStart = toMinutes(b.startTime || b.start_time);
+        const bEnd = toMinutes(b.endTime || b.end_time);
+
+        const isInsideRegular = regMin !== Infinity && bStart >= regMin && bEnd <= regMax;
+        const isSameRoom = regularRoomIds.size === 0 || regularRoomIds.has(String(b.roomId || b.room_id)) || (b.roomName && regularRoomIds.has(String(b.roomName)));
+
+        if (isInsideRegular && isSameRoom) {
+          if (b.id) spuriousBookingIds.push(b.id);
+          return false;
+        }
+        return true;
+      });
+
+      if (spuriousBookingIds.length > 0) {
+        const uniqueSpuriousIds = Array.from(new Set(spuriousBookingIds));
+        supabase.from('room_bookings').delete().in('id', uniqueSpuriousIds).then(({ error }) => {
+          if (!error) {
+            window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          }
+        });
+        try {
+          const cleaned = allBookings.filter((b: any) => !uniqueSpuriousIds.includes(b.id));
+          if (sId) {
+            localStorage.setItem(`groovelab_campus_bookings_${sId}`, JSON.stringify(cleaned));
+          }
+          localStorage.setItem('groovelab_campus_bookings', JSON.stringify(cleaned));
+        } catch (_) {}
+      }
+
+      let calendarCacheOccurs: any[] = [];
+      try {
+        const calKey = `groovelab_calendar_active_occurrences_${userId}`;
+        const rawCal = localStorage.getItem(calKey) || localStorage.getItem('groovelab_calendar_active_occurrences_latest');
+        if (rawCal) {
+          calendarCacheOccurs = JSON.parse(rawCal);
+        }
+      } catch (_) {}
+
+      let pendingChangeOccurs: any[] = [];
+      try {
+        const rawPending = localStorage.getItem('groovelab_pending_schedule_changes');
+        if (rawPending) {
+          const parsed = JSON.parse(rawPending);
+          pendingChangeOccurs = Object.values(parsed);
+        }
+      } catch (_) {}
 
       const { data: occurs } = await supabase
         .from('schedule_occurrences')
@@ -229,14 +297,24 @@ export function useTeacherBookings({
           date,
           original_date,
           start_time,
+          original_start_time,
           status,
           teacher_id,
           student_id,
           student_acknowledged,
+          room_override_id,
+          student:users!schedule_occurrences_student_id_fkey (
+            id,
+            first_name,
+            last_name,
+            nickname,
+            instrument
+          ),
           schedules (
             duration,
             room_id,
             teacher_id,
+            instrument,
             rooms (id, name)
           )
         `);
@@ -264,23 +342,143 @@ export function useTeacherBookings({
         }
 
         const studentDisplayName = (() => {
+          // 1. Direkt über PostgREST-Join
           if (occ.student) {
             const fn = occ.student.first_name || occ.student.firstName || '';
             const ln = occ.student.last_name || occ.student.lastName || '';
-            const full = `${fn} ${maskLastName(ln, showRealNames)}`.trim();
-            if (full) return full;
+            const full = formatSingleStudentAnonymized(fn, ln, occ.student_id, showRealNames);
+            if (full && full !== 'Schüler') return full;
           }
+
+          // 2. Über allStudents Array
+          if (occ.student_id && allStudents && allStudents.length > 0) {
+            const found = allStudents.find((s: any) => 
+              String(s.id) === String(occ.student_id) ||
+              String(s.student_id) === String(occ.student_id) ||
+              String(s.user_id) === String(occ.student_id)
+            );
+            if (found) {
+              const fn = found.first_name || found.firstName || '';
+              const ln = found.last_name || found.lastName || '';
+              const full = formatSingleStudentAnonymized(fn, ln, occ.student_id, showRealNames);
+              if (full && full !== 'Schüler') return full;
+            }
+          }
+
+          // 3. Über teacherBoards (Matching über ID, studentId, student_id, user_id, db_id)
+          if (occ.student_id && teacherBoards && teacherBoards.length > 0) {
+            for (const b of teacherBoards) {
+              const st = (b.students || []).find((s: any) => 
+                String(s.id) === String(occ.student_id) ||
+                String(s.studentId) === String(occ.student_id) ||
+                String(s.student_id) === String(occ.student_id) ||
+                String(s.user_id) === String(occ.student_id) ||
+                String(s.db_id) === String(occ.student_id)
+              );
+              if (st) {
+                const fn = st.first_name || (st.name ? st.name.split(' ')[0] : '') || '';
+                const ln = st.last_name || (st.name ? st.name.split(' ').slice(1).join(' ') : '') || '';
+                const full = formatSingleStudentAnonymized(fn, ln, occ.student_id, showRealNames);
+                if (full && full !== 'Schüler') return full;
+              }
+            }
+          }
+
+          // 4. Über teacherBoards nach Original-Slot-Uhrzeit & Wochentag (bei verschobenen Terminen)
+          if (teacherBoards && teacherBoards.length > 0) {
+            const lookupDateStr = occ.original_date || occ.date;
+            const lookupTimeStr = (occ.original_start_time || occ.start_time || '').substring(0, 5);
+            if (lookupDateStr && lookupTimeStr) {
+              const dObj = new Date(lookupDateStr + 'T00:00:00');
+              const dow = dObj.getDay() || 7;
+              for (const b of teacherBoards) {
+                if (Number(b.dayOfWeek) === dow) {
+                  const st = (b.students || []).find((s: any) => 
+                    (s.assignedTime || s.customStartTime || s.time || '').substring(0, 5) === lookupTimeStr
+                  );
+                  if (st) {
+                    const fn = st.first_name || (st.name ? st.name.split(' ')[0] : '') || '';
+                    const ln = st.last_name || (st.name ? st.name.split(' ').slice(1).join(' ') : '') || '';
+                    const full = formatSingleStudentAnonymized(fn, ln, st.id || occ.student_id, showRealNames);
+                    if (full && full !== 'Schüler') return full;
+                  }
+                }
+              }
+            }
+          }
+
+          // 5. Über Calendar Cache & Pending Changes (bereits serialisierte student-Objekte)
+          const cachedOcc = calendarCacheOccurs.find((c: any) => c.id === occ.id) || 
+                            pendingChangeOccurs.find((p: any) => p.id === occ.id);
+          if (cachedOcc) {
+            const cFn = cachedOcc.student?.first_name || cachedOcc.student_first_name || cachedOcc.studentName?.split(' ')[0] || '';
+            const cLn = cachedOcc.student?.last_name || cachedOcc.student_last_name || cachedOcc.studentName?.split(' ').slice(1).join(' ') || '';
+            if (cFn) {
+              const full = formatSingleStudentAnonymized(cFn, cLn, occ.student_id, showRealNames);
+              if (full && full !== 'Schüler') return full;
+            }
+          }
+
+          // 6. Über student_name / studentName / purpose / title
           if (occ.student_name || occ.studentName || occ.name) {
-            return occ.student_name || occ.studentName || occ.name;
+            const raw = occ.student_name || occ.studentName || occ.name;
+            if (raw && raw !== 'Schüler') {
+              const parts = raw.split(' ');
+              return formatSingleStudentAnonymized(parts[0], parts.slice(1).join(' '), occ.student_id, showRealNames);
+            }
           }
+          if (occ.title && occ.title.startsWith('Unterricht: ')) {
+            const raw = occ.title.replace('Unterricht: ', '').trim();
+            if (raw && raw !== 'Schüler') {
+              const parts = raw.split(' ');
+              return formatSingleStudentAnonymized(parts[0], parts.slice(1).join(' '), occ.student_id, showRealNames);
+            }
+          }
+
           if (occ.student_id && occ.student_id !== 'vacant' && !occ.student_id.startsWith('break-')) {
             return 'Schüler';
           }
           return null;
         })();
 
+        const rawInstrument = occ.student?.instrument || occ.schedules?.instrument || (() => {
+          // 1. Aus allStudents
+          if (occ.student_id && allStudents && allStudents.length > 0) {
+            const found = allStudents.find((s: any) => 
+              String(s.id) === String(occ.student_id) ||
+              String(s.student_id) === String(occ.student_id) ||
+              String(s.user_id) === String(occ.student_id)
+            );
+            if (found?.instrument) return found.instrument;
+          }
+          // 2. Aus teacherBoards
+          if (teacherBoards && teacherBoards.length > 0) {
+            for (const b of teacherBoards) {
+              const st = (b.students || []).find((s: any) => 
+                String(s.id) === String(occ.student_id) ||
+                String(s.studentId) === String(occ.student_id) ||
+                String(s.student_id) === String(occ.student_id) ||
+                String(s.user_id) === String(occ.student_id)
+              );
+              if (st?.instrument) return st.instrument;
+            }
+          }
+          // 3. Aus Calendar Cache
+          const cachedOcc = calendarCacheOccurs.find((c: any) => c.id === occ.id) || 
+                            pendingChangeOccurs.find((p: any) => p.id === occ.id);
+          if (cachedOcc?.student?.instrument || cachedOcc?.instrument) {
+            return cachedOcc.student?.instrument || cachedOcc.instrument;
+          }
+          return '';
+        })();
+
+        const teacherDefaultInst = teacher?.instrument || (teacher?.instruments && teacher.instruments[0]) || 'Gitarre';
+        const instrument = resolveStudentInstrument(rawInstrument, null, teacherDefaultInst);
+
         return {
           id: occ.id,
+          student_id: occ.student_id,
+          studentId: occ.student_id,
           roomId: rId,
           roomName: (rName && rName !== 'Raum') ? rName : '',
           date: occ.date,
@@ -293,6 +491,7 @@ export function useTeacherBookings({
           status: occ.status,
           isSchedule: true,
           studentName: studentDisplayName,
+          instrument,
           student_acknowledged: occ.student_acknowledged,
           studentAcknowledged: occ.studentAcknowledged,
           canceled_by_role: occ.canceled_by_role || ((occ.status === 'canceled_by_teacher_ausfall' || isTeacherCurrentlyAbsent(teacher)) ? 'teacher' : undefined),
@@ -326,22 +525,114 @@ export function useTeacherBookings({
         const bTeacherId = b.teacherId || b.teacher_id;
         if (bTeacherId && String(bTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return false;
         if (!b.date) return false;
+
+        const bDate = new Date(b.date + 'T00:00:00');
+        const bDayOfWeek = bDate.getDay() || 7;
+        const { regularRoomIds, regMin, regMax } = getTeacherRegularWindow(bDayOfWeek);
+        const bStart = toMinutes(b.startTime || b.start_time);
+        const bEnd = toMinutes(b.endTime || b.end_time);
+        const isInsideRegular = regMin !== Infinity && bStart >= regMin && bEnd <= regMax;
+        const isSameRoom = regularRoomIds.size === 0 || regularRoomIds.has(String(b.roomId || b.room_id)) || (b.roomName && regularRoomIds.has(String(b.roomName)));
+        if (isInsideRegular && isSameRoom) {
+          return false;
+        }
+
         return b.date >= todayStr && b.date <= twoWeeksLaterStr;
       });
+
+      // 🏛️ Enterprise+ Goldstandard: Check if an occurrence matches its designer master slot (SSOT with ScheduleCalendarView)
+      const checkIsOccurrenceAtMasterSlot = (occ: any): boolean => {
+        if (!occ || !occ.student_id || occ.student_id === 'vacant') return true;
+        let masterDayOfWeek: number | null = null;
+        let masterAssignedTime: string | null = null;
+
+        if (teacherBoards && teacherBoards.length > 0) {
+          for (const board of teacherBoards) {
+            const bDow = parseDayNumber(board.dayOfWeek ?? board.day_of_week);
+            const studentInBoard = board.students?.find((s: any) => {
+              if (occ.student_id && (
+                String(s.id) === String(occ.student_id) || 
+                String(s.student_id) === String(occ.student_id) || 
+                String(s.studentId) === String(occ.student_id) ||
+                String(s.db_id) === String(occ.student_id) ||
+                String(s.user_id) === String(occ.student_id)
+              )) return true;
+              if (s.groupStudents && Array.isArray(s.groupStudents)) {
+                if (s.groupStudents.some((gs: any) => 
+                  String(gs.id) === String(occ.student_id) || 
+                  String(gs.student_id) === String(occ.student_id) || 
+                  String(gs.studentId) === String(occ.student_id) ||
+                  String(gs.db_id) === String(occ.student_id) ||
+                  String(gs.user_id) === String(occ.student_id)
+                )) return true;
+              }
+              const occFn = (occ.student?.first_name || occ.first_name || (occ.studentName ? occ.studentName.split(' ')[0] : '') || '').trim().toLowerCase();
+              const occLn = (occ.student?.last_name || occ.last_name || (occ.studentName ? occ.studentName.split(' ').slice(1).join(' ') : '') || '').trim().toLowerCase();
+              let sFn = (s.first_name || s.firstName || '').trim().toLowerCase();
+              let sLn = (s.last_name || s.lastName || '').trim().toLowerCase();
+              if (!sFn && (s.name || s.studentName)) {
+                const parts = (s.name || s.studentName).trim().split(' ');
+                sFn = (parts[0] || '').toLowerCase();
+                sLn = (parts.slice(1).join(' ') || '').toLowerCase();
+              }
+              if (sFn && occFn && (sFn === occFn || occFn.includes(sFn) || sFn.includes(occFn))) {
+                if (!sLn || !occLn || sLn === occLn || sLn.startsWith(occLn[0]) || occLn.startsWith(sLn[0])) {
+                  return true;
+                }
+              }
+              return false;
+            });
+            if (studentInBoard) {
+              masterDayOfWeek = bDow;
+              masterAssignedTime = studentInBoard.assignedTime || studentInBoard.customStartTime || studentInBoard.time;
+              break;
+            }
+          }
+        }
+
+        if (masterDayOfWeek === null && teacherSchedules && teacherSchedules.length > 0) {
+          const studentSchedule = teacherSchedules.find((s: any) => 
+            s.student_id && String(s.student_id) === String(occ.student_id)
+          );
+          if (studentSchedule) {
+            masterDayOfWeek = parseDayNumber(studentSchedule.day_of_week);
+            masterAssignedTime = studentSchedule.time_slot;
+          }
+        }
+
+        if (masterDayOfWeek === null || masterAssignedTime === null) return true;
+
+        const occDateObj = new Date(occ.date + 'T00:00:00');
+        const occDayOfWeek = occDateObj.getDay() || 7;
+        const occStartTimeSafe = (occ.startTime || occ.start_time || '').substring(0, 5);
+        return masterDayOfWeek === occDayOfWeek && masterAssignedTime.substring(0, 5) === occStartTimeSafe;
+      };
 
       const filteredOccurs = mappedOccurs.filter((b: any) => {
         const bTeacherId = b.teacherId || b.teacher_id;
         if (bTeacherId && String(bTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return false;
         if (!b.date) return false;
         if (b.student_id === 'vacant' || (typeof b.student_id === 'string' && b.student_id.startsWith('break-'))) return false;
-        
-        const isDateMoved = Boolean(b.original_date && b.original_date !== b.date);
-        const isTimeMoved = Boolean(b.original_start_time && b.startTime && b.original_start_time.substring(0, 5) !== b.startTime.substring(0, 5));
-        const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule', 'changed'].includes(b.status));
-        const isExplicitChange = Boolean(b.is_rescheduled || b.isRescheduled || b.is_changed || b.isChanged || b.is_moved || b.isMoved);
+
+        const isCancelled = Boolean(b.status && ['cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule'].includes(b.status));
+        const isRoomChanged = Boolean(b.is_room_booking || b.isRoomBooking || b.room_override_id || b.roomOverrideId || b.is_room_changed || b.isRoomChanged);
         const isReactivatedUnacknowledged = Boolean(b.status === 'scheduled' && b.original_date && (b.teacher_acknowledged === false || b.teacherAcknowledged === false));
 
-        const isRealReschedule = isDateMoved || isTimeMoved || isChangedStatus || isExplicitChange || isReactivatedUnacknowledged;
+        const isAtMasterSlot = checkIsOccurrenceAtMasterSlot(b);
+
+        // 🏛️ SSOT Parität mit Stundenplan: Termine am regulären Master-Slot, die weder entfallen noch den Raum gewechselt haben,
+        // sind unveränderte Stammtermine (Vollton Grün) und dürfen NIEMALS in den Terminänderungen der Sidebar erscheinen!
+        if (isAtMasterSlot && !isCancelled && !isRoomChanged && !isReactivatedUnacknowledged) {
+          return false;
+        }
+
+        const isDateMoved = Boolean(b.original_date && b.original_date !== b.date);
+        const isTimeMoved = Boolean(b.original_start_time && b.startTime && b.original_start_time.substring(0, 5) !== b.startTime.substring(0, 5));
+        const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'changed'].includes(b.status));
+        const isExplicitChange = Boolean(b.is_rescheduled || b.isRescheduled || b.is_changed || b.isChanged || b.is_moved || b.isMoved);
+
+        const isMovedFromMaster = !isAtMasterSlot && (isDateMoved || isTimeMoved || isChangedStatus || isExplicitChange);
+        const isRealReschedule = isMovedFromMaster || isCancelled || isRoomChanged || isReactivatedUnacknowledged;
         if (!isRealReschedule) return false;
 
         let normDate = b.date || '';
@@ -408,7 +699,7 @@ export function useTeacherBookings({
     } catch (err) {
       console.error('Failed to load my bookings:', err);
     }
-  }, [userId, teacher, activePlatform, rooms, showRealNames, viewMode, activeTab, hideHeader]);
+  }, [userId, teacher, activePlatform, rooms, allStudents, showRealNames, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
     const handleFilteredStorage = (e: StorageEvent) => {

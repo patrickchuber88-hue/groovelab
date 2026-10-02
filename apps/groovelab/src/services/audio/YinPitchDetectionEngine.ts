@@ -291,7 +291,9 @@ export function detectPitchYin(
     const denom = 2 * (2 * s1 - s0 - s2);
     if (Math.abs(denom) > 1e-6) {
       const delta = (s2 - s0) / denom;
-      interpolatedTau = tauCandidate + delta;
+      if (Math.abs(delta) <= 1.0) {
+        interpolatedTau = tauCandidate + delta;
+      }
     }
   }
 

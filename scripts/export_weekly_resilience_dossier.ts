@@ -50,6 +50,20 @@ console.log('  🏛️   CAMPUS-GROOVELAB B2B WEEKLY RESILIENCE & COMPLIANCE ENG
 console.log('       Generating Cryptographically Sealed Art. 32 DSGVO Evidence Dossier');
 console.log(`${HR}\n`);
 
+// Pre-Flight: ISO 27001 / ISO 27701 Compliance Guard Check
+console.log('  🔍 Führe ISO/IEC 27001 & ISO 27701 Compliance Pre-Flight aus...');
+const isoGuardRes = spawnSync('node', ['scripts/iso27001_compliance_guard.mjs'], {
+  cwd: ROOT_DIR,
+  env: process.env,
+  encoding: 'utf-8'
+});
+if (isoGuardRes.status !== 0) {
+  console.error('  ❌ ISO 27001 / ISO 27701 Pre-Flight fehlgeschlagen!');
+  process.exit(1);
+} else {
+  console.log('  ✅ ISO 27001:2022 & ISO 27701 Compliance Pre-Flight verifiziert.\n');
+}
+
 const tGlobalStart = Date.now();
 const runnerResults: RunnerResult[] = [];
 let allPassed = true;
@@ -127,7 +141,10 @@ const fullJsonPayload = {
   complianceFrameworks: [
     'DSGVO Art. 32 (Sicherheit der Verarbeitung)',
     'DSGVO Art. 28 (Auftragsverarbeitung & TOMs)',
-    'DIN EN ISO/IEC 27001:2022 (A.12 & A.14)',
+    'DIN EN ISO/IEC 27001:2022 (Annex A.5, A.6, A.7, A.8 - 93 Controls)',
+    'DIN EN ISO/IEC 27701:2019 (PIMS Bildungsdatenschutz Minderjähriger)',
+    'ISO/IEC 27018:2019 (Schutz von PII in Public Clouds)',
+    'ISO/IEC 27037:2016 (Digitale Beweissicherung & Forensik)',
     'BSI IT-Grundschutz APP.3.1',
     'BFSG 2025 / WCAG 2.2 Stufe AA'
   ]

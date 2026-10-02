@@ -11,6 +11,7 @@ import { StudentScheduleCard, getFormattedScheduleDayTime } from './shared/Stude
 import { StudentAccessSection } from './shared/StudentAccessSection';
 import { StudentConsentProtocol } from './shared/StudentConsentProtocol';
 import { IDBadgeCard } from '../../IDBadgeCard';
+import { resolveUserCampusId } from '../../../utils/campusIdHelper';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../../StudioAvatar';
 import QRCode from 'react-qr-code';
@@ -749,7 +750,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
           <div class="row"><span class="label">Vorname:</span><span class="val">${firstName}</span></div>
           <div class="row"><span class="label">Nachname:</span><span class="val">${lastName}</span></div>
           <div class="row"><span class="label">Hauptfach / Instrument:</span><span class="val">${instrument}</span></div>
-          <div class="row"><span class="label">Schüler-ID:</span><span class="val">${activeStudent.id}</span></div>
+          <div class="row"><span class="label">Schüler-ID:</span><span class="val">${resolveUserCampusId(activeStudent)}</span></div>
           <div class="row"><span class="label">Volljährigkeit:</span><span class="val">${isAdult ? 'Ja (18+)' : 'Minderjährig'}</span></div>
           <div class="row"><span class="label">Campus-Modul:</span><span class="val">${isCampusActive ? 'Aktiv' : 'Basis'}</span></div>
           <div class="row"><span class="label">GrooveLab-Modul:</span><span class="val">${isGroovelabActive ? 'Aktiv' : 'Basis'}</span></div>

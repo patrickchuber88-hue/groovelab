@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
-import { formatSingleStudentAnonymized } from '../../utils/nameHelper';
+import { formatSingleStudentAnonymized, maskLastName } from '../../utils/nameHelper';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
+import { resolveStudentInstrument } from './utils/teacherDashboardUtils';
 import React from 'react';
 import {
   AlertCircle, AlertTriangle, Bell, Building2, Calendar,
@@ -47,6 +48,7 @@ export interface TeacherFeedWidgetProps {
   handleDeleteMyBooking: (bookingId: string) => Promise<void> | void;
   handleMarkRequestAsDone: (requestId: string) => Promise<void> | void;
   userId?: string;
+  allStudents?: any[];
   showRealNames: boolean;
   onTabChange?: (tab: string) => void;
   setMyChangedAppointments: React.Dispatch<React.SetStateAction<any[]>>;
@@ -93,6 +95,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
   handleDeleteMyBooking,
   handleMarkRequestAsDone,
   userId,
+  allStudents = [],
   showRealNames,
   onTabChange,
   setMyChangedAppointments,
@@ -112,10 +115,10 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
           marginBottom: '20px'
         }}>
         {/* Header with Title */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={18} color="#475569" />
-            <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'nowrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <AlertCircle size={18} color="#475569" style={{ flexShrink: 0 }} />
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
               Terminänderungen
             </h3>
           </div>
@@ -125,9 +128,11 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
             color: '#64748b',
             background: '#f1f5f9',
             padding: '2px 8px',
-            borderRadius: '100px'
+            borderRadius: '100px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}>
-            Nächste 7 Tage
+            7 Tage
           </span>
         </div>
 
@@ -141,7 +146,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
               const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
                 Boolean(b.original_date && b.original_date !== b.date) ||
                 Boolean(b.original_start_time && b.startTime && b.original_start_time !== b.startTime);
-              const isConfirmed = b.status === 'rescheduled_confirmed' || b.student_acknowledged === true || b.studentAcknowledged === true;
+              const isConfirmed = (b.status === 'rescheduled_confirmed' || b.student_acknowledged === true || b.studentAcknowledged === true) && b.status !== 'pending_reschedule' && b.student_acknowledged !== false && b.studentAcknowledged !== false;
               const isPending = b.status === 'pending' && !isRescheduled && !isReactivated;
 
               const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
@@ -282,13 +287,52 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
               }
 
               const displayStudentName = (() => {
-                if (!b.studentName) return null;
-                if (b.studentName.includes('&')) {
-                  const parts = b.studentName.split('&');
+                let rawName = b.studentName;
+                if (!rawName || rawName === 'Schüler') {
+                  if (b.purpose && b.purpose.startsWith('Unterricht: ')) {
+                    const parsed = b.purpose.replace('Unterricht: ', '').trim();
+                    if (parsed && parsed !== 'Schüler') {
+                      rawName = parsed;
+                    }
+                  }
+                }
+                if (!rawName || rawName === 'Schüler') {
+                  const sId = b.student_id || b.studentId;
+                  if (sId && allStudents && allStudents.length > 0) {
+                    const st = allStudents.find((s: any) => 
+                      String(s.id) === String(sId) ||
+                      String(s.student_id) === String(sId) ||
+                      String(s.user_id) === String(sId)
+                    );
+                    if (st) {
+                      const fn = st.first_name || st.firstName || '';
+                      const ln = st.last_name || st.lastName || '';
+                      rawName = formatSingleStudentAnonymized(fn, ln, sId, showRealNames);
+                    }
+                  }
+                }
+                if (!rawName) return 'Schüler';
+                if (rawName.includes('&')) {
+                  const parts = rawName.split('&');
                   const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
                   return firstNames.join(', ');
                 }
-                return b.studentName;
+                return rawName;
+              })();
+
+              const displayInstrument = (() => {
+                const sId = b.student_id || b.studentId;
+                let stInst = '';
+                if (sId && allStudents && allStudents.length > 0) {
+                  const st = allStudents.find((s: any) => 
+                    String(s.id) === String(sId) ||
+                    String(s.student_id) === String(sId) ||
+                    String(s.user_id) === String(sId)
+                  );
+                  stInst = st?.instrument || '';
+                }
+                const teacherInst = teacher?.instrument || (teacher?.instruments && teacher.instruments[0]) || 'Gitarre';
+                return resolveStudentInstrument(b.instrument, stInst, teacherInst);
               })();
 
               return (
@@ -365,9 +409,15 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.80rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
-                      <span>{displayStudentName ? displayStudentName : ''}</span>
+                    <div style={{ fontSize: '0.80rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isGroup && <Users size={12} style={{ color: subTextColor, verticalAlign: 'middle', marginRight: '4px', display: 'inline-block' }} />}
+                      <span style={{ fontWeight: 800 }}>{displayStudentName}</span>
+                      {displayInstrument && (
+                        <span style={{ opacity: 0.8, fontWeight: 600 }}> • {displayInstrument}</span>
+                      )}
+                      {isRoomChanged && rName && (
+                        <span style={{ fontWeight: 800, color: '#7c3aed' }}> • {rName}</span>
+                      )}
                     </div>
                   </div>
 
@@ -515,9 +565,25 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
           marginBottom: '20px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-            <Calendar size={18} color="#475569" />
-            <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Meine Buchungen</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'nowrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <Calendar size={18} color="#475569" style={{ flexShrink: 0 }} />
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                Meine Buchungen
+              </h3>
+            </div>
+            <span style={{
+              fontSize: '0.68rem',
+              fontWeight: 750,
+              color: '#64748b',
+              background: '#f1f5f9',
+              padding: '2px 8px',
+              borderRadius: '100px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}>
+              7 Tage
+            </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -525,14 +591,15 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
               const dateObj = new Date(b.date);
               const isCancelled = b.status === 'cancelled';
               const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
-              const isPending = b.status === 'pending';
+              const isConfirmed = (b.is_confirmed === true || b.status === 'confirmed' || b.status === 'approved') && b.status !== 'pending' && b.status !== 'unconfirmed';
+              const isPending = !isCancelled && !isRescheduled && !isConfirmed;
 
-              let cardBg = '#f8fafc';
+              let cardBg = isConfirmed ? '#faf5ff' : '#f8fafc';
               let dateHeaderBg = '#8b5cf6';
-              let label = 'Gebucht';
-              let labelBg = 'rgba(139, 92, 246, 0.12)';
-              let labelTextColor = '#7c3aed';
-              let textColor = '#0f172a';
+              let label = isConfirmed ? 'Bestätigt' : 'Gebucht';
+              let labelBg = isConfirmed ? '#ede9fe' : 'rgba(139, 92, 246, 0.12)';
+              let labelTextColor = isConfirmed ? '#6d28d9' : '#7c3aed';
+              let textColor = isConfirmed ? '#4c1d95' : '#0f172a';
               let subTextColor = '#64748b';
 
               if (isCancelled) {
@@ -552,11 +619,11 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                 textColor = '#854d0e';
                 subTextColor = '#a16207';
               } else if (isPending) {
-                cardBg = '#f5f3ff';
+                cardBg = 'repeating-linear-gradient(-45deg, #f5f3ff 0px, #f5f3ff 8px, #ede9fe 8px, #ede9fe 16px)';
                 dateHeaderBg = '#8b5cf6';
-                label = 'Reserviert';
-                labelBg = '#8b5cf6';
-                labelTextColor = '#ffffff';
+                label = 'Unter Vorbehalt';
+                labelBg = 'rgba(139, 92, 246, 0.12)';
+                labelTextColor = '#6d28d9';
                 textColor = '#5b21b6';
                 subTextColor = '#6d28d9';
               }
@@ -577,7 +644,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     borderRadius: '12px', 
                     padding: '8px 12px', 
                     cursor: 'pointer',
-                    border: '1px solid #e2e8f0',
+                    border: isPending ? '2px dashed #8b5cf6' : (isConfirmed ? '1.5px solid #8b5cf6' : '1px solid #e2e8f0'),
                     transition: 'all 0.15s ease',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                   }}
@@ -624,8 +691,8 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
+                    <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isGroup && <Users size={12} style={{ color: subTextColor, verticalAlign: 'middle', marginRight: '4px', display: 'inline-block' }} />}
                       <span>
                         {displayStudentName ? displayStudentName : ''}
                         {displayStudentName && rName ? ` • ${rName}` : rName}

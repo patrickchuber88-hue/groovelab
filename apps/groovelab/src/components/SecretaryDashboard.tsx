@@ -153,6 +153,8 @@ export function SecretaryDashboard({
     windowWidth, getTabTitle, handleSecretaryLogout
   } = navigation;
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   const { getEffectiveStorageUsedBytes } = useSecretaryStorageQuota({
     currentSchoolProfile,
     setCurrentSchoolProfile,
@@ -435,6 +437,8 @@ export function SecretaryDashboard({
     setIsFeedbackModalOpen,
     setShowDpoIdCardModal,
     setShowDpoPortalModal,
+    showOwnQrModal,
+    setShowOwnQrModal,
     setQrModalUser,
     getEffectiveStorageUsedBytes,
     formatInstrumentName,
@@ -445,6 +449,7 @@ export function SecretaryDashboard({
     campusTeachers, bypassTeachers, coaches, allTeachers, staff, studentsHook, bookings, schedules,
     equipment, announcements, audit, crisis, dashboardData, rooms, roomSearchQuery, userMap,
     isAvvSigned, simulatedToday, dismissedInvoiceAlert, roomsSubView, schedulesRoomsViewMode,
+    showOwnQrModal, setShowOwnQrModal,
     getEffectiveStorageUsedBytes, setIsFeedbackModalOpen, setShowAvvModal, setShowDpoIdCardModal,
     setShowDpoPortalModal, setShowFacilityLogModal, setQrModalUser
   ]);
@@ -599,6 +604,10 @@ export function SecretaryDashboard({
     setShowDpoIdCardModal,
     showDpoPortalModal,
     setShowDpoPortalModal,
+    showOwnQrModal,
+    setShowOwnQrModal,
+    qrModalUser,
+    setQrModalUser,
     showParentInfoSheetModal,
     setShowParentInfoSheetModal,
     showGuidanceModal,
@@ -623,6 +632,7 @@ export function SecretaryDashboard({
     staff, studentsHook, bookings, schedules, dashboardData, rooms, userMap, isAvvSigned,
     showAvvModal, showAgb, showPrivacy, showDpoIdCardModal, showDpoPortalModal, showParentInfoSheetModal,
     showGuidanceModal, guidanceInitialTab, isFeedbackModalOpen, showFacilityLogModal,
+    showOwnQrModal, qrModalUser,
     handleResolveRoomIssue, handleReopenRoomIssue, showUnassignedWarning, allUniqueTeacherProfiles,
     getEffectiveStorageUsedBytes, setIsFeedbackModalOpen, setShowAgb, setShowAvvModal,
     setShowDpoIdCardModal, setShowDpoPortalModal, setShowFacilityLogModal, setShowGuidanceModal,
@@ -661,6 +671,9 @@ export function SecretaryDashboard({
       {/* LEFT SIDEBAR PANEL - GLASS WITH BLUR */}
       <SecretarySidebar
         activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         secretarySubTab={secretarySubTab}
         setSecretarySubTab={setSecretarySubTab}
         campusSubTab={campusSubTab}
@@ -668,6 +681,7 @@ export function SecretaryDashboard({
         groovelabSubTab={groovelabSubTab}
         setGroovelabSubTab={setGroovelabSubTab}
         hasCampusSub={hasCampusSub}
+        hasGroovelabSub={hasGroovelabSub}
         enabledCampusSubjects={enabledCampusSubjects}
         enabledCampusRooms={enabledCampusRooms}
         enabledCampusEvents={enabledCampusEvents}
@@ -679,6 +693,15 @@ export function SecretaryDashboard({
         setShowOwnQrModal={setShowOwnQrModal}
         onLogout={onLogout}
         handleSecretaryLogout={handleSecretaryLogout}
+        schoolName={schoolName}
+        isCurrentUserTeacher={isCurrentUserTeacher}
+        onRoleSwitched={onRoleSwitched}
+        trialDaysRemaining={trialDaysRemaining}
+        isSchoolTrial={isSchoolTrial}
+        onOpenPrivacy={() => setShowPrivacy(true)}
+        onOpenAgb={() => setShowAgb(true)}
+        onOpenImpressum={() => setShowPrivacy(true)}
+        onOpenAccessibility={() => setShowPrivacy(true)}
       />
 
       {/* RIGHT CONTENT PANE */}

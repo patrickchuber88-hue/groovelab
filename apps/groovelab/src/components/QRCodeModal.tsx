@@ -181,8 +181,8 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     const roleLower = (user.role || '').toLowerCase();
     const isAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
 
-    let originalUrl = user.photo_url || '/avatar_ghost.jpg';
-    if (isAdminOrSecretary && activePlatform === 'campus') {
+    let originalUrl = '/avatars/gitarre_avatar_new.png';
+    if (isAdminOrSecretary || activePlatform === 'secretary') {
       originalUrl = '/campus_login_hero.png';
     } else if (activePlatform === 'campus') {
       originalUrl = resolveCampusStudentAvatar(user);
