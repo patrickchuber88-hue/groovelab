@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Lock, Key, Fingerprint, Delete, LogOut, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../../utils/webauthn';
+import { StudioAvatar } from '../StudioAvatar';
 
 interface SessionLockModalProps {
   user: any;
   supabase: any;
   schoolData?: any;
   activePlatform?: string;
+  activeWorkspace?: string | null;
   onUnlock: () => void;
   onLogout: () => void;
 }
@@ -15,6 +17,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
   user,
   supabase,
   activePlatform = 'campus',
+  activeWorkspace,
   onUnlock,
   onLogout
 }) => {
@@ -27,7 +30,11 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' || user?.role === 'master_admin';
+  // Determine resilient active platform and workspace (with storage fallback on reload)
+  const effectivePlatform = activePlatform || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'campus') || 'campus';
+  const effectiveWorkspace = activeWorkspace || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null);
+
+  const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' || user?.role === 'master_admin' || effectiveWorkspace === 'admin' || effectiveWorkspace === 'secretary';
   const webAuthnAvailable = isWebAuthnSupported();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,8 +45,14 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
     (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') || 
     'Angemeldeter Benutzer';
 
-  // Determine role title
+  // Determine role title according to active dashboard/workspace
   const getRoleLabel = () => {
+    if (effectiveWorkspace === 'admin') {
+      return 'Schulleitung & Administration';
+    }
+    if (effectiveWorkspace === 'secretary') {
+      return 'Sekretariat & Verwaltung';
+    }
     switch (user?.role) {
       case 'admin':
         return 'Schulleitung & Administration';
@@ -54,18 +67,6 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
       default:
         return 'Benutzer';
     }
-  };
-
-  // Determine user avatar per platform rules
-  const getAvatarSrc = () => {
-    // Platform rule: admin and secretary strictly use briefing board image across all modules
-    if (user?.role === 'admin' || user?.role === 'secretary') {
-      return '/campus_login_hero.png';
-    }
-    if (activePlatform === 'groovelab') {
-      return user?.avatar_url || user?.photo_url || '/avatar_ghost.jpg';
-    }
-    return user?.photo_url || user?.avatar_url || '/default_avatar.png';
   };
 
   // Trigger error shake feedback
@@ -292,13 +293,16 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
               justifyContent: 'center'
             }}
           >
-            <img
-              src={getAvatarSrc()}
-              alt={displayName}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/campus_login_hero.png';
+            <StudioAvatar
+              src={user?.avatar_url || user?.photo_url}
+              user={{
+                ...user,
+                role: (effectiveWorkspace === 'teacher' || (!effectiveWorkspace && user?.role === 'teacher')) ? 'teacher' : (effectiveWorkspace || user?.role),
+                isTeacherContext: (effectiveWorkspace === 'teacher' || (!effectiveWorkspace && user?.role === 'teacher')),
+                resolved_instrument: user?.resolved_instrument || user?.instrument || 'Gitarre'
               }}
+              activePlatform={effectivePlatform}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
           <div

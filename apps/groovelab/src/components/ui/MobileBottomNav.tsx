@@ -153,30 +153,34 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const getMenuItems = (): MenuItem[] => {
     if (userRole === 'student') {
       if (activePlatform === 'campus') {
-        const isAdultStudent = (() => {
+        const cachedUser = (() => {
           try {
             const raw = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user');
-            if (raw) {
-              const u = JSON.parse(raw);
-              if (u?.is_adult === true) return true;
-              const rawBd = u?.birthdate || u?.birth_date;
-              if (rawBd) {
-                const bd = new Date(rawBd);
-                if (!isNaN(bd.getTime())) {
-                  const age = Math.abs(new Date(Date.now() - bd.getTime()).getUTCFullYear() - 1970);
-                  if (age >= 18) return true;
-                }
-              }
-            }
+            if (raw) return JSON.parse(raw);
           } catch {}
+          return null;
+        })();
+
+        const isAdultStudent = (() => {
+          if (cachedUser?.is_adult === true) return true;
+          const rawBd = cachedUser?.birthdate || cachedUser?.birth_date;
+          if (rawBd) {
+            const bd = new Date(rawBd);
+            if (!isNaN(bd.getTime())) {
+              const age = Math.abs(new Date(Date.now() - bd.getTime()).getUTCFullYear() - 1970);
+              if (age >= 18) return true;
+            }
+          }
           return false;
         })();
         const isMinorStudent = !isAdultStudent;
         const isParentProtected = isMinorStudent && !parentUnlocked;
 
+        const isMeisterwerkEnabled = (cachedUser?.schools?.opening_hours?.gl_campus_meisterwerk_enabled !== false && cachedUser?.school?.opening_hours?.gl_campus_meisterwerk_enabled !== false) || parentUnlocked;
+
         const allItems: MenuItem[] = [
           { id: 'briefing', label: 'Briefing', icon: Monitor },
-          { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
+          ...(isMeisterwerkEnabled ? [{ id: 'homework_book', label: 'Aufgaben', icon: BookOpen }] : []),
           { id: 'practice_board', label: 'Übe-Pfad', icon: Zap },
           { id: 'events', label: 'Termine', icon: Calendar },
           { id: 'campus_cup', label: 'Performance', icon: Trophy },

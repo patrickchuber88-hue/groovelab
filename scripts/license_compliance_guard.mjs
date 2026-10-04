@@ -93,17 +93,48 @@ function readJson(filePath) {
 }
 
 const rootPkg = readJson(path.join(ROOT_DIR, 'package.json')) || {};
-const appPkg = readJson(path.join(ROOT_DIR, 'apps', 'groovelab', 'package.json')) || {};
-const sharedPkg = readJson(path.join(ROOT_DIR, 'packages', 'shared', 'package.json')) || {};
+
+// Dynamically discover all workspaces
+const workspaceDirs = [];
+const internalPackageNames = new Set([rootPkg.name || 'groovelab-monorepo']);
+
+const workspaceGlobs = Array.isArray(rootPkg.workspaces) ? rootPkg.workspaces : ['apps/*', 'packages/*'];
+for (const globPattern of workspaceGlobs) {
+  const baseDirName = globPattern.replace(/\/\*$/, '');
+  const baseDirPath = path.join(ROOT_DIR, baseDirName);
+  if (fs.existsSync(baseDirPath)) {
+    const subDirs = fs.readdirSync(baseDirPath, { withFileTypes: true });
+    for (const sub of subDirs) {
+      if (sub.isDirectory()) {
+        const candidateDir = path.join(baseDirPath, sub.name);
+        const pkgJsonFile = path.join(candidateDir, 'package.json');
+        if (fs.existsSync(pkgJsonFile)) {
+          workspaceDirs.push(candidateDir);
+          const pkgData = readJson(pkgJsonFile);
+          if (pkgData && pkgData.name) {
+            internalPackageNames.add(pkgData.name);
+          }
+        }
+      }
+    }
+  }
+}
 
 const allProductionDeps = {
-  ...(rootPkg.dependencies || {}),
-  ...(appPkg.dependencies || {}),
-  ...(sharedPkg.dependencies || {})
+  ...(rootPkg.dependencies || {})
 };
 
-const depNames = Object.keys(allProductionDeps).sort();
-process.stdout.write(`  📦 Auditing ${depNames.length} production dependencies across Monorepo workspaces\n\n`);
+for (const wsDir of workspaceDirs) {
+  const wsPkg = readJson(path.join(wsDir, 'package.json')) || {};
+  Object.assign(allProductionDeps, wsPkg.dependencies || {});
+}
+
+// Filter out internal workspace packages
+const depNames = Object.keys(allProductionDeps)
+  .filter(dep => !internalPackageNames.has(dep))
+  .sort();
+
+process.stdout.write(`  📦 Auditing ${depNames.length} production dependencies across Monorepo workspaces (${workspaceDirs.length} workspaces)\n\n`);
 
 // -----------------------------------------------------------------------------
 // CHECK 1: Production Dependency License Audit
@@ -112,10 +143,20 @@ let copyleftViolations = [];
 let auditedLicenses = [];
 let unknownLicenses = [];
 
+const searchDirs = [
+  ROOT_DIR,
+  path.join(ROOT_DIR, 'apps', 'groovelab'),
+  ...workspaceDirs
+];
+
 for (const dep of depNames) {
-  let pkgJsonPath = path.join(ROOT_DIR, 'node_modules', dep, 'package.json');
-  if (!fs.existsSync(pkgJsonPath)) {
-    pkgJsonPath = path.join(ROOT_DIR, 'apps', 'groovelab', 'node_modules', dep, 'package.json');
+  let pkgJsonPath = null;
+  for (const sDir of searchDirs) {
+    const candidate = path.join(sDir, 'node_modules', dep, 'package.json');
+    if (fs.existsSync(candidate)) {
+      pkgJsonPath = candidate;
+      break;
+    }
   }
 
   let rawLicense = 'UNKNOWN';

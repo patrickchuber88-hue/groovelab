@@ -174,7 +174,12 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
   }, []);
 
   // Main state
-  const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>(() => {
+    if (typeof window === 'undefined') return 'designer';
+    const isSec = (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) === 'secretary';
+    const draft = readInitialTeacherDraftState(userId);
+    return (isSec || Boolean(draft?.submittedDraftId) || draft?.drafts?.some((d: any) => d.status === 'ready_for_admin_review' || d.status === 'approved')) ? 'calendar' : 'designer';
+  });
   const [schoolProfile, setSchoolProfile] = useState<{ name?: string; subdomain?: string } | null>(null);
 
   useEffect(() => {
@@ -2289,19 +2294,11 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       setBoards(reconstructedBoards);
       setStudents(finalGroupedStudents);
       
-      // Rule 1: Set activeTab dynamically on initial load. The 'calendar' tab opens as the start page whenever rooms are assigned or schedule is approved!
+      // Rule 1: Set activeTab dynamically on initial load. Lehrkräfte ohne eingereichten Stundenplan landen im Designer.
       if (!isInitialLoadDone) {
-        const hasAllocatedRooms = reconstructedBoards.some((b: any) => !!b.roomId);
-        const draftMapStr = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`) : null;
-        const hasDraftAllocations = !!draftMapStr && draftMapStr !== '{}';
-        const isScheduleApproved = (schedData && schedData.length > 0 && schedData.filter((s: any) => s.student_id !== null).every((s: any) => s.status === 'approved'));
-        const isUnlocked = isScheduleApproved || hasAllocatedRooms || hasDraftAllocations || (schedData && schedData.length > 0) || true;
-
-        if (isUnlocked) {
-          setActiveTab('calendar');
-        } else {
-          setActiveTab('designer');
-        }
+        const hasSubmitted = (schedData && schedData.length > 0) || Boolean(loadedSubmittedDraftId) || (loadedDrafts.some(d => (d as any).status === 'ready_for_admin_review' || (d as any).status === 'approved'));
+        const isUnlocked = isSecretaryWorkspace || hasSubmitted;
+        setActiveTab(isUnlocked ? 'calendar' : 'designer');
       }
       
       setIsInitialLoadDone(true);
@@ -4887,6 +4884,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
       // Generate PDF Backup & Celebration
       await generatePDFBackup(validBoards, students);
+      setHasSubmittedSchedule(true);
+      setSubmittedDraftId(currentActiveId);
+      setScheduleStatus('pending');
       setShowCelebration(true);
       setToast({ message: 'Stundenplan zur Prüfung an die Verwaltung übermittelt! Bis zur Freigabe bleibt der bisherige Plan aktiv.', type: 'success' });
     } catch (err: any) {
@@ -5444,48 +5444,22 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
               {/* Center: Tab-Switcher (Full Width on Mobile) */}
               <div style={{ display: 'flex', alignItems: 'center', width: isMobilePortrait ? '100%' : 'auto', boxSizing: 'border-box' }}>
-                <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center', width: isMobilePortrait ? '100%' : 'auto', boxSizing: 'border-box' }}>
-                  <button 
-                    type="button"
-                    onClick={() => setActiveTab('calendar')}
-                    className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                    style={{
-                      padding: '6px 8px',
-                      fontSize: '0.76rem',
-                      lineHeight: '1.2',
-                      opacity: 1,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      flex: isMobilePortrait ? 1 : undefined,
-                      textAlign: 'center',
-                      whiteSpace: 'nowrap'
-                    }}
-                    title="Wöchentlicher freigegebener Stundenplan"
-                  >
-                    <Calendar size={12} style={{ opacity: 0.9 }} />
-                    <span>Stundenplan</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setActiveTab('designer')}
-                    className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                    style={{ 
-                      padding: '6px 8px', 
-                      fontSize: '0.76rem', 
-                      lineHeight: '1.2',
-                      flex: isMobilePortrait ? 1 : undefined,
-                      textAlign: 'center',
-                      justifyContent: 'center',
-                      display: 'inline-flex',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Stundenplan-Designer
-                  </button>
-                </div>
+                {(!isSecretaryWorkspace && !hasSubmittedSchedule) ? (
+                  <div id="tour-calendar-switch" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '100px', padding: '5px 14px', fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', backdropFilter: 'blur(16px) saturate(180%)', minHeight: '36px', width: isMobilePortrait ? '100%' : 'auto', boxSizing: 'border-box' }} title="Stundenplan-Designer (Erst-Einrichtung)">
+                    <Sliders size={13} style={{ color: brandColor }} />
+                    <span>Stundenplan-Designer</span>
+                  </div>
+                ) : (
+                  <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center', width: isMobilePortrait ? '100%' : 'auto', boxSizing: 'border-box' }}>
+                    <button type="button" onClick={() => setActiveTab('calendar')} className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`} style={{ padding: '6px 8px', fontSize: '0.76rem', lineHeight: '1.2', opacity: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', flex: isMobilePortrait ? 1 : undefined, textAlign: 'center', whiteSpace: 'nowrap' }} title="Wöchentlicher freigegebener Stundenplan">
+                      <Calendar size={12} style={{ opacity: 0.9 }} />
+                      <span>Stundenplan</span>
+                    </button>
+                    <button type="button" onClick={() => setActiveTab('designer')} className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`} style={{ padding: '6px 8px', fontSize: '0.76rem', lineHeight: '1.2', flex: isMobilePortrait ? 1 : undefined, textAlign: 'center', justifyContent: 'center', display: 'inline-flex', whiteSpace: 'nowrap' }}>
+                      Stundenplan-Designer
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Right: Didactic Purpose & Secretariat Approval Disclaimer Badge (Desktop Only) */}
@@ -5781,6 +5755,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           <button
             onClick={() => {
               setShowCelebration(false);
+              setActiveTab('calendar');
               loadInitialData();
             }}
             style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}

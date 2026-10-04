@@ -35,7 +35,9 @@ const guards = [
   { id: 'STATIC_HEADERS', name: 'Static Security Headers Guard (Mozilla A+)', cmd: 'node', args: ['scripts/verify_static_security_headers.mjs'] },
   { id: 'SECRET_SCANNER', name: 'Secret Leak & Entropy Scanner', cmd: 'bash', args: ['scripts/pre_commit_secret_scanner.sh'] },
   { id: 'ISO27001_COMPLIANCE', name: 'ISO/IEC 27001 & ISO 27701 Compliance Guard', cmd: 'node', args: ['scripts/iso27001_compliance_guard.mjs'] },
-  { id: 'MONOLITH_CAP_GUARD', name: 'Monolith Ceiling & Zero-Inline-Feature Guard', cmd: 'node', args: ['scripts/monolith_growth_guard.mjs'] }
+  { id: 'MONOLITH_CAP_GUARD', name: 'Monolith Ceiling & Zero-Inline-Feature Guard', cmd: 'node', args: ['scripts/monolith_growth_guard.mjs'] },
+  { id: 'NEUTRAL_AUSFALL', name: 'Neutral Ausfall Guard (DSGVO Art. 9 / No Sick Tokens)', cmd: 'node', args: ['scripts/verify_neutral_ausfall_invariants.mjs'] },
+  { id: 'PARENT_PORTAL_GOVERNANCE', name: 'Parental Governance & Child Protection Guard (OWASP/BGB/DSGVO)', cmd: 'node', args: ['scripts/parent_portal_governance_guard.mjs'] }
 ];
 
 function runGuardAsync(guard) {

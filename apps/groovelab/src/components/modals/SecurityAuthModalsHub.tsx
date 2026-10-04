@@ -12,6 +12,7 @@ export interface SecurityAuthModalsHubProps {
   schoolUsers?: any[];
   supabase: any;
   activePlatform: string;
+  activeWorkspace?: string | null;
 
   // Admin Security Suite & Quarterly Report
   showAdminSecuritySuiteModal: boolean;
@@ -49,6 +50,7 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
   schoolUsers = [],
   supabase,
   activePlatform,
+  activeWorkspace,
 
   showAdminSecuritySuiteModal,
   onCloseAdminSecuritySuite,
@@ -120,6 +122,7 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
             supabase={supabase}
             schoolData={school}
             activePlatform={activePlatform}
+            activeWorkspace={activeWorkspace}
             onUnlock={onUnlockSession}
             onLogout={onLogoutSession}
           />

@@ -483,7 +483,8 @@ function test360UiParity() {
   const LEGAL_DOCS = [
     'LegalTextModal', 'LegalConsentGate', 'DpoAuditPortal', 'InvoicePreviewModal',
     'licenseUtils', 'AVVModal', 'FeedbackHubModal', 'TrustSafetyTab',
-    'ParentCampusActivationModal', 'LoginScreen', 'QRLandingPage'
+    'ParentCampusActivationModal', 'LoginScreen', 'QRLandingPage',
+    'CourtProofExportModal', 'PublicContractVerificationView'
   ];
 
   function stripComments(code: string): string {

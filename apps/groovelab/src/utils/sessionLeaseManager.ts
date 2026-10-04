@@ -187,9 +187,16 @@ export interface UserSessionLease {
  */
 export async function fetchActiveUserSessionLeases(userId: string): Promise<UserSessionLease[]> {
   try {
+    const currentKey = getOrCreateDeviceKey();
+    const activeLeaseId = typeof window !== 'undefined' 
+      ? (sessionStorage.getItem(ACTIVE_LEASE_STORAGE) || sessionStorage.getItem('gl_parent_session_lease')) 
+      : null;
+
     const { data, error } = await supabase.rpc('get_user_session_leases', {
       p_user_id: userId
     });
+    
+    let rawLeases: any[] = [];
     if (error) {
       // Fallback direct query on session_leases
       const { data: directData, error: directErr } = await supabase
@@ -200,13 +207,50 @@ export async function fetchActiveUserSessionLeases(userId: string): Promise<User
         .order('last_active_at', { ascending: false });
 
       if (directErr) throw directErr;
-      const currentKey = getOrCreateDeviceKey();
-      return (directData || []).map((d: any) => ({
-        ...d,
-        is_current: d.device_key === currentKey
-      }));
+      rawLeases = directData || [];
+    } else {
+      rawLeases = Array.isArray(data) ? data : [];
     }
-    return Array.isArray(data) ? data : [];
+
+    // 0,1% Goldstandard: Exakt EINE einzige Lease darf als is_current (Aktiv) markiert werden!
+    // 1. Priorität: Lease mit exakter activeLeaseId aus sessionStorage
+    // 2. Priorität: Die chronologisch NEUESTE Lease mit d.device_key === currentKey
+    // 3. Priorität: Fallback d.is_current === true (aus DB-RPC)
+    let currentLeaseId: string | null = null;
+
+    if (activeLeaseId) {
+      const matchByToken = rawLeases.find((d: any) => String(d.id) === String(activeLeaseId));
+      if (matchByToken) {
+        currentLeaseId = String(matchByToken.id);
+      }
+    }
+
+    if (!currentLeaseId && currentKey) {
+      // rawLeases ist bereits nach last_active_at DESC sortiert -> find() liefert die jüngste Sitzung dieses Geräts
+      const matchByDevice = rawLeases.find((d: any) => d.device_key && String(d.device_key) === String(currentKey));
+      if (matchByDevice) {
+        currentLeaseId = String(matchByDevice.id);
+      }
+    }
+
+    if (!currentLeaseId) {
+      const matchByDb = rawLeases.find((d: any) => d.is_current === true);
+      if (matchByDb) {
+        currentLeaseId = String(matchByDb.id);
+      }
+    }
+
+    // Fallback: Wenn noch kein Match vorliegt, ist die jüngste Lease die aktive Sitzung dieses Geräts
+    if (!currentLeaseId && rawLeases.length > 0) {
+      currentLeaseId = String(rawLeases[0].id);
+    }
+
+    const leases = rawLeases.map((d: any) => ({
+      ...d,
+      is_current: currentLeaseId ? String(d.id) === currentLeaseId : false
+    }));
+
+    return leases;
   } catch (err) {
     console.error('[SessionLease] Error fetching user session leases:', err);
     return [];

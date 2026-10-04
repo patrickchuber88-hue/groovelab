@@ -26,6 +26,23 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
   const [dynamicHash, setDynamicHash] = useState<string>(auditChecksum || '');
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     if (auditChecksum) {
       setDynamicHash(auditChecksum);
       return;
@@ -107,11 +124,18 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
     }, 150);
   };
 
+  if (!isOpen) return null;
+
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="avv-cert-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       style={{
         position: 'fixed',
         inset: 0,

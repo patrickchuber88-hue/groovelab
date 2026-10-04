@@ -183,6 +183,36 @@ export function useSecretaryExtendedSettings({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
 
+  // 🔄 Autoritatives Hydrieren aus schools.opening_hours (Beseitigung des Zurückspringens)
+  useEffect(() => {
+    const oh = currentSchoolProfile?.opening_hours;
+    if (!oh || typeof oh !== 'object') return;
+
+    if (oh.gl_campus_homework_notes_sync !== undefined) setCampusHomeworkNotesSync(Boolean(oh.gl_campus_homework_notes_sync));
+    if (oh.gl_campus_meisterwerk_enabled !== undefined) setCampusMeisterwerkEnabled(Boolean(oh.gl_campus_meisterwerk_enabled));
+    if (oh.gl_campus_focus_timer_default_min !== undefined) setCampusFocusTimerDefaultMin(Number(oh.gl_campus_focus_timer_default_min));
+    if (oh.gl_campus_focus_timer_xp_factor !== undefined) setCampusFocusTimerXpFactor(Number(oh.gl_campus_focus_timer_xp_factor));
+    if (oh.gl_campus_loopstation_bars_pause !== undefined) setCampusLoopstationBarsPause(Number(oh.gl_campus_loopstation_bars_pause));
+    if (oh.gl_campus_audio_max_min !== undefined) setCampusAudioMaxSessionMinutes(Number(oh.gl_campus_audio_max_min));
+    if (oh.gl_campus_schedule_slot_min !== undefined) setCampusScheduleSlotMinutes(Number(oh.gl_campus_schedule_slot_min));
+    if (oh.gl_campus_schedule_conflict_warning !== undefined) setCampusScheduleConflictWarning(Boolean(oh.gl_campus_schedule_conflict_warning));
+    if (oh.gl_campus_parent_absence_notify !== undefined) setCampusParentAbsenceNotify(Boolean(oh.gl_campus_parent_absence_notify));
+    if (oh.gl_campus_parent_chat_enabled !== undefined) setCampusParentChatEnabled(Boolean(oh.gl_campus_parent_chat_enabled));
+    if (oh.gl_campus_parent_stats_enabled !== undefined) setCampusParentStatsEnabled(Boolean(oh.gl_campus_parent_stats_enabled));
+    if (oh.gl_max_band_members !== undefined) setGlMaxBandMembers(Number(oh.gl_max_band_members));
+    if (oh.gl_allow_student_band_creation !== undefined) setGlAllowStudentBandCreation(Boolean(oh.gl_allow_student_band_creation));
+    if (oh.gl_song_level_starter !== undefined) setGlSongLevelStarterEnabled(Boolean(oh.gl_song_level_starter));
+    if (oh.gl_song_level_pro !== undefined) setGlSongLevelProEnabled(Boolean(oh.gl_song_level_pro));
+    if (oh.gl_song_level_master !== undefined) setGlSongLevelMasterEnabled(Boolean(oh.gl_song_level_master));
+    if (oh.gl_song_proposal_workflow !== undefined) setGlSongProposalWorkflow(Boolean(oh.gl_song_proposal_workflow));
+    if (oh.gl_live_default_bpm !== undefined) setGlLiveDefaultBpm(Number(oh.gl_live_default_bpm));
+    if (oh.gl_live_count_in_bars !== undefined) setGlLiveCountInBars(Number(oh.gl_live_count_in_bars));
+    if (oh.gl_live_stage_display_enabled !== undefined) setGlLiveStageDisplayEnabled(Boolean(oh.gl_live_stage_display_enabled));
+    if (oh.gl_musician_avatars_enabled !== undefined) setGlMusicianAvatarsEnabled(Boolean(oh.gl_musician_avatars_enabled));
+    if (oh.gl_band_coat_of_arms_enabled !== undefined) setGlBandCoatOfArmsEnabled(Boolean(oh.gl_band_coat_of_arms_enabled));
+    if (oh.gl_band_chat_enabled !== undefined) setGlBandChatEnabled(Boolean(oh.gl_band_chat_enabled));
+  }, [currentSchoolProfile?.opening_hours]);
+
   // 4. Delinquency & Grace Period Architecture
   const [showDunningPayModal, setShowDunningPayModal] = useState<boolean>(false);
   const [trustRefreshToken, setTrustRefreshToken] = useState<number>(0);

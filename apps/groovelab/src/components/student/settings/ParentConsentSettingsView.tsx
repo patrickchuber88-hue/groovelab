@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { ShieldCheck, AlertTriangle, Check, Trash2 } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, Check, Trash2, X, Lock } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
 export interface ParentConsentSettingsViewProps {
-  studentUser: any;
+  studentUser: {
+    school_id?: string;
+    [key: string]: unknown;
+  } | null;
   studentId: string;
 }
 
@@ -12,23 +15,26 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
   studentId,
 }) => {
   const [showDeletionModal, setShowDeletionModal] = useState<boolean>(false);
+  const [showAudioPurgeModal, setShowAudioPurgeModal] = useState<boolean>(false);
   const [deletionRequested, setDeletionRequested] = useState<boolean>(false);
   const [isPurgingAudio, setIsPurgingAudio] = useState<boolean>(false);
   const [audioPurgeSuccess, setAudioPurgeSuccess] = useState<string | null>(null);
+  const [audioPurgeError, setAudioPurgeError] = useState<string | null>(null);
+  const [deletionError, setDeletionError] = useState<string | null>(null);
 
-  const handleImmediateAudioPurge = async () => {
-    if (!window.confirm('Möchtest du wirklich alle eigenen Übe-Audioaufnahmen sofort und unwiderruflich von den Servern löschen (Art. 17 DSGVO)?')) {
-      return;
-    }
+  const handleExecuteAudioPurge = async () => {
     try {
       setIsPurgingAudio(true);
+      setAudioPurgeError(null);
       const { data, error } = await supabase.rpc('purge_student_recordings_by_parent', {
         p_student_id: studentId
       });
       if (error) throw error;
-      setAudioPurgeSuccess(data?.message || 'Alle Aufnahmen wurden unverzüglich gelöscht.');
-    } catch (e: any) {
-      alert('Fehler beim Löschen: ' + (e?.message || e));
+      setAudioPurgeSuccess(data?.message || 'Alle Übe-Aufnahmen wurden unverzüglich und dauerhaft von den Servern gelöscht.');
+      setShowAudioPurgeModal(false);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setAudioPurgeError('Fehler beim Löschen: ' + (err?.message || String(e)));
     } finally {
       setIsPurgingAudio(false);
     }
@@ -36,23 +42,26 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
 
   const handleRequestGdprDeletion = async () => {
     try {
-      await supabase.from('gdpr_deletion_requests').insert({
+      setDeletionError(null);
+      const { error } = await supabase.from('gdpr_deletion_requests').insert({
         student_id: studentId,
         school_id: studentUser?.school_id || studentId,
         requested_by: studentId,
         scope: 'media_and_profile',
         status: 'pending'
       });
+      if (error) throw error;
       setDeletionRequested(true);
       setShowDeletionModal(false);
-    } catch (e) {
-      alert('Antrag konnte nicht übermittelt werden. Bitte wende dich an das Sekretariat.');
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setDeletionError('Antrag konnte nicht übermittelt werden: ' + (err?.message || 'Bitte wende dich an das Schulsekretariat.'));
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Zero-Photo Privacy-by-Design Certificate Card */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+      {/* 🏛️ 1. Zero-Photo & Privacy-by-Design Sicherheits-Zertifikat */}
       <div style={{
         background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
         borderRadius: '24px',
@@ -65,39 +74,40 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
           <div style={{
-            width: '52px',
-            height: '52px',
+            width: '54px',
+            height: '54px',
             borderRadius: '16px',
             background: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#16a34a',
-            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)',
+            color: '#15803d',
+            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.16)',
             flexShrink: 0
           }}>
-            <ShieldCheck size={30} strokeWidth={2.5} />
+            <ShieldCheck size={32} strokeWidth={2.4} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, fontSize: '1.20rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 Zero-Photo &amp; Privacy-by-Design Garantie
               </h3>
               <span style={{
-                background: '#16a34a',
+                background: '#15803d',
                 color: '#ffffff',
                 fontSize: '0.68rem',
                 fontWeight: 850,
-                padding: '3px 9px',
+                padding: '4px 10px',
                 borderRadius: '999px',
-                letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
               }}>
-                100% Biometriefrei
+                100% BIOMETRIEFREI
               </span>
             </div>
 
-            <p style={{ margin: '8px 0 0 0', fontSize: '0.82rem', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>
+            <p style={{ margin: '10px 0 0 0', fontSize: '0.86rem', color: '#1e293b', fontWeight: 600, lineHeight: 1.55 }}>
               <strong>Höchster Schutz für dein Kind:</strong> Campus-Groovelab speichert, verarbeitet und hostet ausnahmslos <strong>keine biometrischen Profilfotos</strong> oder Gesichtsaufnahmen von Schülern. 
             </p>
 
@@ -110,14 +120,15 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
               <div style={{
                 background: '#ffffff',
                 padding: '12px 14px',
-                borderRadius: '14px',
+                borderRadius: '16px',
                 border: '1px solid #bbf7d0',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
                 <Check size={18} color="#16a34a" strokeWidth={3} />
-                <span style={{ fontSize: '0.76rem', fontWeight: 750, color: '#0f172a' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   Ausschließliche Musiker- &amp; Instrumenten-Avatare
                 </span>
               </div>
@@ -125,14 +136,15 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
               <div style={{
                 background: '#ffffff',
                 padding: '12px 14px',
-                borderRadius: '14px',
+                borderRadius: '16px',
                 border: '1px solid #bbf7d0',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
                 <Check size={18} color="#16a34a" strokeWidth={3} />
-                <span style={{ fontSize: '0.76rem', fontWeight: 750, color: '#0f172a' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   Schutz vor Deepfakes, Cyber-Mobbing &amp; Tracking
                 </span>
               </div>
@@ -140,14 +152,15 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
               <div style={{
                 background: '#ffffff',
                 padding: '12px 14px',
-                borderRadius: '14px',
+                borderRadius: '16px',
                 border: '1px solid #bbf7d0',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
                 <Check size={18} color="#16a34a" strokeWidth={3} />
-                <span style={{ fontSize: '0.76rem', fontWeight: 750, color: '#0f172a' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   Keine Weitergabe an Social Media oder Werbenetzwerke
                 </span>
               </div>
@@ -155,207 +168,485 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
               <div style={{
                 background: '#ffffff',
                 padding: '12px 14px',
-                borderRadius: '14px',
+                borderRadius: '16px',
                 border: '1px solid #bbf7d0',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
                 <Check size={18} color="#16a34a" strokeWidth={3} />
-                <span style={{ fontSize: '0.76rem', fontWeight: 750, color: '#0f172a' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   100% BSI TR-03116 &amp; Art. 25 DSGVO konform
                 </span>
               </div>
             </div>
 
-            <p style={{ margin: '14px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
-              Aufgrund dieser strengen Sicherheitsarchitektur sind keine gesonderten Foto- oder Social-Media-Einwilligungen erforderlich. Dein Kind genießt maximale digitale Privatsphäre.
+            <p style={{ margin: '14px 0 0 0', fontSize: '0.80rem', color: '#334155', fontWeight: 550, lineHeight: 1.55 }}>
+              Aufgrund dieser strengen Sicherheitsarchitektur sind keine gesonderten Foto- oder Social-Media-Einwilligungen erforderlich. Dein Kind genießt maximale digitale Privatsphäre und verlässlichen KUG-Bildnisschutz.
             </p>
           </div>
         </div>
       </div>
 
-      {/* 🛡️ 1-Klick-Sofortlöschung für eigene Audioaufnahmen (Art. 17 Abs. 1 DSGVO) */}
+      {/* 🛡️ 2. Danger Zone: Recht auf Vergessenwerden (Art. 17 DSGVO) */}
       <div style={{
-        marginTop: '8px',
-        padding: '16px',
-        background: '#fef2f2',
-        border: '1.5px solid #fecaca',
-        borderRadius: '16px',
+        background: '#ffffff',
+        border: '1.5px solid #e2e8f0',
+        borderRadius: '24px',
+        padding: '22px',
+        boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04)',
+        textAlign: 'left',
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
-        textAlign: 'left'
+        gap: '16px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Trash2 size={18} color="#dc2626" />
-            <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 850, color: '#991b1b' }}>
-              Sofortige Löschung aller Übe-Audioaufnahmen (Art. 17 DSGVO)
-            </h4>
+        {/* Header Sektion */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: '#fee2e2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#dc2626'
+            }}>
+              <Trash2 size={20} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Recht auf Vergessenwerden (Art. 17 DSGVO)
+              </h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                Autonome Eltern-Souveränität über Medien und Profildaten
+              </p>
+            </div>
           </div>
           <span style={{
-            background: '#ffffff',
-            color: '#dc2626',
-            border: '1px solid #fca5a5',
-            padding: '2px 8px',
+            background: '#f8fafc',
+            color: '#475569',
+            border: '1px solid #cbd5e1',
+            padding: '3px 10px',
             borderRadius: '999px',
-            fontSize: '0.66rem',
-            fontWeight: 800
+            fontSize: '0.68rem',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '0.03em'
           }}>
-            Autonome Eltern-Souveränität
+            Art. 17 DSGVO
           </span>
         </div>
-        <p style={{ margin: 0, fontSize: '0.75rem', color: '#7f1d1d', lineHeight: 1.45 }}>
-          Löscht alle von deinem Kind erstellten Instrumental-Aufnahmen unverzüglich und dauerhaft von den Plattform-Servern. Dein Schulkonto und Unterrichtspläne bleiben vollständig erhalten.
-        </p>
 
-        {audioPurgeSuccess ? (
+        {/* Global Feedback Banners */}
+        {audioPurgeSuccess && (
           <div style={{
             background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
             color: '#166534',
-            padding: '8px 12px',
-            borderRadius: '10px',
-            fontSize: '0.76rem',
+            padding: '12px 16px',
+            borderRadius: '14px',
+            fontSize: '0.80rem',
             fontWeight: 750,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '10px'
           }}>
-            <span>✓</span>
+            <Check size={18} color="#16a34a" />
             <span>{audioPurgeSuccess}</span>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleImmediateAudioPurge}
-            disabled={isPurgingAudio}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: '#dc2626',
-              color: '#ffffff',
-              fontSize: '0.78rem',
-              fontWeight: 850,
-              cursor: isPurgingAudio ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              touchAction: 'manipulation',
-              boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)',
-              opacity: isPurgingAudio ? 0.6 : 1
-            }}
-          >
-            <Trash2 size={15} />
-            <span>{isPurgingAudio ? 'Wird physisch gelöscht...' : 'Alle Übe-Aufnahmen jetzt sofort löschen'}</span>
-          </button>
         )}
-      </div>
 
-      {/* Revisionssicherer Löschantrag */}
-      <div style={{
-        marginTop: '8px',
-        padding: '16px',
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        textAlign: 'left'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AlertTriangle size={18} color="#94a3b8" />
-          <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 850, color: '#334155' }}>
-            Recht auf vollständige Datenlöschung
-          </h4>
-        </div>
-        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45 }}>
-          Du hast das Recht, alle nicht gesetzlich aufbewahrungspflichtigen Daten (Audios, Memos, Übestatistiken) löschen zu lassen. Gesetzliche Buchungsbelege bleiben gemäß gesetzlicher Aufbewahrungspflicht für 10 Jahre revisionssicher archiviert.
-        </p>
+        {audioPurgeError && (
+          <div style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+            padding: '12px 16px',
+            borderRadius: '14px',
+            fontSize: '0.80rem',
+            fontWeight: 750,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <AlertTriangle size={18} color="#dc2626" />
+            <span>{audioPurgeError}</span>
+          </div>
+        )}
 
-        {deletionRequested ? (
+        {deletionRequested && (
           <div style={{
             background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
             color: '#166534',
-            padding: '8px 12px',
-            borderRadius: '10px',
-            fontSize: '0.76rem',
-            fontWeight: 750
+            padding: '12px 16px',
+            borderRadius: '14px',
+            fontSize: '0.80rem',
+            fontWeight: 750,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
           }}>
-            ✓ Dein Löschantrag wurde erfasst und wird vom Sekretariat fristgerecht bearbeitet.
+            <Check size={18} color="#16a34a" />
+            <span>✓ Dein Löschantrag wurde erfasst und wird vom Sekretariat fristgerecht bearbeitet.</span>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowDeletionModal(true)}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '1px solid #fecaca',
-              background: '#fef2f2',
-              color: '#991b1b',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Trash2 size={15} />
-            Löschantrag stellen
-          </button>
         )}
-      </div>
 
-      {/* Bestätigungsmodal für Datenlöschung */}
-      {showDeletionModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          zIndex: 99999
-        }}>
+        {deletionError && (
           <div style={{
-            background: '#ffffff',
-            borderRadius: '20px',
-            padding: '24px',
-            maxWidth: '400px',
-            width: '100%',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            textAlign: 'center'
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+            padding: '12px 16px',
+            borderRadius: '14px',
+            fontSize: '0.80rem',
+            fontWeight: 750,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
           }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              background: '#fee2e2',
-              color: '#dc2626',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px'
-            }}>
-              <AlertTriangle size={24} />
+            <AlertTriangle size={18} color="#dc2626" />
+            <span>{deletionError}</span>
+          </div>
+        )}
+
+        {/* 2-Klassen-Löscharchitektur Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '14px'
+        }}>
+          {/* Stufe 1: Autonome Audio-Sofortlöschung */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1.5px solid #f1f5f9',
+            borderRadius: '18px',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 850,
+                  color: '#b91c1c',
+                  background: '#fee2e2',
+                  padding: '2px 8px',
+                  borderRadius: '6px'
+                }}>
+                  Sofortig
+                </span>
+                <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                  Eigene Übe-Audios löschen
+                </h5>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.45, fontWeight: 550 }}>
+                Löscht alle selbst eingespielten Audioaufnahmen und Sprachmemos unwiderruflich von den Servern. Schulkonto, Noten und Stundenplan bleiben unberührt.
+              </p>
             </div>
 
-            <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 850, color: '#0f172a' }}>
-              Vollständige Datenlöschung beantragen?
-            </h3>
-            <p style={{ margin: 0, fontSize: '0.80rem', color: '#475569', lineHeight: 1.5 }}>
+            <button
+              type="button"
+              onClick={() => setShowAudioPurgeModal(true)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '12px',
+                border: '1.5px solid #fecaca',
+                background: '#ffffff',
+                color: '#b91c1c',
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                touchAction: 'manipulation',
+                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              }}
+              className="hover-scale"
+            >
+              <Trash2 size={15} />
+              <span>Übe-Aufnahmen jetzt löschen</span>
+            </button>
+          </div>
+
+          {/* Stufe 2: Formeller DSGVO-Löschantrag */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1.5px solid #f1f5f9',
+            borderRadius: '18px',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '14px'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 850,
+                  color: '#475569',
+                  background: '#e2e8f0',
+                  padding: '2px 8px',
+                  borderRadius: '6px'
+                }}>
+                  Sekretariat
+                </span>
+                <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                  Vollständigen Löschantrag stellen
+                </h5>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.45, fontWeight: 550 }}>
+                Beantragt die Löschung aller nicht gesetzlich aufbewahrungspflichtigen Daten. Revisionssichere Buchungsbelege bleiben gemäß 147 AO für 10 Jahre archiviert.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={deletionRequested}
+              onClick={() => setShowDeletionModal(true)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '12px',
+                border: '1.5px solid #cbd5e1',
+                background: deletionRequested ? '#f1f5f9' : '#ffffff',
+                color: deletionRequested ? '#94a3b8' : '#334155',
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                cursor: deletionRequested ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                touchAction: 'manipulation',
+                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              }}
+              className={deletionRequested ? "" : "hover-scale"}
+            >
+              <AlertTriangle size={15} />
+              <span>{deletionRequested ? 'Antrag bereits eingereicht' : 'Löschantrag einreichen'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 🛡️ In-App Modal 1: Bestätigung Audio-Sofortlöschung (Two-Step, Fail-Closed) */}
+      {showAudioPurgeModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="audio-purge-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.70)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            zIndex: 99999
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isPurgingAudio) {
+              setShowAudioPurgeModal(false);
+            }
+          }}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '28px',
+            maxWidth: '460px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            border: '1.5px solid #fecaca',
+            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                background: '#fee2e2',
+                color: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 id="audio-purge-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Übe-Aufnahmen löschen?
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 750 }}>
+                  Unwiderrufliche Server-Bereinigung (Art. 17 DSGVO)
+                </span>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.55 }}>
+              Möchtest du wirklich alle selbst erstellten Instrumental-Aufnahmen und Sprachmemos deines Kindes dauerhaft von den Plattform-Servern tilgen?
+            </p>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#991b1b', fontWeight: 700 }}>
+                <span>✕</span>
+                <span>Wird unwiderruflich gelöscht: Alle Audio-Dateien &amp; Memos</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#166534', fontWeight: 700 }}>
+                <span>✓</span>
+                <span>Bleibt 100% erhalten: Schülerkonto, Noten, Stundenpläne &amp; Sticker</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button
+                type="button"
+                disabled={isPurgingAudio}
+                onClick={() => setShowAudioPurgeModal(false)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#475569',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: isPurgingAudio ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                disabled={isPurgingAudio}
+                onClick={handleExecuteAudioPurge}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 850,
+                  fontSize: '0.82rem',
+                  cursor: isPurgingAudio ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                }}
+              >
+                <Trash2 size={15} />
+                <span>{isPurgingAudio ? 'Wird physisch gelöscht...' : 'Jetzt unwiderruflich löschen'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🛡️ In-App Modal 2: Bestätigung DSGVO-Löschantrag (Art. 17 DSGVO) */}
+      {showDeletionModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gdpr-deletion-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.70)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            zIndex: 99999
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDeletionModal(false);
+            }
+          }}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '28px',
+            maxWidth: '460px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            border: '1.5px solid #e2e8f0',
+            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                background: '#fee2e2',
+                color: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 id="gdpr-deletion-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Löschantrag nach Art. 17 DSGVO
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 750 }}>
+                  Offizielle Übermittlung an das Schulsekretariat
+                </span>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.55 }}>
               Dieser Antrag veranlasst die dauerhafte Löschung aller Übungsaufnahmen, Chat-Verläufe und Sticker-Fortschritte deines Kindes. Dieser Vorgang kann <strong>nicht rückgängig</strong> gemacht werden.
             </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              fontSize: '0.76rem',
+              color: '#64748b',
+              lineHeight: 1.45
+            }}>
+              Hinweis: Gesetzliche Buchungsbelege und Vertragsunterlagen bleiben gemäß steuerlicher Aufbewahrungspflicht (147 AO) für 10 Jahre revisionssicher archiviert.
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
               <button
                 type="button"
                 onClick={() => setShowDeletionModal(false)}
@@ -383,7 +674,8 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                   color: '#ffffff',
                   fontWeight: 850,
                   fontSize: '0.82rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
                 }}
               >
                 Antrag verbindlich absenden

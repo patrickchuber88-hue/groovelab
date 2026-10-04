@@ -10,6 +10,7 @@ export interface UniversalPdfPreviewModalProps {
   filename?: string;
   pdfBlob?: Blob | null;
   isLoading?: boolean;
+  zIndex?: number;
 }
 
 export const UniversalPdfPreviewModal: React.FC<UniversalPdfPreviewModalProps> = ({
@@ -20,35 +21,26 @@ export const UniversalPdfPreviewModal: React.FC<UniversalPdfPreviewModalProps> =
   badgeText = 'DIN A4 • Revisionssicher',
   filename = 'Dokument.pdf',
   pdfBlob,
-  isLoading = false
+  isLoading = false,
+  zIndex = 9999999
 }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
-  // Manage Blob URL and Data URL lifecycle for 100% Safari & WebKit compatibility
+  // Manage Blob URL lifecycle (100% Safari & WebKit compliant, zero memory leaks)
   useEffect(() => {
     if (!isOpen || !pdfBlob) {
       if (blobUrl) {
         URL.revokeObjectURL(blobUrl);
         setBlobUrl(null);
       }
-      setDataUrl(null);
       return;
     }
 
+    // Direct Blob URL — 100% compatible with CSP frame-src 'self' blob: and WebKit PDFKit
     const url = URL.createObjectURL(pdfBlob);
     setBlobUrl(url);
-
-    // Also convert to Data URI so Safari/WebKit renders PDFKit without BlobRegistry lookup failure
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        setDataUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(pdfBlob);
 
     return () => {
       URL.revokeObjectURL(url);
@@ -105,9 +97,12 @@ export const UniversalPdfPreviewModal: React.FC<UniversalPdfPreviewModalProps> =
     if (blobUrl) {
       const printWindow = window.open(blobUrl, '_blank');
       if (printWindow) {
-        printWindow.addEventListener('load', () => {
-          printWindow.print();
-        });
+        printWindow.focus();
+        setTimeout(() => {
+          try {
+            printWindow.print();
+          } catch {}
+        }, 300);
       }
     }
   };
@@ -129,7 +124,7 @@ export const UniversalPdfPreviewModal: React.FC<UniversalPdfPreviewModalProps> =
         backgroundColor: 'rgba(15, 23, 42, 0.75)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        zIndex: 99999,
+        zIndex,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -363,10 +358,11 @@ export const UniversalPdfPreviewModal: React.FC<UniversalPdfPreviewModalProps> =
             </div>
           )}
 
-          {!isLoading && (dataUrl || blobUrl) && (
-            <object
-              data={dataUrl || blobUrl || ''}
-              type="application/pdf"
+          {!isLoading && blobUrl && (
+            <iframe
+              ref={iframeRef}
+              src={`${blobUrl}#view=FitH&toolbar=0&navpanes=0`}
+              title={title}
               style={{
                 width: '100%',
                 height: '100%',
@@ -374,28 +370,7 @@ export const UniversalPdfPreviewModal: React.FC<UniversalPdfPreviewModalProps> =
                 display: 'block',
                 backgroundColor: '#ffffff'
               }}
-            >
-              <embed
-                src={dataUrl || blobUrl || ''}
-                type="application/pdf"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  display: 'block'
-                }}
-              />
-              <iframe
-                ref={iframeRef}
-                src={dataUrl || blobUrl || ''}
-                title={title}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none'
-                }}
-              />
-            </object>
+            />
           )}
 
           {!isLoading && !blobUrl && (

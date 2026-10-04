@@ -91,12 +91,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         ? Boolean((studentUser as any)?.parent_allow_timer) 
         : standard.allowTimer);
   
-  const curLeaderboard = draftAllowLeaderboard !== null 
-    ? draftAllowLeaderboard 
-    : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null 
-        ? Boolean((studentUser as any)?.parent_allow_leaderboard) 
-        : standard.allowLeaderboard);
-  
   const curAudio = draftAllowAudio !== null 
     ? draftAllowAudio 
     : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null 
@@ -122,7 +116,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
     curReschedule !== standard.allowRescheduleConfirm ||
     curChat !== standard.allowChat ||
     curTimer !== standard.allowTimer ||
-    curLeaderboard !== standard.allowLeaderboard ||
     curAudio !== standard.allowAudio ||
     curStudentAudio !== standard.allowStudentAudio ||
     curTeacherAudio !== standard.allowTeacherAudio ||
@@ -142,7 +135,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         allowRescheduleConfirm: curReschedule,
         allowChat: curChat,
         allowTimer: curTimer,
-        allowLeaderboard: curLeaderboard,
         allowAudio: curAudio,
         allowStudentAudio: curStudentAudio,
         allowTeacherAudio: curTeacherAudio,
@@ -154,7 +146,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
         allowChat: targetStandard.allowChat,
         allowTimer: targetStandard.allowTimer,
-        allowLeaderboard: targetStandard.allowLeaderboard,
         allowAudio: targetStandard.allowAudio,
         allowStudentAudio: targetStandard.allowStudentAudio,
         allowTeacherAudio: targetStandard.allowTeacherAudio,
@@ -257,7 +248,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
   const hlAbsences = getHighlightProps('allowAbsences');
   const hlReschedule = getHighlightProps('allowRescheduleConfirm');
   const hlChat = getHighlightProps('allowChat');
-  const hlLeaderboard = getHighlightProps('allowLeaderboard');
 
   const pendingTeacherAudioRequest = (() => {
     if (typeof window === 'undefined' || !studentId) return null;
@@ -976,36 +966,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             type="checkbox"
             checked={curChat}
             onChange={(e) => applyAndSaveParentControls({ allowChat: e.target.checked, boardOverrides: { messages: e.target.checked } })}
-            style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-          />
-        </label>
-
-        {/* Toggle 7: Leaderboard (Klassen-Highlights & Team-Power) */}
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '14px 16px',
-          borderRadius: '16px',
-          cursor: 'pointer',
-          ...hlLeaderboard.style
-        }}>
-          <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-            <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <Trophy size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-              <span>Klassen-Highlights &amp; Team-Power</span>
-              {hlLeaderboard.badge}
-            </div>
-            <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-              {currentLvlKey === 'junior'
-                ? 'Gemeinsame Klassen-Ziele ohne individuelle Ranglisten oder Leistungsdruck (DSA Art. 28 konform).'
-                : 'Gemeinsame Übe-Minuten sammeln, Meilensteine der Klasse feiern und Team-Ziele erreichen.'}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={curLeaderboard}
-            onChange={(e) => applyAndSaveParentControls({ allowLeaderboard: e.target.checked, boardOverrides: { campus_cup: e.target.checked } })}
             style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
           />
         </label>

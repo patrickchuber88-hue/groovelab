@@ -347,10 +347,10 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
             </div>
             <div>
               <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
-                Didaktik-Chronik, Urkunden &amp; Sammel-Sticker (.JSON / .PDF)
+                Didaktik-Chronik, Urkunden &amp; Sammel-Sticker (.JSON)
               </div>
               <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 550, marginTop: '2px', lineHeight: 1.45 }}>
-                Das <strong>komplette Sammel-Sticker-Album</strong> mit allen freigeschalteten Badges, Emojis, Erwerbsdaten und didaktischen Lehrkraft-Begründungen sowie die offizielle DSGVO-Chronik.
+                Das <strong>komplette Sammel-Sticker-Album</strong> mit allen freigeschalteten Badges, Emojis, Erwerbsdaten und didaktischen Lehrkraft-Begründungen sowie die offizielle Lernfortschritts-Chronik.
               </div>
             </div>
           </div>
@@ -376,7 +376,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
             className="hover-scale"
           >
             <Download size={15} />
-            <span>{downloadingSection === 'chronicle' ? 'Exportiere...' : 'Export'}</span>
+            <span>{downloadingSection === 'chronicle' ? 'Exportiere...' : 'Chronik herunterladen'}</span>
           </button>
         </div>
 
@@ -448,7 +448,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
                 className="hover-scale"
               >
                 <Lock size={15} />
-                <span>Art. 20 Gesamtdaten</span>
+                <span>Art. 20 Gesamtdaten (JSON)</span>
               </button>
             )}
           </div>

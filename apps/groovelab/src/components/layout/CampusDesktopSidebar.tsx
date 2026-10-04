@@ -541,14 +541,16 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   platform={activePlatform}
                   onClick={() => setActiveStudentTab('briefing')}
                 />
-                <CampusSidebarRailItem
-                  icon={<BookOpen size={20} />}
-                  label="Aufgaben"
-                  isActive={activeStudentTab === 'homework_book'}
-                  isCollapsed={isCollapsed}
-                  platform={activePlatform}
-                  onClick={() => { setActiveStudentTab('homework_book'); window.dispatchEvent(new CustomEvent('campus_reset_homework_board')); }}
-                />
+                {(user?.schools?.opening_hours?.gl_campus_meisterwerk_enabled !== false || parentUnlocked) && (
+                  <CampusSidebarRailItem
+                    icon={<BookOpen size={20} />}
+                    label="Aufgaben"
+                    isActive={activeStudentTab === 'homework_book'}
+                    isCollapsed={isCollapsed}
+                    platform={activePlatform}
+                    onClick={() => { setActiveStudentTab('homework_book'); window.dispatchEvent(new CustomEvent('campus_reset_homework_board')); }}
+                  />
+                )}
                 {(parentUnlocked || (flamesActive && isBoardAllowedForChild('practice_board'))) && (
                   <CampusSidebarRailItem
                     icon={<Zap size={20} />}

@@ -54,6 +54,11 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
    - Aktive Schüler werden als Jahresbeitrag in einer gesonderten Jahresrechnung mit **10% Rabatt** abgerechnet.
 3. **Einmalige Komplett-Aktivierung zum Schuljahresstart (September) (20% Rabatt):**
    - Die Musikschule aktiviert zum Schuljahresbeginn im September alle Schüler für das gesamte Schuljahr mit **20% Rabatt** auf den Schülerbeitrag.
+4. **Amtlicher Schullizenz- & Bereitstellungsnachweis (BuT gem. § 28 Abs. 7 SGB II):**
+   - Im Sammelzahler-Modell erhalten Eltern und Schüler **keinen kaufmännischen Vertrags- oder Rechnungsbeleg** (da kein B2C-Vertrag mit dem Plattformbetreiber besteht).
+   - Stattdessen wird ein amtliches 1-seitiges **Schullizenz-Zertifikat** mit SHA-256 Prüfsiegel zur Verfügung gestellt.
+   - Dieses dient als behördlich anerkannter Nachweis zur Vorlage bei Trägern der Grundsicherung (Bildungs- und Teilhabepaket BuT nach § 28 Abs. 7 SGB II / § 34 Abs. 7 SGB XII), Arbeitgebern zur Inanspruchnahme betrieblicher Familienförderungen sowie dem Finanzamt (außerschulische Bildungsaufwendungen).
+   - Das Dokument ist strikt frei von IBANs, Kassenzeichen, Zahlungsaufforderungen und Widerrufsbelehrungen.
 
 ---
 

@@ -24,6 +24,8 @@ assert.strictEqual(isGenericInstrument('nicht zugeordnet'), true);
 assert.strictEqual(isGenericInstrument('Keine Angabe'), true);
 assert.strictEqual(isGenericInstrument('Allgemein'), true);
 assert.strictEqual(isGenericInstrument('Musiker'), true);
+assert.strictEqual(isGenericInstrument('Musikunterricht'), true);
+assert.strictEqual(isGenericInstrument('Unterricht'), true);
 assert.strictEqual(isGenericInstrument('Schüler'), true);
 assert.strictEqual(isGenericInstrument('Gitarre'), false);
 assert.strictEqual(isGenericInstrument('Klavier'), false);

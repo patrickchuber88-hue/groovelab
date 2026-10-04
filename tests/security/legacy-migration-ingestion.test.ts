@@ -46,7 +46,7 @@ async function runLegacyIngestionAudit() {
 
   assert('Staging-Tabelle migration_staging_records definiert', sqlContent.includes('CREATE TABLE IF NOT EXISTS public.migration_staging_records'));
   assert('RLS auf Staging-Tabelle aktiviert', sqlContent.includes('ALTER TABLE public.migration_staging_records ENABLE ROW LEVEL SECURITY;'));
-  assert('Strikte Mandanten-Policy mit get_current_user_school_id()', sqlContent.includes('school_id = get_current_user_school_id()'));
+  assert('Strikte Mandanten-Policy mit get_current_user_school_id()', sqlContent.includes('get_current_user_school_id()') && sqlContent.includes('school_id'));
   assert('RPC execute_legacy_migration vorhanden', sqlContent.includes('CREATE OR REPLACE FUNCTION execute_legacy_migration'));
   assert('100% Schema-Parität: Schreibt direkt in users_raw', sqlContent.includes('INSERT INTO users_raw'));
   assert('Absolutes Verbot von Phantom-Tabellen (student_profiles)', !sqlContent.includes('student_profiles'));

@@ -33,6 +33,7 @@ const StudentSettingsTab = lazy(() => import('./student/tabs/StudentSettingsTab'
 const StudentCampusCupTab = lazy(() => import('./student/tabs/StudentCampusCupTab').then(m => ({ default: m.StudentCampusCupTab })));
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal || (m as any).default })));
+import { StudentScreenTimeGate, useStudentScreenTimeLock } from './student/gates/StudentScreenTimeGate';
 
 
 export interface StudentAvatarDashboardProps {
@@ -86,6 +87,13 @@ export function StudentAvatarDashboard({
     isIOS: false,
     isMobile: profile.isMobile,
     onProfileUpdate
+  });
+
+  // 🛡️ Screen-Time & Jugendschutz Gate (DSGVO Art. 8)
+  const screenTimeLock = useStudentScreenTimeLock({
+    isAdultStudent: profile.isAdultStudent,
+    isParentUnlocked: parent.isParentUnlocked || parent.checkIsParentSessionActiveLocal(),
+    parentControls: parent
   });
 
   // 5. Schedule & Cancellations Domain Hook
@@ -319,7 +327,15 @@ export function StudentAvatarDashboard({
         boxSizing: 'border-box'
       }}
     >
-      {/* 1. Übe-Board / Practice Tab */}
+      {screenTimeLock ? (
+        <StudentScreenTimeGate
+          lockType={screenTimeLock.lockType}
+          unlockTimeStr={screenTimeLock.untilStr}
+          onOpenParentGate={() => parent.setShowParentGateModal(true)}
+        />
+      ) : (
+        <>
+          {/* 1. Übe-Board / Practice Tab */}
       {profile.visitedTabs.has('practice_board') && (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
           <StudentPracticeTab
@@ -441,10 +457,16 @@ export function StudentAvatarDashboard({
       </div>
 
       {/* 5. Hausaufgaben & Meisterwerk Modal Embed */}
-      <div style={{ display: (profile.activeTab === 'homework_book' && profile.studentUser) ? 'block' : 'none', marginTop: '0px', width: '100%' }}>
-        {profile.activeTab === 'homework_book' && profile.studentUser && (
-          <HomeworkBookErrorBoundary key={homeworkRetryKey} onRetry={() => setHomeworkRetryKey(k => k + 1)}>
-            <Suspense fallback={<HomeworkBookLoadingFallback onReload={() => setHomeworkRetryKey(k => k + 1)} />}>
+      {(() => {
+        const isHwEnabled = (profile.studentUser?.schools?.opening_hours?.gl_campus_meisterwerk_enabled !== false && profile.studentUser?.school?.opening_hours?.gl_campus_meisterwerk_enabled !== false) || parent.isParentUnlocked;
+        if (!isHwEnabled && profile.activeTab === 'homework_book') {
+          return null;
+        }
+        return (
+          <div style={{ display: (profile.activeTab === 'homework_book' && profile.studentUser) ? 'block' : 'none', marginTop: '0px', width: '100%' }}>
+            {profile.activeTab === 'homework_book' && profile.studentUser && (
+              <HomeworkBookErrorBoundary key={homeworkRetryKey} onRetry={() => setHomeworkRetryKey(k => k + 1)}>
+                <Suspense fallback={<HomeworkBookLoadingFallback onReload={() => setHomeworkRetryKey(k => k + 1)} />}>
               <MeisterwerkDocumentationModal
                 key={`hw-modal-${studentId}-${homeworkRetryKey}`}
                 student={profile.modalStudentUser!}
@@ -496,6 +518,8 @@ export function StudentAvatarDashboard({
           </HomeworkBookErrorBoundary>
         )}
       </div>
+    );
+  })()}
 
       {/* 6. Briefing Tab */}
       <Suspense fallback={
@@ -567,6 +591,8 @@ export function StudentAvatarDashboard({
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Einstellungen...</div>}>
           <StudentSettingsTab {...settingsTabProps} />
         </Suspense>
+      )}
+        </>
       )}
 
       {/* 10. Modals & Overlays Hub */}

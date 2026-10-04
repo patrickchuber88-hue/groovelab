@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useParentSessionLock } from '../../../hooks/useParentSessionLock';
 import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics } from '../../../utils/webauthn';
+import { getOrCreateDeviceKey } from '../../../utils/sessionLeaseManager';
 
 interface UseStudentParentControlsProps {
   studentId: string;
@@ -267,15 +268,18 @@ export function useStudentParentControls({
     try {
       let isOk = false;
       try {
+        const currentDevKey = getOrCreateDeviceKey();
         const { data: leaseData, error: leaseErr } = await supabase.rpc('verify_parent_pin_with_lease', {
           p_student_id: targetId,
           p_input_pin: cleanInput,
-          p_device_key: `browser-${Date.now()}`
+          p_device_key: currentDevKey
         });
         if (!leaseErr && leaseData?.success === true) {
           isOk = true;
-          if (leaseData?.lease_token) {
-            sessionStorage.setItem('gl_parent_session_lease', String(leaseData.lease_token));
+          const token = String(leaseData.lease_token || leaseData.lease_id || '');
+          if (token) {
+            sessionStorage.setItem('gl_parent_session_lease', token);
+            sessionStorage.setItem('gl_active_session_lease_id', token);
           }
         }
       } catch (e) {}

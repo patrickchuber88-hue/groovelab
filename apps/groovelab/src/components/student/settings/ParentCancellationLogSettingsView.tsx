@@ -5,20 +5,42 @@ import { formatTeacherFullName } from '../../../utils/nameHelper';
 export interface ParentCancellationLogSettingsViewProps {
   cancelledSchoolYearOccurrences: any[];
   handleUndoCancelOccurrence: (occ: any, isParentAction?: boolean) => Promise<void>;
+  studentId?: string;
 }
 
 export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSettingsViewProps> = ({
   cancelledSchoolYearOccurrences,
   handleUndoCancelOccurrence,
+  studentId,
 }) => {
-  // Strikter Filter: Ausschließlich durch Schüler/Familie initiierte Absagen anzeigen (Art. 9 DSGVO & § 615 BGB Schutz)
+  // Strikter Filter: Ausschließlich durch Schüler/Familie initiierte Absagen anzeigen (Art. 9 DSGVO & § 26 BDSG Schutz)
   const studentCancellations = React.useMemo(() => {
     return (cancelledSchoolYearOccurrences || []).filter((occ: any) => {
       const s = String(occ.status || '').toLowerCase();
       const role = String(occ.canceled_by_role || '').toLowerCase();
-      return s === 'canceled_by_student' || role === 'student' || s === 'absent';
+      const notes = String(occ.notes || '').toLowerCase();
+
+      // Strikt ausschließen: Lehrkraftausfall, Schulausfall, etc.
+      if (
+        role === 'teacher' ||
+        s === 'teacher_ausfall' ||
+        s === 'canceled_by_teacher_ausfall' ||
+        s === 'canceled_by_teacher' ||
+        notes.includes('abwesend: lehrkraft') ||
+        notes.includes('abwesend: schulausfall')
+      ) {
+        return false;
+      }
+
+      // Schüler-ID Matching wenn vorhanden
+      if (studentId && occ.student_id && occ.student_id !== studentId) {
+        return false;
+      }
+
+      // Ausschließlich eigene Absagen des Schülers / der Familie
+      return s === 'canceled_by_student' || role === 'student' || s === 'absent' || notes.includes('abwesend: schüler');
     });
-  }, [cancelledSchoolYearOccurrences]);
+  }, [cancelledSchoolYearOccurrences, studentId]);
 
   const currentYear = new Date().getFullYear();
   const schoolYearLabel = new Date().getMonth() >= 8
@@ -58,7 +80,7 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
             Keine gemeldeten Abwesenheiten
           </div>
           <div style={{ fontSize: '0.84rem', color: '#166534', maxWidth: '400px', lineHeight: 1.45, fontWeight: 550 }}>
-            In diesem Schuljahr ({schoolYearLabel}) wurden keine Unterrichtsstunden abgesagt. Alle Termine wurden regulär wahrgenommen.
+            In diesem Schuljahr ({schoolYearLabel}) wurden keine Unterrichtsstunden durch den Schüler abgesagt. Alle Termine wurden regulär wahrgenommen.
           </div>
         </div>
       ) : (
@@ -76,7 +98,7 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
             color: '#475569',
             fontWeight: 700
           }}>
-            <span>Schuljahr {schoolYearLabel}</span>
+            <span>Eigene Absagen • Schuljahr {schoolYearLabel}</span>
             <span style={{
               background: '#fee2e2',
               color: '#b91c1c',
@@ -195,7 +217,7 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
         lineHeight: 1.4
       }}>
         <ShieldCheck size={15} color="#64748b" style={{ flexShrink: 0 }} />
-        <span>Dokumentierte Abwesenheiten. Etwaige Nachholansprüche richten sich nach dem Unterrichtsvertrag deiner Musikschule.</span>
+        <span>Dokumentierte Abwesenheiten des Schülers. Etwaige Nachholansprüche richten sich nach dem Unterrichtsvertrag deiner Musikschule.</span>
       </div>
     </div>
   );

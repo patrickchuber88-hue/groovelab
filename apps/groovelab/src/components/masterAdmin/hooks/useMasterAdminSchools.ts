@@ -507,7 +507,6 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       delete safePayload.subscription_bypass_reason;
       delete safePayload.summer_moratorium_active;
       delete safePayload.dunning_kulanz_until;
-      delete safePayload.mfa_enforced_for_admins;
 
       const fallbackRes = await supabase
         .from('schools')

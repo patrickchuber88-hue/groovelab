@@ -390,6 +390,7 @@ export const CampusAppModalsHub: React.FC<CampusAppModalsHubProps> = React.memo(
         schoolUsers={schoolUsers}
         supabase={supabase}
         activePlatform={activePlatform}
+        activeWorkspace={activeWorkspace}
         showAdminSecuritySuiteModal={showAdminSecuritySuiteModal}
         onCloseAdminSecuritySuite={() => setShowAdminSecuritySuiteModal(false)}
         showQuarterlyAccessReportModal={showQuarterlyAccessReportModal}

@@ -138,7 +138,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
     isSchoolPaused
   } = props;
 
-  // 0. OFFICIAL B2B CONTRACT VERIFICATION GATE (§ 371a ZPO / eIDAS)
+  // 0. OFFICIAL B2B CONTRACT VERIFICATION GATE (Art. 371a ZPO / eIDAS)
   const isContractVerification = location.pathname === '/verify-contract' || 
     location.pathname.startsWith('/verify-contract') || 
     searchParams.has('verify-contract');

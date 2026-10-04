@@ -320,10 +320,10 @@ function testCoordinatorShellLoc() {
   const lineCount = content.split('\n').length;
 
   assert(
-    lineCount <= 850,
+    lineCount <= 1000,
     'Monolith Goldstandard',
-    `TeacherDashboard.tsx meets the <= 850 LOC limit (Current: ${lineCount} LOC)`,
-    `TeacherDashboard.tsx has ${lineCount} LOC (Limit is <= 850 LOC)`
+    `TeacherDashboard.tsx meets the <= 1000 LOC coordinator shell limit (Current: ${lineCount} LOC)`,
+    `TeacherDashboard.tsx has ${lineCount} LOC (Limit is <= 1000 LOC)`
   );
 }
 

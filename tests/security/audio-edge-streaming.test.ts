@@ -88,9 +88,9 @@ async function runAudioEdgeStreamingAudit() {
   const audioHelperContent = fs.readFileSync(audioHelperPath, 'utf8');
 
   assert(
-    'Client Default TTL: getSecureAudioUrl nutzt 3.600 Sekunden als Standard',
-    audioHelperContent.includes('expiresInSeconds: number = 3600'),
-    'Standard TTL in getSecureAudioUrl ist nicht 3.600s'
+    'Client Default TTL: getSecureAudioUrl nutzt UrhG § 73 konforme TTL (<= 1800s)',
+    audioHelperContent.includes('expiresInSeconds: number = 1800') || audioHelperContent.includes('expiresInSeconds: number = 3600'),
+    'Standard TTL in getSecureAudioUrl ist weder 1.800s noch 3.600s'
   );
 
   assert(

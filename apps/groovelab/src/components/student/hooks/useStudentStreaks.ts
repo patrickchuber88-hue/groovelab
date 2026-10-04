@@ -208,8 +208,23 @@ export function useStudentStreaks({
     return getEngineTargetMinutes(effectiveEvolutionLevel, streak, campusSettings?.fokus_levels);
   }, [effectiveEvolutionLevel, campusSettings]);
 
+  // 🛡️ Disaster Grace-Period Protection (Master Admin Restore Freeze)
+  const isGraceFreezeActive = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem('cg_system_restore_grace_window');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.active && parsed.validUntil && new Date(parsed.validUntil) > new Date()) {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  }, []);
+
   const getDeterministicWeekMetrics = useCallback((): WeeklyStreakMetrics => {
-    return calculateWeeklyStreakState(
+    const metrics = calculateWeeklyStreakState(
       getSimulatedNow(),
       fokusLogs,
       studentId,
@@ -218,7 +233,14 @@ export function useStudentStreaks({
       secondsElapsed,
       avatar?.streak_flame ?? studentUser?.streak_flame ?? 0
     );
-  }, [fokusLogs, studentId, studentUser, sessionActive, secondsElapsed, avatar?.streak_flame]);
+    if (isGraceFreezeActive && metrics.calculatedStreak === 0 && (avatar?.streak_flame || studentUser?.streak_flame)) {
+      return {
+        ...metrics,
+        calculatedStreak: avatar?.streak_flame ?? studentUser?.streak_flame ?? 1
+      };
+    }
+    return metrics;
+  }, [fokusLogs, studentId, studentUser, sessionActive, secondsElapsed, avatar?.streak_flame, isGraceFreezeActive, studentUser?.streak_flame]);
 
   const handleUseJoker = async (dateStr: string) => {
     if (!studentId || !studentUser) return;

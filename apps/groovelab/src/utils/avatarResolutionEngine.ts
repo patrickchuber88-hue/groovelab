@@ -20,6 +20,8 @@ export const isGenericInstrument = (inst: string | null | undefined): boolean =>
     !clean ||
     clean === 'allgemein' ||
     clean === 'musiker' ||
+    clean === 'musikunterricht' ||
+    clean === 'unterricht' ||
     clean === 'schüler' ||
     clean === 'schueler' ||
     clean === 'instrument' ||

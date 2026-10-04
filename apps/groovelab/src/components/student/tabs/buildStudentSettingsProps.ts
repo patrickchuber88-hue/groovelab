@@ -1,6 +1,7 @@
 import React from 'react';
 import { StudentSettingsTabProps } from './StudentSettingsTab';
 import { exportStudentGdprDossier } from '../../../services/gdprDataExportService';
+import { exportStudentFullArt20Json } from '../../../services/studentDataVaultExportService';
 
 export interface BuildStudentSettingsParams {
   studentId: string;
@@ -56,13 +57,13 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
     daytimeLockEnabled: parent.daytimeLockEnabled,
     daytimeLockEnd: parent.daytimeLockEnd,
     daytimeLockStart: parent.daytimeLockStart,
-    draftAllowAbsences: true,
-    draftAllowAudio: true,
-    draftAllowChat: true,
-    draftAllowLeaderboard: true,
-    draftAllowProposals: true,
-    draftAllowReschedule: true,
-    draftAllowTimer: true,
+    draftAllowAbsences: null,
+    draftAllowAudio: null,
+    draftAllowChat: null,
+    draftAllowLeaderboard: null,
+    draftAllowProposals: null,
+    draftAllowReschedule: null,
+    draftAllowTimer: null,
     draftAllowTts: feed.draftAllowTts,
     draftBoardOverrides: {},
     draftUiLevel: profile.studentUiLevel,
@@ -93,7 +94,13 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
         console.error('[GDPR Art. 15 Export] Error:', err);
       }
     },
-    handleExportFullDataArchive: async () => {},
+    handleExportFullDataArchive: async () => {
+      try {
+        await exportStudentFullArt20Json(profile.studentUser);
+      } catch (err) {
+        console.error('[GDPR Art. 20 Export] Error:', err);
+      }
+    },
     handleOpenSettingsModule: (mod) => parent.setActiveStudentSettingsModal(mod),
     handleRemoveFamilyProfile: parent.handleRemoveFamilyProfile,
     handleSetInstantLock: parent.handleSetInstantLock,
@@ -112,7 +119,7 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
     isParentGateShaking: parent.isParentGateShaking,
     isParentLockWarning: parent.isParentLockWarning,
     isParentUnlocked: parent.isParentUnlocked,
-    isPremiumUser: false,
+    isPremiumUser: Boolean(profile.studentUser ? (profile.studentUser.status !== 'ausstehend' && profile.studentUser.is_active !== false) : true),
     isSavingPin: false,
     isStandalone: false,
     isVerifyingParentGate: parent.isVerifyingParentGate,
@@ -187,5 +194,6 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
     totalPracticeMinutes: Math.floor(practice.secondsElapsed / 60),
     weeklyPracticeMinutes: 0,
     schoolYearPracticeMinutes: 0,
+    homeworkNotes: feed.homeworkNotes,
   };
 }

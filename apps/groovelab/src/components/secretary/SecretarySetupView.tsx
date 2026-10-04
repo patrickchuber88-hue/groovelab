@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   AlertCircle, Check, CheckCircle, Clock, Copy, Database, Download,
-  Eye, FileCheck, FileText, Fingerprint, KeyRound, Lightbulb, Palmtree, Printer, QrCode, School, ShieldAlert,
+  Eye, FileCheck, FileText, Fingerprint, HeartHandshake, KeyRound, Lightbulb, Palmtree, Printer, QrCode, School, ShieldAlert,
   ShieldCheck, Sparkles, Trash2, Upload, X, Zap
 } from 'lucide-react';
 import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
@@ -9,6 +9,7 @@ import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTempl
 import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 import { AvvCertificateModal } from '../modals/AvvCertificateModal';
 import { SUPPORTED_STATES } from '../../utils/schoolHolidayEngine';
+import { SecretarySponsorsModal } from './sponsors/SecretarySponsorsModal';
 
 export interface SecretarySetupViewProps {
   schoolId: string;
@@ -373,6 +374,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   shadowColor: 'rgba(239, 68, 68, 0.40)',
                   icon: ShieldAlert
                 },
+                { id: 'sponsors', title: 'Sponsoren & Partner', subtitle: 'Bildungsförderung & Toasts', badge: 'Patenschaften', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', shadowColor: 'rgba(245, 158, 11, 0.40)', icon: HeartHandshake },
                 {
                   id: 'feedback',
                   title: 'Ideenschmiede',
@@ -496,7 +498,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
             )}
 
             {/* FOCUS MODAL FOR SELECTED SETTINGS CATEGORY */}
-            {activeSecretarySettingsModal && (
+            {activeSecretarySettingsModal && activeSecretarySettingsModal !== 'sponsors' && (
               <div 
                 role="dialog"
                 aria-modal="true"
@@ -2156,9 +2158,12 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
             <AvvCertificateModal
               isOpen={showCertModal}
               onClose={() => setShowCertModal(false)}
+              schoolId={schoolId}
               schoolName={props.schoolName || 'Musikschule'}
               adminName={props.currentUserProfile?.full_name || 'Schulleitung'}
             />
+
+            <SecretarySponsorsModal isOpen={activeSecretarySettingsModal === 'sponsors'} onClose={() => setActiveSecretarySettingsModal(null)} schoolId={schoolId} schoolName={props.schoolName || 'Musikschule'} schoolStreet={props.schoolStreet} schoolZipCode={props.schoolZipCode} schoolCity={props.schoolCity} schoolEmail={props.schoolEmail} schoolPhoneNumber={props.schoolPhoneNumber} studentsCount={students?.length || 350} />
 
           </div>
   );

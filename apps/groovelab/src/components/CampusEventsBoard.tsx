@@ -7226,9 +7226,9 @@ export function CampusEventsBoard({
                       padding: '14px 16px 14px 20px',
                       borderRadius: '16px',
                       cursor: isStatutory ? 'pointer' : ((role === 'admin' || role === 'secretary') ? 'grab' : 'pointer'),
-                      background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.06)',
-                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                      background: colors.bg || '#f8fafc',
+                      border: `1px solid ${colors.border || '#e2e8f0'}`,
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
                       position: 'relative',
                       overflow: 'hidden',
                       flexShrink: 0,
@@ -7253,8 +7253,9 @@ export function CampusEventsBoard({
                         <span style={{
                           fontSize: '0.75rem',
                           fontWeight: 800,
-                          color: catColor,
-                          background: `${catColor}14`,
+                          color: colors.textDark || catColor,
+                          background: '#ffffff',
+                          border: `1px solid ${colors.border || catColor}`,
                           padding: '3px 8px',
                           borderRadius: '6px',
                           textTransform: 'uppercase',
@@ -7281,24 +7282,18 @@ export function CampusEventsBoard({
 
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {isMultiDay ? (
-                          <span style={{
-                            fontSize: '0.78rem',
-                            fontWeight: 650,
-                            color: '#475569'
-                          }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: colors.textDark || '#475569' }}>
                             {ev.duration_days ? `${ev.duration_days} Tage unterrichtsfrei` : 'Schulfrei'}
                           </span>
-                        ) : (
-                          ev.start_time ? (
-                            <span style={{
-                              fontSize: '0.78rem',
-                              fontWeight: 650,
-                              color: '#475569'
-                            }}>
-                              {ev.start_time.substring(0, 5)}{ev.end_time ? ` – ${ev.end_time.substring(0, 5)} Uhr` : ' Uhr'}
-                            </span>
-                          ) : null
-                        )}
+                        ) : ((ev.start_time && !ev.start_time.startsWith('00:00')) ? (
+                          <span style={{ fontSize: '0.78rem', fontWeight: 650, color: '#475569' }}>
+                            {ev.start_time.substring(0, 5)}{ev.end_time ? ` – ${ev.end_time.substring(0, 5)} Uhr` : ' Uhr'}
+                          </span>
+                        ) : (isStatutory ? (
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: colors.textDark || '#475569' }}>
+                            Unterrichtsfrei
+                          </span>
+                        ) : null))}
 
                         {!isSubscribed && isMyEvent && (
                           <button

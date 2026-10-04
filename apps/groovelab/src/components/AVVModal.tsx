@@ -137,11 +137,11 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
       try {
         const encoder = new TextEncoder();
         const hashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(canonicalPayload));
-        auditChecksum = Array.from(new Uint8Array(hashBuf))
+        auditChecksum = 'SHA256-CG-AVV-' + Array.from(new Uint8Array(hashBuf))
           .map(b => b.toString(16).padStart(2, '0'))
           .join('');
       } catch (e) {
-        auditChecksum = `SHA256-FALLBACK-${String(targetSchoolId).padStart(6, '0')}`;
+        auditChecksum = `SHA256-CG-AVV-FALLBACK-${String(targetSchoolId).padStart(6, '0')}`;
       }
 
       await logSecurityEvent({

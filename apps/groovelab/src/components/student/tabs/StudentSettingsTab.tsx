@@ -16,9 +16,13 @@ import { AddSiblingModal } from '../../campus/AddSiblingModal';
 import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar, STUDENT_AVATARS } from '../studentAvatars.constants';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
 import { StudentBillingInvoicesSection } from '../StudentBillingInvoicesSection';
-import JSZip from 'jszip';
-import { ensureWavBlob } from '../../../utils/audioMasteringEngine';
-import { ALL_STICKERS, getUnifiedStickerStatus } from '../../../domain/stickersAndTresor';
+import {
+  exportStudentFullArchiveZip,
+  exportStudentAudioOnlyZip,
+  exportStudentBiographyZip,
+  exportStudentChronicleJson,
+  StudentExportContext
+} from '../../../services/studentDataVaultExportService';
 import { ParentProtectionSettingsView } from '../settings/ParentProtectionSettingsView';
 import { ParentScreenTimeSettingsView } from '../settings/ParentScreenTimeSettingsView';
 import { ParentPracticeReportSettingsView } from '../settings/ParentPracticeReportSettingsView';
@@ -27,6 +31,9 @@ import { ParentFamilyProfilesSettingsView } from '../settings/ParentFamilyProfil
 import { ParentDataVaultSettingsView } from '../settings/ParentDataVaultSettingsView';
 import { ParentDevelopmentGridSettingsView } from '../settings/ParentDevelopmentGridSettingsView';
 import { ParentConsentSettingsView } from '../settings/ParentConsentSettingsView';
+import { ParentSponsorPatronageCard } from '../settings/ParentSponsorPatronageCard';
+import { ParentNotificationSettingsView } from '../settings/ParentNotificationSettingsView';
+import { ParentModulesSettingsView } from '../settings/ParentModulesSettingsView';
 
 export interface StudentSettingsTabProps {
   activeStudentSettingsModal: string | null;
@@ -160,6 +167,7 @@ export interface StudentSettingsTabProps {
   weeklyPracticeMinutes?: number;
   schoolYearPracticeMinutes?: number;
   lockParentSession?: () => void;
+  homeworkNotes?: any[];
 }
 
 export function StudentSettingsTab(props: StudentSettingsTabProps) {
@@ -293,7 +301,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     studentUser,
     totalPracticeMinutes,
     weeklyPracticeMinutes,
-    schoolYearPracticeMinutes
+    schoolYearPracticeMinutes,
+    homeworkNotes
   } = props;
 
   const [downloadingSection, setDownloadingSection] = React.useState<string | null>(null);
@@ -309,7 +318,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
   const [isRegisteringPasskey, setIsRegisteringPasskey] = React.useState<boolean>(false);
   const [passkeyActionMessage, setPasskeyActionMessage] = React.useState<string | null>(null);
   const [passkeyActionStatus, setPasskeyActionStatus] = React.useState<'success' | 'error'>('success');
-  const [activeHubSubTab, setActiveHubSubTab] = React.useState<string>('default');
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -436,142 +444,48 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     return { timing: 3, rhythm: 3, technique: 3, repertoire: 2, creativity: 3 };
   }, [studentUser?.skill_radar_levels, studentId, studentUser?.id]);
 
-  const downloadBlobAsFile = (blob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
-  const gatherStudentAudioRecordings = () => {
-    const recordings: { title: string; url: string; date: string; duration?: number }[] = [];
-    const seenUrls = new Set<string>();
-
-    try {
-      const raw = localStorage.getItem(`campus_junior_recordings_${studentId}`) || '[]';
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        parsed.forEach((rec: any, idx: number) => {
-          const u = rec.audioUrl || rec.url;
-          if (u && !seenUrls.has(u)) {
-            seenUrls.add(u);
-            recordings.push({
-              title: rec.title || rec.label || `Übe-Aufnahme #${idx + 1}`,
-              url: u,
-              date: rec.date || rec.created_at || new Date().toISOString().split('T')[0],
-              duration: rec.duration
-            });
-          }
-        });
-      }
-    } catch (e) {}
-
-    try {
-      const rawBio = localStorage.getItem(`campus_milestones_${studentId}`) || '[]';
-      const parsedBio = JSON.parse(rawBio);
-      if (Array.isArray(parsedBio)) {
-        parsedBio.forEach((m: any) => {
-          const u = m.audioUrl || m.masteredAudioUrl;
-          if (u && !seenUrls.has(u)) {
-            seenUrls.add(u);
-            recordings.push({
-              title: m.title || 'Meilenstein',
-              url: u,
-              date: m.recordedAt || new Date().toISOString().split('T')[0],
-              duration: m.duration
-            });
-          }
-        });
-      }
-    } catch (e) {}
-
-    return recordings;
-  };
-
-  const gatherUnlockedStickers = () => {
-    const ctx = {
-      practiceMinutes: totalPracticeMinutes || 0,
-      xp: studentUser?.xp || 0,
-      streakDays: studentUser?.current_streak || 0,
-      progressItems: []
-    };
-    return ALL_STICKERS.map(st => {
-      const status = getUnifiedStickerStatus(st, ctx);
-      return {
-        id: st.id,
-        emoji: st.emoji,
-        title: st.title,
-        desc: st.desc,
-        category: st.category,
-        rarity: st.rarity,
-        rarityLabel: st.rarityLabel,
-        isUnlocked: status.isUnlocked,
-        count: status.count,
-        details: status.details
-      };
-    });
-  };
 
   const studentCancellationsCount = React.useMemo(() => {
     return (cancelledSchoolYearOccurrences || []).filter((occ: any) => {
       const s = String(occ.status || '').toLowerCase();
       const role = String(occ.canceled_by_role || '').toLowerCase();
-      return s === 'canceled_by_student' || role === 'student' || s === 'absent';
+      const notes = String(occ.notes || '').toLowerCase();
+
+      // Strikt ausschließen: Lehrkraftausfall, Schulausfall, etc.
+      if (
+        role === 'teacher' ||
+        s === 'teacher_ausfall' ||
+        s === 'canceled_by_teacher_ausfall' ||
+        s === 'canceled_by_teacher' ||
+        notes.includes('abwesend: lehrkraft') ||
+        notes.includes('abwesend: schulausfall')
+      ) {
+        return false;
+      }
+
+      if (studentId && occ.student_id && occ.student_id !== studentId) {
+        return false;
+      }
+
+      return s === 'canceled_by_student' || role === 'student' || s === 'absent' || notes.includes('abwesend: schüler');
     }).length;
-  }, [cancelledSchoolYearOccurrences]);
+  }, [cancelledSchoolYearOccurrences, studentId]);
+
+  const getExportContext = (): StudentExportContext => ({
+    studentUser,
+    studentId: studentId || studentUser?.id || '',
+    totalPracticeMinutes,
+    homeworkNotes: homeworkNotes || [],
+    onProgress: (msg) => setDownloadProgressMsg(msg)
+  });
 
   const handleDownloadFullArchive = async () => {
     setDownloadingSection('full');
     setDownloadProgressMsg('Stelle didaktische Chronik, Sticker-Album & Audio-Dateien zusammen...');
     try {
-      const zip = new JSZip();
-      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const rootFolder = zip.folder(`Campus_Meisterwerk_Archiv_${safeName}`) || zip;
-
-      const unlockedStickers = gatherUnlockedStickers();
-      const chronicle = {
-        export_date: new Date().toISOString(),
-        schueler: {
-          vorname: studentUser?.first_name || '',
-          gesamt_uebezeit_minuten: totalPracticeMinutes || 0,
-          xp_punkte: studentUser?.xp || 0,
-          aktuelle_streak_tage: studentUser?.current_streak || 0,
-        },
-        sammel_sticker_album: {
-          gesamt_verfuegbar: ALL_STICKERS.length,
-          freigeschaltet_anzahl: unlockedStickers.filter(s => s.isUnlocked).length,
-          auszeichnungen: unlockedStickers.filter(s => s.isUnlocked)
-        },
-        dsgVO_hinweis: 'Dieses Archiv wurde gemäß Art. 20 DSGVO (Recht auf Datenübertragbarkeit) erstellt.'
-      };
-      rootFolder.file('didaktik_chronik_und_sticker.json', JSON.stringify(chronicle, null, 2));
-
-      const audios = gatherStudentAudioRecordings();
-      if (audios.length > 0) {
-        const audioFolder = rootFolder.folder('audio_tresor') || rootFolder;
-        for (let i = 0; i < audios.length; i++) {
-          const a = audios[i];
-          setDownloadProgressMsg(`Lade Aufnahme ${i + 1} von ${audios.length}: ${a.title}...`);
-          try {
-            const res = await fetch(a.url);
-            if (res.ok) {
-              const blob = await res.blob();
-              const safeTitle = a.title.replace(/[^a-zA-Z0-9_-]/g, '_');
-              const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
-              audioFolder.file(`${a.date}_${safeTitle}.wav`, wavBlob);
-            }
-          } catch (err) {}
-        }
-      }
-
-      setDownloadProgressMsg('Erstelle ZIP-Komprimierung...');
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlobAsFile(zipBlob, `Campus-Meisterwerk-Archiv_${safeName}_${new Date().toISOString().split('T')[0]}.zip`);
-      setDownloadFeedback('Vollständiges Meisterwerk-Archiv erfolgreich heruntergeladen!');
+      const res = await exportStudentFullArchiveZip(getExportContext());
+      setDownloadFeedback(res.message);
     } catch (e) {
       setDownloadFeedback('Fehler beim Erstellen des Archivs.');
     } finally {
@@ -585,33 +499,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     setDownloadingSection('audio');
     setDownloadProgressMsg('Sammle Audio-Aufnahmen...');
     try {
-      const zip = new JSZip();
-      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const audios = gatherStudentAudioRecordings();
-      
-      if (audios.length === 0) {
-        setDownloadFeedback('Keine Audioaufnahmen im Tresor vorhanden.');
-        setDownloadingSection(null);
-        return;
-      }
-
-      for (let i = 0; i < audios.length; i++) {
-        const a = audios[i];
-        setDownloadProgressMsg(`Packe Audio ${i + 1}/${audios.length}: ${a.title}...`);
-        try {
-          const res = await fetch(a.url);
-          if (res.ok) {
-            const blob = await res.blob();
-            const safeTitle = a.title.replace(/[^a-zA-Z0-9_-]/g, '_');
-            const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
-            zip.file(`${a.date}_${safeTitle}.wav`, wavBlob);
-          }
-        } catch (err) {}
-      }
-
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlobAsFile(zipBlob, `Audio-Tresor_${safeName}_${new Date().toISOString().split('T')[0]}.zip`);
-      setDownloadFeedback('Audio-Tresor Aufnahmen erfolgreich heruntergeladen!');
+      const res = await exportStudentAudioOnlyZip(getExportContext());
+      setDownloadFeedback(res.message);
     } catch (e) {
       setDownloadFeedback('Fehler beim Herunterladen der Aufnahmen.');
     } finally {
@@ -625,38 +514,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     setDownloadingSection('biography');
     setDownloadProgressMsg('Sammle Meilensteine der Audio-Biografie...');
     try {
-      const zip = new JSZip();
-      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const rawBio = localStorage.getItem(`campus_milestones_${studentId}`) || '[]';
-      const milestones = JSON.parse(rawBio);
-
-      let count = 0;
-      for (const m of milestones) {
-        const u = m.audioUrl || m.masteredAudioUrl;
-        if (u) {
-          count++;
-          setDownloadProgressMsg(`Lade Meilenstein ${count}: ${m.title}...`);
-          try {
-            const res = await fetch(u);
-            if (res.ok) {
-              const blob = await res.blob();
-              const safeTitle = (m.title || 'Meilenstein').replace(/[^a-zA-Z0-9_-]/g, '_');
-              const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
-              zip.file(`${safeTitle}.wav`, wavBlob);
-            }
-          } catch (err) {}
-        }
-      }
-
-      if (count === 0) {
-        setDownloadFeedback('Noch keine Audio-Biografie Aufnahmen vorhanden.');
-        setDownloadingSection(null);
-        return;
-      }
-
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlobAsFile(zipBlob, `Audio-Biografie_${safeName}_${new Date().toISOString().split('T')[0]}.zip`);
-      setDownloadFeedback('Audio-Biografie Meilensteine erfolgreich heruntergeladen!');
+      const res = await exportStudentBiographyZip(getExportContext());
+      setDownloadFeedback(res.message);
     } catch (e) {
       setDownloadFeedback('Fehler beim Export der Biografie.');
     } finally {
@@ -670,38 +529,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     setDownloadingSection('chronicle');
     setDownloadProgressMsg('Erstelle Sammel-Sticker-Album & Didaktik-Chronik...');
     try {
-      const unlockedStickers = gatherUnlockedStickers();
-      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
-
-      const data = {
-        dokument_titel: `Sammel-Sticker-Album & Didaktik-Chronik: ${studentUser?.first_name || ''}`,
-        erstellt_am: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        plattform: 'Campus-Groovelab',
-        statistiken: {
-          gesamt_uebezeit: `${totalPracticeMinutes || 0} Minuten`,
-          xp_stand: `${studentUser?.xp || 0} XP`,
-          aktuelle_streak: `${studentUser?.current_streak || 0} Tage`
-        },
-        sammel_sticker_album: unlockedStickers.map(st => ({
-          emoji: st.emoji,
-          titel: st.title,
-          beschreibung: st.desc,
-          kategorie: st.category,
-          seltenheitsgrad: st.rarityLabel,
-          status: st.isUnlocked ? 'Freigeschaltet ⭐' : 'Noch gesperrt 🔒',
-          anzahl: st.count,
-          auszeichnungen: st.details
-        }))
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      downloadBlobAsFile(blob, `Didaktik-Chronik_und_Sticker-Album_${safeName}.json`);
-
-      if (typeof handleExportGdprReport === 'function') {
-        await handleExportGdprReport();
-      }
-
-      setDownloadFeedback('Sammel-Sticker-Album & Didaktik-Chronik erfolgreich exportiert!');
+      const res = await exportStudentChronicleJson(getExportContext());
+      setDownloadFeedback(res.message);
     } catch (e) {
       setDownloadFeedback('Fehler beim Export.');
     } finally {
@@ -712,7 +541,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
   };
 
   return (
-      <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
+      <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '24px', width: '100%', maxWidth: '100%', margin: '0', padding: '0', boxSizing: 'border-box' }}>
         {activeTab === 'settings' && studentUser && (() => {
           const isJuniorOrTeen = (studentUiLevel === 'junior' || studentUiLevel === 'teen');
           const isMinorStudent = !isAdultStudent;
@@ -720,43 +549,117 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
           const isParentGateLocked = isMinorStudent && !isParentSessionActive;
           const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
 
-          const isProtectionHub = activeStudentSettingsModal === 'protection_and_safety' || activeStudentSettingsModal === 'parent_controls' || activeStudentSettingsModal === 'screentime' || activeStudentSettingsModal === 'security';
-          const isLearningHub = activeStudentSettingsModal === 'learning_and_insights' || activeStudentSettingsModal === 'practice_report' || activeStudentSettingsModal === 'skills_radar' || activeStudentSettingsModal === 'cancellations';
-          const isFamilyHub = activeStudentSettingsModal === 'family_and_devices' || activeStudentSettingsModal === 'family_profiles';
-          const isBillingHub = activeStudentSettingsModal === 'billing_and_legal' || activeStudentSettingsModal === 'billing' || activeStudentSettingsModal === 'notifications' || activeStudentSettingsModal === 'consents' || activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'legal' || activeStudentSettingsModal === 'modules';
-
-          const effectiveProtectionSubTab = (isProtectionHub && activeHubSubTab !== 'default')
-            ? activeHubSubTab
-            : (activeStudentSettingsModal === 'screentime' ? 'screentime' : (activeStudentSettingsModal === 'security' ? 'security' : 'parent_controls'));
-
-          const effectiveLearningSubTab = (isLearningHub && activeHubSubTab !== 'default')
-            ? activeHubSubTab
-            : (activeStudentSettingsModal === 'skills_radar' ? 'skills_radar' : (activeStudentSettingsModal === 'cancellations' ? 'cancellations' : 'practice_report'));
-
-          const effectiveBillingSubTab = (isBillingHub && activeHubSubTab !== 'default')
-            ? activeHubSubTab
-            : (activeStudentSettingsModal === 'notifications' ? 'notifications' : (activeStudentSettingsModal === 'consents' ? 'consents' : (activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'legal' ? 'downloads' : 'billing')));
+          const getModalMeta = (modalId: string | null) => {
+            switch (modalId) {
+              case 'parent_controls':
+              case 'protection_and_safety':
+                return {
+                  title: isAdultStudent ? 'App-Design & Freigaben' : 'Kinderschutz & Freigaben',
+                  subtitle: isAdultStudent ? 'Altersstufe, didaktische Freigaben und Feature-Toggles.' : 'Altersstufen-Standards und didaktische Freigaben.',
+                  icon: isAdultStudent ? Compass : ShieldCheck,
+                  iconBg: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                };
+              case 'screentime':
+                return {
+                  title: 'Bildschirmzeit & Ruhe',
+                  subtitle: 'Nachtruhe, Fokusfenster und Sofortpause für ein gesundes Maß.',
+                  icon: Moon,
+                  iconBg: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+                };
+              case 'security':
+                return {
+                  title: isAdultStudent ? 'Persönliche PIN & Sicherheit' : 'PIN & Gerätesicherheit',
+                  subtitle: isAdultStudent ? '4-stellige persönliche PIN verwalten.' : '6-stellige Eltern-Master-PIN und 4-stellige Schüler-PIN.',
+                  icon: Lock,
+                  iconBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                };
+              case 'notifications':
+                return {
+                  title: 'Mitteilungen & Alerts',
+                  subtitle: 'Push-Kanäle für Hausaufgaben, Stundenplan und wichtige Schul-Alerts.',
+                  icon: Bell,
+                  iconBg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                };
+              case 'practice_report':
+              case 'learning_and_insights':
+                return {
+                  title: 'Übe-Report & Streak',
+                  subtitle: 'Wöchentliche Übezeit, Zielerreichung und fleißige Übe-Serien.',
+                  icon: Clock,
+                  iconBg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                };
+              case 'cancellations':
+                return {
+                  title: 'Unterrichtsausfälle',
+                  subtitle: 'Eigene gemeldete Abwesenheiten und Chronik der Termine.',
+                  icon: CalendarX,
+                  iconBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                };
+              case 'family_profiles':
+              case 'family_and_devices':
+                return {
+                  title: 'Familie & Geschwister',
+                  subtitle: 'Geschwisterkinder per 1-Tap wechseln, neues Kind anlegen und Geräte verwalten.',
+                  icon: Users,
+                  iconBg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                };
+              case 'skills_radar':
+                return {
+                  title: draftUiLevel === 'junior' ? 'Musik-Stern (5 Säulen)' : 'Didaktisches Entwicklungsraster',
+                  subtitle: 'Didaktisches Kompetenzraster in 5 musikalischen Entwicklungsdimensionen.',
+                  icon: Sparkles,
+                  iconBg: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'
+                };
+              case 'modules':
+                return {
+                  title: 'Module & Studio',
+                  subtitle: 'Campus-Studio und GrooveLab Features im Überblick.',
+                  icon: Zap,
+                  iconBg: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
+                };
+              case 'billing':
+              case 'billing_and_legal': {
+                const isDirectBilled = Boolean((studentUser as any)?.is_direct_billed);
+                return {
+                  title: isAdultStudent ? 'Vertrag & Belege' : (isDirectBilled ? 'Vertrag & Abrechnung' : 'Schullizenz & Bereitstellung'),
+                  subtitle: isAdultStudent 
+                    ? 'Vertragsübersicht und amtliche Belege.' 
+                    : (isDirectBilled 
+                      ? 'Gesetzliche Vertragsbestätigung und Kassenbeleg.' 
+                      : '100% Schullizenz, kommunaler Bildungsnachweis und Bereitstellungspaket.'),
+                  icon: FileText,
+                  iconBg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                };
+              }
+              case 'downloads':
+              case 'legal':
+                return {
+                  title: 'Datenschutz & Datentresor',
+                  subtitle: 'Art. 15 DSGVO 1-Klick-Selbstauskunft und Art. 20 Datenportabilität.',
+                  icon: Download,
+                  iconBg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                };
+              case 'consents':
+                return {
+                  title: 'Bildnisschutz & Medienrechte',
+                  subtitle: 'KUG 22 Zero-Photo-Doktrin, Privacy-by-Design & Art. 17 DSGVO Löschrechte.',
+                  icon: ShieldCheck,
+                  iconBg: 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                };
+              default:
+                return {
+                  title: 'Einstellungen',
+                  subtitle: 'Persönliche Konfiguration und Sicherheitsoptionen.',
+                  icon: Settings,
+                  iconBg: 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
+                };
+            }
+          };
+          const modalMeta = getModalMeta(activeStudentSettingsModal);
+          const ModalIcon = modalMeta.icon;
 
           const handleCardClick = (id: string) => {
-            if (id === 'parent_controls' || id === 'screentime' || id === 'security') {
-              setActiveHubSubTab(id);
-              handleOpenSettingsModule('protection_and_safety');
-            } else if (id === 'practice_report' || id === 'cancellations' || id === 'skills_radar') {
-              setActiveHubSubTab(id);
-              handleOpenSettingsModule('learning_and_insights');
-            } else if (id === 'family_profiles') {
-              setActiveHubSubTab('family_profiles');
-              handleOpenSettingsModule('family_and_devices');
-            } else if (id === 'modules') {
-              setActiveHubSubTab('default');
-              handleOpenSettingsModule('modules');
-            } else if (id === 'billing' || id === 'notifications' || id === 'consents' || id === 'downloads' || id === 'legal') {
-              setActiveHubSubTab(id === 'legal' ? 'downloads' : id);
-              handleOpenSettingsModule('billing_and_legal');
-            } else {
-              setActiveHubSubTab(id);
-              handleOpenSettingsModule(id);
-            }
+            handleOpenSettingsModule(id);
           };
 
           return (
@@ -1238,8 +1141,15 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 </div>
               )}
 
-              {/* 🌟 3 ERGONOMISCHE SINNABSCHNITTE: ELTERNZONE & EINSTELLUNGEN (0,1% GOLDSTANDARD) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
+              {/* 🌟 3 ERGONOMISCHE SINNABSCHNITTE: ELTERNZONE & RECHTE STIFTER-URKUNDE (0,1% GOLDSTANDARD) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 340px',
+                gap: '28px',
+                alignItems: 'start',
+                width: '100%'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', minWidth: 0 }}>
 
                 {/* 1. Geschwister-Switcher Chips (wenn mehrere Profile vorhanden) */}
                 {familyProfiles && familyProfiles.length > 1 && (
@@ -1423,9 +1333,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         {isAdultStudent ? 'Altersstufe, Benutzeroberfläche und Login-Sicherheit' : 'Altersstufen, Bildschirmzeit-Ruhefenster und Eltern-PIN'}
                       </p>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bae6fd' }}>
-                      Sicherheitszone
-                    </span>
                   </div>
 
                   <div style={{
@@ -1438,51 +1345,51 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       {
                         id: 'parent_controls',
                         title: isAdultStudent ? 'App-Design & Modus' : 'Kinderschutz & Freigaben',
-                        subtitle: isAdultStudent ? 'Didaktisches UI-Level & Funktionen' : 'Altersstufen & 8 didaktische Toggles',
-                        badge: isAdultStudent ? 'Self-Management' : 'Altersstufe',
-                        badgeBg: '#dcfce7',
-                        badgeColor: '#15803d',
-                        badgeBorder: '#86efac',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(250, 204, 21, 0.40)' : 'rgba(2, 132, 199, 0.40)',
+                        subtitle: isAdultStudent ? 'Didaktisches UI-Level & Funktionen' : 'Altersgerechte Filter & didaktische Freigaben',
+                        badge: isAdultStudent ? 'Design' : 'Altersstufe',
+                        badgeBg: '#eff6ff',
+                        badgeColor: '#1d4ed8',
+                        badgeBorder: '#bfdbfe',
+                        gradient: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        shadowColor: 'rgba(37, 99, 235, 0.32)',
                         icon: isAdultStudent ? Compass : ShieldCheck
                       },
                       {
                         id: 'screentime',
                         title: 'Bildschirmzeit & Ruhe',
-                        subtitle: bedtimeModeEnabled ? `Ruhezeit ab ${bedtimeStart} Uhr aktiv` : 'Nachtruhe, Schul-Fokus & Sofortpause',
-                        badge: bedtimeModeEnabled ? 'Geschützt' : 'Ruhefenster',
-                        badgeBg: bedtimeModeEnabled ? '#dcfce7' : '#f8fafc',
-                        badgeColor: bedtimeModeEnabled ? '#15803d' : '#475569',
-                        badgeBorder: bedtimeModeEnabled ? '#86efac' : '#e2e8f0',
-                        gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                        shadowColor: 'rgba(99, 102, 241, 0.40)',
+                        subtitle: bedtimeModeEnabled ? `Ruhezeit ab ${bedtimeStart} Uhr aktiv` : 'Nachtruhe, Fokuszeit & Sofortpause',
+                        badge: bedtimeModeEnabled ? 'Aktiv' : 'Ruhefenster',
+                        badgeBg: bedtimeModeEnabled ? '#f0fdf4' : '#f5f3ff',
+                        badgeColor: bedtimeModeEnabled ? '#15803d' : '#6d28d9',
+                        badgeBorder: bedtimeModeEnabled ? '#bbf7d0' : '#ddd6fe',
+                        gradient: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                        shadowColor: 'rgba(124, 58, 237, 0.32)',
                         icon: Moon
                       },
                       {
                         id: 'security',
-                        title: isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Eltern-Schutz',
+                        title: isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Gerätesicherheit',
                         subtitle: isAdultStudent
-                          ? ((studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen')
-                          : '6-stellige Eltern-PIN & 4-stellige Schüler-PIN',
-                        badge: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'PIN vergeben',
-                        badgeBg: '#dcfce7',
-                        badgeColor: '#15803d',
-                        badgeBorder: '#86efac',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(202, 138, 4, 0.40)' : 'rgba(22, 163, 74, 0.40)',
+                          ? ((studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : 'Persönliche PIN festlegen')
+                          : 'Eltern-PIN, Schüler-PIN & FaceID',
+                        badge: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'PIN einrichten',
+                        badgeBg: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#ecfeff' : '#fffbeb',
+                        badgeColor: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#0e7490' : '#b45309',
+                        badgeBorder: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#a5f3fc' : '#fef3c7',
+                        gradient: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+                        shadowColor: 'rgba(8, 145, 178, 0.32)',
                         icon: Lock
                       },
                       {
                         id: 'notifications',
-                        title: 'Mitteilungen & Push',
-                        subtitle: pushEnabled ? 'Push-Mitteilungen auf diesem Gerät aktiv' : 'Hausaufgaben, Chat & Stundenplan-Meldungen',
-                        badge: pushEnabled ? 'Aktiv' : 'Inaktiv',
-                        badgeBg: pushEnabled ? '#dcfce7' : '#f1f5f9',
-                        badgeColor: pushEnabled ? '#15803d' : '#64748b',
-                        badgeBorder: pushEnabled ? '#86efac' : '#e2e8f0',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.40)' : 'rgba(59, 130, 246, 0.40)',
+                        title: 'Mitteilungen & Alerts',
+                        subtitle: pushEnabled ? 'Push-Mitteilungen aktiv' : 'Hausaufgaben, Stundenplan & Vertretungen',
+                        badge: pushEnabled ? 'Aktiv' : 'Mitteilungen',
+                        badgeBg: pushEnabled ? '#f0fdf4' : '#fff7ed',
+                        badgeColor: pushEnabled ? '#15803d' : '#c2410c',
+                        badgeBorder: pushEnabled ? '#bbf7d0' : '#fed7aa',
+                        gradient: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                        shadowColor: 'rgba(234, 88, 12, 0.32)',
                         icon: Bell
                       }
                     ].map((module) => {
@@ -1582,9 +1489,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         Übefortschritt, Unterrichtsausfälle im Blick und Geschwisterprofile
                       </p>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', background: '#e6f4ea', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
-                      Transparenz
-                    </span>
                   </div>
 
                   <div style={{
@@ -1596,40 +1500,40 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     {[
                       {
                         id: 'practice_report',
-                        title: 'Übe-Report & Insights',
+                        title: 'Übe-Report & Streak',
                         subtitle: `${weeklyPracticeMinutes !== undefined ? weeklyPracticeMinutes : totalPracticeMinutes} Min. Übezeit diese Woche`,
-                        badge: `${(studentUser?.current_streak || avatar?.streak_flame || 0) > 0 ? `${studentUser?.current_streak || avatar?.streak_flame || 0} Tage Streak` : '1 Tage Streak'}`,
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
+                        badge: `${(studentUser?.current_streak || avatar?.streak_flame || 0) > 0 ? `${studentUser?.current_streak || avatar?.streak_flame || 0} Tage Serie` : '1 Tag Serie'}`,
+                        badgeBg: '#f0fdf4',
+                        badgeColor: '#15803d',
+                        badgeBorder: '#bbf7d0',
                         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        shadowColor: 'rgba(16, 185, 129, 0.40)',
+                        shadowColor: 'rgba(16, 185, 129, 0.32)',
                         icon: Clock
                       },
                       {
                         id: 'cancellations',
-                        title: 'Gemeldete Abwesenheiten',
-                        subtitle: cancelledSchoolYearOccurrences.length > 0
-                          ? `${cancelledSchoolYearOccurrences.length} Abwesenheiten gemeldet`
-                          : 'Keine Abwesenheiten gemeldet',
-                        badge: cancelledSchoolYearOccurrences.length > 0 ? `${cancelledSchoolYearOccurrences.length} Termine` : 'Alles regulär',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
+                        title: 'Unterrichtsausfälle',
+                        subtitle: studentCancellationsCount > 0
+                          ? `${studentCancellationsCount} eigene ${studentCancellationsCount === 1 ? 'Absage' : 'Absagen'}`
+                          : 'Keine eigenen Absagen',
+                        badge: studentCancellationsCount > 0 ? `${studentCancellationsCount} ${studentCancellationsCount === 1 ? 'Absage' : 'Absagen'}` : 'Regulär',
+                        badgeBg: studentCancellationsCount > 0 ? '#fef2f2' : '#f8fafc',
+                        badgeColor: studentCancellationsCount > 0 ? '#b91c1c' : '#475569',
+                        badgeBorder: studentCancellationsCount > 0 ? '#fecaca' : '#e2e8f0',
                         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                        shadowColor: 'rgba(245, 158, 11, 0.40)',
+                        shadowColor: 'rgba(245, 158, 11, 0.32)',
                         icon: CalendarX
                       },
                       {
                         id: 'family_profiles',
                         title: 'Familie & Geschwister',
-                        subtitle: familyProfiles.length > 1 ? `${familyProfiles.length} Profile verknüpft (1-Tap Wechsel)` : 'Geschwisterkinder & Geräteverwaltung',
+                        subtitle: familyProfiles.length > 1 ? `${familyProfiles.length} Profile verknüpft (1-Tap Wechsel)` : 'Geschwisterkinder & Geräte verwalten',
                         badge: familyProfiles.length > 1 ? `${familyProfiles.length} Kinder` : 'Multi-Profil',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
-                        gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                        shadowColor: 'rgba(59, 130, 246, 0.40)',
+                        badgeBg: '#f0f9ff',
+                        badgeColor: '#0369a1',
+                        badgeBorder: '#bae6fd',
+                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        shadowColor: 'rgba(2, 132, 199, 0.32)',
                         icon: Users
                       },
                       {
@@ -1639,12 +1543,12 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           return lvl === 'junior' ? 'Musik-Stern & Raster' : (lvl === 'pro' ? 'Kompetenzen-Radar' : 'Skill-Radar & Raster');
                         })(),
                         subtitle: 'Didaktisches Entwicklungsraster (5 Säulen)',
-                        badge: '5 Dimensionen',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
-                        gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-                        shadowColor: 'rgba(236, 72, 153, 0.40)',
+                        badge: '5 Säulen',
+                        badgeBg: '#fff1f2',
+                        badgeColor: '#be123c',
+                        badgeBorder: '#fecdd3',
+                        gradient: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                        shadowColor: 'rgba(225, 29, 72, 0.32)',
                         icon: Sparkles
                       }
                     ].map((module) => {
@@ -1744,9 +1648,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         Modul-Status, 0,00 € Bereitstellung, Datenschutz &amp; DSGVO-Downloads
                       </p>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #ddd6fe' }}>
-                      Konto
-                    </span>
                   </div>
 
                   <div style={{
@@ -1758,51 +1659,51 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     {[
                       {
                         id: 'modules',
-                        title: 'Module & Freischaltung',
-                        subtitle: studentUser?.is_campus_active ? 'Campus & GrooveLab aktiv' : (currentPlatform === 'groovelab' ? 'GrooveLab aktiv' : '1 Monat gratis schnuppern'),
-                        badge: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? 'Aktiv' : '1 Mo. gratis',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(5, 150, 105, 0.40)',
+                        title: 'Module & Studio',
+                        subtitle: studentUser?.is_campus_active ? 'Campus-Studio & GrooveLab aktiv' : (currentPlatform === 'groovelab' ? 'GrooveLab aktiv' : 'Campus Studio freischalten'),
+                        badge: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? 'Aktiv' : 'Schnuppern',
+                        badgeBg: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? '#fefce8' : '#fffbeb',
+                        badgeColor: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? '#854d0e' : '#b45309',
+                        badgeBorder: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? '#fef08a' : '#fde68a',
+                        gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                        shadowColor: 'rgba(234, 179, 8, 0.32)',
                         icon: Zap
                       },
                       {
                         id: 'billing',
-                        title: isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung',
-                        subtitle: (studentUser as any)?.is_direct_billed ? 'Jahresbeitrag & Zahlungsbelege' : 'Von Musikschule übernommen (0,00 €)',
-                        badge: (studentUser as any)?.is_direct_billed ? 'Direktabrechnung' : '0,00 € Inklusive',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
-                        gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                        shadowColor: currentPlatform === 'groovelab' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(124, 58, 237, 0.40)',
+                        title: isAdultStudent ? 'Vertrag & Belege' : ((studentUser as any)?.is_direct_billed ? 'Vertrag & Abrechnung' : 'Schullizenz & Bereitstellung'),
+                        subtitle: (studentUser as any)?.is_direct_billed ? 'Jahresbeitrag & Zahlungsbelege' : '100% von Musikschule übernommen',
+                        badge: (studentUser as any)?.is_direct_billed ? 'Direktabrechnung' : '100% Schullizenz',
+                        badgeBg: (studentUser as any)?.is_direct_billed ? '#eff6ff' : '#f0fdf4',
+                        badgeColor: (studentUser as any)?.is_direct_billed ? '#1e40af' : '#166534',
+                        badgeBorder: (studentUser as any)?.is_direct_billed ? '#bfdbfe' : '#bbf7d0',
+                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        shadowColor: 'rgba(2, 132, 199, 0.32)',
                         icon: FileText
                       },
                       {
                         id: 'downloads',
                         title: 'Datenschutz & Datentresor',
-                        subtitle: 'Art. 15 Auskunft & 4 Archiv-Downloads',
-                        badge: 'DSGVO konform',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
-                        gradient: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
-                        shadowColor: 'rgba(71, 85, 105, 0.40)',
-                        icon: ShieldCheck
+                        subtitle: 'Art. 15 Auskunft & Art. 20 Datenexport',
+                        badge: 'DSGVO',
+                        badgeBg: '#ecfdf5',
+                        badgeColor: '#047857',
+                        badgeBorder: '#a7f3d0',
+                        gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        shadowColor: 'rgba(5, 150, 105, 0.32)',
+                        icon: Download
                       },
                       {
                         id: 'consents',
-                        title: 'Einwilligungen & Medien',
-                        subtitle: 'Foto-, Audio- & Video-Zustimmungen',
-                        badge: 'KUG Bildnisschutz',
-                        badgeBg: '#f8fafc',
-                        badgeColor: '#334155',
-                        badgeBorder: '#e2e8f0',
-                        gradient: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-                        shadowColor: 'rgba(13, 148, 136, 0.40)',
-                        icon: Camera
+                        title: 'Bildnisschutz & Medienrechte',
+                        subtitle: 'Zero-Photo-Doktrin & Art. 17 Löschrechte',
+                        badge: 'KUG Schutz',
+                        badgeBg: '#ecfdf5',
+                        badgeColor: '#047857',
+                        badgeBorder: '#a7f3d0',
+                        gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        shadowColor: 'rgba(5, 150, 105, 0.32)',
+                        icon: ShieldCheck
                       }
                     ].map((module) => {
                       const IconComp = module.icon;
@@ -1889,170 +1790,20 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
                 </div>
 
-                {/* KOMPAKTE SERVICE-LEISTE: Mitteilungen & Direkter Feedback-Kanal */}
+                </div>
+
+                {/* 🏛️ RECHTE SIDEBAR: REPRÄSENTATIVE STIFTER-URKUNDE & BILDUNGSFÖRDERUNG (0,1% GOLDSTANDARD) */}
                 <div style={{
+                  position: isMobile ? 'static' : 'sticky',
+                  top: '20px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '12px',
-                  background: '#f8fafc',
-                  padding: '14px 20px',
-                  borderRadius: '18px',
-                  border: '1.5px solid #e2e8f0'
+                  flexDirection: 'column',
+                  gap: '16px',
+                  paddingTop: isMobile ? '0' : '44px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '10px',
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#64748b'
-                    }}>
-                      <Settings size={18} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a' }}>
-                        Service &amp; Mitteilungen
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
-                        Push-Kanäle anpassen oder Ideen direkt an unser Team senden.
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveHubSubTab('notifications');
-                        handleOpenSettingsModule('billing_and_legal');
-                      }}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '7px',
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        background: '#ffffff',
-                        border: '1.5px solid #cbd5e1',
-                        color: '#334155',
-                        fontSize: '0.80rem',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Bell size={15} color="#3b82f6" />
-                      <span>Mitteilungen {pushEnabled ? '(Aktiv)' : ''}</span>
-                    </button>
-
-                    <a
-                      href="mailto:kontakt@campus-groovelab.de?subject=Feedback%20Elternbereich"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '7px',
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        background: '#ffffff',
-                        border: '1.5px solid #cbd5e1',
-                        color: '#334155',
-                        fontSize: '0.80rem',
-                        fontWeight: 800,
-                        textDecoration: 'none',
-                        cursor: 'pointer'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Lightbulb size={15} color="#ca8a04" />
-                      <span>Feedback &amp; Ideen</span>
-                    </a>
-                  </div>
-                </div>
-
-              </div>
-
-            {/* PERSISTENT STATUS BAR */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px 28px',
-              border: '1px solid #e2e8f0',
-              background: '#f8fafc',
-              borderRadius: '20px',
-              marginTop: '8px'
-            }}>
-              <span style={{ fontSize: '0.82rem', color: currentPlatform === 'groovelab' ? '#ca8a04' : '#34a853', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ✓ Alle Einstellungen synchronisiert.
-              </span>
-              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                Änderungen werden sofort wirksam und gesichert.
-              </span>
-            </div>
-
-            {/* QUICK LINK: HANDBUCH & AKADEMIE */}
-            <div style={{ 
-              background: currentPlatform === 'groovelab' ? '#fefce8' : '#f0fdf4', 
-              borderRadius: '20px', 
-              padding: '18px 24px', 
-              border: `1.5px solid ${currentPlatform === 'groovelab' ? '#fef08a' : '#bbf7d0'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ 
-                  width: '38px', 
-                  height: '38px', 
-                  borderRadius: '12px', 
-                  background: currentPlatform === 'groovelab' ? '#eab308' : '#34a853', 
-                  color: currentPlatform === 'groovelab' ? '#0f172a' : '#ffffff', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center' 
-                }}>
-                  <BookOpen size={20} />
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: currentPlatform === 'groovelab' ? '#713f12' : '#14532d' }}>
-                    Campus-Hilfe &amp; Akademie für Schüler &amp; Eltern
-                  </h4>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: currentPlatform === 'groovelab' ? '#854d0e' : '#166534' }}>
-                    So nutzt du dein digitales Aufgabenheft, den Übe-Timer, Streaks und die Loopstation.
-                  </p>
+                  <ParentSponsorPatronageCard schoolId={(studentUser as any)?.school_id} />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsHelpCenterOpen(true)}
-                style={{
-                  background: currentPlatform === 'groovelab' ? '#eab308' : '#34a853',
-                  color: currentPlatform === 'groovelab' ? '#0f172a' : '#ffffff',
-                  border: 'none',
-                  padding: '9px 18px',
-                  borderRadius: '10px',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: currentPlatform === 'groovelab' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 4px 12px rgba(52, 168, 83, 0.25)',
-                  transition: 'all 0.15s'
-                }}
-                className="hover-scale"
-              >
-                <BookOpen size={14} /> Leitfäden öffnen
-              </button>
-            </div>
 
             {/* PARENT GATEKEEPER MODAL (6-Digit Parent Master PIN) */}
             {renderParentGateModal()}
@@ -2079,11 +1830,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 }}
               >
                 <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="student-settings-modal-title"
                   style={{
                     background: '#ffffff',
                     borderRadius: isMobile ? 0 : '24px',
                     width: '100%',
-                    maxWidth: isMobile ? '100vw' : (isBillingHub ? '920px' : '760px'),
+                    maxWidth: isMobile ? '100vw' : ((activeStudentSettingsModal === 'billing' || activeStudentSettingsModal === 'billing_and_legal') ? '920px' : (activeStudentSettingsModal === 'notifications' ? '540px' : '760px')),
                     height: isMobile ? '100dvh' : 'auto',
                     maxHeight: isMobile ? '100dvh' : '88vh',
                     display: 'flex',
@@ -2147,13 +1901,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             overflow: 'hidden',
                             textOverflow: 'ellipsis'
                           }}>
-                            {isProtectionHub && (isAdultStudent ? 'App & Sicherheit' : 'Kinderschutz & Sicherheit')}
-                            {isLearningHub && 'Lernalltag & Einblick'}
-                            {isFamilyHub && 'Familie & Geräte'}
-                            {isBillingHub && (isAdultStudent ? 'Vertrag & Datenschutz' : 'Bereitstellung & Datenschutz')}
-                            {!isProtectionHub && !isLearningHub && !isFamilyHub && !isBillingHub && (
-                              activeStudentSettingsModal === 'modules' ? 'Module' : 'Einstellungen'
-                            )}
+                            {modalMeta.title}
                           </h3>
                         </div>
 
@@ -2186,35 +1934,20 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             width: '42px',
                             height: '42px',
                             borderRadius: '12px',
-                            background: isProtectionHub
-                              ? (currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)')
-                              : isLearningHub
-                              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                              : isFamilyHub
-                              ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-                              : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                            background: modalMeta.iconBg,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
                           }}>
-                            {isProtectionHub && (isAdultStudent ? <Compass size={20} color="#ffffff" /> : <ShieldCheck size={20} color="#ffffff" />)}
-                            {isLearningHub && <BookOpen size={20} color="#ffffff" />}
-                            {isFamilyHub && <Users size={20} color="#ffffff" />}
-                            {isBillingHub && <FileText size={20} color="#ffffff" />}
+                            <ModalIcon size={20} color="#ffffff" />
                           </div>
                           <div>
-                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              {isProtectionHub && (isAdultStudent ? 'App-Design & Sicherheit' : 'Kinderschutz & Sicherheit')}
-                              {isLearningHub && 'Lernalltag & Einblick'}
-                              {isFamilyHub && 'Familie & Geräte'}
-                              {isBillingHub && (isAdultStudent ? 'Vertrag, Belege & Datenschutz' : 'Bereitstellung, Belege & Datenschutz')}
+                            <h3 id="student-settings-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              {modalMeta.title}
                             </h3>
                             <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              {isProtectionHub && (isAdultStudent ? 'Altersstufe, didaktische Freigaben und persönliche PIN.' : 'Altersstufen-Standards, Bildschirmzeit, Ruhefenster & Eltern-PIN.')}
-                              {isLearningHub && 'Wöchentliche Übezeit, didaktisches 5-Säulen Entwicklungsraster & Abwesenheiten.'}
-                              {isFamilyHub && 'Geschwisterkinder per 1-Tap wechseln, neues Kind hinzufügen und Geräte verwalten.'}
-                              {isBillingHub && (isAdultStudent ? 'Vertragsübersicht, amtliche Belege, Push-Kanäle und DSGVO-Datentresor.' : '0,00 € Bereitstellung, amtliche Bestätigung, Push-Kanäle und DSGVO-Datentresor.')}
+                              {modalMeta.subtitle}
                             </p>
                           </div>
                         </div>
@@ -2237,6 +1970,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
                                 background: '#fef2f2',
                                 border: '1.5px solid #fecaca',
                                 borderRadius: '12px',
@@ -2285,200 +2020,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     )}
                   </div>
 
-                  {/* WAI-ARIA SUBTAB-LEISTE FÜR MULTI-TAB HUBS */}
-                  {isProtectionHub && (
-                    <div
-                      role="tablist"
-                      aria-label="Kinderschutz-Untermenü"
-                      style={{
-                        padding: isMobile ? '8px 14px 10px 14px' : '10px 24px 12px 24px',
-                        background: '#f8fafc',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        gap: '8px',
-                        overflowX: 'auto',
-                        WebkitOverflowScrolling: 'touch',
-                        flexShrink: 0
-                      }}
-                    >
-                      {[
-                        { id: 'parent_controls', label: isAdultStudent ? 'Altersstufe & Design' : 'Didaktik & Freigaben', icon: ShieldCheck },
-                        { id: 'screentime', label: 'Bildschirmzeit & Ruhe', icon: Moon },
-                        { id: 'security', label: isAdultStudent ? 'Persönliche PIN' : 'PIN & Passkey', icon: Lock }
-                      ].map(tab => {
-                        const isSelected = effectiveProtectionSubTab === tab.id;
-                        const TabIcon = tab.icon;
-                        return (
-                          <button
-                            key={tab.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={isSelected}
-                            tabIndex={0}
-                            onClick={() => setActiveHubSubTab(tab.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setActiveHubSubTab(tab.id);
-                              }
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '7px 14px',
-                              borderRadius: '12px',
-                              border: isSelected ? '1px solid #cbd5e1' : '1px solid transparent',
-                              background: isSelected ? '#ffffff' : 'transparent',
-                              color: isSelected ? '#0f172a' : '#64748b',
-                              fontWeight: isSelected ? 850 : 650,
-                              fontSize: '0.80rem',
-                              cursor: 'pointer',
-                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
-                              whiteSpace: 'nowrap',
-                              minHeight: '38px',
-                              touchAction: 'manipulation',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <TabIcon size={14} color={isSelected ? (currentPlatform === 'groovelab' ? '#ca8a04' : '#0284c7') : '#64748b'} />
-                            <span>{tab.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {isLearningHub && (
-                    <div
-                      role="tablist"
-                      aria-label="Lernalltag-Untermenü"
-                      style={{
-                        padding: isMobile ? '8px 14px 10px 14px' : '10px 24px 12px 24px',
-                        background: '#f8fafc',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        gap: '8px',
-                        overflowX: 'auto',
-                        WebkitOverflowScrolling: 'touch',
-                        flexShrink: 0
-                      }}
-                    >
-                      {[
-                        { id: 'practice_report', label: 'Übe-Report & Streak', icon: Clock },
-                        { id: 'skills_radar', label: draftUiLevel === 'junior' ? 'Musik-Stern (5 Säulen)' : 'Entwicklungsraster', icon: Sparkles },
-                        { id: 'cancellations', label: 'Abwesenheiten', icon: CalendarX }
-                      ].map(tab => {
-                        const isSelected = effectiveLearningSubTab === tab.id;
-                        const TabIcon = tab.icon;
-                        return (
-                          <button
-                            key={tab.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={isSelected}
-                            tabIndex={0}
-                            onClick={() => setActiveHubSubTab(tab.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setActiveHubSubTab(tab.id);
-                              }
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '7px 14px',
-                              borderRadius: '12px',
-                              border: isSelected ? '1px solid #cbd5e1' : '1px solid transparent',
-                              background: isSelected ? '#ffffff' : 'transparent',
-                              color: isSelected ? '#0f172a' : '#64748b',
-                              fontWeight: isSelected ? 850 : 650,
-                              fontSize: '0.80rem',
-                              cursor: 'pointer',
-                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
-                              whiteSpace: 'nowrap',
-                              minHeight: '38px',
-                              touchAction: 'manipulation',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <TabIcon size={14} color={isSelected ? '#15803d' : '#64748b'} />
-                            <span>{tab.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {isBillingHub && (
-                    <div
-                      role="tablist"
-                      aria-label="Vertrag-Untermenü"
-                      style={{
-                        padding: isMobile ? '8px 14px 10px 14px' : '10px 24px 12px 24px',
-                        background: '#f8fafc',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        gap: '8px',
-                        overflowX: 'auto',
-                        WebkitOverflowScrolling: 'touch',
-                        flexShrink: 0
-                      }}
-                    >
-                      {[
-                        { id: 'billing', label: isAdultStudent ? 'Vertrag & Belege' : 'Bereitstellung & Belege', icon: FileText },
-                        { id: 'notifications', label: 'Mitteilungen & Push', icon: Bell },
-                        { id: 'consents', label: 'Einwilligungen', icon: Camera },
-                        { id: 'downloads', label: 'DSGVO & Datentresor', icon: Download }
-                      ].map(tab => {
-                        const isSelected = effectiveBillingSubTab === tab.id;
-                        const TabIcon = tab.icon;
-                        return (
-                          <button
-                            key={tab.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={isSelected}
-                            tabIndex={0}
-                            onClick={() => setActiveHubSubTab(tab.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setActiveHubSubTab(tab.id);
-                              }
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '7px 14px',
-                              borderRadius: '12px',
-                              border: isSelected ? '1px solid #cbd5e1' : '1px solid transparent',
-                              background: isSelected ? '#ffffff' : 'transparent',
-                              color: isSelected ? '#0f172a' : '#64748b',
-                              fontWeight: isSelected ? 850 : 650,
-                              fontSize: '0.80rem',
-                              cursor: 'pointer',
-                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
-                              whiteSpace: 'nowrap',
-                              minHeight: '38px',
-                              touchAction: 'manipulation',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <TabIcon size={14} color={isSelected ? '#6d28d9' : '#64748b'} />
-                            <span>{tab.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
                   {/* Modal Body */}
                   <div
                     style={{
@@ -2494,7 +2035,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     }}
                     className={isMobile ? "mobile-scroll-container" : ""}
                   >
-                    {(activeStudentSettingsModal === 'parent_controls' || (isProtectionHub && effectiveProtectionSubTab === 'parent_controls')) && (
+                    {(activeStudentSettingsModal === 'parent_controls' || activeStudentSettingsModal === 'protection_and_safety') && (
                       <ParentProtectionSettingsView
                         studentUser={studentUser}
                         studentId={studentId}
@@ -2519,7 +2060,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       />
                     )}
 
-                    {(activeStudentSettingsModal === 'screentime' || (isProtectionHub && effectiveProtectionSubTab === 'screentime')) && (() => {
+                    {activeStudentSettingsModal === 'screentime' && (() => {
                       const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
                       return (
                         <ParentScreenTimeSettingsView
@@ -2540,7 +2081,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       );
                     })()}
 
-                    {(activeStudentSettingsModal === 'practice_report' || (isLearningHub && effectiveLearningSubTab === 'practice_report')) && (() => {
+                    {(activeStudentSettingsModal === 'practice_report' || activeStudentSettingsModal === 'learning_and_insights') && (() => {
                       const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
                       return (
                         <ParentPracticeReportSettingsView
@@ -2555,14 +2096,15 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       );
                     })()}
 
-                    {(activeStudentSettingsModal === 'cancellations' || (isLearningHub && effectiveLearningSubTab === 'cancellations')) && (
+                    {activeStudentSettingsModal === 'cancellations' && (
                       <ParentCancellationLogSettingsView
                         cancelledSchoolYearOccurrences={cancelledSchoolYearOccurrences}
                         handleUndoCancelOccurrence={handleUndoCancelOccurrence}
+                        studentId={studentId}
                       />
                     )}
 
-                    {(activeStudentSettingsModal === 'family_profiles' || isFamilyHub) && (
+                    {(activeStudentSettingsModal === 'family_profiles' || activeStudentSettingsModal === 'family_and_devices') && (
                       <ParentFamilyProfilesSettingsView
                         familyProfiles={familyProfiles}
                         studentId={studentId}
@@ -2573,7 +2115,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       />
                     )}
 
-                    {(activeStudentSettingsModal === 'skills_radar' || (isLearningHub && effectiveLearningSubTab === 'skills_radar')) && (() => {
+                    {activeStudentSettingsModal === 'skills_radar' && (() => {
                       const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
                       return (
                         <ParentDevelopmentGridSettingsView
@@ -2585,189 +2127,31 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       );
                     })()}
 
-                    {(activeStudentSettingsModal === 'notifications' || (isBillingHub && effectiveBillingSubTab === 'notifications')) && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {/* Push-Benachrichtigungen Haupt-Toggle */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
-                            <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                              <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                                <Bell size={18} />
-                              </div>
-                              <div>
-                                <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
-                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir wichtige Mitteilungen auf dein Handy zu schicken.</p>
-                              </div>
-                            </div>
-                            
-                            {isPremiumUser ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                {pushEnabled && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowPushSoftPrompt(true)}
-                                    style={{
-                                      background: '#f1f5f9',
-                                      color: '#0f172a',
-                                      border: 'none',
-                                      borderRadius: '100px',
-                                      padding: '6px 14px',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      transition: 'background 0.2s'
-                                    }}
-                                  >
-                                    Anpassen
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (!pushEnabled) {
-                                      setShowPushSoftPrompt(true);
-                                    } else {
-                                      const success = await unsubscribeUserFromPush(studentId);
-                                      if (!success) {
-                                        alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                                      } else {
-                                        setPushEnabled(false);
-                                      }
-                                    }
-                                  }}
-                                  className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                                  style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
-                                >
-                                  <div className="app-binary-switch-knob" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                                <Lock size={12} strokeWidth={2.5} aria-hidden="true" />
-                                <span>Nur für aktive Schüler</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {!isPremiumUser && (
-                            <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
-                              * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
-                            </p>
-                          )}
-
-                          {/* iOS Helper Alert */}
-                          {isIOS && !isStandalone && (
-                            <div style={{
-                              padding: '12px 16px',
-                              background: '#fffbeb',
-                              border: '1px solid #fef3c7',
-                              borderRadius: '16px',
-                              fontSize: '0.75rem',
-                              color: '#b45309',
-                              lineHeight: '1.4',
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: '8px'
-                            }}>
-                              <Lightbulb size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#d97706' }} aria-hidden="true" />
-                              <div>
-                                <strong>iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={750} /> danach über das neue App-Icon auf deinem Homescreen.
-                              </div>
-                            </div>
-                          )}
-
-                          {/* The 5 Modular Granular Push Channels */}
-                          {pushEnabled && isPremiumUser && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-                                Spezifische Benachrichtigungs-Kanäle
-                              </div>
-                              {[
-                                { k: 'changes', label: 'Termin- & Stundenplanänderungen', desc: 'Sofortige Alerts bei Raumwechseln, Vertretungen oder Ausfällen.', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
-                                { k: 'homework', label: 'Hausaufgaben & Lehrer-Feedback', desc: 'Benachrichtigung, sobald deine Lehrkraft neue Aufgaben notiert hat.', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
-                                { k: 'chat', label: 'Direktnachrichten & Chat', desc: 'Sofort-Mitteilung bei neuen Antworten von deiner Lehrkraft oder Musikschule.', val: pushNotifChat, setter: setPushNotifChat, dbKey: 'push_notif_chat', icon: <Mail size={18} /> },
-                                { k: 'practice', label: 'Übe-Erinnerung & Streak-Schutz', desc: 'Sanfter Reminder am Nachmittag, um die tägliche Übe-Serie zu halten.', val: pushNotifPracticeReminder, setter: setPushNotifPracticeReminder, dbKey: 'push_notif_practice_reminder', icon: <Zap size={18} /> },
-                                { k: 'digest', label: 'Wöchentlicher Übe-Rückblick', desc: 'Sonntags-Digest mit gesammelten Übe-Minuten und Meilensteinen.', val: pushNotifWeeklyDigest, setter: setPushNotifWeeklyDigest, dbKey: 'push_notif_weekly_digest', icon: <Trophy size={18} /> }
-                              ].map((row) => (
-                                <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                                    <div style={{ padding: '10px', borderRadius: '12px', background: row.val ? '#34a85315' : '#f1f5f9', color: row.val ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                                      {row.icon}
-                                    </div>
-                                    <div>
-                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{row.label}</h4>
-                                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{row.desc}</p>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const nextVal = !row.val;
-                                      row.setter(nextVal);
-                                      try {
-                                        await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
-                                      } catch (err) {
-                                        console.warn('[NotificationSettings] Failed to save push preference:', err);
-                                      }
-                                    }}
-                                    className={`app-binary-switch ${row.val ? 'active' : ''}`}
-                                    style={{ backgroundColor: row.val ? '#34a853' : undefined }}
-                                  >
-                                    <div className="app-binary-switch-knob" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* System-Cache leeren (Hilfe & Diagnose) */}
-                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                          <h3 style={{ fontSize: '0.90rem', fontWeight: 850, color: '#64748b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <RotateCcw size={15} color="#64748b" /> App-Cache &amp; Diagnose
-                          </h3>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '12px', fontWeight: 550, lineHeight: '1.4' }}>
-                            Wenn die App nicht korrekt lädt oder alte Daten anzeigt, kannst du hier den lokalen Speicher bereinigen.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (window.confirm('Möchtest du wirklich den lokalen Cache-Speicher leeren? Deine Anmeldung bleibt dabei vollständig erhalten.')) {
-                                try {
-                                  if ('caches' in window) {
-                                    const keys = await caches.keys();
-                                    await Promise.all(keys.map(key => caches.delete(key)));
-                                  }
-                                } catch (e) {
-                                  console.warn('Could not clear PWA cache:', e);
-                                }
-                                localStorage.removeItem('groovelab_active_practice_session');
-                                localStorage.removeItem('student_lehrwerke_progress');
-                                localStorage.removeItem('groovelab_offline_user_cache');
-                                localStorage.removeItem('groovelab_cached_schools');
-                                localStorage.removeItem('groovelab_cached_user');
-                                window.location.reload();
-                              }
-                            }}
-                            style={{
-                              fontWeight: 800,
-                              fontSize: '0.82rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '8px'
-                            }}
-                            className="hover-scale"
-                          >
-                            <RotateCcw size={14} /> Lokalen Cache leeren
-                          </button>
-                        </div>
-                      </div>
+                    {activeStudentSettingsModal === 'notifications' && (
+                      <ParentNotificationSettingsView
+                        studentId={studentId}
+                        studentUser={studentUser}
+                        isPremiumUser={isPremiumUser}
+                        pushEnabled={pushEnabled}
+                        setPushEnabled={setPushEnabled}
+                        setShowPushSoftPrompt={setShowPushSoftPrompt}
+                        isIOS={isIOS}
+                        isStandalone={isStandalone}
+                        pushNotifScheduleChanges={pushNotifScheduleChanges}
+                        setPushNotifScheduleChanges={setPushNotifScheduleChanges}
+                        pushNotifHomework={pushNotifHomework}
+                        setPushNotifHomework={setPushNotifHomework}
+                        pushNotifChat={pushNotifChat}
+                        setPushNotifChat={setPushNotifChat}
+                        pushNotifPracticeReminder={pushNotifPracticeReminder}
+                        setPushNotifPracticeReminder={setPushNotifPracticeReminder}
+                        pushNotifWeeklyDigest={pushNotifWeeklyDigest}
+                        setPushNotifWeeklyDigest={setPushNotifWeeklyDigest}
+                        unsubscribeUserFromPush={unsubscribeUserFromPush}
+                      />
                     )}
 
-                    {(activeStudentSettingsModal === 'security' || (isProtectionHub && effectiveProtectionSubTab === 'security')) && (() => {
+                    {activeStudentSettingsModal === 'security' && (() => {
                       const isParentTarget = securityPinTarget === 'parent' && !isAdultStudent;
                       const targetPinLength = isParentTarget ? 6 : 4;
                       const isFilledComplete = pinFormNew.length === targetPinLength && pinFormConfirm.length === targetPinLength;
@@ -3443,218 +2827,16 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     })()}
 
                     {activeStudentSettingsModal === 'modules' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        {/* Modul 1: Campus */}
-                        <div style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #86efac',
-                          borderRadius: '20px',
-                          padding: '22px',
-                          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '14px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '14px',
-                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                color: '#ffffff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-                              }}>
-                                <BookOpen size={22} />
-                              </div>
-                              <div>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  Schüler- &amp; Übestudio
-                                </span>
-                                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-                                  Modul Campus
-                                </h4>
-                              </div>
-                            </div>
-                            <span style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              padding: '4px 10px',
-                              borderRadius: '100px',
-                              background: studentUser?.is_campus_active ? '#dcfce7' : '#fef3c7',
-                              color: studentUser?.is_campus_active ? '#15803d' : '#b45309',
-                              border: `1px solid ${studentUser?.is_campus_active ? '#86efac' : '#fde68a'}`
-                            }}>
-                              {studentUser?.is_campus_active ? '✓ Aktiv freigeschaltet' : 'Bereit zur Aktivierung'}
-                            </span>
-                          </div>
-
-                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
-                            Umfasst das digitale Hausaufgabenheft, den interaktiven Übe-Timer mit Streaks &amp; Level-Ups, die Audio-Loopstation und die persönliche Audio-Biografie.
-                          </p>
-
-                          {/* Feature Pills */}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {[
-                              { label: 'Übe-Timer & Streaks', icon: Clock },
-                              { label: 'Audio-Loopstation', icon: Mic },
-                              { label: 'Hausaufgabenheft & Notizen', icon: BookOpen },
-                              { label: 'Audio-Biografie', icon: Music }
-                            ].map((feat) => {
-                              const FeatIcon = feat.icon;
-                              return (
-                                <span key={feat.label} style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: 700,
-                                  color: '#1e293b',
-                                  background: '#f1f5f9',
-                                  padding: '4px 10px',
-                                  borderRadius: '8px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px'
-                                }}>
-                                  <FeatIcon size={12} color="#15803d" />
-                                  <span>{feat.label}</span>
-                                </span>
-                              );
-                            })}
-                          </div>
-
-                          {/* Action Button */}
-                          <div style={{ paddingTop: '6px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9' }}>
-                            {studentUser?.is_campus_active ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 700 }}>
-                                  Aktiv für das laufende Schuljahr
-                                </span>
-                                <span
-                                  role="status"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    padding: '8px 14px',
-                                    borderRadius: '10px',
-                                    background: '#f1f5f9',
-                                    color: '#64748b',
-                                    border: '1px solid #e2e8f0',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 700,
-                                    cursor: 'default',
-                                    minHeight: '44px'
-                                  }}
-                                >
-                                  Bereits freigeschaltet
-                                </span>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setShowParentActivationModal(true)}
-                                style={{
-                                  padding: '10px 18px',
-                                  borderRadius: '12px',
-                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  fontSize: '0.82rem',
-                                  fontWeight: 850,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                                  minHeight: '44px',
-                                  touchAction: 'manipulation'
-                                }}
-                                className="hover-scale"
-                              >
-                                <Sparkles size={14} />
-                                <span>Gratis-Schnuppermonat starten &amp; freischalten</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Modul 2: GrooveLab Modul */}
-                        <div style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #fef08a',
-                          borderRadius: '20px',
-                          padding: '20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '14px',
-                          boxShadow: '0 4px 16px -4px rgba(234, 179, 8, 0.15)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Music size={18} color="#ca8a04" />
-                              </div>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
-                                  Modul GrooveLab
-                                </h4>
-                              </div>
-                            </div>
-                            <span style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              padding: '4px 10px',
-                              borderRadius: '100px',
-                              background: '#fefce8',
-                              color: '#a16207',
-                              border: '1px solid #fef08a'
-                            }}>
-                              Inklusive (Musikschule übernimmt 100%)
-                            </span>
-                          </div>
-
-                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
-                            Umfasst die Band-Rooms, Song-Bibliotheken zum Mitspielen, Live Lab, den Skill-Radar und spielerische Musiker-Avatare.
-                          </p>
-
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {[
-                              { label: 'Band-Rooms', icon: Users },
-                              { label: 'Song-Bibliotheken', icon: Library },
-                              { label: 'Skill-Radar', icon: Target },
-                              { label: 'Musiker-Avatare', icon: Sparkles }
-                            ].map((feat) => {
-                              const FeatIcon = feat.icon;
-                              return (
-                                <span key={feat.label} style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: 700,
-                                  color: '#1e293b',
-                                  background: '#fefce8',
-                                  border: '1px solid #fef9c3',
-                                  padding: '4px 10px',
-                                  borderRadius: '8px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px'
-                                }}>
-                                  <FeatIcon size={12} color="#ca8a04" />
-                                  <span>{feat.label}</span>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
+                      <ParentModulesSettingsView
+                        studentUser={studentUser}
+                        currentPlatform={currentPlatform}
+                        onOpenActivation={() => setShowParentActivationModal(true)}
+                      />
                     )}
 
-                    {(activeStudentSettingsModal === 'billing' || (isBillingHub && effectiveBillingSubTab === 'billing')) && (
+                    {(activeStudentSettingsModal === 'billing' || activeStudentSettingsModal === 'billing_and_legal') && (
                       <div>
-                        {studentUser?.role?.toLowerCase() === 'student' && (
-                          <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
-                        )}
+                        <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
                       </div>
                     )}
 
@@ -3787,54 +2969,15 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       </div>
                     )}
 
-                    {(activeStudentSettingsModal === 'consents' || (isBillingHub && effectiveBillingSubTab === 'consents')) && (
+                    {activeStudentSettingsModal === 'consents' && (
                       <ParentConsentSettingsView
                         studentUser={studentUser}
                         studentId={studentId}
                       />
                     )}
 
-                    {(activeStudentSettingsModal === 'downloads' || (isBillingHub && (effectiveBillingSubTab === 'downloads' || effectiveBillingSubTab === 'legal'))) && (
+                    {(activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'legal') && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        {/* DSGVO Art. 20 Datenübertragbarkeit / Voll-Archiv Export */}
-                        {handleExportFullDataArchive && (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <Download size={18} color="#059669" style={{ flexShrink: 0 }} />
-                              <div>
-                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
-                                  Vollständiges Datenarchiv (Art. 20 DSGVO)
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginTop: '2px' }}>
-                                  Alle Hausaufgaben, Meisterwerke, Übe-Logs &amp; Audio-Memos als JSON herunterladen.
-                                </div>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleExportFullDataArchive}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '8px 14px',
-                                borderRadius: '10px',
-                                background: '#059669',
-                                color: '#ffffff',
-                                border: 'none',
-                                fontSize: '0.78rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                flexShrink: 0
-                              }}
-                              className="hover-scale"
-                            >
-                              <Download size={14} />
-                              <span>JSON Export</span>
-                            </button>
-                          </div>
-                        )}
-
                         {/* 🌟 4 Modulare Didaktik-Datentresor Downloads (Art. 20 DSGVO) */}
                         <ParentDataVaultSettingsView
                           downloadingSection={downloadingSection}

@@ -9,16 +9,30 @@ cd "$REPO_ROOT"
 
 echo "🔍 Führe automatisierten Pre-Commit Secret-Scan durch (Root: $REPO_ROOT)..."
 
-# List of files staged for commit, or all files in tracking if running standalone
+# List of files staged for commit, or all files in tracking if running standalone or no staged files
+SCAN_ALL=false
 if [ "$1" == "--all" ]; then
-    FILES=$(git ls-files 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 'deploy/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || find apps/groovelab/src packages scripts supabase/migrations deploy -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" -o -name "*.conf" -o -name "*.yml" -o -name "*.yaml" \) -print | grep -v 'pre_commit_secret_scanner.sh')
+    SCAN_ALL=true
 else
-    FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/|^deploy/' | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || true)
+    ANY_STAGED=$(git diff --cached --name-only 2>/dev/null || true)
+    if [ -z "$ANY_STAGED" ]; then
+        echo "  ℹ️  Keine Staged-Dateien im Git-Index gefunden. Schalte automatisch auf Vollscan (--all) um..."
+        SCAN_ALL=true
+    else
+        FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/|^deploy/' | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || true)
+        if [ -z "$FILES" ]; then
+            echo "  ✓ Keine relevanten Code-, Paket-, Skript-, Deploy- oder Migrationsdateien verändert."
+            exit 0
+        fi
+    fi
 fi
 
-if [ -z "$FILES" ]; then
-    echo "  ✓ Keine relevanten Code-, Paket-, Skript-, Deploy- oder Migrationsdateien verändert."
-    exit 0
+if [ "$SCAN_ALL" = true ]; then
+    FILES=$(git ls-files --cached --others --exclude-standard 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 'deploy/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || find apps/groovelab/src packages scripts supabase/migrations deploy -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" -o -name "*.conf" -o -name "*.yml" -o -name "*.yaml" \) -print | grep -v 'pre_commit_secret_scanner.sh')
+    if [ -z "$FILES" ]; then
+        echo "  ✓ Keine relevanten Code-, Paket-, Skript-, Deploy- oder Migrationsdateien gefunden."
+        exit 0
+    fi
 fi
 
 LEAKS_FOUND=0

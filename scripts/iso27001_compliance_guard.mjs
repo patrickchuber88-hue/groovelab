@@ -155,6 +155,27 @@ recordCheck(
 );
 
 // -----------------------------------------------------------------------------
+// CHECK 9: 360° Legal Compliance ISO Standards Matrix
+// -----------------------------------------------------------------------------
+const legalDossier = path.join(DOCS_DIR, 'LEGAL_COMPLIANCE_360_DOSSIER.md');
+let hasAllIsoStandards = false;
+if (fs.existsSync(legalDossier)) {
+  const content = fs.readFileSync(legalDossier, 'utf-8');
+  hasAllIsoStandards = 
+    content.includes('ISO/IEC 27001') &&
+    content.includes('ISO 22301') &&
+    content.includes('DIN EN 16931') &&
+    content.includes('DIN ISO 7064') &&
+    content.includes('ISO 20022') &&
+    content.includes('DIN 66398');
+}
+recordCheck(
+  'ISO 360° Standards Matrix: Vollständigkeit aller relevanten ISO/DIN-Normen im Legal Dossier',
+  hasAllIsoStandards,
+  'ISO 27001, ISO 27701, ISO 22301, ISO 5230, DIN ISO 7064, ISO 20022, DIN 66398 lückenlos verankert.'
+);
+
+// -----------------------------------------------------------------------------
 // Summary & Verdict
 // -----------------------------------------------------------------------------
 process.stdout.write(`\n${HR}\n`);

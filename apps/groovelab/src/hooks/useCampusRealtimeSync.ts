@@ -310,17 +310,34 @@ export function useCampusRealtimeSync({
     };
   }, [user?.id, user?.school_id, user?.role, user?.token_version]);
 
-  // Enterprise Kiosk Inactivity Auto-Reset
+  // Enterprise Kiosk Inactivity Auto-Reset (Dynamisch synchronisiert mit Schule & Lehrkraft)
   useEffect(() => {
     if (!loggedInUserId || !isKioskMode) return;
 
+    const schoolSettings = user?.schools?.opening_hours?.groovelab_settings 
+      || user?.school?.opening_hours?.groovelab_settings
+      || (() => {
+        try {
+          const raw = localStorage.getItem('groovelab_cached_schools');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const s = Array.isArray(parsed) ? parsed.find((item: any) => item.id === user?.school_id) : parsed;
+            return s?.opening_hours?.groovelab_settings;
+          }
+        } catch {}
+        return null;
+      })();
+
+    const configuredTimeoutMin = Number(schoolSettings?.kiosk_auto_timeout_minutes);
+    const effectiveTimeoutMin = (!isNaN(configuredTimeoutMin) && configuredTimeoutMin >= 15) ? configuredTimeoutMin : 60;
+    const KIOSK_IDLE_LIMIT_MS = effectiveTimeoutMin * 60 * 1000;
+
     let timeoutId: any;
-    const KIOSK_IDLE_LIMIT_MS = 5 * 60 * 1000; // 5 Minuten Inaktivität
 
     const resetIdleTimer = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        console.log('[Kiosk] Inactivity timeout reached. Resetting session to Kiosk login screen.');
+        console.log(`[Kiosk] Inactivity timeout reached (${effectiveTimeoutMin}m). Resetting session to Kiosk login screen.`);
         handleLogout(true, false);
       }, KIOSK_IDLE_LIMIT_MS);
     };
@@ -333,7 +350,7 @@ export function useCampusRealtimeSync({
       clearTimeout(timeoutId);
       events.forEach(ev => window.removeEventListener(ev, resetIdleTimer));
     };
-  }, [loggedInUserId, isKioskMode]);
+  }, [loggedInUserId, isKioskMode, user?.school_id, user?.schools?.opening_hours, user?.school?.opening_hours]);
 
   // Camera Kill Switch on Login
   useEffect(() => {

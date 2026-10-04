@@ -39,7 +39,7 @@ const results: InvariantCheckResult[] = [];
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ RLS & SCHEMA CATALOG INVARIANT AUDIT');
 console.log('    Standards: DIN EN ISO/IEC 27001 (A.8.20/A.8.24) & BSI C5 Kriterienkatalog');
-console.log('    Validating 21 Forensic Architecture & Performance Invariants...');
+console.log('    Validating 22 Forensic Architecture & Performance Invariants...');
 console.log('════════════════════════════════════════════════════════════════════\n');
 
 if (!fs.existsSync(MIGRATION_389)) {
@@ -654,6 +654,103 @@ function verifyInvariant21(): InvariantCheckResult {
 }
 
 // ------------------------------------------------------------------------------
+// INVARIANT 22: Dynamic Inspection of Post-470 Migrations (>= 471 to 519+)
+// ------------------------------------------------------------------------------
+function verifyInvariant22(): InvariantCheckResult {
+  const migrationFiles = fs.readdirSync(MIGRATIONS_DIR)
+    .filter(f => f.endsWith('.sql'));
+
+  const post470Migrations: { num: number; file: string; content: string }[] = [];
+
+  for (const file of migrationFiles) {
+    const match = file.match(/^(\d{1,4})_/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num >= 471) {
+        const content = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8');
+        post470Migrations.push({ num, file, content });
+      }
+    }
+  }
+
+  post470Migrations.sort((a, b) => a.num - b.num);
+
+  const findings: string[] = [];
+  const maxMigration = post470Migrations.length > 0 
+    ? Math.max(...post470Migrations.map(m => m.num))
+    : 0;
+
+  if (maxMigration < 519) {
+    findings.push(`Expected latest migration to reach at least 519, but highest detected was ${maxMigration}`);
+  }
+
+  for (const m of post470Migrations) {
+    // 1. Verify table creations in public schema enforce RLS
+    const createTableMatches = m.content.matchAll(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+public\.([a-zA-Z0-9_]+)/gi);
+    for (const match of createTableMatches) {
+      const tableName = match[1];
+      const rlsRegex = new RegExp(`ALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:public\\.)?["']?${tableName}["']?\\s+(?:ENABLE|FORCE)\\s+ROW\\s+LEVEL\\s+SECURITY`, 'i');
+      const hasRls = post470Migrations.some(mig => rlsRegex.test(mig.content));
+      if (!hasRls) {
+        findings.push(`Migration ${m.file}: Table public.${tableName} missing ENABLE/FORCE ROW LEVEL SECURITY`);
+      }
+    }
+
+    // 2. Verify SECURITY DEFINER functions explicitly pin search_path
+    if (m.content.includes('SECURITY DEFINER') && !m.content.includes('SET search_path')) {
+      findings.push(`Migration ${m.file}: Declares SECURITY DEFINER without explicit SET search_path`);
+    }
+  }
+
+  // 3. Verify core milestone invariants in migrations 471-519
+  const m473 = post470Migrations.find(m => m.num === 473);
+  if (!m473 || !m473.content.includes('campus_ui_level') || !m473.content.includes('save_parent_controls')) {
+    findings.push('Migration 473 missing authoritative campus_ui_level / save_parent_controls governance');
+  }
+
+  const m476 = post470Migrations.find(m => m.num === 476);
+  if (!m476 || !m476.content.includes('gdpr_tombstones') || !m476.content.includes('DO INSTEAD NOTHING')) {
+    findings.push('Migration 476 missing gdpr_tombstones WORM immutability rule');
+  }
+
+  const m502 = post470Migrations.find(m => m.num === 502);
+  if (!m502 || !m502.content.includes('execute_legacy_migration') || !m502.content.includes('p_school_id')) {
+    findings.push('Migration 502 missing execute_legacy_migration RPC or p_school_id scoping');
+  }
+
+  const m504 = post470Migrations.find(m => m.num === 504);
+  if (!m504 || !m504.content.includes('authenticate_by_credential') || !m504.content.includes('qr_login_rate_limits')) {
+    findings.push('Migration 504 missing authenticate_by_credential hardening or qr_login_rate_limits audit');
+  }
+
+  const m510 = post470Migrations.find(m => m.num === 510);
+  if (!m510 || !m510.content.includes('set_initial_student_pin') || !m510.content.includes('is_pin_activated')) {
+    findings.push('Migration 510 missing set_initial_student_pin or is_pin_activated parity');
+  }
+
+  const m514 = post470Migrations.find(m => m.num === 514);
+  if (!m514 || !m514.content.includes('compute_name_blind_index') || !m514.content.includes('bidx_last_name')) {
+    findings.push('Migration 514 missing blind index identity vault encryption');
+  }
+
+  const m519 = post470Migrations.find(m => m.num === 519);
+  if (!m519 || !m519.content.includes('log_audit_event') || !m519.content.includes('progress_matrix')) {
+    findings.push('Migration 519 missing WORM progress_matrix audit logging');
+  }
+
+  const passed = findings.length === 0;
+  return {
+    id: 22,
+    name: `Dynamic Post-470 Migration Inspection (Migrations 471 to ${maxMigration})`,
+    passed,
+    details: passed
+      ? `Dynamically inspected ${post470Migrations.length} migrations (471 to ${maxMigration}): 100% tables enforce RLS, SECURITY DEFINER functions pin search_path, and milestones 473-519 sealed.`
+      : `Failed: ${findings.join('; ')}`,
+    findings
+  };
+}
+
+// ------------------------------------------------------------------------------
 // LIVE CATALOG AUDIT ENGINE (Checks pg_policies, pg_views, pg_proc when connected)
 // ------------------------------------------------------------------------------
 export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed: boolean; message: string }> {
@@ -709,7 +806,7 @@ export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed
   };
 }
 
-// Execute all 20 checks
+// Execute all 22 checks
 results.push(verifyInvariant1());
 results.push(verifyInvariant2());
 results.push(verifyInvariant3());
@@ -731,6 +828,7 @@ results.push(verifyInvariant18());
 results.push(verifyInvariant19());
 results.push(verifyInvariant20());
 results.push(verifyInvariant21());
+results.push(verifyInvariant22());
 
 let failedCount = 0;
 
@@ -752,7 +850,7 @@ if (liveResult.executed) {
 
 console.log('\n════════════════════════════════════════════════════════════════════');
 if (failedCount === 0) {
-  console.log(`🎉 ALL 21 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
+  console.log(`🎉 ALL 22 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
   console.log('   OWASP ASVS Level 3 / DSGVO Art. 5, 8, 25, 32 / Sub-MS Invariants Sealed.');
   console.log('════════════════════════════════════════════════════════════════════\n');
   process.exit(0);

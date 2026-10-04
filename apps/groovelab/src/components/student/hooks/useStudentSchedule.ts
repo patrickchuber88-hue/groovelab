@@ -193,8 +193,32 @@ export function useStudentSchedule({
   }, [fetchSchedule]);
 
   const cancelledSchoolYearOccurrences = useMemo(() => {
-    return scheduleOccurrences.filter(o => o.status === 'cancelled' || o.status === 'canceled_by_student');
-  }, [scheduleOccurrences]);
+    return scheduleOccurrences.filter(o => {
+      const s = String(o.status || '').toLowerCase();
+      const role = String(o.canceled_by_role || '').toLowerCase();
+      const notes = String(o.notes || '').toLowerCase();
+
+      // Ausschluss jeglicher Lehrkraft- oder Schulausfälle (Art. 9 DSGVO, § 26 BDSG)
+      if (
+        role === 'teacher' ||
+        s === 'teacher_ausfall' ||
+        s === 'canceled_by_teacher_ausfall' ||
+        s === 'canceled_by_teacher' ||
+        notes.includes('abwesend: lehrkraft') ||
+        notes.includes('abwesend: schulausfall')
+      ) {
+        return false;
+      }
+
+      // Schüler-ID Matching wenn vorhanden
+      if (studentId && o.student_id && o.student_id !== studentId) {
+        return false;
+      }
+
+      // Ausschließlich eigene Absagen des Schülers / der Familie
+      return s === 'canceled_by_student' || role === 'student' || s === 'absent' || notes.includes('abwesend: schüler');
+    });
+  }, [scheduleOccurrences, studentId]);
 
   // Actions
   const handleConfirmReschedule = async (occId: string) => {
