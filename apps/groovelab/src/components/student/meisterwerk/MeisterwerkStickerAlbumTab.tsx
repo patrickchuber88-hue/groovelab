@@ -1,53 +1,26 @@
 import React, { useState } from "react";
 import {
-  BookOpen,
-  Music,
-  Sliders,
-  RotateCcw,
-  Download,
-  Star,
-  Check,
-  X,
-  Award,
-  ChevronRight,
-  Lock,
-  Trophy,
-  Compass,
-  Clock,
-  Sparkles,
-  Flame,
-  Target,
-  Archive,
-  Building2,
-  GraduationCap
+  BookOpen, Music, Sliders, RotateCcw, Download, Star, Check, X, Award, ChevronRight,
+  Lock, Trophy, Compass, Clock, Sparkles, Flame, Target, Archive, Building2, GraduationCap
 } from "lucide-react";
 import Confetti from "react-confetti";
 import { isDevEnvironment } from "../../../utils/tenantUrlHelper";
-import { ALL_STICKERS, calculateCampusSchoolYearNumber, StickerUnlockResult } from "../../../domain/stickersAndTresor";
+import { ALL_STICKERS, calculateCampusSchoolYearNumber, getUnifiedStickersMap, StickerUnlockResult } from "../../../domain/stickersAndTresor";
 import { getSchoolYearString } from "../studentDateUtils";
 import { StudentStickerAwardCelebrationModal } from "../modals/StudentStickerAwardCelebrationModal";
 
 export interface MeisterwerkStickerAlbumTabProps {
-  isMobileOrSim: boolean;
-  readOnly?: boolean;
-  isDevSimulationActive: boolean;
-  setIsDevSimulationActive: (val: boolean) => void;
-  simulateMultiYearProgress: () => void;
-  resetStickerAlbum: () => void;
+  isMobileOrSim: boolean; readOnly?: boolean;
+  isDevSimulationActive: boolean; setIsDevSimulationActive: (val: boolean) => void;
+  simulateMultiYearProgress: () => void; resetStickerAlbum: () => void;
   collectedStickers: Record<string, StickerUnlockResult>;
-  renderSchoolYearSelector: () => React.ReactNode;
-  awardSticker: (stickerId: string, reason?: string) => void;
-  awardedStickerToAnimate: any;
-  setAwardedStickerToAnimate: (val: any) => void;
-  downloadShareCard: (sticker: any, topicName?: string) => void;
-  topicName?: string;
-  actualStudentName?: string;
-  studentInstrument?: string | null;
+  renderSchoolYearSelector: () => React.ReactNode; awardSticker: (stickerId: string, reason?: string) => void;
+  awardedStickerToAnimate: any; setAwardedStickerToAnimate: (val: any) => void;
+  downloadShareCard: (sticker: any, topicName?: string) => void; topicName?: string;
+  actualStudentName?: string; studentInstrument?: string | null;
   shareCard?: (sticker: any, topicOverride?: string) => Promise<void>;
-  selectedSchoolYear?: string;
-  currentSchoolYear?: string;
-  student?: any;
-  schoolName?: string;
+  selectedSchoolYear?: string; currentSchoolYear?: string;
+  student?: any; schoolName?: string;
 }
 
 export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProps> = ({
@@ -107,6 +80,25 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
   const completedCycles = Math.floor((schoolYearNum - 1) / 15);
   const currentCoverStickerId = `schuljahr-${cycleYear}`;
   const currentCoverSticker = ALL_STICKERS.find(s => s.id === currentCoverStickerId);
+
+  const effectiveCollectedStickers = React.useMemo(() => {
+    const hasAnyUnlocked = Object.values(collectedStickers || {}).some((s: any) => s?.isUnlocked || (s?.count || 0) > 0);
+    if (hasAnyUnlocked) return collectedStickers;
+    const regDateStr = student?.activated_at || student?.created_at || (student as any)?.registration_date;
+    const practiceMins = (student as any)?.total_focus_minutes ?? (student as any)?.practice_minutes ?? 0;
+    const xpVal = (student as any)?.current_xp ?? (student as any)?.xp ?? 0;
+    const streakVal = (student as any)?.current_streak ?? (student as any)?.streak ?? 0;
+    return getUnifiedStickersMap({
+      practiceMinutes: practiceMins,
+      xp: xpVal,
+      streakDays: streakVal,
+      masteredSongsCount: 0,
+      progressItems: [],
+      studentCreatedAt: regDateStr,
+      activatedAt: regDateStr,
+      selectedSchoolYear: selectedSchoolYear || '2025/2026'
+    });
+  }, [collectedStickers, student, selectedSchoolYear]);
 
   return (
         <div style={{
@@ -585,21 +577,22 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                   color: activeAlbumView === 'season' ? '#ffffff' : '#94a3b8',
                   border: activeAlbumView === 'season' ? '1px solid rgba(255, 255, 255, 0.3)' : 'none',
                   borderRadius: '20px',
-                  padding: '9px 20px',
-                  fontSize: '0.84rem',
+                  padding: isMobileOrSim ? '8px 12px' : '9px 20px',
+                  fontSize: isMobileOrSim ? '0.78rem' : '0.84rem',
                   fontWeight: 900,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
                   boxShadow: activeAlbumView === 'season' ? '0 4px 16px rgba(16, 185, 129, 0.4)' : 'none',
                   transition: 'all 0.18s ease'
                 }}
                 className="hover-scale"
               >
-                <Trophy size={16} strokeWidth={2.4} color={activeAlbumView === 'season' ? '#ffffff' : '#94a3b8'} />
-                <span>Saison-Album (20 Meilensteine)</span>
+                <Trophy size={15} strokeWidth={2.4} color={activeAlbumView === 'season' ? '#ffffff' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                <span>{isMobileOrSim ? 'Saison-Album' : 'Saison-Album (20 Meilensteine)'}</span>
               </button>
 
               <button
@@ -611,30 +604,33 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                   color: activeAlbumView === 'journey' ? '#0f172a' : '#94a3b8',
                   border: activeAlbumView === 'journey' ? '1px solid rgba(255, 255, 255, 0.4)' : 'none',
                   borderRadius: '20px',
-                  padding: '9px 20px',
-                  fontSize: '0.84rem',
+                  padding: isMobileOrSim ? '8px 12px' : '9px 20px',
+                  fontSize: isMobileOrSim ? '0.78rem' : '0.84rem',
                   fontWeight: 900,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
                   boxShadow: activeAlbumView === 'journey' ? '0 4px 16px rgba(234, 179, 8, 0.4)' : 'none',
                   transition: 'all 0.18s ease'
                 }}
                 className="hover-scale"
               >
-                <Compass size={16} strokeWidth={2.4} color={activeAlbumView === 'journey' ? '#0f172a' : '#94a3b8'} />
-                <span>Meine Campus-Jahre (Klangreise)</span>
+                <Compass size={15} strokeWidth={2.4} color={activeAlbumView === 'journey' ? '#0f172a' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                <span>{isMobileOrSim ? 'Klangreise' : 'Meine Campus-Jahre (Klangreise)'}</span>
                 <span style={{
                   background: activeAlbumView === 'journey' ? '#0f172a' : 'rgba(255, 255, 255, 0.12)',
                   color: activeAlbumView === 'journey' ? '#facc15' : '#e2e8f0',
-                  fontSize: '0.68rem',
-                  padding: '2px 8px',
+                  fontSize: '0.66rem',
+                  padding: '2px 7px',
                   borderRadius: '10px',
-                  fontWeight: 900
+                  fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}>
-                  {schoolYearNum}. Jahr
+                  {isMobileOrSim ? `J${schoolYearNum}` : `${schoolYearNum}. Jahr`}
                 </span>
               </button>
             </div>
@@ -642,9 +638,9 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
 
           {/* VIEW 1: SAISON-ALBUM (EXACTLY 20 MEILENSTEINE • KINDGERECHT & AUFGERÄUMT) */}
           {activeAlbumView === 'season' && (() => {
-            const activeStickerSource = collectedStickers;
-            // Seasonal milestone collection (20 core milestone stickers, strictly excluding schuljahr)
-            const seasonalStickers = ALL_STICKERS.filter(st => st.category !== 'schuljahr');
+            const activeStickerSource = effectiveCollectedStickers;
+            // Seasonal milestone collection (20 core milestone stickers, strictly excluding schuljahr and worldtour)
+            const seasonalStickers = ALL_STICKERS.filter(st => st.category !== 'schuljahr' && st.category !== 'worldtour');
             const totalSeasonalCount = seasonalStickers.length; // 20
             const collectedSeasonalCount = seasonalStickers.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
             const percentage = Math.round((collectedSeasonalCount / totalSeasonalCount) * 100);
@@ -1155,7 +1151,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                       : 'rgba(255, 255, 255, 0.02)',
                                     border: isCollected 
                                       ? (isLegendary ? '2px solid rgba(234, 179, 8, 0.75)' : isEpic ? '2px solid rgba(175, 82, 222, 0.75)' : isRare ? '2px solid rgba(59, 130, 246, 0.75)' : '2px solid rgba(34, 197, 94, 0.65)') 
-                                      : '1.5px dashed rgba(255, 255, 255, 0.12)',
+                                      : '1px solid rgba(255, 255, 255, 0.08)',
                                     borderRadius: '22px',
                                     padding: '18px 14px 14px 14px',
                                     display: 'flex',
@@ -1349,7 +1345,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                         <span style={{ 
                                           fontSize: isCollected ? '2.6rem' : '2.3rem', 
                                           zIndex: 1, 
-                                          filter: isCollected ? 'none' : 'grayscale(100%) brightness(0.2) contrast(1.2)',
+                                          filter: isCollected ? 'none' : 'grayscale(15%) brightness(0.85) opacity(0.90)',
                                           userSelect: 'none'
                                         }}>
                                           {st.emoji}
@@ -1369,7 +1365,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                             objectFit: 'cover',
                                             borderRadius: '50%',
                                             zIndex: 2,
-                                            filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(100%) brightness(0.18) contrast(1.2)',
+                                            filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(15%) brightness(0.85) opacity(0.92)',
                                             transition: 'opacity 0.2s ease-in-out'
                                           }}
                                           onError={(e) => {
@@ -1381,39 +1377,47 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                             e.currentTarget.style.opacity = '0';
                                           }}
                                         />
-
-                                        {/* Locked Center Badge: Lock icon or progress % pill */}
-                                        {!isCollected && (
-                                          <div style={{
-                                            position: 'absolute',
-                                            inset: 0,
-                                            borderRadius: '50%',
-                                            background: 'rgba(8, 13, 24, 0.55)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            zIndex: 3
-                                          }}>
-                                            {progressPct > 0 ? (
-                                              <span style={{
-                                                background: 'rgba(15, 23, 42, 0.85)',
-                                                border: '1px solid rgba(56, 189, 248, 0.4)',
-                                                color: '#38bdf8',
-                                                fontSize: '0.66rem',
-                                                fontWeight: 950,
-                                                padding: '2px 6px',
-                                                borderRadius: '8px',
-                                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)'
-                                              }}>
-                                                {progressPct}%
-                                              </span>
-                                            ) : (
-                                              <Lock size={18} color="#64748b" />
-                                            )}
-                                          </div>
-                                        )}
                                       </div>
+
+                                      {/* Locked Corner Badge (Non-obstructing, 0,1% Goldstandard) */}
+                                      {!isCollected && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          bottom: '2px',
+                                          right: '2px',
+                                          zIndex: 5,
+                                          pointerEvents: 'none'
+                                        }}>
+                                          {progressPct > 0 ? (
+                                            <span style={{
+                                              background: 'rgba(15, 23, 42, 0.92)',
+                                              border: '1px solid rgba(56, 189, 248, 0.6)',
+                                              color: '#38bdf8',
+                                              fontSize: '0.62rem',
+                                              fontWeight: 950,
+                                              padding: '1px 6px',
+                                              borderRadius: '999px',
+                                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)'
+                                            }}>
+                                              {progressPct}%
+                                            </span>
+                                          ) : (
+                                            <div style={{
+                                              width: '24px',
+                                              height: '24px',
+                                              borderRadius: '50%',
+                                              background: 'rgba(15, 23, 42, 0.90)',
+                                              border: '1.5px solid rgba(250, 204, 21, 0.7)',
+                                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}>
+                                              <Lock size={12} color="#facc15" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* STICKER TITLE & DESCRIPTION */}
@@ -1516,7 +1520,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
 
           {/* VIEW 2: CAMPUS-EHRENHALLE (3X3 BASIS-ALBUM + PROGRESSIVE HALL OF FAME) */}
           {activeAlbumView === 'journey' && (() => {
-            const activeStickerSource = collectedStickers;
+            const activeStickerSource = effectiveCollectedStickers;
             const campusStickers = ALL_STICKERS.filter(st => st.category === 'schuljahr');
             const unlockedCampusCount = campusStickers.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
 
@@ -1574,8 +1578,8 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         ? '2px solid rgba(250, 204, 21, 0.85)'
                         : `2px solid ${st.color || '#34a853'}`
                       : isHallOfFameTier
-                      ? '1.5px dashed rgba(234, 179, 8, 0.45)'
-                      : '1.5px dashed rgba(255, 255, 255, 0.12)',
+                      ? '1px solid rgba(234, 179, 8, 0.45)'
+                      : '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '22px',
                     padding: '18px 16px 14px 16px',
                     display: 'flex',
@@ -1736,7 +1740,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                       <span style={{ 
                         fontSize: isCollected ? '3rem' : '2.6rem', 
                         zIndex: 1, 
-                        filter: isCollected ? 'none' : 'grayscale(100%) brightness(0.2) contrast(1.2)',
+                        filter: isCollected ? 'none' : 'grayscale(40%) brightness(0.60) opacity(0.70)',
                         userSelect: 'none'
                       }}>
                         {st.emoji}
@@ -1755,7 +1759,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           objectFit: 'cover',
                           borderRadius: '50%',
                           zIndex: 2,
-                          filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(100%) brightness(0.18) contrast(1.2)',
+                          filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(40%) brightness(0.60) opacity(0.70)',
                           transition: 'opacity 0.2s ease-in-out'
                         }}
                         onError={(e) => {
@@ -1774,7 +1778,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         position: 'absolute',
                         inset: 0,
                         borderRadius: '50%',
-                        background: isHallOfFameTier ? 'rgba(25, 20, 10, 0.65)' : 'rgba(8, 13, 24, 0.55)',
+                        background: isHallOfFameTier ? 'rgba(25, 20, 10, 0.45)' : 'rgba(8, 13, 24, 0.35)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -2695,75 +2699,52 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                     </h3>
                   </div>
 
-                  {/* 3D STICKER BADGE (135px Compact Vinyl Graphic) */}
-                  <div style={{
-                    width: '135px',
-                    height: '135px',
-                    borderRadius: '50%',
-                    background: isCollected ? (st.bg || '#f0fdf4') : 'radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%)',
-                    border: isCollected ? '4px solid #ffffff' : '1.5px dashed rgba(255, 255, 255, 0.2)',
-                    boxShadow: isCollected 
-                      ? `0 10px 26px ${st.color || '#34a853'}50, 0 0 0 1px rgba(255,255,255,0.7)` 
-                      : '0 6px 18px rgba(0,0,0,0.4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    position: 'relative',
-                    zIndex: 2,
-                    margin: '2px 0',
-                    flexShrink: 0
-                  }}>
+                  {/* 3D STICKER BADGE (135px Compact Vinyl Graphic with Corner Lock) */}
+                  <div style={{ position: 'relative', margin: '2px 0', flexShrink: 0 }}>
                     <div style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '50%',
-                      overflow: 'hidden'
+                      width: '135px', height: '135px', borderRadius: '50%',
+                      background: isCollected ? (st.bg || '#f0fdf4') : 'radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%)',
+                      border: isCollected ? '4px solid #ffffff' : '1.5px dashed rgba(255, 255, 255, 0.2)',
+                      boxShadow: isCollected ? `0 10px 26px ${st.color || '#34a853'}50, 0 0 0 1px rgba(255,255,255,0.7)` : '0 6px 18px rgba(0,0,0,0.4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', zIndex: 2
                     }}>
-                      <span style={{ 
-                        fontSize: isCollected ? '3.8rem' : '3.2rem', 
-                        zIndex: 1, 
-                        filter: isCollected ? 'none' : 'grayscale(100%) brightness(0.25) contrast(1.2)',
-                        userSelect: 'none'
+                      <div style={{
+                        position: 'relative', width: '100%', height: '100%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: '50%', overflow: 'hidden'
                       }}>
-                        {st.emoji}
-                      </span>
+                        <span style={{ 
+                          fontSize: isCollected ? '3.8rem' : '3.2rem', 
+                          zIndex: 1, 
+                          filter: isCollected ? 'none' : 'grayscale(15%) brightness(0.85) contrast(1.1)',
+                          userSelect: 'none'
+                        }}>
+                          {st.emoji}
+                        </span>
 
-                      <img 
-                        src={`/stickers/${st.id}.png?v=1`} 
-                        alt={st.title} 
-                        style={{ 
-                          position: 'absolute',
-                          inset: 0,
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'cover',
-                          borderRadius: '50%',
-                          zIndex: 2,
-                          filter: isCollected ? 'none' : 'grayscale(100%) brightness(0.22) contrast(1.2)'
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
+                        <img 
+                          src={`/stickers/${st.id}.png?v=1`} 
+                          alt={st.title} 
+                          style={{ 
+                            position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+                            borderRadius: '50%', zIndex: 2,
+                            filter: isCollected ? 'none' : 'grayscale(15%) brightness(0.88) contrast(1.05)'
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
                     </div>
 
                     {!isCollected && (
                       <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'rgba(8, 13, 24, 0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 3,
-                        pointerEvents: 'none'
+                        position: 'absolute', bottom: '4px', right: '4px', width: '32px', height: '32px', borderRadius: '50%',
+                        background: 'rgba(15, 23, 42, 0.95)', border: '2px solid rgba(250, 204, 21, 0.8)',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 10, pointerEvents: 'none'
                       }}>
-                        <Lock size={30} color="#facc15" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))' }} />
+                        <Lock size={15} color="#facc15" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />
                       </div>
                     )}
                   </div>
@@ -2882,13 +2863,14 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                   </div>
 
                   {/* Status & Verification Line */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', zIndex: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', zIndex: 2 }}>
                     <span style={{ 
                       fontSize: '0.72rem', 
                       color: isCollected ? '#4ade80' : '#94a3b8', 
                       fontWeight: 800,
                       display: 'inline-flex',
                       alignItems: 'center',
+                      whiteSpace: 'nowrap',
                       gap: '4px'
                     }}>
                       {isCollected ? (
@@ -2902,7 +2884,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                       )}
                     </span>
                     <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 950, letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 950, letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
                       <span style={{ color: '#34a853' }}>Campus</span>
                       <span style={{ color: '#94a3b8', margin: '0 1px' }}>-</span>
                       <span style={{ color: '#facc15' }}>Groovelab</span>

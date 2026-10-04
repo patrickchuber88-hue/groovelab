@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { TourStartButton } from '../PremiumOnboardingTour';
 import { resolveUserCampusId } from '../../utils/campusIdHelper';
+import { CampusSidebarRailItem } from '../layout/CampusSidebarRailItem';
 
 export interface SecretaryUserProfile {
   id?: string;
@@ -542,80 +543,21 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
         ] as any[]).filter(Boolean).map((item: any) => {
           const Icon = item.icon;
           const isSelected = secretarySubTab === item.id;
-          return isCollapsed ? (
-            <button
+          return (
+            <CampusSidebarRailItem
               key={item.id}
+              icon={<Icon size={isCollapsed ? 20 : 18} />}
+              label={item.label}
+              isActive={isSelected}
+              isCollapsed={isCollapsed}
+              platform="briefing"
+              badgeCount={item.count}
               onClick={() => {
                 React.startTransition(() => {
                   setSecretarySubTab(item.id as any);
                 });
               }}
-              title={item.label}
-              aria-label={item.label}
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '12px',
-                border: isSelected ? '1px solid rgba(234, 67, 53, 0.3)' : '1px solid transparent',
-                background: isSelected ? '#fce8e6' : 'transparent',
-                color: isSelected ? '#ea4335' : '#64748b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                position: 'relative',
-                transition: 'all 0.18s ease'
-              }}
-              className="hover-scale"
-            >
-              <Icon size={18} />
-              {item.count !== undefined && item.count > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  background: '#ea4335',
-                  color: '#ffffff',
-                  fontSize: '0.6rem',
-                  fontWeight: 900,
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {item.count}
-                </span>
-              )}
-            </button>
-          ) : (
-            <button
-              key={item.id}
-              onClick={() => {
-                React.startTransition(() => {
-                  setSecretarySubTab(item.id as any);
-                });
-              }}
-              className={`google-sidebar-item briefing ${isSelected ? 'active briefing' : ''}`}
-            >
-              <div className="sidebar-icon-circle briefing">
-                <Icon size={16} />
-              </div>
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-              {item.count !== undefined && item.count > 0 && (
-                <span style={{
-                  background: isSelected ? '#ea4335' : '#fce8e6',
-                  color: isSelected ? '#ffffff' : '#c5221f',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  padding: '2px 8px',
-                  borderRadius: '100px'
-                }}>
-                  {item.count}
-                </span>
-              )}
-            </button>
+            />
           );
         })}
 
@@ -632,72 +574,17 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
         ] as any[]).filter(Boolean).map((item: any) => {
           const Icon = item.icon;
           const isSelected = campusSubTab === item.id;
-          return isCollapsed ? (
-            <button
+          return (
+            <CampusSidebarRailItem
               key={item.id}
+              icon={<Icon size={isCollapsed ? 20 : 18} />}
+              label={item.label}
+              isActive={isSelected}
+              isCollapsed={isCollapsed}
+              platform="campus"
+              badgeCount={item.count}
               onClick={() => setCampusSubTab(item.id as any)}
-              title={item.label}
-              aria-label={item.label}
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '12px',
-                border: isSelected ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid transparent',
-                background: isSelected ? '#e6f4ea' : 'transparent',
-                color: isSelected ? '#34a853' : '#64748b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                position: 'relative',
-                transition: 'all 0.18s ease'
-              }}
-              className="hover-scale"
-            >
-              <Icon size={18} />
-              {item.count !== undefined && item.count > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  background: '#34a853',
-                  color: '#ffffff',
-                  fontSize: '0.6rem',
-                  fontWeight: 900,
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {item.count}
-                </span>
-              )}
-            </button>
-          ) : (
-            <button
-              key={item.id}
-              onClick={() => setCampusSubTab(item.id as any)}
-              className={`google-sidebar-item campus ${isSelected ? 'active campus' : ''}`}
-            >
-              <div className="sidebar-icon-circle campus">
-                <Icon size={16} />
-              </div>
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-              {item.count !== undefined && item.count > 0 && (
-                <span style={{
-                  background: isSelected ? '#34a853' : '#e6f4ea',
-                  color: isSelected ? '#ffffff' : '#34a853',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  padding: '2px 8px',
-                  borderRadius: '100px'
-                }}>
-                  {item.count}
-                </span>
-              )}
-            </button>
+            />
           );
         })}
 
@@ -710,40 +597,16 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
         ].map((item) => {
           const Icon = item.icon;
           const isSelected = groovelabSubTab === item.id;
-          return isCollapsed ? (
-            <button
+          return (
+            <CampusSidebarRailItem
               key={item.id}
+              icon={<Icon size={isCollapsed ? 20 : 18} />}
+              label={item.label}
+              isActive={isSelected}
+              isCollapsed={isCollapsed}
+              platform="groovelab"
               onClick={() => setGroovelabSubTab(item.id as any)}
-              title={item.label}
-              aria-label={item.label}
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '12px',
-                border: isSelected ? '1px solid rgba(234, 179, 8, 0.35)' : '1px solid transparent',
-                background: isSelected ? '#fefce8' : 'transparent',
-                color: isSelected ? '#ca8a04' : '#64748b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.18s ease'
-              }}
-              className="hover-scale"
-            >
-              <Icon size={18} />
-            </button>
-          ) : (
-            <button
-              key={item.id}
-              onClick={() => setGroovelabSubTab(item.id as any)}
-              className={`google-sidebar-item groovelab-dark ${isSelected ? 'active' : ''}`}
-            >
-              <div className="sidebar-icon-circle groovelab">
-                <Icon size={16} />
-              </div>
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-            </button>
+            />
           );
         })}
       </nav>

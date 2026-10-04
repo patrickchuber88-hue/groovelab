@@ -1564,7 +1564,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                 mode="teacher"
               />
 
-              {/* Emergency Contact */}
+              {/* Institutioneller Notfall-Kanal gem. Zero-User-Contact Doktrin */}
               <section
                 style={{
                   background: '#ffffff',
@@ -1578,24 +1578,10 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                 }}
               >
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                  📞 Notfallkontakt (Unterrichtsausfall / Notfall)
+                  🛡️ Notfall & Schul-Kommunikation
                 </h4>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
-                  Im Falle einer plötzlichen Verhinderung oder eines Notfalls während der Unterrichtsstunde:
-                </div>
-                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
-                  {(student.emergency_phone || student.parent_phone || student.phone) ? (
-                    <span>
-                      {student.emergency_phone || student.parent_phone || student.phone}
-                      {student.parent_name ? (
-                        <span style={{ marginLeft: '8px', color: '#64748b', fontWeight: 600, fontSize: '0.78rem' }}>
-                          ({student.parent_name})
-                        </span>
-                      ) : null}
-                    </span>
-                  ) : (
-                    'Keine Notfall-Nummer im Schülerprofil hinterlegt.'
-                  )}
+                  Gemäß 100 % Zero-User-Contact Doktrin werden keine privaten Telefonnummern gespeichert. Notfallmeldungen und Unterrichtsausfälle erfolgen autoritativ über das Schulsekretariat und den In-App Status.
                 </div>
               </section>
             </div>

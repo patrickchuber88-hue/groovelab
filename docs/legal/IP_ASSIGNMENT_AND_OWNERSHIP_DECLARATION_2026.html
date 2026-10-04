@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Rechteinhaberschafts- & IP-Zuordnungserklärung – Campus-Groovelab</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 15mm 18mm 15mm 18mm;
+      @bottom-right {
+        content: "Seite " counter(page) " von " counter(pages);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+      @bottom-left {
+        content: "Campus-Groovelab · Sole IP Ownership Declaration · BSI TR-02102";
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #94a3b8;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 8.8pt;
+      line-height: 1.45;
+      color: #0f172a;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .doc-header {
+      border-bottom: 2.5px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .brand-title {
+      font-size: 14pt;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 8pt;
+      color: #64748b;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .doc-badge {
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: #059669;
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h1 {
+      font-size: 13.5pt;
+      font-weight: 900;
+      color: #0f172a;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+    }
+
+    .doc-subheading {
+      font-size: 9pt;
+      color: #475569;
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+
+    .meta-box {
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      font-size: 8.4pt;
+    }
+
+    .meta-box strong {
+      display: block;
+      color: #0f172a;
+      font-size: 8.6pt;
+      margin-bottom: 2px;
+    }
+
+    .section {
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 9.8pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 1.5px solid #0f172a;
+      padding-bottom: 3px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      margin: 0 0 6px 0;
+      text-align: justify;
+    }
+
+    ul {
+      margin: 0 0 6px 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin-bottom: 3px;
+      text-align: justify;
+    }
+
+    .highlight-card {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-left: 3.5px solid #16a34a;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 8.4pt;
+    }
+
+    .hash-box {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 7.5pt;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin: 8px 0;
+      word-break: break-all;
+    }
+
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 24px;
+      page-break-inside: avoid;
+    }
+
+    .sig-block {
+      border-top: 1.5px solid #0f172a;
+      padding-top: 6px;
+    }
+
+    .sig-name {
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 9pt;
+    }
+
+    .sig-role {
+      font-size: 7.8pt;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="doc-header">
+    <div>
+      <div class="brand-title">Campus-Groovelab</div>
+      <div class="brand-subtitle">Intellectual Property & Corporate Asset Governance</div>
+    </div>
+    <div class="doc-badge">Rechtssichere Urkunde</div>
+  </div>
+
+  <h1>Erklärung zur alleinigen Rechteinhaberschaft & IP-Zuordnung</h1>
+  <div class="doc-subheading">
+    <strong>Rechtsverbindliche Feststellung der ausschließlichen Urheber-, Verwertungs- und Immaterialgüterrechte an der Software-Plattform „Campus-Groovelab“ zur Vorlage bei Notaren, Wirtschaftsprüfern und M&A-Due-Diligence-Prüfungen.</strong>
+  </div>
+
+  <div class="meta-box">
+    <div>
+      <strong>Urheber, Erfinder & Alleininhaber:</strong>
+      Patrick Huber<br>
+      Campus-Groovelab (Einzelunternehmen)<br>
+      Rheinfelden (Baden), Deutschland
+    </div>
+    <div>
+      <strong>Rechtsgrundlagen & Standards:</strong>
+      §§ 69a ff. UrhG (Computerprogramme)<br>
+      GeschGehG (Geschäftsgeheimnisschutzgesetz)<br>
+      BSI TR-02102 (Kryptografische Verifikation)<br>
+      Stand: 04. Oktober 2026
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 1 Gegenstand der Rechteinhaberschaft (IP-Inventar)</div>
+    <p>
+      Gegenstand dieser Erklärung ist die gesamte, unter der Bezeichnung <strong>„Campus-Groovelab“</strong> entwickelte 
+      Cloud-Softwareplattform (SaaS) nebst aller dazugehörigen Schutzgüter. Dies umfasst insbesondere:
+    </p>
+    <ul>
+      <li><strong>Quellcode & Softwarearchitektur:</strong> Das gesamte Git-Monorepo (Frontend-Anwendungen `apps/groovelab`, Shared Packages `packages/*`, API-Gateways und Backend-Funktionen) in allen Versionen.</li>
+      <li><strong>Datenbank-Design & Schemata:</strong> Sämtliche relationalen Tabellenstrukturen, Row-Level-Security (RLS) Policies, PostgreSQL-Triggers und autoritativen Security-RPCs (Migrationen 001 bis 526).</li>
+      <li><strong>Didaktische & Spielmechanische Konzepte:</strong> Das adaptive 3-Stufen-UI-System (Junior, Teen, Pro), das 7-Tage-Übetracker-System, die Meisterwerk-Dokumentation sowie das zweistufige Dispositions- und Ausfallmodell.</li>
+      <li><strong>Audio-Engines & Algorithmen:</strong> Web Audio API Playback-Engines, Multi-Track-Audio-Recorder und Sound-Synthese.</li>
+      <li><strong>Kennzeichen & Unternehmenskennzeichen:</strong> Die Wort- und Bildmarke <em>„Campus-GrooveLab“</em>, Domainnamen, grafische Oberflächen (UI-Design) und digitale Ausweis-Layouts.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 2 Feststellung der ausschließlichen Urheberschaft gem. §§ 69a ff. UrhG</div>
+    <p>
+      Der Unterzeichnende, <strong>Herr Patrick Huber</strong>, erklärt an Eides statt und mit bindender Wirkung:
+    </p>
+    <ol style="margin: 0; padding-left: 18px; line-height: 1.5;">
+      <li>Er ist der <strong>alleinige Schöpfer und Urheber</strong> der in § 1 bezeichneten Software gem. § 69b UrhG.</li>
+      <li>Die Entwicklung erfolgte als eigenverantwortliche, unabhängige Leistung außerhalb eines bestehenden Dienst- oder Arbeitsverhältnisses. Es bestehen keinerlei Arbeitnehmererfinderrechte oder Rückforderungsansprüche früherer Arbeitgeber oder Dritter.</li>
+      <li>Es wurden keine externen Agenturen, Unterauftragnehmer oder Freelancer mit der Kernentwicklung beauftragt, die übertragbare Miturheberrechte begründet haben könnten.</li>
+      <li>Sämtliche fremde Softwarekomponenten Dritter beschränken sich ausschließlich auf lizenzkonforme Open-Source-Bibliotheken unter permissiven Standardlizenzen (MIT, Apache 2.0, BSD) gem. ISO/IEC 5230 OpenChain. Virulente Copyleft-Lizenzen (GPL, AGPL) sind ausgeschlossen.</li>
+    </ol>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 3 Kryptografische Verifikation & Merkle-Integrität (BSI TR-02102)</div>
+    <p>
+      Die ununterbrochene Herkunfts- und Integritätskette der Codebasis ist durch kryptografische Commit-Signaturen 
+      auf Basis des Ed25519-Standards revisionssicher verankert. Sämtliche Commits sind mit dem persönlichen, 
+      im autorisierten GitHub-Repository hinterlegten Signaturschlüssel des Urhebers beglaubigt und genügen den 
+      strengen Vorgaben der BSI-Richtlinie TR-02102 sowie den GoBD an unveränderbare, manipulationssichere Software-Entwicklungsketten.
+    </p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 4 Zuordnung & Einbringungsvorbehalt (Holding & GmbH)</div>
+    <div class="highlight-card">
+      <strong>Verbindlicher Einbringungsvorbehalt:</strong><br>
+      Alle Rechte an der Software verbleiben bis zur notariellen Gründung der Holding- und Betriebsgesellschaft 
+      im ausschließlichen Alleineigentum von Patrick Huber. Etwaigen Vertriebspartnern, Beiräten oder Kooperationsschulen 
+      werden zu keinem Zeitpunkt dingliche oder immaterielle Eigentumsrechte an der Software übertragen. 
+      Die spätere Übertragung erfolgt exklusiv an die <em>Campus-Groovelab GmbH</em> bzw. <em>Huber Holding GmbH</em>.
+    </div>
+  </div>
+
+  <div class="signatures-grid">
+    <div class="sig-block">
+      <div class="sig-name">Patrick Huber</div>
+      <div class="sig-role">Gründer, alleiniger Urheber & Inhaber · Campus-Groovelab</div>
+      <div style="font-size: 7.5pt; color: #94a3b8; margin-top: 4px;">Rheinfelden (Baden), den 04. Oktober 2026</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-name">Forensische Beglaubigung</div>
+      <div class="sig-role">Codebase Integrity & Merkle Hash-Seal (SHA-256)</div>
+      <div style="font-size: 7.5pt; color: #059669; font-weight: 700; margin-top: 4px;">Status: UNVERÄNDERLICH GESICHERT ✓</div>
+    </div>
+  </div>
+
+</body>
+</html>

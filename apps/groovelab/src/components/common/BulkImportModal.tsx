@@ -378,8 +378,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           payload: {
             sanitized_name: row.sanitizedName,
             full_name: `${row.originalFirstName} ${row.originalLastName}`.trim(),
-            instrument: row.instrument,
-            email: targetType === 'TEACHER' ? row.email : undefined
+            instrument: row.instrument
           },
           validation_status: 'VALID'
         }));

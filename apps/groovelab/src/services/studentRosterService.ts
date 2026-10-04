@@ -158,7 +158,6 @@ export const ROSTER_STUDENT_PROJECTION = [
   'is_campus_active',
   'is_groovelab_active',
   'teacher_id',
-  'birth_date',
   'group_id',
   'sibling_group_id',
   'lesson_duration',
@@ -168,7 +167,6 @@ export const ROSTER_STUDENT_PROJECTION = [
   'is_trial',
   'exempt_from_direct_billing',
   'ausweis_nummer',
-  'phone',
   'campus_ui_level'
 ].join(', ');
 

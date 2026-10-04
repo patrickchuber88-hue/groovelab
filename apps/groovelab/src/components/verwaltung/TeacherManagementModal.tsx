@@ -286,7 +286,6 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
     id: teacher.id,
     firstName: teacher.firstName || teacher.first_name || '',
     lastName: teacher.lastName || teacher.last_name || '',
-    phone: teacher.phone || '',
     instrument: teacher.instrument || '',
     requiredEquipment: Array.isArray(teacher.requiredEquipment)
       ? teacher.requiredEquipment

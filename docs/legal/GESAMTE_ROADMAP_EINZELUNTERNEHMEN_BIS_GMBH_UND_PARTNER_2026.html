@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Gesamte Roadmap: Vom Einzelunternehmen zur Holding/GmbH & zum M&A-Exit – Campus-Groovelab</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 13mm 15mm 13mm 15mm;
+      @bottom-right {
+        content: "Seite " counter(page) " von " counter(pages);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 7.5pt;
+        color: #64748b;
+      }
+      @bottom-left {
+        content: "Campus-Groovelab · Vertrauliche Betreiber-Roadmap · Stand: 04.10.2026";
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 7.5pt;
+        color: #94a3b8;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 8.2pt;
+      line-height: 1.36;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .doc-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .brand-title {
+      font-size: 12.5pt;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 7.5pt;
+      color: #64748b;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .doc-badge {
+      font-size: 7.2pt;
+      font-weight: 700;
+      color: #047857;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h1 {
+      font-size: 12.8pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 5px 0;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      text-transform: uppercase;
+    }
+
+    .doc-subheading {
+      font-size: 8.5pt;
+      color: #475569;
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+
+    .meta-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 7px 12px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      font-size: 8pt;
+    }
+
+    .meta-col strong {
+      display: block;
+      color: #0f172a;
+      font-size: 8.2pt;
+      margin-bottom: 2px;
+    }
+
+    .chapter {
+      margin-bottom: 11px;
+      page-break-inside: avoid;
+    }
+
+    .chapter-break {
+      page-break-before: always;
+    }
+
+    .chapter-title {
+      font-size: 9.6pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4px;
+      border-bottom: 1.5px solid #0f172a;
+      padding-bottom: 2px;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chapter-tag {
+      font-size: 7pt;
+      font-weight: 700;
+      color: #0369a1;
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .step-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 11px;
+      margin-bottom: 8px;
+      page-break-inside: avoid;
+    }
+
+    .step-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 4px;
+    }
+
+    .step-num {
+      font-size: 9pt;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-pill {
+      font-size: 7pt;
+      font-weight: 700;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .step-status {
+      font-size: 7.2pt;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .roles-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .role-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 7.8pt;
+    }
+
+    .role-box.patrick {
+      border-left: 3px solid #2563eb;
+    }
+
+    .role-box.manuel {
+      border-left: 3px solid #16a34a;
+    }
+
+    .role-box strong {
+      display: block;
+      color: #0f172a;
+      font-size: 8pt;
+      margin-bottom: 2px;
+    }
+
+    p {
+      margin: 0 0 4px 0;
+      text-align: justify;
+    }
+
+    ul {
+      margin: 0 0 3px 0;
+      padding-left: 14px;
+    }
+
+    li {
+      margin-bottom: 2px;
+      text-align: justify;
+    }
+
+    .table-container {
+      margin: 6px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7.8pt;
+      margin-bottom: 4px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .highlight-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 3px solid #16a34a;
+      border-radius: 4px;
+      padding: 5px 8px;
+      margin: 5px 0;
+      font-size: 7.9pt;
+    }
+
+    .warning-card {
+      background: #fffbeb;
+      border: 1px solid #fef3c7;
+      border-left: 3px solid #f59e0b;
+      border-radius: 4px;
+      padding: 5px 8px;
+      margin: 5px 0;
+      font-size: 7.9pt;
+    }
+
+    .diagram-box {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 6.9pt;
+      line-height: 1.25;
+      padding: 6px 10px;
+      border-radius: 5px;
+      margin: 5px 0;
+      white-space: pre;
+    }
+
+    .mono-icon {
+      display: inline-block;
+      vertical-align: -1.5px;
+      margin-right: 4px;
+      width: 11px;
+      height: 11px;
+    }
+
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+      margin-top: 14px;
+      page-break-inside: avoid;
+    }
+
+    .sig-block {
+      border-top: 1px solid #0f172a;
+      padding-top: 4px;
+    }
+
+    .sig-name {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 8.5pt;
+    }
+
+    .sig-role {
+      font-size: 7.4pt;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== SEITE 1 ==================== -->
+  <div class="doc-header">
+    <div>
+      <div class="brand-title">Campus-Groovelab</div>
+      <div class="brand-subtitle">Executive Corporate Roadmap · 0,1% Goldstandard</div>
+    </div>
+    <div class="doc-badge">Verbindliche Marschroute</div>
+  </div>
+
+  <h1>Die gesamte Roadmap: Einzelunternehmen ➔ GmbH ➔ Exit</h1>
+  <div class="doc-subheading">
+    <strong>Lückenloser 8-Schritte-Fahrplan von Tag 1 bis zum 2-Millionen-Euro-Unternehmensverkauf inklusive präziser Rollenverteilung zwischen Patrick Huber (Gründer & Alleininhaber) und Manuel Wagner (Strategischer Partner & Fachbeirat).</strong>
+  </div>
+
+  <div class="meta-box">
+    <div class="meta-col">
+      <strong>Gründer & Tech-Sovereign:</strong>
+      Patrick Huber<br>
+      Campus-Groovelab<br>
+      Rheinfelden (Baden)
+    </div>
+    <div class="meta-col">
+      <strong>Strategischer Partner:</strong>
+      Manuel Wagner<br>
+      Musikschule Bad Säckingen<br>
+      Albbruck-Buch
+    </div>
+    <div class="meta-col">
+      <strong>Vertragliches Fundament:</strong>
+      Partnervereinbarung v2026<br>
+      GmbHG, KStG, EStG, GewStG<br>
+      Stand: 04. Oktober 2026
+    </div>
+  </div>
+
+  <div class="diagram-box">MEILENSTEIN 1 ➔ MEILENSTEIN 2 ➔ MEILENSTEIN 3 ➔ MEILENSTEIN 4 ➔ MEILENSTEIN 5 ➔ MEILENSTEIN 6 ➔ MEILENSTEIN 7 ➔ MEILENSTEIN 8
+Einzelunternehmen   Reallabor Start    1–7 Schulen        Tipping-Point      Simultan-Notar     Skalierung 10–49   50 Schulen:        M&A EXIT
+Gewerbe + 2Mio-Vers Bad Säckingen 0€   24.500€ Freibetrag ~30.000 € ARR      Holding + GmbH     Provisionsstaffel  GmbH-Anteile       1,5 – 2,5 Mio. €
+Patrick: 100% IP    Manuel: Feedback   Manuel: 20% Prov.  12.5k€ angespart   100% Patrick       Manuel: 25–40%     4-Jahres-Vesting   1,5% Steuern</div>
+
+  <!-- SCHRITT 1 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 1</span> Gründung & Basis-Setup des Einzelunternehmens</div>
+      <div class="step-status">Status: Tag 1 (Sofort) · Bürokratieaufwand: &lt; 2 Tage</div>
+    </div>
+    <p>Rechtssichere Handlungsfähigkeit mit minimalen Fixkosten, 0 € Notarkosten und maximaler Haftungsabschirmung.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber (Gründer & Betreiber):</strong>
+        <ul>
+          <li><strong>Gewerbeanmeldung:</strong> Beim Gewerbeamt Rheinfelden (Baden) als <em>„Entwicklung, Betrieb und Vertrieb von Software und Cloud-Diensten (SaaS)“</em> (Gebühr: ca. 35 €).</li>
+          <li><strong>Finanzamt (Elster-Fragebogen):</strong> Verzicht auf Kleinunternehmerregelung (§ 19 UStG) zugunsten der Regelbesteuerung (ermöglicht vollen Vorsteuerabzug für Server, Hardware und Tools). Gewinnermittlung via einfacher EÜR (§ 4 Abs. 3 EStG).</li>
+          <li><strong>Geschäftskonto:</strong> Eröffnung eines separaten Firmenkontos (z. B. Qonto oder Finom).</li>
+          <li><strong>2-Mio.-€-Schutzschild:</strong> Abschluss einer IT-Betriebshaftpflicht- & Cyber-Versicherung (Hiscox / Exali, ca. 50 €/Monat) mit 2.000.000 € Deckung zur 100%igen Enthaftung des Privatvermögens.</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner (Partner):</strong>
+        <ul>
+          <li>Noch keine operative Verpflichtung in Schritt 1.</li>
+          <li>Bereitet seine persönliche Situation vor (formlose Vorab-Prüfung der dienstrechtlichen Nebentätigkeitsanzeige bei seinem Schulträger/Dienstherrn gem. § 6 der Vereinbarung).</li>
+          <li>Hält sich für die Unterzeichnung der Partnervereinbarung bereit.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 2 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 2</span> Inkrafttreten der Partnerschaft & Reallabor Bad Säckingen</div>
+      <div class="step-status">Status: Woche 1 · Meilenstein: Erstes System im Realbetrieb</div>
+    </div>
+    <p>Die Software wird im realen Musikschulalltag verankert und liefert die unanfechtbare Beweisreferenz.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>Vertragsschluss:</strong> Gegenzeichnung der strategischen Kooperations- und Beiratsvereinbarung mit Manuel Wagner.</li>
+          <li><strong>Mandanten-Provisionierung:</strong> Technisches Aufsetzen der Musikschule Bad Säckingen mit dauerhafter 0,00 € Garantie gem. § 2.</li>
+          <li><strong>Ausweisdruck:</strong> Generierung und Bereitstellung der Schulausweise und QR-Tokens für Kollegium und Schülerschaft.</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li><strong>Reallabor-Leitung:</strong> Führt Campus-Groovelab im Kollegium, im Schulsekretariat und bei den Schülern in Bad Säckingen ein.</li>
+          <li><strong>Monatlicher 90-Min.-Jour-Fixe (§ 3):</strong> Liefert Patrick ungefiltertes Schulleitungs- und Didaktik-Feedback aus der Praxis.</li>
+          <li><strong>Referenz-Showcase:</strong> Erteilt die Freigabe, die Schule öffentlich als offizielles Reallabor zu benennen.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SEITE 2 ==================== -->
+  <div class="chapter-break"></div>
+
+  <!-- SCHRITT 3 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 3</span> Akquise der ersten 1 bis 7 zahlenden Schulen</div>
+      <div class="step-status">Status: Monat 1 – 6 · Meilenstein: Proof of Concept im Markt</div>
+    </div>
+    <p>Validierung des Zahlungsmodells (5,39 € / Schüler bzw. B2B-Kombi 19,90 € / Mo.) unter Ausnutzung des 24.500 € Freibetrags.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>Vertragsabschlüsse:</strong> Schließt B2B-Mietverträge und AVVs (Art. 28 DSGVO) als Einzelunternehmer mit Neuschulen ab.</li>
+          <li><strong>EÜR-Buchhaltung:</strong> Bis 24.500 € Jahresgewinn fällt 0 € Gewerbesteuer an! Volle Ausnutzung der steuerlichen Einfachheit.</li>
+          <li><strong>Provisionsabrechnung:</strong> Rechnet monatlich nachträglich bis zum 15. Werktag Manuels <strong>20 % Umsatzbeteiligung</strong> (§ 4 Abs. 2) ab und zahlt pünktlich aus.</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li><strong>Peer-to-Peer Schulleiter-Sales:</strong> Spricht 4–6 befreundete Schulleiter in der Region Hochrhein/Südbaden direkt an.</li>
+          <li><strong>Augenhöhe & Vertrauen:</strong> Tritt in kurzen Zoom-Demos mit Patrick auf und bezeugt als amtierender Direktor die Zeitersparnis.</li>
+          <li>Erhält monatlich seine 20 % Provision auf alle vereinnahmten Umsätze – ohne persönliches Kostenrisiko.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 4 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 4</span> Der Tipping-Point (8 bis 10 Schulen erreicht)</div>
+      <div class="step-status">Status: Monat 6 – 10 · Meilenstein: Wirtschaftliche Reife für die GmbH</div>
+    </div>
+    <p>Der ARR erreicht ca. 30.000 €. Der Gewerbesteuerfreibetrag ist voll ausgeschöpft; die GmbH-Gründung wird eingeleitet.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>Kassensturz & Kapitalbildung:</strong> Die 12.500 € Mindest-Bareinlage für das Stammkapital wurden vollständig aus dem laufenden Cashflow angespart.</li>
+          <li><strong>Notar-Vorbereitung:</strong> Beauftragung des Notars für den simultanen Gründungsakt (Holding + operative GmbH in einem Termin).</li>
+          <li><strong>Vertragsübernahme vorbereiten:</strong> Entwurf der Übernahmevereinbarung für bestehende Schulverträge.</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li><strong>Erfolgsleiter-Sprung (§ 4 Abs. 3):</strong> Mit Erreichen der 10. vermittelten Schule springt Manuels Beteiligung automatisch von 20 % auf <strong>25 % an allen Schulen</strong>!</li>
+          <li>Bereitet die Ausweitung seiner Ansprache auf Landesverbandsebene (VdM Baden-Württemberg) vor.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 5 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 5</span> Der simultane Gründungsakt (Holding + GmbH in 1 Notartermin)</div>
+      <div class="step-status">Status: Monat 10 – 12 · Meilenstein: Die steueroptimierte Festung steht</div>
+    </div>
+    <p>Vermeidung der 7-jährigen Sperrfristfalle (§ 22 UmwStG) durch gleichzeitige Gründung der Holding und der operativen Gesellschaft.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>Notartermin Akt 1:</strong> Patrick gründet die <strong>Huber Holding GmbH</strong> (100 % Patrick, 12.500 € Bareinzahlung).</li>
+          <li><strong>Notartermin Akt 2 (10 Min. später):</strong> Die Huber Holding GmbH gründet die <strong>Campus-Groovelab GmbH</strong> (100 % Holding, 12.500 € Bareinzahlung).</li>
+          <li><strong>CEO-Bestellung:</strong> Patrick wird alleiniger, einzelvertretungsberechtigter Geschäftsführer der operativen GmbH (befreit von § 181 BGB).</li>
+          <li>Verträge mit den Schulen werden auf die Campus-Groovelab GmbH übertragen.</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li>Die bestehende Partnervereinbarung wird formal auf die neue <em>Campus-Groovelab GmbH</em> umgeschrieben.</li>
+          <li>Manuel bleibt weiterhin als freier Beirat und Vermittler mit seinen <strong>25 % Umsatzbeteiligung</strong> angebunden.</li>
+          <li>Fokus auf strategische Beirats- und Netzwerkarbeit ohne operative Verwaltungspflichten oder persönliche Haftungsrisiken.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SEITE 3 ==================== -->
+  <div class="chapter-break"></div>
+
+  <!-- SCHRITT 6 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 6</span> Skalierung & Multiplikation (11 bis 49 Schulen)</div>
+      <div class="step-status">Status: Jahr 2 · Meilenstein: Bundesweite Verbands-Multiplikation</div>
+    </div>
+    <p>Campus-Groovelab etabliert sich überregional. Der ARR klettert auf 80.000 € bis 180.000 €.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>Enterprise Tech & Operations:</strong> Automatisiertes Onboarding für Schulsekretariate; Betreuung der Hetzner-Serverinfrastruktur.</li>
+          <li><strong>Steuerfreies Holding-Parken:</strong> Schüttet operative Gewinne zu <strong>98,5 % steuerfrei</strong> (§ 8b KStG) in seine Holding aus.</li>
+          <li><strong>M&A Data Room:</strong> Baut den virtuellen Prüfungsraum (Due Diligence Data Room) auf (ISO 27001, TOMs, DSGVO-Nachweise, B2B-Mietverträge).</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li><strong>VdM-Kongresse & Fachtagungen:</strong> Tritt als didaktischer Impulsgeber auf Schulleiter-Tagungen auf.</li>
+          <li><strong>Provisions-Aufstieg (§ 4 Abs. 3):</strong>
+            <ul>
+              <li>Ab 25 Schulen: Beteiligung steigt auf <strong>30 %</strong>.</li>
+              <li>Ab 50 Schulen: Beteiligung steigt auf <strong>40 %</strong>.</li>
+            </ul>
+          </li>
+          <li>Leitet das quartalsweise <em>„Campus-Groovelab Schulleiter-Forum“</em>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 7 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 7</span> Meilenstein 50 Schulen & Notarielle Gesellschafter-Beteiligung</div>
+      <div class="step-status">Status: Jahr 3 · Meilenstein: § 8 wird umgesetzt – Wandlung in Anteile</div>
+    </div>
+    <p>Die in § 8 der Kooperationsvereinbarung definierte Zielmarke von 50 Schulen ist erreicht. Die bisherige Umsatzbeteiligung wird planmäßig in eine feste gesellschaftsrechtliche Beteiligung an der GmbH überführt.</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>Notarielle Gesellschafteraufnahme:</strong> Übertragung von Anteilen (z. B. 40 %) an Manuel Wagner.</li>
+          <li><strong>Durchsetzung der 5 Schutzgesetze:</strong>
+            <ol>
+              <li><em>Mehrheit:</em> Patrick (über Holding) behält verbindlich <strong>mindestens 51 % (bis 60 %)</strong>.</li>
+              <li><em>Geschäftsführung & Beirat:</em> Patrick führt die Gesellschaft operativ als CEO; Manuel übernimmt den Vorsitz des didaktischen Fachbeirats (klare Trennung von Hauptamt und Gesellschafterstellung).</li>
+              <li><em>Vesting-Governance:</em> Die Gesellschaftsanteile unterliegen einem 4-Jahres-Vesting (10 % / Jahr) zur Absicherung der nachhaltigen gemeinsamen Begleitung.</li>
+              <li><em>Good-/Bad-Leaver:</em> Klarer Abfindungsrahmen bei vorzeitigem Ausscheiden.</li>
+              <li><em>Wettbewerbsverbot:</em> 2 Jahre Konkurrenzschutz.</li>
+            </ol>
+          </li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li>Wird offizieller Mitgesellschafter der <em>Campus-Groovelab GmbH</em>.</li>
+          <li>Verankert seinen maßgeblichen Beitrag zum bundesweiten Rollout und die didaktische Etablierung fest im Gesellschafterkreis.</li>
+          <li>Wird dauerhafter Vorsitzender des Fachbeirats.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 8 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num"><span class="step-pill">SCHRITT 8</span> Der M&A-Unternehmensverkauf (Exit für 1,5 – 2,5 Mio. €)</div>
+      <div class="step-status">Status: Ende Jahr 3 / Anfang Jahr 4 · Meilenstein: Erfolgreicher M&A-Unternehmensverkauf</div>
+    </div>
+    <p>Verkauf der GmbH an einen Altsystem-Betreiber (iMikel, WinMusik) oder EdTech-Konzern (WebUntis).</p>
+    <div class="roles-grid">
+      <div class="role-box patrick">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Rolle Patrick Huber:</strong>
+        <ul>
+          <li><strong>M&A-Verhandlung:</strong> Verhandelt den Kaufpreis (z. B. 2.000.000 €; 75 % Cash at Closing, 25 % Earn-Out).</li>
+          <li><strong>Der 1,5%-Holding-Exit:</strong> Seine Holding verkauft ihre Anteile und zahlt gem. § 8b Abs. 2 KStG <strong>nur 1,5 % Steuern</strong>.  
+            <svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg> <strong>Erlös fließt steueroptimiert in die Vermögensverwaltungs-Holding zur langfristigen Reinvestition.</strong></li>
+          <li><strong>Übergangsphase:</strong> Begleitet die technische Übergabe für 6–12 Monate als bezahlter Berater (z. B. 6.000 € / Monat).</li>
+        </ul>
+      </div>
+      <div class="role-box manuel">
+        <strong><svg class="mono-icon" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Rolle Manuel Wagner:</strong>
+        <ul>
+          <li>Verkauft seine Anteile (z. B. 40 %) im selben Notartermin.</li>
+          <li><strong>Realisierung des entsprechenden Kaufpreisanteils (ca. 800.000 € brutto gem. Beteiligungsquote).</strong></li>
+          <li>Leistungsgerechte Honorierung für den erfolgreichen Aufbau des bundesweiten Schulnetzwerks und die didaktische Marktführerschaft.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SEITE 4 ==================== -->
+  <div class="chapter-break"></div>
+
+  <!-- KAPITEL 9: SUMMARY TABLE -->
+  <div class="chapter">
+    <div class="chapter-title">
+      <span>Übersicht: Die 8 Schritte im direkten Vergleich</span>
+      <span class="chapter-tag">Master-Matrix</span>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Schritt</th>
+            <th>Ziel-Status</th>
+            <th>Aufgabe Patrick Huber</th>
+            <th>Aufgabe Manuel Wagner</th>
+            <th>Rechtsform / Vertrag</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1. Setup</strong></td>
+            <td>Tag 1</td>
+            <td>Gewerbeanmeldung, Elster, 2 Mio. € Cyber-Police, Konto</td>
+            <td>Nebentätigkeitsanzeige dienstrechtlich vorbereiten</td>
+            <td>Einzelunternehmen</td>
+          </tr>
+          <tr>
+            <td><strong>2. Reallabor</strong></td>
+            <td>1. Schule</td>
+            <td>MS Bad Säckingen live schalten, Ausweise drucken</td>
+            <td>Kollegium & Schüler onboarden, monatl. 90-Min.-Jour-Fixe</td>
+            <td>Partnervereinbarung v2026</td>
+          </tr>
+          <tr>
+            <td><strong>3. Validierung</strong></td>
+            <td>1 – 7 Schulen</td>
+            <td>Verträge & Rechnungen via EÜR (24.500 € Freibetrag), 20% Provision</td>
+            <td>4–6 befreundete Direktoren anrufen, Demos begleiten</td>
+            <td>Einzelunternehmer + Beirat</td>
+          </tr>
+          <tr>
+            <td><strong>4. Tipping-Point</strong></td>
+            <td>8 – 10 Schulen</td>
+            <td>12.500 € Stammkapital aus Cashflow separieren, Notartermin buchen</td>
+            <td>Knackt 10 Schulen ➔ Beteiligung springt auf 25 %</td>
+            <td>Einzelunternehmer + Beirat</td>
+          </tr>
+          <tr>
+            <td><strong>5. Gründung</strong></td>
+            <td>Start GmbH</td>
+            <td>Simultan-Notartermin: Huber Holding + Campus-Groovelab GmbH</td>
+            <td>Übernahme Beiratsvertrag auf GmbH mit 25 % Provision</td>
+            <td>GmbH-Betrieb + Beirat</td>
+          </tr>
+          <tr>
+            <td><strong>6. Skalierung</strong></td>
+            <td>11 – 49 Schulen</td>
+            <td>Gewinne zu 98,5 % in Holding parken, M&A Data Room aufbauen</td>
+            <td>VdM-Kongresse, Schulleiter-Sales, Provision 30 % ➔ 40 %</td>
+            <td>GmbH-Betrieb + Beirat</td>
+          </tr>
+          <tr>
+            <td><strong>7. 50 Schulen</strong></td>
+            <td>Meilenstein</td>
+            <td>Notarielle Beteiligung als Gesellschafter (4-Jahres-Vesting & Beiratsvorsitz)</td>
+            <td>Wird echter GmbH-Gesellschafter (40 %), leitet Fachbeirat</td>
+            <td>GmbH-Gesellschaftervertrag</td>
+          </tr>
+          <tr>
+            <td><strong>8. M&A Exit</strong></td>
+            <td>Verkauf</td>
+            <td>Anteilsverkauf via Holding (1,5 % Steuern), 1,2 Mio. € Netto-Erlös</td>
+            <td>Verkauft 40 % Anteile ➔ Erlös ca. 800.000 € (Erfolgreiche Wertrealisierung)</td>
+            <td>Notarieller M&A-Kaufvertrag</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="highlight-card">
+      <strong>Das unantastbare 0,1% Goldstandard-Fazit:</strong><br>
+      Dieser Fahrplan gewährleistet absolute <strong>Rechtssicherheit, eine klare funktionale Aufgabenteilung und eine transparente, leistungsgerechte Partizipation am gemeinsamen Unternehmenserfolg</strong> für beide Partner. Er verbindet technologische Innovationskraft mit anerkannter pädagogischer Praxis-Expertise auf partnerschaftlicher Augenhöhe.
+    </div>
+  </div>
+
+  <div class="signatures-grid">
+    <div class="sig-block">
+      <div class="sig-name">Patrick Huber</div>
+      <div class="sig-role">Gründer, Plattformbetreiber & Software-Architekt</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-name">0,1% Senior Tech- & Wirtschaftsjurist</div>
+      <div class="sig-role">Corporate Governance & Venture Strategy Audit</div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -542,7 +542,8 @@ const LEGAL_EXCEPTION_FILES = [
   'LoginScreen',
   'QRLandingPage',
   'CourtProofExportModal',
-  'PublicContractVerificationView'
+  'PublicContractVerificationView',
+  'HerrenbergComplianceModal'
 ];
 
 let paragraphViolations = [];

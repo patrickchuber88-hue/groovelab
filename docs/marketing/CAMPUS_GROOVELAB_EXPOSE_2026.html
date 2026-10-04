@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus-Groovelab | Executive Dossier für Schulleitungen & Trägerschaften</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
+        :root {
+            --brand-green: #15803d;
+            --brand-green-light: #f0fdf4;
+            --brand-green-border: #bbf7d0;
+            --brand-yellow: #ca8a04;
+            --brand-yellow-light: #fefce8;
+            --brand-yellow-border: #fef08a;
+            --slate-50: #f8fafc;
+            --slate-100: #f1f5f9;
+            --slate-200: #e2e8f0;
+            --slate-300: #cbd5e1;
+            --slate-500: #64748b;
+            --slate-600: #475569;
+            --slate-700: #334155;
+            --slate-800: #1e293b;
+            --slate-900: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            color: var(--slate-900);
+            line-height: 1.5;
+            font-size: 13px;
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            max-height: 297mm;
+            padding: 20mm 20mm 18mm 20mm;
+            position: relative;
+            page-break-after: always;
+            page-break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 2px solid var(--slate-900);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+
+        .header-brand h1 {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.04em;
+            color: var(--slate-900);
+            line-height: 1;
+        }
+
+        .header-brand p {
+            color: var(--slate-500);
+            font-size: 11px;
+            margin: 4px 0 0 0;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .header-meta {
+            text-align: right;
+            font-size: 10px;
+            color: var(--slate-600);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            line-height: 1.3;
+        }
+
+        /* FOOTER */
+        .page-footer {
+            border-top: 1px solid var(--slate-200);
+            padding-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--slate-500);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .page-footer span.confidential {
+            color: var(--slate-700);
+            font-weight: 700;
+        }
+
+        /* CONTENT CONTAINERS */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 16px;
+        }
+
+        /* TYPOGRAPHY */
+        h2.page-title {
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0 0 6px 0;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+            color: var(--slate-900);
+        }
+
+        h2.page-title span {
+            color: var(--brand-green);
+        }
+
+        p.lead {
+            font-size: 14px;
+            color: var(--slate-600);
+            margin: 0 0 14px 0;
+            line-height: 1.55;
+            font-weight: 500;
+        }
+
+        /* CARDS & PILLARS */
+        .card {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: 10px;
+            padding: 16px 18px;
+        }
+
+        .card-green {
+            background: var(--brand-green-light);
+            border: 1px solid var(--brand-green-border);
+        }
+
+        .card-yellow {
+            background: var(--brand-yellow-light);
+            border: 1px solid var(--brand-yellow-border);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--slate-900);
+            color: #ffffff;
+            font-size: 9.5px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .badge-green {
+            background: var(--brand-green);
+        }
+
+        .badge-yellow {
+            background: var(--brand-yellow);
+        }
+
+        .card h3 {
+            font-size: 15px;
+            font-weight: 800;
+            margin: 0;
+            color: var(--slate-900);
+            letter-spacing: -0.02em;
+        }
+
+        .card p {
+            font-size: 12.5px;
+            color: var(--slate-600);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .card-list {
+            margin: 8px 0 0 0;
+            padding: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .card-list li {
+            font-size: 12px;
+            color: var(--slate-700);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .card-list li svg {
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: var(--brand-green);
+        }
+
+        /* GRID */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* KPI BANNER */
+        .kpi-row {
+            display: flex;
+            background: var(--slate-900);
+            border-radius: 10px;
+            padding: 16px 20px;
+            color: #ffffff;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .kpi-item h4 {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 0 2px 0;
+            color: #ffffff;
+            letter-spacing: -0.03em;
+        }
+
+        .kpi-item h4.green {
+            color: #4ade80;
+        }
+
+        .kpi-item p {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--slate-300);
+            margin: 0;
+        }
+
+        .icon-box {
+            width: 32px;
+            height: 32px;
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ========================================== -->
+    <!-- SEITE 1: EXECUTIVE SUMMARY & DAS DILEMMA -->
+    <!-- ========================================== -->
+    <div class="page">
+        <div>
+            <div class="page-header">
+                <div class="header-brand">
+                    <h1>Campus-Groovelab</h1>
+                    <p>Executive Dossier für Schulleitungen & Trägerschaften</p>
+                </div>
+                <div class="header-meta">
+                    Strategisches Whitepaper 2026<br>
+                    Dokumenten-ID: EXP-B2B-01
+                </div>
+            </div>
+
+            <div class="content">
+                <div>
+                    <h2 class="page-title">Das digitale Betriebssystem für <span>rechtssichere Musikschulen.</span></h2>
+                    <p class="lead">
+                        Die Leitung einer modernen Musikschule gleicht heute einem Drahtseilakt: Das Herrenberg-Urteil gefährdet traditionelle Honorarmodelle, strenge DSGVO-Vorgaben verbieten WhatsApp-Absprachen, und veraltete Zettelwirtschaft bindet wertvolle Ressourcen im Schulsekretariat. Campus-Groovelab löst diese Kernprobleme durch eine ganzheitliche, modulare SaaS-Architektur.
+                    </p>
+                </div>
+
+                <div class="card" style="background: #ffffff; border: 2px solid var(--slate-900);">
+                    <div style="font-weight: 800; font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; color: var(--slate-900);">
+                        Das Dreifach-Dilemma deutscher Musikschulen
+                    </div>
+                    <div class="grid-3" style="margin-top: 10px;">
+                        <div style="border-right: 1px solid var(--slate-200); padding-right: 10px;">
+                            <div style="font-weight: 700; color: #dc2626; font-size: 12px; margin-bottom: 4px;">1. Juristisches Risiko</div>
+                            <p style="font-size: 11.5px; color: var(--slate-600); margin: 0;">
+                                Scheinselbstständigkeits-Klagen nach BSG Herrenberg & DSGVO-Bußgelder durch illegale Schüler-Kommunikation auf WhatsApp.
+                            </p>
+                        </div>
+                        <div style="border-right: 1px solid var(--slate-200); padding-right: 10px;">
+                            <div style="font-weight: 700; color: #d97706; font-size: 12px; margin-bottom: 4px;">2. Operatives Nadelöhr</div>
+                            <p style="font-size: 11.5px; color: var(--slate-600); margin: 0;">
+                                Hektische Absage-Ketten bei Ausfällen, Doppelbelegungen knapper Fachräume und wochenlanges Planungschaos im September.
+                            </p>
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: var(--brand-green); font-size: 12px; margin-bottom: 4px;">3. Schüler-Churn</div>
+                            <p style="font-size: 11.5px; color: var(--slate-600); margin: 0;">
+                                Motivationsverlust bei Hausaufgaben führt zu schleichender Frustration und schmerzhaften Kündigungen nach 6 bis 12 Monaten.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card card-green">
+                    <div class="card-header">
+                        <span class="badge badge-green">Die Lösung</span>
+                        <h3>Campus-Groovelab: Die 8 Säulen der Entlastung</h3>
+                    </div>
+                    <p style="color: var(--slate-700); font-size: 12px;">
+                        Campus-Groovelab verbindet rechtliche Immunität für Schulleiter mit radikaler administrativer Entlastung und pädagogischer Exzellenz:
+                    </p>
+                    <ul class="card-list" style="margin-top: 8px;">
+                        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>100% Herrenberg-Schutzschild:</strong> Zweistufige Disposition schützt Träger vor Scheinselbstständigkeit.</li>
+                        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Intelligente Raum-Matrix:</strong> Echtzeit-Kollisionsprüfung für Flügel- und Schlagzeugräume.</li>
+                        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Stundenplan-Magie:</strong> Wunsch- & Sperrzeiten beschleunigen die Semesterplanung im September sowie laufende wöchentliche Umbuchungen.</li>
+                        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>1-Klick Ausfallmanagement:</strong> Sekundenschneller Push an Eltern; Sekretariat führt 0 Telefonate.</li>
+                        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>GrooveLab Pädagogik:</strong> Interaktive Loopstation & XP-System steigern Übemotivation massiv.</li>
+                    </ul>
+                </div>
+
+                <div class="kpi-row">
+                    <div class="kpi-item">
+                        <h4 class="green">0,00 €</h4>
+                        <p>Software-Lizenzen</p>
+                    </div>
+                    <div class="kpi-item">
+                        <h4>100%</h4>
+                        <p>Herrenberg-Immunität</p>
+                    </div>
+                    <div class="kpi-item">
+                        <h4 class="green">0 Anrufe</h4>
+                        <p>Bei Unterrichtsausfall</p>
+                    </div>
+                    <div class="kpi-item">
+                        <h4>ISO 27001</h4>
+                        <p>Hosting in Deutschland</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>Campus-Groovelab B2B Infrastruktur</span>
+            <span class="confidential">Streng Vertraulich · Seite 1 von 4</span>
+            <span>Überblick & Management Summary</span>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- SEITE 2: RECHTLICHE ENTHAFTUNG & HERRENBERG -->
+    <!-- ========================================== -->
+    <div class="page">
+        <div>
+            <div class="page-header">
+                <div class="header-brand">
+                    <h1>Campus-Groovelab</h1>
+                    <p>Rechtliche Enthaftung für Schulleitungen & Träger</p>
+                </div>
+                <div class="header-meta">
+                    Säule 1 & Säule 2<br>
+                    Fokus: Herrenberg & DSGVO
+                </div>
+            </div>
+
+            <div class="content">
+                <div>
+                    <h2 class="page-title">Maximale Rechtssicherheit: <span>Herrenberg-Urteil & DSGVO.</span></h2>
+                    <p class="lead">
+                        Rechtliche Risiken dürfen nicht auf die leichte Schulter genommen werden. Campus-Groovelab wurde unter strikter Zugrundelegung der höchstrichterlichen Kriterien des Bundessozialgerichts (BSG, Urteil vom 28.06.2022 – B 12 R 3/20 R) und der Leitlinien der Datenschutzbehörden als robuster Compliance- und Enthaftungsrahmen für Schulträger konzipiert.
+                    </p>
+                </div>
+
+                <!-- SÄULE 1: HERRENBERG -->
+                <div class="card" style="border-left: 4px solid var(--brand-green);">
+                    <div class="card-header">
+                        <span class="badge badge-green">Säule 1: BSG B 12 R 3/20 R</span>
+                        <h3>100% Herrenberg-Schutzschild & Dozentenautonomie</h3>
+                    </div>
+                    <p style="margin-bottom: 8px;">
+                        Das Herrenberg-Urteil hat das Direktionsrecht und die Eingliederung freier Musikschullehrkräfte drastisch eingeschränkt. Unsere Architektur schützt Musikschulen und Schulträger vor statusrechtlichen Nachforderungen der Deutschen Rentenversicherung (§ 7a SGB IV):
+                    </p>
+                    <ul class="card-list">
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Zweistufiges Dispositionsmodell:</strong> Lehrkräfte stimmen Unterrichtszeiten autonom mit Schülern ab und reichen unverbindliche Entwürfe ein. Das Sekretariat prüft ausschließlich Raumkollisionen und weist den Raum zu. Keine hoheitliche Zuweisung von Unterrichtszeiten durch die Schulleitung.</span>
+                        </li>
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Übermittlungsfreiheit:</strong> Lehrkräften steht es frei, Termine per App oder traditionell (Zettel, E-Mail) zu melden. Die App erzwingt kein Weisungsverhältnis und fungiert nicht als Kontrollinstrument (§ 87 BetrVG).</span>
+                        </li>
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Zero-Payroll Doktrin:</strong> Die Plattform verarbeitet strikt keine Honorar-, Gehalts- oder Arbeitszeitdaten. Kein Betriebsrisiko einer arbeitgeberseitigen Arbeitszeiterfassung.</span>
+                        </li>
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Herrenberg-Status-Attest:</strong> Automatisierte Generierung gerichtsfester Dokumentationen für Träger und Betriebsprüfungen.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- SÄULE 2: DSGVO & JUGENDSCHUTZ -->
+                <div class="card" style="border-left: 4px solid var(--slate-900);">
+                    <div class="card-header">
+                        <span class="badge">Säule 2: Art. 28 DSGVO & § 22 KUG</span>
+                        <h3>100% DSGVO-Immunität & Digitaler AVV-Koffer</h3>
+                    </div>
+                    <p style="margin-bottom: 8px;">
+                        Schulleitungen haften persönlich für Datenschutzverstöße bei der ungeschützten Kommunikation mit Minderjährigen. Campus-Groovelab schafft absolute Rechtsklarheit:
+                    </p>
+                    <ul class="card-list">
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Digitaler AVV (Art. 28 DSGVO):</strong> Schulleitung und Träger schließen den Auftragsverarbeitungsvertrag rechtssicher per Mausklick direkt im Admin-Dashboard ab. Kein bürokratischer Papierkrieg.</span>
+                        </li>
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Zero-Photo-Doktrin (§ 22 KUG):</strong> Keine echten Fotos von Kindern auf Servern. Stattdessen nutzen Schüler stilisierte 3D-Instrumenten-Avatare. Das schließt Urheber- und Persönlichkeitsrechtsklagen physikalisch aus.</span>
+                        </li>
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Zero-Mail-Architektur & Zero-Contact:</strong> Schüler und Eltern erhalten keine unverschlüsselten E-Mails. Lehrkräfte kommunizieren ohne Offenlegung ihrer privaten Mobilfunknummer oder Mailadresse.</span>
+                        </li>
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span><strong>Deutsches ISO-27001 Hosting:</strong> Sämtliche Daten verbleiben auf gehärteten Servern in Nürnberg und Falkenstein (Hetzner Cloud). Keine US-Cloud-Exposition.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>Campus-Groovelab B2B Infrastruktur</span>
+            <span class="confidential">Streng Vertraulich · Seite 2 von 4</span>
+            <span>Recht & Enthaftung</span>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- SEITE 3: OPERATIVE EXZELLENZ IM SCHULALLTAG -->
+    <!-- ========================================== -->
+    <div class="page">
+        <div>
+            <div class="page-header">
+                <div class="header-brand">
+                    <h1>Campus-Groovelab</h1>
+                    <p>Operative Exzellenz im Schulbetrieb</p>
+                </div>
+                <div class="header-meta">
+                    Säule 3, 4 & 5<br>
+                    Fokus: Verwaltung & Raumplanung
+                </div>
+            </div>
+
+            <div class="content">
+                <div>
+                    <h2 class="page-title">Maximale Entlastung: <span>Räume, Pläne & Ausfälle.</span></h2>
+                    <p class="lead">
+                        Im täglichen Betrieb zählt jede Minute. Campus-Groovelab verwandelt zeitaufwendige Routineprozesse in intuitive, fehlerfreie 1-Klick-Abläufe für Schulsekretariat und Kollegium.
+                    </p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- SÄULE 3: RAUMVERWALTUNG -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="badge">Säule 3</span>
+                            <h3>Echtzeit-Raumverwaltung</h3>
+                        </div>
+                        <p style="font-size: 12px; margin-bottom: 8px;">
+                            <strong>Schluss mit Doppelbelegungen:</strong> Spezialräume (Flügelzimmer, Drum-Labs, Ensembleräume) sind die knappste Ressource jeder Musikschule.
+                        </p>
+                        <ul class="card-list">
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Kollisionserkennung:</strong> Das System prüft Raumbelegungen in Echtzeit und blockiert Doppelbuchungen automatisch.</li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Sekretariats-Dashboard:</strong> 1-Klick-Zuweisung freier Räume bei Terminverschiebungen.</li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Volle Raumtransparenz:</strong> Wer unterrichtet wann in welchem Raum? Jederzeit auf Abruf.</li>
+                        </ul>
+                    </div>
+
+                    <!-- SÄULE 4: STUNDENPLAN-MANAGEMENT -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="badge">Säule 4</span>
+                            <h3>Stundenplan & Termin-Magie</h3>
+                        </div>
+                        <p style="font-size: 12px; margin-bottom: 8px;">
+                            <strong>Souveräne Planung ohne Zettelchaos:</strong> Schnelle Stundenplanfindung zu Schuljahresbeginn und laufende wöchentliche Terminanpassungen ohne Reibungsverluste.
+                        </p>
+                        <ul class="card-list">
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Wunsch- & Sperrzeiten:</strong> Schüler hinterlegen Schul- und Freizeitzeiten autonom – für den Semesterstart und die wöchentliche Feinplanung.</li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Verfügbarkeits-Heatmap:</strong> Bei wöchentlichen Verlegungen oder Vorbereitungen sieht die Lehrkraft sofort freie Zeitfenster.</li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Satzungskonformität (§ 615 BGB):</strong> Schülerabsagen begründen keinen Nachholanspruch – die Schulordnung bleibt 100% gewahrt.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- SÄULE 5: AUSFALLMANAGEMENT -->
+                <div class="card card-green" style="border-left: 4px solid var(--brand-green);">
+                    <div class="card-header">
+                        <span class="badge badge-green">Säule 5: § 26 BDSG</span>
+                        <h3>1-Klick Ausfallmanagement & 2-Stunden-Sicherheitsnetz</h3>
+                    </div>
+                    <p style="margin-bottom: 8px; font-size: 12.5px;">
+                        Fällt eine Lehrkraft aus, bricht normalerweise das Chaos im Sekretariat aus. Campus-Groovelab automatisiert diesen Notfallprozess vollständig:
+                    </p>
+                    <div class="grid-2" style="margin-top: 6px;">
+                        <ul class="card-list">
+                            <li>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span><strong>Ein Klick genügt:</strong> Lehrkraft klickt im Cockpit auf „Ausfall melden“. Sekundenschnell erhalten alle betroffenen Eltern eine Push-Nachricht.</span>
+                            </li>
+                            <li>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span><strong>Null Belastung fürs Sekretariat:</strong> Keine endlosen Telefonketten am Morgen. Mitarbeiter können sich auf Beratung und Schulentwicklung konzentrieren.</span>
+                            </li>
+                        </ul>
+                        <ul class="card-list">
+                            <li>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span><strong>§ 26 BDSG Datenschutz:</strong> Es werden ausnahmslos <strong>keine medizinischen Diagnosedaten</strong> erfasst. Revisionssichere Neutralität.</span>
+                            </li>
+                            <li>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span><strong>2-Stunden-Sicherheitsnetz:</strong> Haben Eltern 2h vor Unterrichtsbeginn noch nicht quittiert, schlägt der Tagesplan Alarm (Aufsichtspflichtschutz). Statt einer ganzen Klasse muss so maximal noch ein einzelner Nachzügler telefonisch erreicht werden (über 95% Zeitersparnis).</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>Campus-Groovelab B2B Infrastruktur</span>
+            <span class="confidential">Streng Vertraulich · Seite 3 von 4</span>
+            <span>Operative Effizienz</span>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- SEITE 4: KOLLEGIUM, DIDAKTIK & KONDITIONEN -->
+    <!-- ========================================== -->
+    <div class="page">
+        <div>
+            <div class="page-header">
+                <div class="header-brand">
+                    <h1>Campus-Groovelab</h1>
+                    <p>Kollegium, Pädagogik & B2B-Konditionsmodell</p>
+                </div>
+                <div class="header-meta">
+                    Säule 6, 7 & 8<br>
+                    Fokus: Didaktik & Fair-Pricing
+                </div>
+            </div>
+
+            <div class="content">
+                <div>
+                    <h2 class="page-title">Begeisterte Lehrkräfte & <span>motivierte Schüler.</span></h2>
+                    <p class="lead">
+                        Software wird nur dann ein Erfolg, wenn das Kollegium sie gerne nutzt und Schüler mit Freude üben. Campus-Groovelab vereint Dozentenschutz mit innovativer Unterrichtsdidaktik.
+                    </p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- SÄULE 6: LEHRKRAFT-SCHUTZ -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="badge">Säule 6</span>
+                            <h3>Schutz der Lehrkräfte</h3>
+                        </div>
+                        <ul class="card-list">
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Feierabend-Schutz:</strong> Private Handynummern bleiben verborgen. Keine WhatsApp-Nachrichten am Wochenende.</li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Zero-Password (Passkeys):</strong> Sicherer Login via FaceID / Fingerabdruck. Kein Passwort-Chaos.</li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong>Zero-Admin:</strong> Sekretariat legt Klassen an. Lehrer teilt nur einen schlüsselfertigen Onboarding-Link.</li>
+                        </ul>
+                    </div>
+
+                    <!-- SÄULE 7: GROOVELAB DIDAKTIK -->
+                    <div class="card card-yellow">
+                        <div class="card-header">
+                            <span class="badge badge-yellow">Säule 7</span>
+                            <h3>GrooveLab Pädagogik</h3>
+                        </div>
+                        <ul class="card-list">
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a16207" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <span style="color: #713f12;"><strong>Maximale Übemotivation:</strong> WebAudio Loopstation, Playalongs, Audio-Tresor und Level-Badges.</span></li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a16207" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <span style="color: #713f12;"><strong>Schüler-Lehrer Match:</strong> Spannender 1,2s Gehör-Showdown im Präsenzunterricht für Begeisterung.</span></li>
+                            <li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a16207" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <span style="color: #713f12;"><strong>Senkt Kündigungsquote:</strong> Schüler bleiben motiviert am Instrument – weniger Abmeldungen.</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- SÄULE 8: DAS SAAS-AXIOM -->
+                <div class="card" style="background: #ffffff; border: 2px solid var(--slate-900);">
+                    <div class="card-header" style="justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="badge">Säule 8: B2B-Konditionen</span>
+                            <h3>Das faire SaaS-Axiom: Keine Software-Lizenzgebühren</h3>
+                        </div>
+                        <div style="font-size: 13px; font-weight: 800; color: var(--brand-green);">0,00 € LIZENZEN</div>
+                    </div>
+                    <p style="font-size: 12px; margin-bottom: 8px;">
+                        Klassische Softwareanbieter verlangen fünfstellige Lizenzgebühren und zwingen Schulen zu teurer Server-Hardware. Campus-Groovelab bricht mit diesem Modell:
+                    </p>
+                    <div class="grid-3" style="margin-top: 10px;">
+                        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 6px; padding: 10px;">
+                            <div style="font-weight: 800; font-size: 14px; color: var(--brand-green);">0,00 €</div>
+                            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-600); margin: 2px 0;">Software-Lizenzen</div>
+                            <p style="font-size: 11px; color: var(--slate-500); margin: 0;">Die Software an sich ist dauerhaft lizenzkostenfrei.</p>
+                        </div>
+                        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 6px; padding: 10px;">
+                            <div style="font-weight: 800; font-size: 14px; color: var(--slate-900);">Feste Pauschale</div>
+                            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-600); margin: 2px 0;">Server-Hosting</div>
+                            <p style="font-size: 11px; color: var(--slate-500); margin: 0;">Ab 14,90 € / Monat für die sichere Cloud-Infrastruktur.</p>
+                        </div>
+                        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 6px; padding: 10px;">
+                            <div style="font-weight: 800; font-size: 14px; color: var(--slate-900);">Zero-Hardware</div>
+                            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-600); margin: 2px 0;">PWA Standard</div>
+                            <p style="font-size: 11px; color: var(--slate-500); margin: 0;">Funktioniert auf bestehenden Handys & PCs (BYOD).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CALL TO ACTION BOX -->
+                <div style="background: var(--slate-900); color: #ffffff; border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="padding-right: 16px;">
+                        <div style="font-weight: 800; font-size: 12.5px; color: #4ade80; text-transform: uppercase; letter-spacing: 0.05em;">Gemeinsam Zukunft gestalten · Reallabor 2026</div>
+                        <div style="font-size: 11px; color: var(--slate-300); line-height: 1.4; margin-top: 3px;">
+                            Wir stehen am Anfang unserer Reise und entwickeln Campus-Groovelab im stetigen Dialog mit Pilotschulen weiter: Den Schulalltag durch smarte Automatisierungen so radikal vereinfachen, dass der Fokus wieder zu 100% auf der Musik liegt.
+                        </div>
+                    </div>
+                    <div style="font-weight: 700; font-size: 10.5px; background: rgba(255,255,255,0.15); padding: 8px 14px; border-radius: 6px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
+                        Pilotphase Starten &rarr;
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer">
+            <span>Campus-Groovelab B2B Infrastruktur</span>
+            <span class="confidential">Streng Vertraulich · Seite 4 von 4</span>
+            <span>Kollegium & Konditionen</span>
+        </div>
+    </div>
+
+</body>
+</html>

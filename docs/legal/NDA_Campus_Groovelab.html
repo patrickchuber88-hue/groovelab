@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Vertraulichkeits- & IP-Schutzvereinbarung (NDA) – Campus-Groovelab</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 20mm 18mm 20mm;
+      @bottom-right {
+        content: "Seite " counter(page) " von " counter(pages);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.45;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .doc-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .brand-title {
+      font-size: 13pt;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 8pt;
+      color: #64748b;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .doc-badge {
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h1 {
+      font-size: 12.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 14px 0;
+      letter-spacing: -0.01em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .parties-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      font-size: 9pt;
+    }
+
+    .party-col strong {
+      display: block;
+      color: #0f172a;
+      margin-bottom: 3px;
+      font-size: 9pt;
+    }
+
+    .preamble {
+      font-style: italic;
+      color: #334155;
+      margin-bottom: 12px;
+      font-size: 8.8pt;
+      line-height: 1.4;
+      text-align: justify;
+    }
+
+    .section {
+      margin-bottom: 11px;
+      page-break-inside: avoid;
+    }
+
+    .section-title {
+      font-size: 9.8pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 2px;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      margin: 0 0 5px 0;
+      text-align: justify;
+    }
+
+    ol, ul {
+      margin: 0 0 5px 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin-bottom: 2px;
+      text-align: justify;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .signatures-container {
+      margin-top: 24px;
+      page-break-inside: avoid;
+    }
+
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 20px;
+    }
+
+    .sig-block {
+      border-top: 1px solid #0f172a;
+      padding-top: 6px;
+    }
+
+    .sig-name {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 9.5pt;
+    }
+
+    .sig-role {
+      font-size: 8pt;
+      color: #64748b;
+    }
+
+    .sig-meta {
+      font-size: 8.5pt;
+      color: #475569;
+      margin-bottom: 35px;
+    }
+
+    .footer-note {
+      margin-top: 15px;
+      font-size: 7pt;
+      color: #94a3b8;
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SEITE 1 -->
+  <div class="doc-header">
+    <div>
+      <div class="brand-title">Campus-Groovelab</div>
+      <div class="brand-subtitle">Rechtliche Vorfeld-Governance & IP-Schutz</div>
+    </div>
+    <div class="doc-badge">Vertraulich / NDA</div>
+  </div>
+
+  <h1>Qualifizierte Vertraulichkeits- & IP-Schutzvereinbarung</h1>
+
+  <div class="parties-box">
+    <div class="party-col">
+      <strong>Partei 1 (Projektinhaber & Entwickler):</strong>
+      Herr Patrick Huber<br>
+      Karl-Fürstenberg Str. 59<br>
+      79618 Rheinfelden<br>
+      E-Mail: patrick.huber@campus-groovelab.de
+    </div>
+    <div class="party-col">
+      <strong>Partei 2 (Didaktischer Fachbeirat / Partner):</strong>
+      Herr Manuel Wagner<br>
+      Straße: ___________________________<br>
+      79774 Albbruck-Buch<br>
+      E-Mail: ___________________________
+    </div>
+  </div>
+
+  <div class="preamble">
+    <strong>Präambel:</strong> Partei 1 ist Urheber, Entwickler und alleiniger wirtschaftlicher Inhaber der softwarebasierten Bildungs- und Musikschulplattform „Campus-Groovelab“, in deren Konzeption und technische Umsetzung hunderte Stunden hochkonzentrierter Entwicklungsarbeit eingeflossen sind. Partei 2 verfügt über langjährige Leitungserfahrung als Musikschulleiter, Musikpädagoge sowie über Netzwerke im Musikschulwesen. Die Parteien beabsichtigen, vertrauliche Gespräche über eine strategische Zusammenarbeit in den Bereichen didaktischer Fachbeirat, Reallabor-Erprobung und Vertriebspartnerschaft zu führen. Zu diesem Zweck werden die Parteien vertrauliche Informationen austauschen.
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 1 Gegenstand der vertraulichen Informationen & Zweckbindung</div>
+    <p>(1) „Vertrauliche Informationen“ im Sinne dieser Vereinbarung sind sämtliche geschäftlichen, technischen, didaktischen oder organisatorischen Informationen und Daten, die eine Partei der anderen Partei im Rahmen der Gespräche mündlich, schriftlich, elektronisch oder im Rahmen von Produkt-Demonstrationen offenbart oder zugänglich macht.</p>
+    <p>(2) Zu den vertraulichen Informationen von Partei 1 gehören insbesondere:</p>
+    <ul>
+      <li>Sämtliche Software- und Systemarchitekturen, Quelltexte, Datenbankschemata, API-Spezifikationen, State-Management-Konzepte und PWA-Lösungen der Plattform „Campus-Groovelab“;</li>
+      <li>Didaktische Bedienkonzepte, UI/UX-Workflows, Gamification-Ansätze sowie Methoden zur automatisierten Unterrichts-, Raum- und Ausfallorganisation;</li>
+      <li>Geschäfts-, Preis- und Vertriebsmodelle, Factsheets, Kalkulationen sowie geplante Markteinführungsstrategien.</li>
+    </ul>
+    <p>(3) Zu den vertraulichen Informationen von Partei 2 gehören insbesondere spezifische pädagogische und organisatorische Erfahrungswerte aus dem Leitungsalltag sowie individuelle Kontaktnetzwerke zu Schulen und Trägern.</p>
+    <p>(4) Die vertraulichen Informationen dürfen ausschließlich zur Prüfung und Verhandlung der gemeinsamen Kooperation verwendet werden (Zweckbindung). Sie sind mit der Sorgfalt eines ordentlichen Kaufmanns vor dem Zugriff unbefugter Dritter zu schützen.</p>
+    <p>(5) Keine vertraulichen Informationen sind solche, die der empfangenden Partei vor der Mitteilung nachweislich bekannt waren, die der Öffentlichkeit allgemein zugänglich sind oder ohne Verstoß gegen diese Vereinbarung wurden.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 2 Alleiniges Software- & Code-Eigentum (IP-Schutz)</div>
+    <p>(1) Partei 2 erkennt ausdrücklich und unwiderruflich an, dass sämtliche Urheberrechte, Erfindungen, Geschäftsgeheimnisse, Marken und sonstigen geistigen Eigentumsrechte an der Plattform „Campus-Groovelab“ (einschließlich aller Quelltexte, Softwarearchitekturen, Datenbankstrukturen, Designs und Modulkonzepte) im ausschließlichen und ungeteilten Eigentum von Partei 1 stehen und verbleiben.</p>
+    <p>(2) Soweit Partei 2 im Rahmen der Gespräche didaktisches Feedback, Verbesserungsvorschläge oder Feature-Ideen einbringt und diese durch Partei 1 in die Plattform implementiert werden, räumt Partei 2 Partei 1 hieran mit Entstehung das ausschließliche, unentgeltliche, zeitlich, räumlich und inhaltlich unbeschränkte sowie unterlizenzierbare Recht ein, diese Beiträge im Rahmen der Software zu nutzen, zu bearbeiten und zu verwerten. Partei 2 verzichtet auf das Recht auf Urhebernennung (§ 13 UrhG) im Rahmen der Software.</p>
+  </div>
+
+  <!-- SEITE 2 (oder sauberer Anschluss) -->
+  <div class="section" style="margin-top: 14px;">
+    <div class="section-title">§ 3 Kundenschutz & Kopierverbot (Non-Circumvention)</div>
+    <p>(1) Partei 2 verpflichtet sich, die ihr durch Partei 1 anvertrauten technischen und konzeptionellen Informationen nicht dazu zu nutzen, selbst oder über Dritte eine im direkten sachlichen Wettbewerb zu „Campus-Groovelab“ stehende Musikschulsoftware zu entwickeln, vermarkten oder betreiben zu lassen.</p>
+    <p>(2) Partei 2 verpflichtet sich ferner, geschäftliche Kontakte, die ihr von Partei 1 im Rahmen der Verhandlungen vorgestellt wurden, für die Dauer von 18 Monaten nach Beendigung der Gespräche nicht unter Umgehung von Partei 1 direkt geschäftlich bezüglich des Projektgegenstands zu kontaktieren.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 4 Vertragsstrafe nach Hamburger Brauch (§ 339 BGB)</div>
+    <p>Für jeden Fall der schuldhaften Zuwiderhandlung gegen die Geheimhaltungs-, IP- oder Kundenschutzpflichten aus §§ 1, 2 oder 3 verpflichtet sich die verletzende Partei zur Zahlung einer angemessenen, von der geschädigten Partei nach billigem Ermessen festzusetzenden und im Streitfall durch das sachlich und örtlich zuständige Landgericht am Sitz von Partei 1 auf ihre Angemessenheit überprüfbaren Vertragsstrafe. Die Geltendmachung eines weitergehenden Schadensersatzes bleibt unberührt; eine gezahlte Vertragsstrafe wird hierauf angerechnet.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 5 Ausschluss der vorvertraglichen Bindung & Anti-GbR-Klausel</div>
+    <p>(1) Durch den Abschluss dieser Vereinbarung, die Aufnahme von Verhandlungen und den Austausch von Informationen wird keine Gesellschaft bürgerlichen Rechts (GbR), keine Vorgründungsgesellschaft, kein Vorvertrag und kein Arbeitsverhältnis begründet (§ 705 BGB).</p>
+    <p>(2) Jede Partei trägt die ihr im Rahmen der Anbahnung und Verhandlung entstehenden Kosten selbst. Eine gesellschafts- oder vertragsrechtliche Bindung entsteht ausschließlich durch den separaten Abschluss eines schriftlichen Kooperations- bzw. notariellen Gesellschaftsvertrags.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 6 Laufzeit & Schlussbestimmungen</div>
+    <p>(1) Diese Vereinbarung tritt mit Unterzeichnung in Kraft. Die Verpflichtungen enden 3 Jahre nach Beendigung der Verhandlungen; für Quellcode, Systemarchitekturen und gesetzliche Geschäftsgeheimnisse (§ 2 GeschGehG) gilt die Geheimhaltungspflicht zeitlich unbegrenzt fort.</p>
+    <p>(2) Änderungen und Ergänzungen bedürfen der Schriftform oder einer qualifizierten elektronischen Signatur. Dies gilt auch für die Aufhebung dieses Formerfordernisses.</p>
+    <p>(3) Es gilt das Recht der Bundesrepublik Deutschland. Ausschließlicher Gerichtsstand für alle Streitigkeiten ist der Sitz von Partei 1.</p>
+  </div>
+
+  <div class="signatures-container">
+    <div class="sig-meta">
+      Ort, Datum: ____________________________________
+    </div>
+    <div class="signatures-grid">
+      <div class="sig-block">
+        <div class="sig-name">Patrick Huber</div>
+        <div class="sig-role">Partei 1 (Projektinhaber & Urheber)</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-name">Manuel Wagner</div>
+        <div class="sig-role">Partei 2 (Didaktischer Fachbeirat / Partner)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Campus-Groovelab · Vertraulichkeits- & IP-Schutzvereinbarung · Ausfertigung für die Vertragsparteien
+  </div>
+
+</body>
+</html>

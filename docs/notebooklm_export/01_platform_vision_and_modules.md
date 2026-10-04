@@ -47,7 +47,7 @@ Die Plattform unterscheidet strikt rollenbasierte Zugänge (RBAC):
 * **`admin` / `secretary`**: Schulleitung und Verwaltung einer Musikschule. Neutrales Profilbild (`/campus_login_hero.png`), kein Musiker-Avatar.
 * **`teacher`**: Lehrkräfte mit Zugriff auf zugewiesene Schüler, Stundenpläne, Notenvergabe und GrooveLab.
 * **`student`**: Schülerinnen und Schüler mit Zugriff auf Unterrichtsmaterialien, GrooveLab-Tools und Chat mit der Lehrkraft.
-* **`parent`**: Elternbereich zur Einsicht von Terminen, Rechnungen, Krankmeldungen und didaktischer UI-Level-Steuerung.
+* **`parent`**: Elternbereich zur Einsicht von Terminen, Rechnungen, Abwesenheiten / Unterrichtsausfällen und didaktischer UI-Level-Steuerung.
 
 ---
 

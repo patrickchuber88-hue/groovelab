@@ -67,6 +67,7 @@ import { useMeisterwerkHomework, getCanonicalSongKey, getNormalizedSongTitle } f
 import { MeisterwerkHeader } from './student/meisterwerk/views/MeisterwerkHeader';
 import { MeisterwerkSkillRadarDrawer } from './student/meisterwerk/views/MeisterwerkSkillRadarDrawer';
 import { MeisterwerkModalsHub } from './student/meisterwerk/modals/MeisterwerkModalsHub';
+import { MeisterwerkMobileBottomBar } from './student/meisterwerk/components/MeisterwerkMobileBottomBar';
 
 const GrooveLoopstation = lazy(() => import('./groovelab/GrooveLoopstation').then(m => ({ default: m.GrooveLoopstation })));
 const CampusTuner = lazy(() => import('./campus/CampusTuner').then(m => ({ default: m.CampusTuner })));
@@ -149,6 +150,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const [uiLevel, setUiLevel] = useState<'junior' | 'teen' | 'pro'>(resolveInitialUiLevel);
+  const [studentStats, setStudentStats] = useState<{ practiceMinutes: number; xp: number; streak: number } | null>(() => (initialPracticeMinutes != null || initialXp != null || initialStreak != null) ? { practiceMinutes: initialPracticeMinutes || 0, xp: initialXp || 0, streak: initialStreak || 0 } : null);
 
   useEffect(() => {
     if (isTeacherSelf) return;
@@ -165,6 +167,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           try {
             localStorage.setItem(`campus_student_ui_level_${sId}`, data.campus_ui_level);
           } catch {}
+        }
+      });
+    supabase
+      .from('student_stats')
+      .select('total_focus_minutes, current_xp, streak_flame')
+      .eq('student_id', sId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setStudentStats({
+            practiceMinutes: data.total_focus_minutes || 0,
+            xp: data.current_xp || 0,
+            streak: (data as any).streak_flame || 0
+          });
         }
       });
   }, [student?.id, isTeacherSelf]);
@@ -3361,29 +3377,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               setIsRecordingMetronomeActive={setIsRecordingMetronomeActive}
               setIsStudentWeekExpanded={setIsStudentWeekExpanded}
               setIsTeacherHomeworkExpanded={setIsTeacherHomeworkExpanded}
-              setLocalJuniorRecordingsTrigger={() => {}}
-              setMobileRecordingsTab={setMobileRecordingsTab}
-              setNewPlaylistTitle={() => {}}
-              setOpenHomeworkWeekAccordions={setOpenHomeworkWeekAccordions}
-              setRecordingBpm={setRecordingBpm}
-              setShareAudioModal={() => {}}
-              setShareCustomTitle={() => {}}
-              setSharePlaylistId={() => {}}
-              setShareProcessing={() => {}}
-              setShowNewPlaylistInput={() => {}}
-              setShowRecordingMetronomePopup={setShowRecordingMetronomePopup}
-              setShowStudentFavoritesOnly={setShowStudentFavoritesOnly}
-              setShowTeacherFavoritesOnly={setShowTeacherFavoritesOnly}
-              setShowTeacherHomeworkArchive={setShowTeacherHomeworkArchive}
-              shareAudioModal={null}
-              shareCustomTitle=""
-              sharePlaylistId=""
-              shareProcessing="raw"
-              showNewPlaylistInput={false}
-              showRecordingMetronomePopup={showRecordingMetronomePopup}
-              showStudentFavoritesOnly={showStudentFavoritesOnly}
-              showTeacherFavoritesOnly={showTeacherFavoritesOnly}
-              showTeacherHomeworkArchive={showTeacherHomeworkArchive}
+              setLocalJuniorRecordingsTrigger={() => {}} setMobileRecordingsTab={setMobileRecordingsTab} setNewPlaylistTitle={() => {}}
+              setOpenHomeworkWeekAccordions={setOpenHomeworkWeekAccordions} setRecordingBpm={setRecordingBpm}
+              setShareAudioModal={() => {}} setShareCustomTitle={() => {}} setSharePlaylistId={() => {}} setShareProcessing={() => {}}
+              setShowNewPlaylistInput={() => {}} setShowRecordingMetronomePopup={setShowRecordingMetronomePopup}
+              setShowStudentFavoritesOnly={setShowStudentFavoritesOnly} setShowTeacherFavoritesOnly={setShowTeacherFavoritesOnly}
+              setShowTeacherHomeworkArchive={setShowTeacherHomeworkArchive} shareAudioModal={null} shareCustomTitle=""
+              sharePlaylistId="" shareProcessing="raw" showNewPlaylistInput={false}
+              showRecordingMetronomePopup={showRecordingMetronomePopup} showStudentFavoritesOnly={showStudentFavoritesOnly}
+              showTeacherFavoritesOnly={showTeacherFavoritesOnly} showTeacherHomeworkArchive={showTeacherHomeworkArchive}
               songs={songs}
               startRecordingAudio={startRecordingAudio}
               stopRecordingAudio={stopRecordingAudio}
@@ -3403,26 +3405,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
         ) : activeModalTab === 'stickeralbum' ? (
           <MeisterwerkStickerAlbumTab
-            isMobileOrSim={isMobileOrSim}
-            readOnly={readOnly}
-            isDevSimulationActive={false}
-            setIsDevSimulationActive={() => {}}
-            simulateMultiYearProgress={() => {}}
-            resetStickerAlbum={() => {}}
-            collectedStickers={{}}
-            renderSchoolYearSelector={() => null}
-            awardSticker={() => {}}
-            awardedStickerToAnimate={null}
-            setAwardedStickerToAnimate={() => {}}
-            downloadShareCard={() => {}}
-            topicName={topicName}
-            actualStudentName={displayedStudentName}
-            studentInstrument={(student as any)?.instrument}
-            shareCard={undefined}
-            selectedSchoolYear="2025/2026"
-            currentSchoolYear="2025/2026"
-            student={student}
-            schoolName={propSchoolName || ''}
+            isMobileOrSim={isMobileOrSim} readOnly={readOnly}
+            isDevSimulationActive={false} setIsDevSimulationActive={() => {}}
+            simulateMultiYearProgress={() => {}} resetStickerAlbum={() => {}}
+            collectedStickers={getUnifiedStickersMap({
+              practiceMinutes: Math.max(studentStats?.practiceMinutes || 0, initialPracticeMinutes || 0, (student as any)?.total_focus_minutes || 0),
+              xp: Math.max(studentStats?.xp || 0, initialXp || 0, (student as any)?.current_xp || 0, (student as any)?.xp || 0),
+              streakDays: Math.max(studentStats?.streak || 0, initialStreak || 0, (student as any)?.current_streak || 0, (student as any)?.streak_flame || 0),
+              masteredSongsCount: progressItems?.filter(i => i.status === 'MASTERED' || i.progress_percent === 100)?.length || initialMasteredSongsCount || 0,
+              progressItems: progressItems || [],
+              studentCreatedAt: student?.activated_at || student?.created_at || (student as any)?.registration_date,
+              activatedAt: student?.activated_at || student?.created_at || (student as any)?.registration_date,
+              selectedSchoolYear: '2025/2026'
+            })}
+            renderSchoolYearSelector={() => null} awardSticker={() => {}}
+            awardedStickerToAnimate={null} setAwardedStickerToAnimate={() => {}}
+            downloadShareCard={() => {}} topicName={topicName}
+            actualStudentName={displayedStudentName} studentInstrument={(student as any)?.instrument}
+            shareCard={undefined} selectedSchoolYear="2025/2026" currentSchoolYear="2025/2026"
+            student={student} schoolName={propSchoolName || ''}
           />
         ) : activeModalTab === 'audiobiography' ? (
           <Suspense fallback={<div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Lade Audio-Biografie...</div>}>
@@ -3720,6 +3721,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           />
         )}
       </div>
+
+      {(isMobileOrSim || isMobileView) && activeModalTab !== 'stickeralbum' && (
+        <MeisterwerkMobileBottomBar
+          mobileProtokollTab={mobileProtokollTab} setMobileProtokollTab={setMobileProtokollTab}
+          activeViewMode={activeViewMode} setActiveViewMode={setActiveViewMode}
+          activeModalTab={activeModalTab} setActiveModalTab={setActiveModalTab}
+          activeSubView={activeSubView} setActiveSubView={setActiveSubView}
+          setHubTab={setHubTab} isTeacherSelf={isTeacherSelf}
+        />
+      )}
     </div>
   );
 

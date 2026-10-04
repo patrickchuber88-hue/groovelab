@@ -10,9 +10,11 @@ import {
   Bell,
   ShieldCheck,
   Check,
-  Lock
+  Lock,
+  ArrowLeft
 } from 'lucide-react';
 import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
+import { resolveCampusStudentAvatar } from '../../utils/avatarResolutionEngine';
 import { CampusMobileSidebarDrawer } from './CampusMobileSidebarDrawer';
 
 export interface GeminiMobileShellProps {
@@ -110,6 +112,33 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
   }, []);
 
   const triggerBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // 🏛️ Sub-View State Listener für Header-Verschmelzung (Aufgabenheft, Sticker-Album, etc.)
+  const [subViewNavState, setSubViewNavState] = useState<{
+    isActive: boolean;
+    label: string;
+    isStickerAlbum: boolean;
+  }>({
+    isActive: false,
+    label: 'Zurück zu den Modulen',
+    isStickerAlbum: false
+  });
+
+  useEffect(() => {
+    const handleSubViewNav = (e: any) => {
+      if (e?.detail) {
+        setSubViewNavState({
+          isActive: !!e.detail.isActive,
+          label: e.detail.label || 'Zurück zu den Modulen',
+          isStickerAlbum: !!e.detail.isStickerAlbum
+        });
+      }
+    };
+    window.addEventListener('campus_subview_nav_state', handleSubViewNav as EventListener);
+    return () => {
+      window.removeEventListener('campus_subview_nav_state', handleSubViewNav as EventListener);
+    };
+  }, []);
 
   // Normalized role checks
   const userRole = (user?.role || 'student').toLowerCase();
@@ -213,9 +242,14 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
 
 
 
+  const isSubViewActive = activePlatform === 'campus' && activeTab === 'homework_book' && subViewNavState.isActive;
+
   const getAvatarSrc = () => {
     if (isStaff) return '/campus_login_hero.png';
-    return user?.avatar_url || '/campus_login_hero.png';
+    if (activePlatform === 'campus') {
+      return resolveCampusStudentAvatar(user, teachers);
+    }
+    return user?.avatar_url || resolveCampusStudentAvatar(user, teachers);
   };
 
 
@@ -261,13 +295,21 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
         aria-label="Hauptnavigation Oben"
         className="cg-mobile-top-header cg-gemini-header"
         style={{
-          background: isScrolled ? 'rgba(255, 255, 255, 0.85)' : 'transparent',
-          backdropFilter: isScrolled ? 'blur(20px)' : 'none',
-          WebkitBackdropFilter: isScrolled ? 'blur(20px)' : 'none',
-          borderBottom: isScrolled ? '1px solid rgba(226, 232, 240, 0.8)' : '1px solid transparent'
+          background: (isSubViewActive && subViewNavState.isStickerAlbum)
+            ? 'rgba(15, 23, 42, 0.92)'
+            : isScrolled
+            ? 'rgba(255, 255, 255, 0.85)'
+            : 'transparent',
+          backdropFilter: (isSubViewActive && subViewNavState.isStickerAlbum) || isScrolled ? 'blur(20px)' : 'none',
+          WebkitBackdropFilter: (isSubViewActive && subViewNavState.isStickerAlbum) || isScrolled ? 'blur(20px)' : 'none',
+          borderBottom: (isSubViewActive && subViewNavState.isStickerAlbum)
+            ? '1px solid rgba(255, 255, 255, 0.12)'
+            : isScrolled
+            ? '1px solid rgba(226, 232, 240, 0.8)'
+            : '1px solid transparent'
         }}
       >
-        {/* Left: ☰ Hamburger Button (44×44px Touch Target) */}
+        {/* Left: ☰ Hamburger Button (44×44px Touch Target) in GrooveLab Gelb */}
         <button
           ref={triggerBtnRef}
           type="button"
@@ -278,11 +320,74 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
           className="cg-gemini-touch-btn hover-scale"
           title="Hauptmenü öffnen"
         >
-          <Menu size={22} strokeWidth={2.4} />
+          <div
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: (isSubViewActive && subViewNavState.isStickerAlbum)
+                ? 'rgba(234, 179, 8, 0.22)'
+                : 'rgba(234, 179, 8, 0.14)',
+              border: (isSubViewActive && subViewNavState.isStickerAlbum)
+                ? '1.5px solid rgba(250, 204, 21, 0.70)'
+                : '1.5px solid rgba(234, 179, 8, 0.40)',
+              boxShadow: (isSubViewActive && subViewNavState.isStickerAlbum)
+                ? '0 2px 8px rgba(234, 179, 8, 0.30)'
+                : '0 1px 4px rgba(234, 179, 8, 0.12)',
+              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <Menu
+              size={24}
+              strokeWidth={2.6}
+              color={(isSubViewActive && subViewNavState.isStickerAlbum) ? '#facc15' : '#b45309'}
+            />
+          </div>
         </button>
 
-        {/* Center: Scope/Platform Dropdown (Reiner Gemini Typografie-Stil 1:1 wie „Gemini Flash ⌵“) */}
-        <div style={{ position: 'relative' }}>
+        {/* Center: SubView Back Button OR Scope/Platform Dropdown */}
+        {isSubViewActive ? (
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('campus_trigger_universal_back'));
+            }}
+            className="cg-gemini-pill-btn hover-scale-mini"
+            aria-label={subViewNavState.label}
+            style={{
+              background: subViewNavState.isStickerAlbum ? 'rgba(255, 255, 255, 0.12)' : '#f1f5f9',
+              border: subViewNavState.isStickerAlbum ? '1px solid rgba(255, 255, 255, 0.22)' : '1px solid #cbd5e1',
+              color: subViewNavState.isStickerAlbum ? '#ffffff' : '#0f172a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '36px',
+              minHeight: '36px',
+              padding: '0 14px',
+              borderRadius: '100px',
+              fontWeight: 800,
+              fontSize: '0.80rem',
+              cursor: 'pointer',
+              boxShadow: subViewNavState.isStickerAlbum
+                ? '0 2px 8px rgba(0, 0, 0, 0.3)'
+                : '0 1px 3px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <ArrowLeft
+              size={15}
+              strokeWidth={2.6}
+              color={subViewNavState.isStickerAlbum ? '#ffffff' : '#0f172a'}
+            />
+            <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {subViewNavState.label}
+            </span>
+          </button>
+        ) : (
+          <div style={{ position: 'relative' }}>
           <button
             type="button"
             onClick={() => {
@@ -455,6 +560,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
             </>
           )}
         </div>
+        )}
 
         {/* Right: Parental status, Cloud sync, Bell & Avatar (>=44×44px touch targets) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
@@ -510,7 +616,10 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
             }}
             aria-label={unreadCount > 0 ? `${unreadCount} ungelesene Benachrichtigungen` : 'Benachrichtigungen & Nachrichten'}
             className="cg-gemini-touch-btn hover-scale-mini"
-            style={{ position: 'relative', color: '#475569' }}
+            style={{
+              position: 'relative',
+              color: (isSubViewActive && subViewNavState.isStickerAlbum) ? '#ffffff' : '#475569'
+            }}
             title="Benachrichtigungen & Mitteilungen"
           >
             <Bell size={19} />

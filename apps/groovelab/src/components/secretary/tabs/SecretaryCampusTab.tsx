@@ -967,10 +967,10 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                 const filteredTeachers = allUniqueTeachers.filter((t: any) => {
                   const firstName = (t.firstName || t.first_name || '').toLowerCase();
                   const lastName = (t.lastName || t.last_name || '').toLowerCase();
-                  const email = (t.email || '').toLowerCase();
+                  const pin = (t.ausweisNummer || t.ausweis_nummer || '').toLowerCase();
                   const query = teacherSearchQuery.toLowerCase().trim();
                   
-                  const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
+                  const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || pin.includes(query);
                   
                   const isCampus = t.isCampusActive || t.is_campus_active;
                   const isActive = t.isActive ?? t.is_active;
@@ -1333,8 +1333,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                   <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {teacherName}
                                   </span>
-                                  <span style={{ fontSize: '0.74rem', color: t.email ? '#86868b' : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {t.email || 'Keine E-Mail hinterlegt'}
+                                  <span style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    🛡️ Ausweis: {t.ausweisNummer || t.ausweis_nummer || 'Aktiv'}
                                   </span>
                                 </div>
                               </div>

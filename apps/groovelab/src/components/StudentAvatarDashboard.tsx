@@ -483,8 +483,13 @@ export function StudentAvatarDashboard({
                 uiLevel={profile.studentUiLevel || profile.studentUser?.campus_ui_level || undefined}
                 initialXp={streaks.currentXp}
                 initialStreak={streaks.streakFlamesCount}
-                initialPracticeMinutes={Math.floor(practice.secondsElapsed / 60)}
                 initialMasteredSongsCount={0}
+                initialPracticeMinutes={
+                  ((practice.fokusLogs || []).reduce(
+                    (sum: number, l: any) => sum + (l.duration_minutes || Math.floor((l.duration_seconds || 0) / 60)),
+                    0
+                  )) + Math.floor((practice.secondsElapsed || 0) / 60)
+                }
                 hasTresorStorage={true}
                 isParentUnlocked={parent.isParentUnlocked || parent.checkIsParentUnlockedGlobal()}
                 parentPermissions={(profile.studentUser as any)?.parent_permissions}

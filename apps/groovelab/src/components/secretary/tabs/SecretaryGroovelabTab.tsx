@@ -1809,10 +1809,10 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
               const filteredCoaches = activeCoaches.filter((t: any) => {
                 const firstName = (t.firstName || '').toLowerCase();
                 const lastName = (t.lastName || '').toLowerCase();
-                const email = (t.email || '').toLowerCase();
+                const pin = (t.ausweisNummer || t.ausweis_nummer || '').toLowerCase();
                 const query = coachSearchQuery.toLowerCase().trim();
                 
-                const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
+                const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || pin.includes(query);
                 
                 const instrument = (t.instrument || 'Nicht festgelegt').toLowerCase();
                 const filterInst = coachFilterInstrument.toLowerCase();
@@ -1827,7 +1827,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                 (
                   (t.firstName || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim()) ||
                   (t.lastName || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim()) ||
-                  (t.email || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim())
+                  (t.ausweisNummer || t.ausweis_nummer || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim())
                 )
               );
 
@@ -1943,7 +1943,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                               }}>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                   <strong style={{ fontSize: '0.8rem', color: '#0f172a', fontFamily: 'Urbanist' }}>{name}</strong>
-                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{t.email ? `${t.email} • ` : ''}{t.instrument || 'Kein Instrument'}</span>
+                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{t.instrument || 'Kein Instrument'}</span>
                                 </div>
                                 <button
                                   type="button"

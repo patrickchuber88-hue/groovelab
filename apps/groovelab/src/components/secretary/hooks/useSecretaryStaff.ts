@@ -187,7 +187,7 @@ export function useSecretaryStaff({
 
   const handleCreateCoach = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coachFirstName || !coachLastName || !coachEmail) return;
+    if (!coachFirstName || !coachLastName) return;
 
     if (!isAvvSigned) {
       alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
@@ -207,7 +207,6 @@ export function useSecretaryStaff({
           roles: [coachRole],
           first_name: coachFirstName,
           last_name: coachLastName,
-          email: coachEmail,
           instrument: coachInstrument || 'Nicht festgelegt',
           is_active: true,
           is_app_user: true,
@@ -306,7 +305,6 @@ export function useSecretaryStaff({
             roles: [role],
             first_name: firstName,
             last_name: lastName,
-            email: email,
             nickname: nickname,
             photo_url: '/campus_login_hero.png',
             ausweis_nummer: pin,
@@ -612,8 +610,6 @@ export function useSecretaryStaff({
         });
       } catch (e) {}
 
-      try { await supabase.from('user_email_prefixes').delete().eq('user_id', id); } catch (e) {}
-      try { await supabase.from('user_email_suffixes').delete().eq('user_id', id); } catch (e) {}
       try { await supabase.from('activation_days').delete().eq('student_id', id); } catch (e) {}
       try { await supabase.from('student_first_names').delete().eq('student_id', id); } catch (e) {}
       try { await supabase.from('student_last_names').delete().eq('student_id', id); } catch (e) {}

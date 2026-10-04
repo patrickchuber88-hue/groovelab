@@ -53,6 +53,7 @@ export interface ProgressItem {
   id?: string;
   topic_name: string;
   status: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED';
+  progress_percent?: number;
   is_current_homework: boolean;
   teacher_notes: string;
   homework_notes?: string;

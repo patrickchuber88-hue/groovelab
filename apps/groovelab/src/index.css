@@ -1821,7 +1821,8 @@ select option {
    ========================================================================== */
 
 /* Hide Mobile Bottom Nav on Desktop by default */
-.cg-mobile-bottom-nav {
+.cg-mobile-bottom-nav,
+.meisterwerk-mobile-bottom-dock {
   display: none !important;
 }
 
@@ -1844,6 +1845,10 @@ select option {
 
   .cg-mobile-bottom-nav {
     display: none !important;
+  }
+
+  .meisterwerk-mobile-bottom-dock {
+    display: flex !important;
   }
 
   .main-wrapper {
@@ -1971,6 +1976,21 @@ select option {
 .sim-viewport-mobile .cg-mobile-bottom-nav,
 .sim-viewport-portrait .cg-mobile-bottom-nav {
   display: none !important;
+}
+
+.sim-viewport-mobile .meisterwerk-mobile-bottom-dock,
+.sim-viewport-portrait .meisterwerk-mobile-bottom-dock,
+[class*="sim-viewport-"]:not(.sim-viewport-landscape) .meisterwerk-mobile-bottom-dock {
+  display: flex !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 74px !important;
+  padding-bottom: 24px !important;
+  padding-top: 6px !important;
+  box-sizing: border-box !important;
 }
 
 /* Simulator Gemini Fullscreen Drawer Parity */

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Eye, EyeOff, FileText, GraduationCap, Plus, Search,
+  Eye, EyeOff, FileText, GraduationCap, Plus, Scale, Search,
   ShieldAlert, Sliders, Trash2, UserCheck, Users
 } from 'lucide-react';
 import { resolveUserCampusId } from '../../utils/campusIdHelper';
+import { HerrenbergComplianceModal } from './modals/HerrenbergComplianceModal';
 
 export interface SecretaryEmployeesViewProps {
   employees: any[];
@@ -82,13 +83,14 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
   handleToggleRole,
   handleUpdateEmployeeRole,
 }) => {
-          const filteredEmployees = employees.filter(emp => {
+  const [showHerrenbergModal, setShowHerrenbergModal] = useState(false);
+  const filteredEmployees = employees.filter(emp => {
             const firstName = (emp.first_name || '').toLowerCase();
             const lastName = (emp.last_name || '').toLowerCase();
-            const email = (emp.email || '').toLowerCase();
+            const pin = (emp.ausweis_nummer || '').toLowerCase();
             const query = employeeSearchQuery.toLowerCase().trim();
             
-            const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
+            const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || pin.includes(query);
             const matchesRole = employeeFilterRole === 'All' || 
               (emp.roles && emp.roles.includes(employeeFilterRole)) || 
               emp.role === employeeFilterRole;
@@ -133,7 +135,32 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                       </h3>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        aria-label="Herrenberg-Compliance und Enthaftungs-Cockpit öffnen"
+                        onClick={() => setShowHerrenbergModal(true)}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          borderRadius: '12px', 
+                          padding: '8px 16px', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 800,
+                          background: '#ecfdf5',
+                          color: '#065f46',
+                          border: '1.5px solid #86efac',
+                          cursor: 'pointer',
+                          fontFamily: 'Urbanist',
+                          boxShadow: '0 2px 6px rgba(16,185,129,0.08)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Scale size={15} style={{ color: '#059669' }} />
+                        Herrenberg-Cockpit
+                      </button>
+
                       <button
                         type="button"
                         aria-label="Sammel-Onboarding CSV ein- oder ausklappen"
@@ -471,8 +498,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                   )}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                                  <span style={{ fontSize: '0.74rem', color: emp.email ? '#86868b' : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {emp.email || 'Keine E-Mail hinterlegt'}
+                                  <span style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    🛡️ Ausweis-Auth (Zero-Contact)
                                   </span>
                                   <span style={{
                                     fontSize: '0.62rem',
@@ -632,28 +659,12 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             <div style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
                               <button
                                 type="button"
-                                aria-label={`Mitarbeiter-Pass für ${emp.first_name} ${emp.last_name} per E-Mail teilen`}
+                                aria-label={`Mitarbeiter-Pass für ${emp.first_name} ${emp.last_name} in Zwischenablage kopieren`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (emp.ausweis_nummer) {
-                                    // Copy to clipboard as backup
                                     navigator.clipboard.writeText(emp.ausweis_nummer);
-                                    
-                                    // Construct mail components
-                                    const emailRecipient = emp.email || '';
-                                    const subject = encodeURIComponent('Dein Campus-Mitarbeiterzugang 🎓');
-                                    const body = encodeURIComponent(
-                                      `Hallo ${emp.first_name || 'Mitarbeiter(in)'},\n\n` +
-                                      `willkommen im Campus-Team!\n\n` +
-                                      `Dein persönlicher Mitarbeiter-PIN für die Anmeldung und Profilverknüpfung lautet:\n` +
-                                      `👉 ${emp.ausweis_nummer}\n\n` +
-                                      `(Die PIN wurde soeben auch in deine Zwischenablage kopiert)\n\n` +
-                                      `Damit kannst du dich auf dem Campus-Portal anmelden oder dein Profil verknüpfen.\n\n` +
-                                      `Viele Grüße,\n` +
-                                      `Musikschule Bad Säckingen`
-                                    );
-                                    
-                                    window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+                                    alert(`Mitarbeiter-PIN für ${emp.first_name} (${emp.ausweis_nummer}) wurde in die Zwischenablage kopiert.`);
                                   } else {
                                     alert('Keine PIN vorhanden.');
                                   }
@@ -1196,6 +1207,10 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
 
               </div>
 
+              <HerrenbergComplianceModal
+                isOpen={showHerrenbergModal}
+                onClose={() => setShowHerrenbergModal(false)}
+              />
             </div>
           );
 

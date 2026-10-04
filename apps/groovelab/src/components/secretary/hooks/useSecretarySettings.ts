@@ -653,8 +653,6 @@ export function useSecretarySettings({
         bandMembersRes,
         studentFirstNamesRes,
         studentLastNamesRes,
-        emailPrefixesRes,
-        emailSuffixesRes,
         activationDaysRes
       ] = await Promise.all([
         bandIds.length > 0
@@ -667,12 +665,6 @@ export function useSecretarySettings({
           ? supabase.from('student_last_names').select('*').in('student_id', studentIds)
           : Promise.resolve({ data: [], error: null }),
         studentIds.length > 0
-          ? supabase.from('email_prefixes').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
-          ? supabase.from('email_suffixes').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
           ? supabase.from('activation_days').select('*').in('student_id', studentIds)
           : Promise.resolve({ data: [], error: null })
       ]);
@@ -680,8 +672,6 @@ export function useSecretarySettings({
       if (bandMembersRes.error) throw bandMembersRes.error;
       if (studentFirstNamesRes.error) throw studentFirstNamesRes.error;
       if (studentLastNamesRes.error) throw studentLastNamesRes.error;
-      if (emailPrefixesRes.error) throw emailPrefixesRes.error;
-      if (emailSuffixesRes.error) throw emailSuffixesRes.error;
       if (activationDaysRes.error) throw activationDaysRes.error;
 
       const backupData = {
@@ -698,8 +688,6 @@ export function useSecretarySettings({
         students: studentsRes.data || [],
         studentFirstNames: studentFirstNamesRes.data || [],
         studentLastNames: studentLastNamesRes.data || [],
-        emailPrefixes: emailPrefixesRes.data || [],
-        emailSuffixes: emailSuffixesRes.data || [],
         activationDays: activationDaysRes.data || []
       };
 
@@ -782,8 +770,6 @@ export function useSecretarySettings({
         const restoreStudentIds = (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || [];
         await supabase.from('student_first_names').delete().in('student_id', restoreStudentIds);
         await supabase.from('student_last_names').delete().in('student_id', restoreStudentIds);
-        await supabase.from('email_prefixes').delete().in('student_id', restoreStudentIds);
-        await supabase.from('email_suffixes').delete().in('student_id', restoreStudentIds);
         await supabase.from('activation_days').delete().in('student_id', restoreStudentIds);
         await supabase.from('students').delete().eq('school_id', schoolId);
         await supabase.from('rooms').delete().eq('school_id', schoolId);
@@ -840,14 +826,6 @@ export function useSecretarySettings({
           if (fErr) throw fErr;
           const { error: lErr } = await supabase.from('student_last_names').insert(lastNamesToInsert);
           if (lErr) throw lErr;
-        }
-        if (backupData.emailPrefixes && backupData.emailPrefixes.length > 0) {
-          const { error } = await supabase.from('email_prefixes').insert(backupData.emailPrefixes);
-          if (error) throw error;
-        }
-        if (backupData.emailSuffixes && backupData.emailSuffixes.length > 0) {
-          const { error } = await supabase.from('email_suffixes').insert(backupData.emailSuffixes);
-          if (error) throw error;
         }
         if (backupData.activationDays && backupData.activationDays.length > 0) {
           const { error } = await supabase.from('activation_days').insert(backupData.activationDays);

@@ -2299,23 +2299,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     <>
       {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
           <div style={{
-            flex: isMobileView ? 'none' : '0 0 45%',
+            flex: isMobileView ? '1' : '0 0 45%',
             width: isMobileView ? '100%' : '45%',
             maxWidth: isMobileView ? '100%' : '45%',
             minWidth: 0,
             overflowX: isMobileView ? 'clip' : 'visible',
-            height: isMobileView ? 'auto' : '100%',
-            minHeight: '0',
+            height: isMobileView ? '100%' : '100%',
+            minHeight: isMobileView ? 'calc(100dvh - 140px)' : '0',
             maxHeight: isMobileView ? 'none' : '100%',
             overflowY: isMobileView ? 'visible' : 'auto',
             display: isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
             justifyContent: 'flex-start',
-            gap: '16px',
+            gap: isMobileView ? '0px' : '16px',
             background: useNotebookLayout ? '#faf8f2' : '#ffffff',
             borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
             position: 'relative',
-            padding: isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '0px',
+            padding: isMobileView ? '8px 4px 0px 4px' : '0px',
             boxSizing: 'border-box'
           }}>
             
@@ -4852,11 +4852,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               animation: campusJiggle 0.28s infinite ease-in-out;
                             }
                           `}</style>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Sliders size={15} style={{ color: '#34a853' }} />
-                                <span>Campus Studio Module</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                                <Sliders size={15} style={{ color: '#34a853', flexShrink: 0 }} />
+                                <span>{isMobileOrSim ? 'Studio-Module' : 'Campus Studio Module'}</span>
                               </span>
 
                               {/* 🔄 DEZENTER ZURÜCKSETZEN-KNOPF (sichtbar wenn Layout angepasst wurde) */}
@@ -4876,6 +4876,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
                                     transition: 'all 0.15s ease'
                                   }}
                                   className="hover-scale-mini"
@@ -4888,7 +4890,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             </div>
 
                             {/* ✏️ EDIT-MODUS (JIGGLE) & 🎧 AUDIO-EINSTELLUNGEN BUTTONS */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                               {/* ⚙️ Dezent monochromes Einstellungs-Icon für Audio & Latenz */}
                               <button
                                 type="button"
@@ -4898,13 +4900,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   color: '#475569',
                                   border: '1px solid #e2e8f0',
                                   borderRadius: '100px',
-                                  padding: '3px 9px',
+                                  padding: isMobileOrSim ? '3px 8px' : '3px 9px',
                                   fontSize: '0.68rem',
                                   fontWeight: 800,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '4px',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
                                   transition: 'all 0.15s ease'
                                 }}
                                 className="hover-scale-mini"
@@ -4924,13 +4928,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     color: isModuleEditMode ? '#ffffff' : '#475569',
                                     border: `1px solid ${isModuleEditMode ? '#0f172a' : '#e2e8f0'}`,
                                     borderRadius: '100px',
-                                    padding: '3px 10px',
+                                    padding: isMobileOrSim ? '3px 8px' : '3px 10px',
                                     fontSize: '0.68rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
                                     boxShadow: isModuleEditMode ? '0 2px 6px rgba(15, 23, 42, 0.25)' : 'none',
                                     transition: 'all 0.18s ease'
                                   }}
@@ -6432,7 +6438,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
           {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
                 <div style={{
-                  padding: isMobileOrSim ? '8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) 10px' : '10px 16px 14px 16px',
+                  marginTop: isMobileOrSim ? 'auto' : undefined,
+                  marginBottom: isMobileOrSim ? 'calc(50px + max(24px, env(safe-area-inset-bottom, 24px)))' : '0px',
+                  padding: isMobileOrSim ? '10px 10px 12px 10px' : '10px 16px 14px 16px',
                   display: 'flex',
                   gap: isMobileOrSim ? '6px' : '10px',
                   borderTop: '1px solid #f1f5f9',
@@ -6472,7 +6480,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     <Award size={isMobileOrSim ? 15 : 16} strokeWidth={2.4} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isMobileOrSim 
-                        ? (masteredPiecesCount > 0 ? `Meister (${masteredPiecesCount})` : 'Meisterwerke') 
+                        ? (masteredPiecesCount > 0 ? `Meister (${masteredPiecesCount})` : 'Meister') 
                         : (masteredPiecesCount > 0 ? `Meine Meisterwerke (${masteredPiecesCount})` : 'Meine Meisterwerke')}
                     </span>
                   </button>
@@ -9949,9 +9957,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               display: 'flex', 
                               justifyContent: 'space-between', 
                               alignItems: 'center', 
-                              flexWrap: isMobileView ? 'wrap' : 'nowrap', 
-                              gap: isMobileView ? '8px' : '12px',
-                              rowGap: isMobileView ? '8px' : '0',
+                              flexWrap: 'nowrap', 
+                              gap: isMobileView ? '6px' : '12px',
+                              rowGap: '0',
                               width: '100%',
                               minWidth: 0,
                               maxWidth: '100%',
@@ -10138,7 +10146,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         setIsQuestionEditorOpen(prev => !prev);
                                       }}
                                       style={{
-                                        display: 'inline-flex',
+                                        display: isMobileView ? 'none' : 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: isMobileView ? '4px' : '6px',
@@ -10202,7 +10210,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         setIsQuestionEditorOpen(prev => !prev);
                                       }}
                                       style={{
-                                        display: 'inline-flex',
+                                        display: isMobileView ? 'none' : 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: '5px',
@@ -10302,12 +10310,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                    {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
                                      <>
                                        <VolumeX size={14} strokeWidth={2.4} />
-                                       {!isMobileView && <span>Stopp</span>}
+                                       <span>Stopp</span>
                                      </>
                                    ) : (
                                      <>
                                        <Volume2 size={14} color="#15803d" strokeWidth={2.3} />
-                                       {!isMobileView && <span>Vorlesen</span>}
+                                       <span>Vorlesen</span>
                                      </>
                                    )}
                                  </button>
@@ -10328,7 +10336,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     minWidth: isMobileView ? '36px' : '32px',
                                     minHeight: isMobileView ? '36px' : '32px',
                                     cursor: 'pointer',
-                                    display: 'inline-flex',
+                                    display: isMobileView ? 'none' : 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     transition: 'all 0.15s ease',
@@ -10361,7 +10369,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     minWidth: isMobileView ? '36px' : '32px',
                                     minHeight: isMobileView ? '36px' : '32px',
                                     cursor: 'pointer',
-                                    display: 'inline-flex',
+                                    display: isMobileView ? 'none' : 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     transition: 'all 0.15s ease',
@@ -10405,7 +10413,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     minWidth: isMobileView ? '36px' : '32px',
                                     minHeight: isMobileView ? '36px' : '32px',
                                     cursor: 'pointer',
-                                    display: 'inline-flex',
+                                    display: isMobileView ? 'none' : 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     transition: 'all 0.15s ease',
@@ -10904,83 +10912,43 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                               {readOnly && !isQuestionEditorOpen && effectiveViewingQuestion?.hasQuestion && (
                                 <div style={{
-                                  background: '#fffdf0',
-                                  border: '1.5px solid #fde047',
-                                  borderRadius: '14px',
-                                  padding: '8px 12px',
-                                  boxShadow: '0 2px 8px rgba(250, 204, 21, 0.12)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '4px'
+                                  background: '#fffdf0', border: '1.5px solid #fde047',
+                                  borderRadius: '16px', padding: isMobileView ? '12px 14px' : '12px 16px',
+                                  boxShadow: '0 2px 10px rgba(250, 204, 21, 0.16), 0 1px 3px rgba(0, 0, 0, 0.03)',
+                                  display: 'flex', flexDirection: 'column', gap: '8px'
                                 }}>
+                                  {/* Header: Gelber Marken-Badge (Desktop Parität) & Clean Action Targets */}
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                                       <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: '#facc15',
-                                        border: 'none',
-                                        color: '#0f172a',
-                                        fontSize: '0.70rem',
-                                        fontWeight: 850,
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.03em',
-                                        padding: '2px 8px',
-                                        borderRadius: '100px',
-                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.3)',
+                                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                        background: '#facc15', color: '#0f172a',
+                                        fontSize: '0.70rem', fontWeight: 850,
+                                        textTransform: 'uppercase', letterSpacing: '0.03em',
+                                        padding: '2px 8px', borderRadius: '100px',
+                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.35)',
                                         flexShrink: 0
                                       }}>
-                                        <HelpCircle size={12} color="currentColor" strokeWidth={2.5} />
-                                        Frage
+                                        <HelpCircle size={12} color="#0f172a" strokeWidth={2.5} />
+                                        <span>Frage</span>
                                       </span>
-                                      <span style={{
-                                        fontSize: '0.90rem',
-                                        fontWeight: 700,
-                                        color: '#0f172a',
-                                        lineHeight: 1.35,
-                                        wordBreak: 'break-word'
-                                      }}>
-                                        „{effectiveViewingQuestion.text}“
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#854d0e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        an {effectiveTeacherFullName}
                                       </span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                       <button
-                                        type="button"
-                                        role="button"
-                                        tabIndex={0}
+                                        type="button" role="button" tabIndex={0}
                                         onClick={() => handleSpeakText(effectiveViewingQuestion.text, 'student_q')}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            handleSpeakText(effectiveViewingQuestion.text, 'student_q');
-                                          }
-                                        }}
-                                        title="Frage vorlesen"
-                                        aria-label="Frage vorlesen"
-                                        style={{
-                                          border: '1px solid rgba(250, 204, 21, 0.6)',
-                                          background: '#ffffff',
-                                          color: '#0f172a',
-                                          borderRadius: '8px',
-                                          width: isMobileView ? '32px' : '28px',
-                                          height: isMobileView ? '32px' : '28px',
-                                          padding: 0,
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          transition: 'all 0.15s ease',
-                                          touchAction: 'manipulation'
-                                        }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSpeakText(effectiveViewingQuestion.text, 'student_q'); } }}
+                                        title="Frage vorlesen" aria-label="Frage vorlesen"
+                                        style={{ border: '1px solid rgba(250, 204, 21, 0.6)', background: '#ffffff', color: '#0f172a', borderRadius: '8px', width: '32px', height: '32px', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease', touchAction: 'manipulation' }}
                                         className="hover-scale-mini"
                                       >
-                                        <Volume2 size={14} color="currentColor" />
+                                        <Volume2 size={14} color="#0f172a" />
                                       </button>
                                       <button
-                                        type="button"
-                                        role="button"
-                                        tabIndex={0}
+                                        type="button" role="button" tabIndex={0}
                                         onClick={() => {
                                           let textToUse = effectiveViewingQuestion.text;
                                           if (student?.id) {
@@ -11006,96 +10974,33 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             setIsQuestionEditorOpen(true);
                                           }
                                         }}
-                                        title="Frage bearbeiten"
-                                        aria-label="Frage bearbeiten"
-                                        style={{
-                                          border: '1px solid rgba(250, 204, 21, 0.6)',
-                                          background: '#ffffff',
-                                          color: '#0f172a',
-                                          borderRadius: '8px',
-                                          width: isMobileView ? '32px' : '28px',
-                                          height: isMobileView ? '32px' : '28px',
-                                          padding: 0,
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          transition: 'all 0.15s ease',
-                                          touchAction: 'manipulation'
-                                        }}
+                                        title="Frage bearbeiten" aria-label="Frage bearbeiten"
+                                        style={{ border: '1px solid rgba(250, 204, 21, 0.6)', background: '#ffffff', color: '#0f172a', borderRadius: '8px', width: '32px', height: '32px', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease', touchAction: 'manipulation' }}
                                         className="hover-scale-mini"
                                       >
-                                        <Edit3 size={14} color="currentColor" />
+                                        <Edit3 size={14} color="#0f172a" />
                                       </button>
 
                                       {/* 🛡️ Fail-Safe 2-Schritt Lösch-Schutz */}
                                       {isConfirmingResolveQuestion ? (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                           <button
-                                            type="button"
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={async () => {
-                                              setIsConfirmingResolveQuestion(false);
-                                              await handleResolveStudentQuestion();
-                                            }}
-                                            onKeyDown={async (e) => {
-                                              if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                setIsConfirmingResolveQuestion(false);
-                                                await handleResolveStudentQuestion();
-                                              }
-                                            }}
-                                            title="Löschen bestätigen"
-                                            aria-label="Löschen bestätigen"
-                                            style={{
-                                              border: 'none',
-                                              background: '#dc2626',
-                                              color: '#ffffff',
-                                              borderRadius: '8px',
-                                              height: isMobileView ? '32px' : '28px',
-                                              padding: '0 8px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              fontSize: '0.72rem',
-                                              fontWeight: 800,
-                                              boxShadow: '0 1px 4px rgba(220, 38, 38, 0.3)',
-                                              touchAction: 'manipulation'
-                                            }}
+                                            type="button" role="button" tabIndex={0}
+                                            onClick={async () => { setIsConfirmingResolveQuestion(false); await handleResolveStudentQuestion(); }}
+                                            onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsConfirmingResolveQuestion(false); await handleResolveStudentQuestion(); } }}
+                                            title="Löschen bestätigen" aria-label="Löschen bestätigen"
+                                            style={{ border: 'none', background: '#dc2626', color: '#ffffff', borderRadius: '8px', height: '32px', padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, boxShadow: '0 1px 4px rgba(220, 38, 38, 0.3)', touchAction: 'manipulation' }}
                                             className="hover-scale-mini"
                                           >
                                             <Check size={12} strokeWidth={3} />
                                             <span>Löschen?</span>
                                           </button>
                                           <button
-                                            type="button"
-                                            role="button"
-                                            tabIndex={0}
+                                            type="button" role="button" tabIndex={0}
                                             onClick={() => setIsConfirmingResolveQuestion(false)}
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                setIsConfirmingResolveQuestion(false);
-                                              }
-                                            }}
-                                            title="Abbrechen"
-                                            aria-label="Abbrechen"
-                                            style={{
-                                              border: '1px solid #cbd5e1',
-                                              background: '#ffffff',
-                                              color: '#64748b',
-                                              borderRadius: '8px',
-                                              width: isMobileView ? '32px' : '28px',
-                                              height: isMobileView ? '32px' : '28px',
-                                              padding: 0,
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              touchAction: 'manipulation'
-                                            }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsConfirmingResolveQuestion(false); } }}
+                                            title="Abbrechen" aria-label="Abbrechen"
+                                            style={{ border: '1px solid #cbd5e1', background: '#ffffff', color: '#64748b', borderRadius: '8px', width: '32px', height: '32px', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
                                             className="hover-scale-mini"
                                           >
                                             <X size={13} strokeWidth={2.4} />
@@ -11103,33 +11008,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         </div>
                                       ) : (
                                         <button
-                                          type="button"
-                                          role="button"
-                                          tabIndex={0}
+                                          type="button" role="button" tabIndex={0}
                                           onClick={() => setIsConfirmingResolveQuestion(true)}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                              e.preventDefault();
-                                              setIsConfirmingResolveQuestion(true);
-                                            }
-                                          }}
-                                          title="Frage löschen oder als erledigt markieren"
-                                          aria-label="Frage löschen oder als erledigt markieren"
-                                          style={{
-                                            border: '1px solid rgba(254, 202, 202, 0.8)',
-                                            background: 'rgba(254, 226, 226, 0.7)',
-                                            color: '#dc2626',
-                                            borderRadius: '8px',
-                                            width: isMobileView ? '32px' : '28px',
-                                            height: isMobileView ? '32px' : '28px',
-                                            padding: 0,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            transition: 'all 0.15s ease',
-                                            touchAction: 'manipulation'
-                                          }}
+                                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsConfirmingResolveQuestion(true); } }}
+                                          title="Frage löschen oder als erledigt markieren" aria-label="Frage löschen oder als erledigt markieren"
+                                          style={{ border: '1px solid rgba(254, 202, 202, 0.8)', background: 'rgba(254, 226, 226, 0.7)', color: '#dc2626', borderRadius: '8px', width: '32px', height: '32px', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease', touchAction: 'manipulation' }}
                                           className="hover-scale-mini"
                                         >
                                           <Trash2 size={14} />
@@ -11137,19 +11020,55 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       )}
                                     </div>
                                   </div>
-                                  <div style={{
-                                    fontSize: '0.74rem',
-                                    fontWeight: 650,
-                                    color: '#854d0e',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    paddingLeft: '2px'
-                                  }}>
+
+                                  {/* Question Body: Full width, clean typography, NO double quotes */}
+                                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.45, wordBreak: 'break-word', padding: '2px 0' }}>
+                                    {effectiveViewingQuestion.text}
+                                  </div>
+
+                                  {/* Footer: Dezent & beruhigend im warmen Gelb-Farbton */}
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 650, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '5px', paddingTop: '6px', borderTop: '1px solid rgba(250, 204, 21, 0.3)' }}>
                                     <Sparkles size={11} color="#ca8a04" />
-                                    <span>Für {effectiveTeacherFullName} zur nächsten Stunde vorgemerkt</span>
+                                    <span>Für deine nächste Stunde vorgemerkt</span>
                                   </div>
                                 </div>
+                              )}
+
+                              {/* 💬 Empty-State Prompt Chip auf Mobile (wenn noch keine Frage existiert) */}
+                              {readOnly && !isQuestionEditorOpen && !effectiveViewingQuestion?.hasQuestion && isMobileView && (
+                                <button
+                                  type="button" role="button" tabIndex={0}
+                                  onClick={() => {
+                                    let textToUse = '';
+                                    if (student?.id) {
+                                      try {
+                                        const draft = localStorage.getItem(`campus_student_question_draft_${student.id}`);
+                                        if (draft) textToUse = draft;
+                                      } catch {}
+                                    }
+                                    setQuestionDraftText(textToUse);
+                                    setIsQuestionEditorOpen(true);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      let textToUse = '';
+                                      if (student?.id) {
+                                        try {
+                                          const draft = localStorage.getItem(`campus_student_question_draft_${student.id}`);
+                                          if (draft) textToUse = draft;
+                                        } catch {}
+                                      }
+                                      setQuestionDraftText(textToUse);
+                                      setIsQuestionEditorOpen(true);
+                                    }
+                                  }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 13px', background: '#fffdf0', border: '1px dashed #fde047', borderRadius: '12px', color: '#854d0e', fontSize: '0.78rem', fontWeight: 750, cursor: 'pointer', width: '100%', boxSizing: 'border-box', textAlign: 'left', boxShadow: '0 1px 3px rgba(250, 204, 21, 0.08)', transition: 'all 0.15s ease' }}
+                                  className="hover-scale-mini"
+                                >
+                                  <HelpCircle size={14} color="#ca8a04" style={{ flexShrink: 0 }} />
+                                  <span>Frage an {effectiveTeacherFullName} für die nächste Stunde notieren...</span>
+                                </button>
                               )}
 
                               {/* 🍎 LEHRKRAFT-BANNER: Prominenter Schülerfrage-Hinweis */}

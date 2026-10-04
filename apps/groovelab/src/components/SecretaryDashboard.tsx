@@ -29,6 +29,7 @@ import { useSecretaryTeacherProfiles } from './secretary/hooks/useSecretaryTeach
 
 // Modular UI Components, Navigation Hubs & Styles
 import { SecretarySidebar } from './secretary/SecretarySidebar';
+import { useSidebarCollapse } from '../hooks/useSidebarCollapse';
 import { SecretaryHeader } from './secretary/SecretaryHeader';
 import { SecretaryModalsMasterHub } from './secretary/SecretaryModalsMasterHub';
 import { SecretaryDashboardStyles } from './secretary/SecretaryDashboardStyles';
@@ -153,7 +154,10 @@ export function SecretaryDashboard({
     windowWidth, getTabTitle, handleSecretaryLogout
   } = navigation;
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const {
+    isCollapsed: isSidebarCollapsed,
+    toggleCollapsed: toggleSidebarCollapse
+  } = useSidebarCollapse(windowWidth);
 
   const { getEffectiveStorageUsedBytes } = useSecretaryStorageQuota({
     currentSchoolProfile,
@@ -673,7 +677,7 @@ export function SecretaryDashboard({
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+        onToggleCollapse={toggleSidebarCollapse}
         secretarySubTab={secretarySubTab}
         setSecretarySubTab={setSecretarySubTab}
         campusSubTab={campusSubTab}

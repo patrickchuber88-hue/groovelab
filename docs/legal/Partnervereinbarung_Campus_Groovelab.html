@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Strategische Kooperations- & Beiratsvereinbarung – Campus-Groovelab</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 14mm 18mm 14mm 18mm;
+      @bottom-right {
+        content: "Seite " counter(page) " von " counter(pages);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 7.5pt;
+        color: #64748b;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 8.6pt;
+      line-height: 1.37;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .doc-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .brand-title {
+      font-size: 12.5pt;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 7.5pt;
+      color: #64748b;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .doc-badge {
+      font-size: 7.2pt;
+      font-weight: 700;
+      color: #0f172a;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h1 {
+      font-size: 11.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 9px 0;
+      letter-spacing: -0.01em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .parties-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 9px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      font-size: 8.4pt;
+    }
+
+    .party-col strong {
+      display: block;
+      color: #0f172a;
+      margin-bottom: 2px;
+      font-size: 8.4pt;
+    }
+
+    .preamble {
+      font-style: italic;
+      color: #334155;
+      margin-bottom: 9px;
+      font-size: 8.2pt;
+      line-height: 1.34;
+      text-align: justify;
+    }
+
+    .section {
+      margin-bottom: 8px;
+      page-break-inside: avoid;
+    }
+
+    .section-title {
+      font-size: 8.9pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1px;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      margin: 0 0 4px 0;
+      text-align: justify;
+    }
+
+    ol, ul {
+      margin: 0 0 4px 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin-bottom: 2px;
+      text-align: justify;
+    }
+
+    .table-container {
+      margin: 6px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5pt;
+      margin-bottom: 4px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .signatures-container {
+      margin-top: 18px;
+      page-break-inside: avoid;
+    }
+
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 15px;
+    }
+
+    .sig-block {
+      border-top: 1px solid #0f172a;
+      padding-top: 5px;
+    }
+
+    .sig-name {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 9pt;
+    }
+
+    .sig-role {
+      font-size: 7.8pt;
+      color: #64748b;
+    }
+
+    .sig-meta {
+      font-size: 8.2pt;
+      color: #475569;
+      margin-bottom: 28px;
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      font-size: 7pt;
+      color: #94a3b8;
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="doc-header">
+    <div>
+      <div class="brand-title">Campus-Groovelab</div>
+      <div class="brand-subtitle">Strategische Partnerschaft & Beirats-Governance</div>
+    </div>
+    <div class="doc-badge">Partnervereinbarung</div>
+  </div>
+
+  <h1>Strategische Kooperations-, Beirats- & Vermittlungsvereinbarung</h1>
+
+  <div class="parties-box">
+    <div class="party-col">
+      <strong>Projektinhaber & Plattformbetreiber:</strong>
+      Herr Patrick Huber<br>
+      Karl-Fürstenberg Str. 59<br>
+      79618 Rheinfelden<br>
+      E-Mail: patrick.huber@campus-groovelab.de
+    </div>
+    <div class="party-col">
+      <strong>Didaktischer Fachbeirat & Partner:</strong>
+      Herr Manuel Wagner<br>
+      Straße: ___________________________<br>
+      79774 Albbruck-Buch<br>
+      E-Mail: ___________________________
+    </div>
+  </div>
+
+  <div class="preamble">
+    <strong>Präambel:</strong> Der Projektinhaber entwickelt und betreibt die innovative Softwareplattform „Campus-Groovelab“. Der Partner verfügt über herausragende musikpädagogische Fachkenntnisse sowie langjährige Leitungserfahrung im öffentlichen Musikschulwesen. Die Parteien vereinbaren auf Basis des Factsheets „Campus-Groovelab“ eine langfristige strategische Zusammenarbeit, um die didaktische Exzellenz der Software sicherzustellen und den Markteintritt in Musikschulen bundesweit zu beschleunigen.
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 1 Rechtsnatur der Zusammenarbeit & Status</div>
+    <p>(1) Der Partner wird für den Projektinhaber als freier strategischer Berater, didaktischer Fachbeirat und selbstständiger Vermittler tätig. Ein Arbeits- oder Anstellungsverhältnis wird nicht begründet.</p>
+    <p>(2) Zwischen den Parteien wird keine Gesellschaft bürgerlichen Rechts (GbR) begründet (§ 705 BGB). Der Partner bestimmt Ort und Zeit seiner Tätigkeit eigenverantwortlich, vorbehaltlich der gemeinsamen Abstimmungen gem. § 3.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 2 Reallabor: Musikschule Bad Säckingen (Dauerhafte 0-Euro-Garantie)</div>
+    <p>(1) Die Musikschule Bad Säckingen erhält dauerhaften und unentgeltlichen Vollzugriff auf alle Module von „Campus-Groovelab“ als offizielles Referenz- und Reallabor (dauerhaft 0,00 EUR).</p>
+    <p>(2) Soweit der Projektinhaber zur Refinanzierung Bildungsförderer, Stiftungen oder Sponsoren akquiriert, entstehen Zahlungs- und Leistungsbeziehungen ausschließlich im Verhältnis zwischen dem Projektinhaber und den Förderern. Der Projektinhaber stellt die Musikschule von jeglichen Zahlungsansprüchen im Innen- und Außenverhältnis vollumfänglich frei.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 3 Rolle als Didaktischer Fachbeirat & Zeitaufwand</div>
+    <p>(1) <strong>Aufgaben:</strong> Der Partner berät den Projektinhaber praxisnah bei der didaktischen Konzeption, der Optimierung von Schulleitungs-Workflows und der Ausrichtung der Software an den Bedarfen kommunaler Musikschulen.</p>
+    <p>(2) <strong>Monatlicher Jour-Fixe:</strong> Die Parteien führen einmal monatlich einen gemeinsamen Arbeits- und Feedbacktermin (persönlich oder via Videokonferenz) von in der Regel ca. 90 Minuten Dauer durch.</p>
+    <p>(3) <strong>All-inclusive-Vergütung:</strong> Der zeitliche und inhaltliche Aufwand des Partners für Beratung und Feedback ist mit den laufenden Beteiligungen nach § 4 vollständig abgegolten. Es erfolgt keine Zeiterfassung und keine Abrechnung nach Stundensätzen.</p>
+    <p>(4) <strong>Koppelung an aktive Mitwirkung:</strong> Die Auszahlung honoriert die fortlaufende aktive Begleitung. Nimmt der Partner am monatlichen Jour-Fixe aus Gründen, die er selbst zu vertreten hat, unentschuldigt nicht teil, entfällt der Auszahlungsanspruch für den jeweiligen Abrechnungsmonat ersatzlos.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 4 Umsatzbeteiligung, Erfolgsleiter & Proportionaler Einsatz</div>
+    <p>(1) <strong>Berechnungsbasis (Variante B – Bereinigter Deckungsbeitrag):</strong> Bemessungsgrundlage der Beteiligung ist der monatlich tatsächlich bankmäßig vereinnahmte bereinigte Netto-Monatsumsatz aller vertraglich gebundenen Schulen. Dieser berechnet sich aus den Netto-Gesamterlösen aller Schulen (Rechnungsbeträge abzüglich gesetzlicher Umsatzsteuer und Zahlungsdienstleister-Gebühren; Einnahmen durch Bildungsförderer / Sponsoren für Schulen zählen voll hinzu) <strong>abzüglich einer festen monatlichen Grundbetriebskosten-Pauschale in Höhe von 169,00 EUR</strong> (zur Deckung der drei existentiellen Infrastruktur-Säulen: Server-Hosting, Google Gemini KI-Didaktik-APIs und IT-Haftpflichtpolice). Sämtliche weiteren Entwicklungs-, Hard-, Software-, Marken- und Rechtsberatungskosten trägt der Projektinhaber zu 100 % allein.</p>
+    <p>(2) <strong>Basis-Beteiligung (ab Tag 1):</strong> Der Partner erhält ab dem ersten Abrechnungsmonat eine laufende Beteiligung in Höhe von <strong>20 % dieses bereinigten Netto-Monatsumsatzes aller vertraglich gebundenen Schulen</strong> – unabhängig davon, wer den Erstkontakt hergestellt hat.</p>
+    <p>(3) <strong>Erfolgsleiter durch eigene Akquise:</strong> Gewinnt der Partner aktiv weitere Schulen, erhöht sich seine Beteiligung an den monatlichen Netto-Gesamteinnahmen aller vertraglich gebundenen Schulen wie folgt:</p>
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Eigene vermittelte Schulen</th>
+            <th>Beteiligung an allen Schulen</th>
+            <th>Operativer Rahmen (jeweils zusätzlich zum 90-Min.-Jour-Fixe)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Basis (0 – 9 Schulen)</td>
+            <td><strong>20 %</strong></td>
+            <td>Fachbeirat (monatlicher Jour-Fixe ca. 90 Min.)</td>
+          </tr>
+          <tr>
+            <td>Ab 10 Schulen</td>
+            <td><strong>25 %</strong></td>
+            <td>Jour-Fixe <strong>+ zusätzlicher</strong> operativer Einsatz (nach flexibler Absprache)</td>
+          </tr>
+          <tr>
+            <td>Ab 25 Schulen</td>
+            <td><strong>30 %</strong></td>
+            <td>Jour-Fixe <strong>+ erweiterter</strong> operativer Einsatz (nach flexibler Absprache)</td>
+          </tr>
+          <tr>
+            <td>Ab 50 Schulen</td>
+            <td><strong>40 %</strong></td>
+            <td>Jour-Fixe <strong>+ vertiefter</strong> operativer Einsatz (nach flexibler Absprache)</td>
+          </tr>
+          <tr>
+            <td>Ab 100 Schulen</td>
+            <td><strong>49 %</strong></td>
+            <td>Jour-Fixe <strong>+ umfassender</strong> operativer Einsatz (nach flexibler Absprache)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>(4) Eine Schule gilt als „eigene Schule“, wenn der Erstkontakt und der Vertragsschluss nachweislich durch die persönliche Vermittlung des Partners zustande gekommen sind.</p>
+    <p>(5) <strong>Wachsende operative Rolle & zusätzlicher Zeiteinsatz:</strong> Die Parteien stellen klar, dass der monatliche Jour-Fixe von ca. 90 Minuten (§ 3) das dauerhafte Grundfundament der Zusammenarbeit bildet. Mit dem Erreichen jeder höheren Beteiligungsstufe der Erfolgsleiter (ab 25 %, 30 %, 40 % bzw. 49 %) wächst die operative Rolle des Partners sowie sein zeitlicher Stundeneinsatz <strong>jeweils zusätzlich und angemessen zum monatlichen 90-Minuten-Jour-Fixe</strong> hinzu. Welche konkreten inhaltlichen Aufgaben und Schwerpunkte dies in der Praxis umfasst, wird sich dynamisch aus der Live-Praxis und dem realen Projektverlauf ergeben und von den Parteien bei Erreichen der jeweiligen Staffelstufe einvernehmlich und flexibel nach den zeitlichen Möglichkeiten des Partners abgestimmt; die Inanspruchnahme der jeweils höheren Beteiligungsstufe setzt die Bereitschaft zur Übernahme dieses entsprechend erweiterten Engagements voraus.</p>
+    <p>(6) <strong>Abrechnung:</strong> Die Abrechnung erfolgt monatlich nachträglich bis zum 15. Werktag des Folgemonats. Zahlungen sind binnen 14 Tagen nach Abrechnung fällig.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 5 Systemarchitektur & Code-Eigentum</div>
+    <p>Die alleinige Systemarchitektur, der Source Code, Datenbanksysteme, Hosting-Strukturen und Entwicklungsentscheidungen verbleiben zu 100 % im ausschließlichen Eigentum und in der alleinigen Entscheidungshoheit des Projektinhabers. Der Partner erwirbt hieran keinerlei Rechte.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 6 Status, Steuern & Dienstrechtliche Compliance</div>
+    <p>(1) Der Partner versteuert seine Einnahmen aus dieser Vereinbarung eigenverantwortlich im Rahmen seiner steuerlichen Veranlagung.</p>
+    <p>(2) Der Partner versichert, dass seine Tätigkeit mit seinen etwaigen hauptberuflichen Dienstpflichten im Einklang steht, er etwaig erforderliche Nebentätigkeitsanzeigen bzw. -genehmigungen eigenverantwortlich einholt und dass keine Interessenkollisionen mit seinem Hauptamt bestehen.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 7 Laufzeit, Kündigung & Provisions-Nachlauf</div>
+    <p>(1) Diese Vereinbarung wird auf unbestimmte Zeit geschlossen. Sie ist von beiden Parteien mit einer Frist von 2 Monaten zum Monatsende ordentlich kündbar. Das Recht zur außerordentlichen Kündigung aus wichtigem Grund (§ 626 BGB) bleibt unberührt.</p>
+    <p>(2) <strong>Provisions-Nachlauf bei Kündigung:</strong> Mit Wirksamwerden der Beendigung endet die Basis-Beteiligung (20 %) für allgemeine Schulen sofort. Für Schulen, die der Partner nachweislich selbst vermittelt hat (§ 4 Abs. 3 und 4), erhält der Partner seine vereinbarte Beteiligung für einen Übergangszeitraum von 12 Kalendermonaten ab Vertragsende fortgezahlt, solange diese Schulen zahlende Kunden bleiben.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 8 Ausblick: Gesellschaftsrechtliche Beteiligung</div>
+    <p>Bei Erreichen von mindestens 50 stabil vertraglich gebundenen Schulen („stabile Marktpräsenz“) beabsichtigen die Parteien, die Kooperation einvernehmlich in eine feste gesellschaftsrechtliche Beteiligung an einer Kapitalgesellschaft (UG/GmbH) zu überführen. Dieser Ausblick begründet noch keinen klagbaren Rechtsanspruch auf Anteile; die Ausgestaltung bleibt einem gesonderten notariellen Vertrag vorbehalten.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">§ 9 Schlussbestimmungen</div>
+    <p>(1) Änderungen und Ergänzungen bedürfen der Textform (z. B. E-Mail). Es gilt das Recht der Bundesrepublik Deutschland.</p>
+    <p>(2) Gerichtsstand für alle Streitigkeiten ist der Sitz des Projektinhabers.</p>
+  </div>
+
+  <div class="signatures-container">
+    <div class="sig-meta">
+      Ort, Datum: ____________________________________
+    </div>
+    <div class="signatures-grid">
+      <div class="sig-block">
+        <div class="sig-name">Patrick Huber</div>
+        <div class="sig-role">Projektinhaber & Plattformbetreiber</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-name">Manuel Wagner</div>
+        <div class="sig-role">Didaktischer Fachbeirat & Partner</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Campus-Groovelab · Strategische Partnerschaft & Beiratsvereinbarung · Ausfertigung für die Vertragsparteien
+  </div>
+
+</body>
+</html>

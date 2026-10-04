@@ -443,7 +443,6 @@ export function useStudentProfile({
       const sanitize = (val?: string) => (val || '').trim();
       const cleanFirstName = sanitize(editingProfile.first_name);
       const cleanNickname = sanitize(editingProfile.nickname);
-      const cleanPhone = sanitize(editingProfile.phone);
       const cleanInstrument = sanitize(editingProfile.instrument);
       const photoUrl = editingProfile.photo_url || null;
 
@@ -452,7 +451,6 @@ export function useStudentProfile({
         .update({
           first_name: cleanFirstName,
           nickname: cleanNickname,
-          phone: cleanPhone,
           instrument: cleanInstrument,
           photo_url: photoUrl,
           avatar_url: photoUrl
@@ -465,7 +463,6 @@ export function useStudentProfile({
         ...editingProfile,
         first_name: cleanFirstName,
         nickname: cleanNickname,
-        phone: cleanPhone,
         instrument: cleanInstrument,
         photo_url: photoUrl,
         avatar_url: photoUrl

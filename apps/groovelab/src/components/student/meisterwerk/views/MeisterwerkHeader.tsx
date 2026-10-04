@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowLeft, Info, Search, Send } from 'lucide-react';
 import { Student } from '../../meisterwerk.types';
 
@@ -101,6 +101,201 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
   const desktopBackLabel = (activeSubView === 'lehrwerk' || activeSubView === 'song')
     ? 'Zurück zum Aufgabenheft'
     : 'Zurück zu den Modulen';
+
+  const isSubViewActive =
+    activeViewMode !== 'document' ||
+    activeModalTab !== 'document' ||
+    activeSubView !== 'hub' ||
+    hubTab === 'protocol';
+  const isStickerAlbum = activeModalTab === 'stickeralbum';
+
+  // 🏛️ Sub-View State Broadcast & Universal Back Event Listener (0,1% Goldstandard)
+  useEffect(() => {
+    if (isMobileOrSim) {
+      window.dispatchEvent(
+        new CustomEvent('campus_subview_nav_state', {
+          detail: {
+            isActive: isSubViewActive,
+            label: desktopBackLabel,
+            isStickerAlbum
+          }
+        })
+      );
+    }
+    return () => {
+      if (isMobileOrSim) {
+        window.dispatchEvent(
+          new CustomEvent('campus_subview_nav_state', {
+            detail: {
+              isActive: false,
+              label: '',
+              isStickerAlbum: false
+            }
+          })
+        );
+      }
+    };
+  }, [isMobileOrSim, isSubViewActive, desktopBackLabel, isStickerAlbum]);
+
+  useEffect(() => {
+    const onTriggerBack = () => {
+      handleUniversalBack();
+    };
+    window.addEventListener('campus_trigger_universal_back', onTriggerBack);
+    return () => {
+      window.removeEventListener('campus_trigger_universal_back', onTriggerBack);
+    };
+  }, [onBackToHub, setActiveModalTab, setActiveViewMode, setActiveSubView, setHubTab]);
+
+  if (isMobileOrSim) {
+    return (
+      <>
+        {/* Compact utility strip on mobile only if recordings search or assign is active */}
+        {activeViewMode === 'recordings' && (
+          <div
+            style={{
+              padding: '6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '8px',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0'
+            }}
+          >
+            <div style={{ position: 'relative', width: '100%', maxWidth: '220px' }}>
+              <Search
+                size={13}
+                color="#64748b"
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)'
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Aufnahmen suchen..."
+                value={recordingSearchQuery}
+                onChange={(e) => setRecordingSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '5px 22px 5px 28px',
+                  borderRadius: '100px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              {recordingSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setRecordingSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: '#e2e8f0',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '14px',
+                    height: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    fontSize: '9px',
+                    padding: 0
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {onOpenAssignModal && (
+              <button
+                type="button"
+                onClick={onOpenAssignModal}
+                aria-label="Hausaufgabe an Schüler zuweisen"
+                style={{
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  borderRadius: '20px',
+                  padding: '5px 12px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  color: '#ffffff',
+                  fontWeight: 850,
+                  fontSize: '0.76rem',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)'
+                }}
+                className="hover-scale"
+                title="Hausaufgabe an Schüler zuweisen"
+              >
+                <Send size={12} />
+                <span>Zuweisen</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Teacher Demo Mode Banner on Mobile if active */}
+        {isTeacherMode && !isTeacherSandbox && !isTeacherTools && !isTeacherSelf && isCurrentModuleInactive && (
+          <div
+            style={{
+              background: 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)',
+              borderBottom: '1.5px solid #fde68a',
+              padding: '8px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.76rem',
+              fontWeight: 750,
+              color: '#92400e',
+              zIndex: 45,
+              flexShrink: 0
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Info size={14} color="#d97706" style={{ flexShrink: 0 }} />
+              <span>
+                <strong>Lehrer-Demo:</strong> In {uiLevel.toUpperCase()} regulär inaktiv.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleUniversalBack}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #fcd34d',
+                borderRadius: '8px',
+                padding: '3px 8px',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                color: '#b45309',
+                cursor: 'pointer'
+              }}
+            >
+              Übersicht
+            </button>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
