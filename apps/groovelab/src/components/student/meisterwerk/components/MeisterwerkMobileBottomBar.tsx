@@ -2,6 +2,7 @@ import React from 'react';
 import { BookOpen, LayoutGrid } from 'lucide-react';
 
 export interface MeisterwerkMobileBottomBarProps {
+  hubTab?: string;
   mobileProtokollTab: string;
   setMobileProtokollTab: (tab: any) => void;
   activeViewMode: string;
@@ -15,6 +16,7 @@ export interface MeisterwerkMobileBottomBarProps {
 }
 
 export const MeisterwerkMobileBottomBar: React.FC<MeisterwerkMobileBottomBarProps> = ({
+  hubTab,
   mobileProtokollTab,
   setMobileProtokollTab,
   activeViewMode,
@@ -26,11 +28,14 @@ export const MeisterwerkMobileBottomBar: React.FC<MeisterwerkMobileBottomBarProp
   setHubTab,
   isTeacherSelf = false
 }) => {
-  const isHausaufgabenActive =
-    mobileProtokollTab === 'homework' &&
-    (activeViewMode === 'document' || activeViewMode === 'recordings') &&
-    activeModalTab === 'document';
-  const isModulesActive = !isHausaufgabenActive;
+  const isModulesActive =
+    hubTab === 'modules' ||
+    mobileProtokollTab === 'repertoire' ||
+    activeViewMode === 'loopstation' ||
+    activeViewMode === 'tuner' ||
+    activeViewMode === 'earlab' ||
+    activeViewMode === 'worldtour';
+  const isHausaufgabenActive = !isModulesActive;
 
   const handleSelectHomework = () => {
     try {
@@ -65,29 +70,31 @@ export const MeisterwerkMobileBottomBar: React.FC<MeisterwerkMobileBottomBarProp
     <nav
       role="tablist"
       aria-label="Aufgabenheft Hauptnavigation"
+      className="meisterwerk-mobile-bottom-dock"
       style={{
         position: 'fixed',
         bottom: 0,
         left: 0,
         right: 0,
         width: '100%',
-        zIndex: 90,
-        height: 'calc(50px + max(24px, env(safe-area-inset-bottom, 24px)))',
-        paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+        zIndex: 900,
+        height: 'calc(52px + max(20px, env(safe-area-inset-bottom, 20px)))',
+        paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
         paddingTop: '6px',
         background: 'rgba(255, 255, 255, 0.94)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '0.5px solid rgba(0, 0, 0, 0.12)',
-        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)',
+        borderTop: '0.5px solid rgba(0, 0, 0, 0.10)',
+        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
         boxSizing: 'border-box',
         userSelect: 'none',
-        WebkitUserSelect: 'none'
+        WebkitUserSelect: 'none',
+        touchAction: 'manipulation',
+        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
       }}
-      className="meisterwerk-mobile-bottom-dock"
     >
       {/* Tab 1: Hausaufgaben */}
       <button
@@ -110,31 +117,45 @@ export const MeisterwerkMobileBottomBar: React.FC<MeisterwerkMobileBottomBarProp
           justifyContent: 'center',
           gap: '3px',
           height: '100%',
+          minHeight: '44px',
           border: 'none',
           borderRadius: 0,
           background: 'transparent',
           cursor: 'pointer',
-          padding: '4px 0',
-          transition: 'color 0.15s ease, opacity 0.15s ease',
+          padding: '2px 0',
+          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
           outline: 'none',
           WebkitTapHighlightColor: 'transparent',
-          position: 'relative'
+          boxSizing: 'border-box'
         }}
       >
-        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* ICON SQUIRCLE / PILL INDICATOR */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '24px',
+            borderRadius: '12px',
+            background: isHausaufgabenActive ? `${CAMPUS_GREEN}18` : 'transparent',
+            transition: 'all 0.2s ease'
+          }}
+        >
           <BookOpen
-            size={22}
-            strokeWidth={isHausaufgabenActive ? 2.5 : 1.8}
-            color={isHausaufgabenActive ? CAMPUS_GREEN : INACTIVE_COLOR}
+            size={18}
+            strokeWidth={isHausaufgabenActive ? 2.4 : 1.9}
+            color={isHausaufgabenActive ? CAMPUS_GREEN : '#94a3b8'}
           />
         </div>
         <span
           style={{
             fontSize: '0.68rem',
-            fontWeight: isHausaufgabenActive ? 800 : 550,
-            letterSpacing: '-0.01em',
-            color: isHausaufgabenActive ? CAMPUS_GREEN : INACTIVE_COLOR,
-            lineHeight: 1
+            fontWeight: isHausaufgabenActive ? 800 : 600,
+            letterSpacing: isHausaufgabenActive ? '-0.01em' : '0',
+            color: isHausaufgabenActive ? CAMPUS_GREEN : '#64748b',
+            lineHeight: 1,
+            transition: 'color 0.15s ease'
           }}
         >
           {isTeacherSelf ? 'Anleitung' : 'Hausaufgaben'}
@@ -162,31 +183,45 @@ export const MeisterwerkMobileBottomBar: React.FC<MeisterwerkMobileBottomBarProp
           justifyContent: 'center',
           gap: '3px',
           height: '100%',
+          minHeight: '44px',
           border: 'none',
           borderRadius: 0,
           background: 'transparent',
           cursor: 'pointer',
-          padding: '4px 0',
-          transition: 'color 0.15s ease, opacity 0.15s ease',
+          padding: '2px 0',
+          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
           outline: 'none',
           WebkitTapHighlightColor: 'transparent',
-          position: 'relative'
+          boxSizing: 'border-box'
         }}
       >
-        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* ICON SQUIRCLE / PILL INDICATOR */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '24px',
+            borderRadius: '12px',
+            background: isModulesActive ? `${CAMPUS_GREEN}18` : 'transparent',
+            transition: 'all 0.2s ease'
+          }}
+        >
           <LayoutGrid
-            size={22}
-            strokeWidth={isModulesActive ? 2.5 : 1.8}
-            color={isModulesActive ? CAMPUS_GREEN : INACTIVE_COLOR}
+            size={18}
+            strokeWidth={isModulesActive ? 2.4 : 1.9}
+            color={isModulesActive ? CAMPUS_GREEN : '#94a3b8'}
           />
         </div>
         <span
           style={{
             fontSize: '0.68rem',
-            fontWeight: isModulesActive ? 800 : 550,
-            letterSpacing: '-0.01em',
-            color: isModulesActive ? CAMPUS_GREEN : INACTIVE_COLOR,
-            lineHeight: 1
+            fontWeight: isModulesActive ? 800 : 600,
+            letterSpacing: isModulesActive ? '-0.01em' : '0',
+            color: isModulesActive ? CAMPUS_GREEN : '#64748b',
+            lineHeight: 1,
+            transition: 'color 0.15s ease'
           }}
         >
           {isTeacherSelf ? 'Studio-Module' : 'Module'}

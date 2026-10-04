@@ -312,6 +312,16 @@ export function useAuthSessionActions({
     localStorage.removeItem('gl_active_session_lease_id');
     sessionStorage.removeItem('gl_global_device_key');
     localStorage.removeItem('gl_global_device_key');
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('cg_sponsor_shown_')) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    } catch {}
 
     await scrubSharedDeviceCache();
     window.location.replace(getRedirectUrl());
@@ -337,6 +347,18 @@ export function useAuthSessionActions({
     // Prime sessionStorage immediately so customFetch interceptor injects user_id into x-client-info
     if (typeof window !== 'undefined' && userId) {
       sessionStorage.setItem('groovelab_user_id', userId);
+      // 🏛️ 0,1% Goldstandard: Reset des Bildungsförderer-Ingress Flags für die neue Anmeldesitzung
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && k.startsWith('cg_sponsor_shown_')) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => sessionStorage.removeItem(k));
+      } catch {}
+      window.dispatchEvent(new CustomEvent('campus_sponsor_refresh'));
     }
     setLoggedInUserIdRaw(userId);
 

@@ -57,17 +57,17 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --touch-target-min: 48px;
-  --bottom-nav-height: 0px;
+  --bottom-nav-height: calc(52px + max(20px, env(safe-area-inset-bottom, 20px)));
   --mobile-header-height: calc(48px + env(safe-area-inset-top, 0px));
 
   /* Canonical Mobile Architecture Tokens (<= 768px) */
   --mobile-breakpoint: 768px;
   --mobile-vh: 100dvh;
   --mobile-header-h: calc(48px + env(safe-area-inset-top, 0px));
-  --mobile-bottom-nav-bar-h: 0px;
-  --mobile-bottom-nav-h: 0px;
+  --mobile-bottom-nav-bar-h: calc(52px + max(20px, env(safe-area-inset-bottom, 20px)));
+  --mobile-bottom-nav-h: calc(52px + max(20px, env(safe-area-inset-bottom, 20px)));
   --mini-player-h: 0px;
-  --mobile-scroll-clearance-bottom: calc(env(safe-area-inset-bottom, 12px) + 8px);
+  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-h) + 16px);
   --mobile-scroll-clearance-top: var(--mobile-header-h);
   --mobile-sheet-radius: 28px;
 
@@ -185,6 +185,25 @@
   }
   *::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover, rgba(100, 116, 139, 0.7));
+  }
+
+  /* 🏛️ 0,1% Goldstandard Mobile & PWA Scrollbar Suppression */
+  .no-scrollbar,
+  .sim-viewport-pwa,
+  .sim-viewport-pwa *,
+  .pwa-standalone-mode,
+  .pwa-standalone-mode * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .no-scrollbar::-webkit-scrollbar,
+  .sim-viewport-pwa::-webkit-scrollbar,
+  .sim-viewport-pwa *::-webkit-scrollbar,
+  .pwa-standalone-mode::-webkit-scrollbar,
+  .pwa-standalone-mode *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   /* WCAG 2.2 AA / BFSG 2025 Goldstandard Focus Ring */
@@ -1822,7 +1841,8 @@ select option {
 
 /* Hide Mobile Bottom Nav on Desktop by default */
 .cg-mobile-bottom-nav,
-.meisterwerk-mobile-bottom-dock {
+.meisterwerk-mobile-bottom-dock,
+.campus-events-mobile-bottom-dock {
   display: none !important;
 }
 
@@ -1843,11 +1863,18 @@ select option {
     display: flex !important;
   }
 
+  /* 🏛️ 0,1% Goldstandard: Generic Mobile Bottom Nav is permanently disabled across all platforms */
   .cg-mobile-bottom-nav {
     display: none !important;
   }
 
-  .meisterwerk-mobile-bottom-dock {
+  .cg-mobile-bottom-nav::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .meisterwerk-mobile-bottom-dock,
+  .campus-events-mobile-bottom-dock,
+  .student-briefing-mobile-bottom-dock {
     display: flex !important;
   }
 
@@ -1855,7 +1882,7 @@ select option {
     margin-left: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
-    padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
+    padding-bottom: 0 !important;
   }
 }
 
@@ -1875,9 +1902,15 @@ select option {
     padding-bottom: 0 !important;
   }
 
-  /* Single Source of Scroll: Exclusively #main-content receives the bottom clearance */
+  /* Single Source of Scroll: Standard Boards (Übe-Pfad, Library, Settings) receive clean native safe-area clearance */
   #main-content,
   .main-content {
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+  }
+
+  /* Specialized Sub-Docks Exception: Events, Homework, and Briefing receive full dock clearance */
+  .main-wrapper.has-mobile-sub-dock #main-content,
+  .main-wrapper.has-mobile-sub-dock .main-content {
     padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
   }
 
@@ -1913,10 +1946,6 @@ select option {
   select,
   textarea {
     font-size: 16px !important;
-  }
-
-  .cg-mobile-bottom-nav {
-    display: none !important;
   }
 }
 
@@ -1980,7 +2009,13 @@ select option {
 
 .sim-viewport-mobile .meisterwerk-mobile-bottom-dock,
 .sim-viewport-portrait .meisterwerk-mobile-bottom-dock,
-[class*="sim-viewport-"]:not(.sim-viewport-landscape) .meisterwerk-mobile-bottom-dock {
+[class*="sim-viewport-"]:not(.sim-viewport-landscape) .meisterwerk-mobile-bottom-dock,
+.sim-viewport-mobile .campus-events-mobile-bottom-dock,
+.sim-viewport-portrait .campus-events-mobile-bottom-dock,
+[class*="sim-viewport-"]:not(.sim-viewport-landscape) .campus-events-mobile-bottom-dock,
+.sim-viewport-mobile .student-briefing-mobile-bottom-dock,
+.sim-viewport-portrait .student-briefing-mobile-bottom-dock,
+[class*="sim-viewport-"]:not(.sim-viewport-landscape) .student-briefing-mobile-bottom-dock {
   display: flex !important;
   position: absolute !important;
   bottom: 0 !important;
@@ -1991,6 +2026,7 @@ select option {
   padding-bottom: 24px !important;
   padding-top: 6px !important;
   box-sizing: border-box !important;
+  z-index: 900 !important;
 }
 
 /* Simulator Gemini Fullscreen Drawer Parity */
@@ -2483,9 +2519,29 @@ a:focus-visible,
     z-index: 950;
   }
 
-  /* Mobile Fixed Bottom Navbar (Removed in Gemini Mobile Architecture) */
+  /* Mobile Fixed Bottom Navbar */
   .cg-mobile-bottom-nav {
-    display: none !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: calc(52px + max(20px, env(safe-area-inset-bottom, 20px))) !important;
+    padding-top: 6px !important;
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-top: 0.5px solid rgba(0, 0, 0, 0.10) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-around !important;
+    z-index: 900 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04) !important;
+    box-sizing: border-box !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
   }
 
   .cg-bottom-nav-item {
@@ -3059,11 +3115,22 @@ input[type="range"]::-moz-range-thumb {
     /* 4. Scroll Containment (Prevents Page Rubberband Bouncing) */
     .mobile-scroll-view,
     .mobile-sheet-content,
-    .mobile-scroll-container {
+    .mobile-scroll-container,
+    .fluid-board-scroll-container {
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
       touch-action: pan-y;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+    }
+    .mobile-scroll-view::-webkit-scrollbar,
+    .mobile-sheet-content::-webkit-scrollbar,
+    .mobile-scroll-container::-webkit-scrollbar,
+    .fluid-board-scroll-container::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
     }
 
     /* 5. Mobile Fixed Bottom Navigation (Deinstalled in Gemini Mobile Architecture) */

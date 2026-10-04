@@ -108,7 +108,7 @@ const ENGLISH_TO_GERMAN_PHONETICS: [RegExp, string][] = [
   [/\bUnder the Bridge\b/gi, 'Ander se Bridsch'],
   [/\bIn the End\b/gi, 'In si Änd'],
   [/\bNumb\b/gi, 'Namm'],
-  [/\bLinkin Park\b/gi, 'Linkin Pahrk'],
+  [/\bLink[ei]n[ -]?Park\b/gi, 'Linkin Pahrk'],
   [/\bOver Each Other\b/gi, 'Ohwer Ietsch Asser'],
   [/\bBoulevard of Broken Dreams\b/gi, 'Bulewahrd of Brouken Driems'],
   [/\bWake Me Up\b/gi, 'Wäjk mie ap'],
@@ -170,6 +170,8 @@ const ENGLISH_TO_GERMAN_PHONETICS: [RegExp, string][] = [
   [/\bHeavy Metal\b/gi, 'Häwwi Mettl'],
   [/\bBlues\b/gi, 'Bluuhs'],
   [/\bFunk\b|\bFunky\b/gi, 'Fank'],
+  [/\bGuitar\b/gi, 'Gittahr'],
+  [/\bGuitars\b/gi, 'Gittahrs'],
   [/\bBass\b/gi, 'Bäss'],
   [/\bDrum\b|\bDrumset\b/gi, 'Dram'],
   [/\bDrums\b/gi, 'Drams'],
@@ -395,7 +397,27 @@ export function formatBookTitleForSpeech(rawTitle: string): string {
  */
 export function cleanTeacherNoteForSpeech(note: string): string {
   if (!note) return '';
-  if (note.includes('WORLDTOUR_MASTERY:') || note.toLowerCase().includes('worldtour_mastery:')) return '';
+  const lower = note.toLowerCase().trim();
+  if (
+    lower.includes('worldtour_mastery:') ||
+    lower.includes('earlab_score:') ||
+    lower.includes('earlab:') ||
+    lower.includes('rhythm_score:') ||
+    lower.includes('latency:') ||
+    lower.includes('latency_calibration:') ||
+    lower.includes('system:') ||
+    lower.includes('sticker:') ||
+    lower.includes('audio:') ||
+    lower.includes('loop:') ||
+    lower.includes('snapshot_') ||
+    lower.includes('feedback:') ||
+    lower.includes('student_note_') ||
+    lower.includes('student_question:') ||
+    lower.includes('task_refl:') ||
+    lower.includes('frage für den unterricht')
+  ) {
+    return '';
+  }
   return note
     // Formale Präfixe entfernen
     .replace(/^(?:Aufgabe|Fahrplan|Hinweis|Notiz|Übe-Tipp|Tipp)\s*:\s*/gi, '')
@@ -482,8 +504,21 @@ export function cleanTextForTts(text: string): string {
     .replace(/bzw\./gi, 'beziehungsweise')
     .replace(/inkl\./gi, 'inklusive')
     .replace(/evtl\./gi, 'eventuell')
-    .replace(/•/g, ', ')
+    .replace(/[•·]/g, ', ')
     .replace(/#/g, 'Nummer ')
+    // Monatsabkürzungen bei Datumsangaben (z. B. 21. Sep. -> 21. September)
+    .replace(/\b(\d{1,2}\.)\s*Jan(?:uar)?\.?\b/gi, '$1 Januar')
+    .replace(/\b(\d{1,2}\.)\s*Feb(?:ruar)?\.?\b/gi, '$1 Februar')
+    .replace(/\b(\d{1,2}\.)\s*Mär(?:z)?\.?\b/gi, '$1 März')
+    .replace(/\b(\d{1,2}\.)\s*Apr(?:il)?\.?\b/gi, '$1 April')
+    .replace(/\b(\d{1,2}\.)\s*Mai\.?\b/gi, '$1 Mai')
+    .replace(/\b(\d{1,2}\.)\s*Jun(?:i)?\.?\b/gi, '$1 Juni')
+    .replace(/\b(\d{1,2}\.)\s*Jul(?:i)?\.?\b/gi, '$1 Juli')
+    .replace(/\b(\d{1,2}\.)\s*Aug(?:ust)?\.?\b/gi, '$1 August')
+    .replace(/\b(\d{1,2}\.)\s*(?:Sep(?:tember)?|Sept)\.?\b/gi, '$1 September')
+    .replace(/\b(\d{1,2}\.)\s*Okt(?:ober)?\.?\b/gi, '$1 Oktober')
+    .replace(/\b(\d{1,2}\.)\s*Nov(?:ember)?\.?\b/gi, '$1 November')
+    .replace(/\b(\d{1,2}\.)\s*Dez(?:ember)?\.?\b/gi, '$1 Dezember')
     // Keine Emojis vorlesen
     .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
     .replace(/[\u{2600}-\u{27BF}]/gu, '')
@@ -715,9 +750,12 @@ export function buildContinuousHomeworkNarrative(options: {
 
   // 7. Zusätzliche Hinweise der Lehrkraft
   if (hasGeneralNotes && options.generalNotes) {
-    const cleanGen = cleanTeacherNoteForSpeech(options.generalNotes.trim());
-    if (cleanGen && !cleanGen.startsWith('[AUDIO:') && !cleanGen.startsWith('AUDIO:')) {
-      parts.push(`Ein wichtiger Hinweis von deiner Lehrkraft: ${cleanGen}.`);
+    const rawLines = options.generalNotes.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    const validNotes = rawLines
+      .map(line => cleanTeacherNoteForSpeech(line))
+      .filter(cleaned => cleaned && !cleaned.startsWith('[AUDIO:') && !cleaned.startsWith('AUDIO:'));
+    if (validNotes.length > 0) {
+      parts.push(`Ein wichtiger Hinweis von deiner Lehrkraft: ${validNotes.join('. ')}.`);
     }
   }
 
@@ -728,6 +766,67 @@ export function buildContinuousHomeworkNarrative(options: {
 
   const fullRawText = parts.join(' ');
   return cleanTextForTts(fullRawText);
+}
+
+/**
+ * 📖 Pädagogischer Vorlesetext für ein einzelnes Lehrwerk (Zeilen-Button)
+ */
+export function formatSingleBookForSpeech(book: {
+  title: string;
+  pages?: number[] | string;
+  formattedPages?: string;
+  notes?: string[] | string;
+}): string {
+  const cleanTitle = formatBookTitleForSpeech(book.title || '');
+  const pagePhrase = formatPageNumbersGerman(book.pages, book.formattedPages);
+  let sentence = pagePhrase
+    ? `Im Lehrwerk ${cleanTitle} übst du ${pagePhrase}.`
+    : `Im Lehrwerk ${cleanTitle} vertiefst du deine aktuellen Übungen.`;
+
+  const notesArr = Array.isArray(book.notes)
+    ? book.notes
+    : (typeof book.notes === 'string' ? book.notes.split(';').map(n => n.trim()) : []);
+  const rawNotes = notesArr
+    .filter(n => n && !n.startsWith('AUDIO:'))
+    .map(n => cleanTeacherNoteForSpeech(n))
+    .filter(Boolean);
+
+  if (rawNotes.length > 0) {
+    const formattedNotes = rawNotes.map(n => {
+      if (/^Seite\s*\d+\s*:/i.test(n)) {
+        return n.replace(/^(Seite\s*\d+)\s*:\s*/i, 'zu $1, ');
+      }
+      return n;
+    }).join(', ');
+    sentence += ` Achte dabei besonders auf folgenden Hinweis: ${formattedNotes}.`;
+  }
+  return cleanTextForTts(sentence);
+}
+
+/**
+ * 🎵 Pädagogischer Vorlesetext für einen einzelnen Song (Zeilen-Button)
+ */
+export function formatSingleSongForSpeech(song: {
+  title: string;
+  artist?: string;
+  note?: string;
+  notes?: string;
+}): string {
+  let fullTitle = song.title || '';
+  if (song.artist && !fullTitle.toLowerCase().includes(song.artist.toLowerCase())) {
+    fullTitle = `${fullTitle} von ${song.artist}`;
+  }
+  const songInfo = formatSongTitleForSpeech(fullTitle);
+  const rawNote = song.note || song.notes || '';
+  const cleanSongNote = rawNote ? cleanTeacherNoteForSpeech(rawNote) : '';
+
+  let sentence = '';
+  if (cleanSongNote) {
+    sentence = `Beim Song ${songInfo.spokenPhrase} lautet dein Fahrplan: ${cleanSongNote}.`;
+  } else {
+    sentence = `Beim Song ${songInfo.spokenPhrase} übst du das Stück weiter.`;
+  }
+  return cleanTextForTts(sentence);
 }
 
 /**

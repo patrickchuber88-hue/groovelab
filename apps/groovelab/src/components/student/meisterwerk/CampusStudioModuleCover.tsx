@@ -308,7 +308,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         justifyContent: 'center',
         boxShadow: config.boxShadow,
         border: moduleKey === 'unlock_tile'
-          ? '1.5px dashed #94a3b8'
+          ? '1.5px solid #cbd5e1'
           : 'none',
         boxSizing: 'border-box',
         flexShrink: 0,

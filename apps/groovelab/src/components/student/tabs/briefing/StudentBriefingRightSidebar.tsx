@@ -19,6 +19,7 @@ import {
 import { getSimulatedNow } from '../../studentDateUtils';
 
 export interface StudentBriefingRightSidebarProps {
+  isMobileSheet?: boolean;
   isRightSidebarCollapsed: boolean;
   handleToggleRightSidebar: (collapse: boolean) => void;
   sidebarTotalAlertsCount: number;
@@ -51,9 +52,11 @@ export interface StudentBriefingRightSidebarProps {
   classWeeklyMins?: number;
   feedInteractions?: any[];
   effectiveLevel?: number | string;
+  activeSection?: 'all' | 'appointments' | 'news';
 }
 
 export function StudentBriefingRightSidebar({
+  isMobileSheet = false,
   effectiveLevel,
   isRightSidebarCollapsed,
   handleToggleRightSidebar,
@@ -85,86 +88,91 @@ export function StudentBriefingRightSidebar({
   isStudentRescheduleAllowed = true,
   classGoals = [],
   classWeeklyMins = 0,
-  feedInteractions = []
+  feedInteractions = [],
+  activeSection = 'all'
 }: StudentBriefingRightSidebarProps) {
   return (
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column', 
-              gap: '24px',
-              width: isRightSidebarCollapsed ? '0px' : '340px',
-              minWidth: isRightSidebarCollapsed ? '0px' : '340px',
-              maxWidth: isRightSidebarCollapsed ? '0px' : '340px',
-              opacity: isRightSidebarCollapsed ? 0 : 1,
-              transform: isRightSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
-              pointerEvents: isRightSidebarCollapsed ? 'none' : 'auto',
-              overflowY: isRightSidebarCollapsed ? 'hidden' : 'visible',
+              gap: isMobileSheet ? '16px' : '24px',
+              width: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : '340px'),
+              minWidth: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : '340px'),
+              maxWidth: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : '340px'),
+              opacity: isMobileSheet ? 1 : (isRightSidebarCollapsed ? 0 : 1),
+              transform: isMobileSheet ? 'none' : (isRightSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)'),
+              pointerEvents: isMobileSheet ? 'auto' : (isRightSidebarCollapsed ? 'none' : 'auto'),
+              overflowY: isMobileSheet ? 'visible' : (isRightSidebarCollapsed ? 'hidden' : 'visible'),
               overflowX: 'hidden',
               boxSizing: 'border-box',
-              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              transition: isMobileSheet ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
-              {/* Sidebar Header with Collapse Button */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 2px 4px 2px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    background: '#e6f4ea',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Calendar size={15} color="#34a853" />
-                  </div>
-                  <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                    Termine &amp; Mitteilungen
-                  </span>
-                  {sidebarTotalAlertsCount > 0 && (
-                    <span style={{
-                      background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
-                      color: '#ffffff',
-                      fontSize: '0.65rem',
-                      fontWeight: 900,
-                      padding: '2px 7px',
-                      borderRadius: '100px'
+              {/* Sidebar Header with Collapse Button - Nur auf Desktop anzeigen */}
+              {!isMobileSheet && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 2px 4px 2px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      background: '#e6f4ea',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}>
-                      {sidebarTotalAlertsCount}
+                      <Calendar size={15} color="#34a853" />
+                    </div>
+                    <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                      Termine &amp; Mitteilungen
                     </span>
-                  )}
-                </div>
+                    {sidebarTotalAlertsCount > 0 && (
+                      <span style={{
+                        background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
+                        color: '#ffffff',
+                        fontSize: '0.65rem',
+                        fontWeight: 900,
+                        padding: '2px 7px',
+                        borderRadius: '100px'
+                      }}>
+                        {sidebarTotalAlertsCount}
+                      </span>
+                    )}
+                  </div>
 
-                <button
-                  onClick={() => handleToggleRightSidebar(true)}
-                  style={{
-                    background: '#f8fafc',
-                    border: '1.5px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '6px 10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                  title="Sidebar einklappen"
-                >
-                  <span>Einklappen</span>
-                  <ChevronRight size={14} color="#64748b" />
-                </button>
-              </div>
+                  <button
+                    onClick={() => handleToggleRightSidebar(true)}
+                    style={{
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      border: '1.5px solid rgba(52, 168, 83, 0.30)',
+                      borderRadius: '10px',
+                      padding: '6px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      color: '#34a853',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                    title="Sidebar einklappen"
+                  >
+                    <span>Einklappen</span>
+                    <ChevronRight size={14} color="#34a853" />
+                  </button>
+                </div>
+              )}
 
               {/* Nächste Termine */}
-              <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+              {(activeSection === 'all' || activeSection === 'appointments') && (
+                <>
+                  <div style={{ background: '#ffffff', borderRadius: isMobileSheet ? '20px' : '24px', padding: isMobileSheet ? '18px 16px' : '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Calendar size={18} color="#34a853" />
@@ -227,7 +235,11 @@ export function StudentBriefingRightSidebar({
                                     const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                                     const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
                                     setAppointmentChatData({
+                                      ...occ,
                                       teacherId: occ.teacher_id,
+                                      teacher_id: occ.teacher_id,
+                                      teacher: occ.teacher || occ.teacher_profile,
+                                      teacher_name: occ.teacher_name || occ.teacherName,
                                       date: occ.date,
                                       start_time: occ.start_time?.substring(0, 5),
                                       label,
@@ -313,7 +325,11 @@ export function StudentBriefingRightSidebar({
                                     const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                                     const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Verschoben)`;
                                     setAppointmentChatData({
+                                      ...occ,
                                       teacherId: occ.teacher_id,
+                                      teacher_id: occ.teacher_id,
+                                      teacher: occ.teacher || occ.teacher_profile,
+                                      teacher_name: occ.teacher_name || occ.teacherName,
                                       date: occ.date,
                                       start_time: occ.start_time?.substring(0, 5),
                                       label,
@@ -382,8 +398,12 @@ export function StudentBriefingRightSidebar({
                                 const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                                 const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr`;
                                 setAppointmentChatData({
-                                  teacherId: occ.teacher_id,
-                                  date: occ.date,
+                                      ...occ,
+                                      teacherId: occ.teacher_id,
+                                      teacher_id: occ.teacher_id,
+                                      teacher: occ.teacher || occ.teacher_profile,
+                                      teacher_name: occ.teacher_name || occ.teacherName,
+                                      date: occ.date,
                                   start_time: occ.start_time?.substring(0, 5),
                                   label,
                                   occurrenceId: occ.id,
@@ -812,9 +832,11 @@ export function StudentBriefingRightSidebar({
                   </div>
                 );
               })()}
+                </>
+              )}
 
               {/* ÜBE-ZIEL WIDGET (Crowdfunding-Stil) */}
-              {classGoals.length > 0 && (
+              {(activeSection === 'all' || activeSection === 'appointments') && classGoals.length > 0 && (
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
@@ -965,11 +987,12 @@ export function StudentBriefingRightSidebar({
                 </div>
               )}
 
-              {/* LIVE CAMPUS FEED (DESKTOP) */}
+              {/* LIVE CAMPUS FEED */}
+              {(activeSection === 'all' || activeSection === 'news') && (
               <div style={{ 
                 background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '24px', 
+                borderRadius: isMobileSheet ? '20px' : '24px', 
+                padding: isMobileSheet ? '18px 16px' : '24px', 
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -1333,6 +1356,7 @@ export function StudentBriefingRightSidebar({
                   )}
                 </div>
               </div>
+              )}
             </div>
 
   );

@@ -60,7 +60,7 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
     : `⭐ ${rarityLabel.toUpperCase()} • SCHULJAHR ${syDisplay}`;
 
   // Slanted Ribbon
-  const ribbonText = isSchuljahr ? 'ABSOLVIERT!' : 'GEMEISTERT!';
+  const ribbonText = isSchuljahr ? 'NEUES SCHULJAHR!' : 'GEMEISTERT!';
   const ribbonBg = isLegendary || isSchuljahr
     ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
     : isEpic

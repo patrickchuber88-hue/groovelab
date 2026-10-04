@@ -1,15 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Menu,
-  ChevronDown,
-  GraduationCap,
-  Music,
-  Cloud,
   CloudOff,
   RefreshCw,
   Bell,
-  ShieldCheck,
-  Check,
   Lock,
   ArrowLeft
 } from 'lucide-react';
@@ -83,16 +77,17 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
   setShowTrialInfoModal
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isScopeMenuOpen, setIsScopeMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+  const [isTitleVisible, setIsTitleVisible] = useState<boolean>(false);
 
-  // 🏛️ Scroll-Aware Header Listener (Transparenz ganz oben -> Frosted Glass beim Scrollen)
+  // 🏛️ Scroll-Aware Header Listener (Transparenz ganz oben -> Frosted Glass & Large Title Collapse)
   useEffect(() => {
     const checkScroll = (pos: number) => {
       setIsScrolled(pos > 10);
+      setIsTitleVisible(pos > 40);
     };
     const onWindowScroll = () => {
       checkScroll(window.scrollY || document.documentElement.scrollTop || 0);
@@ -110,6 +105,57 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
       document.removeEventListener('scroll', onContainerScroll, { capture: true });
     };
   }, []);
+
+  // 🏛️ 0,1% Dynamic Board Title Resolver für Scroll-Aware Header Transition
+  const currentBoardTitle = React.useMemo(() => {
+    switch (activeTab) {
+      case 'settings':
+        return parentUnlocked ? 'Elternbereich' : 'Einstellungen';
+      case 'homework_book':
+      case 'homework':
+        return 'Aufgaben';
+      case 'practice_board':
+        return 'Übe-Pfad';
+      case 'events':
+        return 'Termine';
+      case 'messages':
+        return 'Nachrichten';
+      case 'briefing':
+        return 'Briefing';
+      case 'schedule':
+        return 'Stundenplan';
+      case 'live':
+        return 'Live Lab';
+      case 'practice':
+        return 'Üben';
+      case 'library':
+        return 'Bibliothek';
+      case 'repertoire':
+        return 'Repertoire';
+      case 'matching':
+        return 'Band-Matching';
+      case 'bands':
+        return 'Bands';
+      case 'students':
+        return 'Schüler';
+      case 'studio':
+        return 'Aufgaben-Studio';
+      case 'team':
+        return 'Team';
+      case 'rooms':
+        return 'Räume';
+      case 'songs':
+        return 'Mediathek';
+      case 'stats':
+        return 'Statistik';
+      case 'gallery':
+        return 'ID Galerie';
+      case 'setup':
+        return 'Einstellungen';
+      default:
+        return '';
+    }
+  }, [activeTab, parentUnlocked]);
 
   const triggerBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -143,15 +189,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
   // Normalized role checks
   const userRole = (user?.role || 'student').toLowerCase();
   const isStudent = userRole === 'student' || (!userRole && !user?.is_master_admin);
-  const isTeacher = userRole === 'teacher';
   const isStaff = userRole === 'admin' || userRole === 'secretary';
-
-  const hasCampusSub = Boolean(school?.has_campus_subscription || !school?.is_billing_booked || school?.subscription_bypass);
-  const hasGrooveLabSub = Boolean(school?.has_groovelab_subscription || !school?.is_billing_booked || school?.subscription_bypass);
-
-  const isCampusEligible = hasCampusActive !== undefined ? hasCampusActive : Boolean((isStaff || user?.is_campus_active) && hasCampusSub);
-  const isGrooveLabEligible = hasGrooveLabActive !== undefined ? hasGrooveLabActive : Boolean((isStaff || user?.is_groovelab_active) && hasGrooveLabSub);
-  const showModuleSwitcher = (isCampusEligible && isGrooveLabEligible) || isStaff;
 
   // Offline sync queue & network status listeners
   useEffect(() => {
@@ -185,18 +223,6 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
     prevDrawerOpenRef.current = isDrawerOpen;
   }, [isDrawerOpen]);
 
-  // Global keydown listener for Escape dismissal of Scope Dropdown
-  useEffect(() => {
-    if (!isScopeMenuOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsScopeMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isScopeMenuOpen]);
-
   const handleManualSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
@@ -210,7 +236,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
   // Authoritative Platform Switching with state caching
   const handlePlatformSwitch = useCallback(
     (target: 'campus' | 'groovelab' | 'admin' | string) => {
-      setIsScopeMenuOpen(false);
+      setIsDrawerOpen(false);
       setActivePlatform(target);
       if (target === 'campus') {
         const rawCampusTab = sessionStorage.getItem('campus_active_tab');
@@ -328,13 +354,19 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: (isSubViewActive && subViewNavState.isStickerAlbum)
+              background: activePlatform === 'campus'
+                ? 'rgba(52, 168, 83, 0.15)'
+                : (isSubViewActive && subViewNavState.isStickerAlbum)
                 ? 'rgba(234, 179, 8, 0.22)'
                 : 'rgba(234, 179, 8, 0.14)',
-              border: (isSubViewActive && subViewNavState.isStickerAlbum)
+              border: activePlatform === 'campus'
+                ? '1.5px solid rgba(52, 168, 83, 0.50)'
+                : (isSubViewActive && subViewNavState.isStickerAlbum)
                 ? '1.5px solid rgba(250, 204, 21, 0.70)'
                 : '1.5px solid rgba(234, 179, 8, 0.40)',
-              boxShadow: (isSubViewActive && subViewNavState.isStickerAlbum)
+              boxShadow: activePlatform === 'campus'
+                ? '0 2px 8px rgba(52, 168, 83, 0.25)'
+                : (isSubViewActive && subViewNavState.isStickerAlbum)
                 ? '0 2px 8px rgba(234, 179, 8, 0.30)'
                 : '0 1px 4px rgba(234, 179, 8, 0.12)',
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -343,12 +375,12 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
             <Menu
               size={24}
               strokeWidth={2.6}
-              color={(isSubViewActive && subViewNavState.isStickerAlbum) ? '#facc15' : '#b45309'}
+              color={activePlatform === 'campus' ? '#34a853' : (isSubViewActive && subViewNavState.isStickerAlbum) ? '#facc15' : '#b45309'}
             />
           </div>
         </button>
 
-        {/* Center: SubView Back Button OR Scope/Platform Dropdown */}
+        {/* Center: SubView Back Button OR 0,1% Scroll-Aware Collapsing Title (Apple Large Title Pattern) */}
         {isSubViewActive ? (
           <button
             type="button"
@@ -387,182 +419,39 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
             </span>
           </button>
         ) : (
-          <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => {
-              if (showModuleSwitcher) setIsScopeMenuOpen((prev) => !prev);
-            }}
-            aria-label={`Plattform wählen: Aktuell ${
-              activePlatform === 'campus' ? 'Campus' : activePlatform === 'admin' ? 'Verwaltung' : 'GrooveLab'
-            }`}
-            aria-haspopup="listbox"
-            aria-expanded={isScopeMenuOpen}
+          <div
             style={{
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              height: '44px',
-              padding: '0 8px',
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              cursor: showModuleSwitcher ? 'pointer' : 'default',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              justifyContent: 'center',
+              maxWidth: '200px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              opacity: currentBoardTitle ? 1 : 0,
+              pointerEvents: 'auto',
+              userSelect: 'none',
+              WebkitUserSelect: 'none'
             }}
-            title={showModuleSwitcher ? 'Plattform wechseln' : undefined}
           >
             <span
               style={{
-                fontSize: '1.02rem',
+                fontSize: '0.96rem',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
-                fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif",
-                color: '#0f172a'
+                fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+                color: (isSubViewActive && subViewNavState.isStickerAlbum) ? '#ffffff' : '#0f172a',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}
             >
-              {activePlatform === 'campus' ? 'Campus' : activePlatform === 'admin' ? 'Verwaltung' : 'GrooveLab'}
+              {currentBoardTitle}
             </span>
-            {activePlatform === 'groovelab' && (
-              <span style={{ fontSize: '0.80rem', fontWeight: 600, color: '#ca8a04', marginLeft: '2px' }}>
-                Studio
-              </span>
-            )}
-            {showModuleSwitcher && (
-              <ChevronDown
-                size={14}
-                strokeWidth={2.4}
-                style={{
-                  color: '#64748b',
-                  marginLeft: '2px',
-                  transform: isScopeMenuOpen ? 'rotate(180deg)' : 'none',
-                  transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              />
-            )}
-          </button>
-
-          {/* Scope Dropdown Menu */}
-          {isScopeMenuOpen && (
-            <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setIsScopeMenuOpen(false)} />
-              <div
-                role="listbox"
-                aria-label="Plattform wählen"
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 6px)',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  zIndex: 999,
-                  background: '#ffffff',
-                  borderRadius: '16px',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
-                  padding: '6px',
-                  minWidth: '180px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
-                }}
-              >
-                {isCampusEligible && (
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={activePlatform === 'campus'}
-                    onClick={() => handlePlatformSwitch('campus')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: activePlatform === 'campus' ? '#e6f4ea' : 'transparent',
-                      color: activePlatform === 'campus' ? '#166534' : '#334155',
-                      fontWeight: activePlatform === 'campus' ? 800 : 650,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      width: '100%',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <GraduationCap size={16} color={activePlatform === 'campus' ? '#166534' : '#64748b'} />
-                      <span>Campus Schule</span>
-                    </span>
-                    {activePlatform === 'campus' && <Check size={14} color="#166534" strokeWidth={3} />}
-                  </button>
-                )}
-
-                {isGrooveLabEligible && (
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={activePlatform === 'groovelab'}
-                    onClick={() => handlePlatformSwitch('groovelab')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: activePlatform === 'groovelab' ? '#fef9c3' : 'transparent',
-                      color: activePlatform === 'groovelab' ? '#854d0e' : '#334155',
-                      fontWeight: activePlatform === 'groovelab' ? 800 : 650,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      width: '100%',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Music size={15} color={activePlatform === 'groovelab' ? '#854d0e' : '#64748b'} />
-                      <span>GrooveLab Studio</span>
-                    </span>
-                    {activePlatform === 'groovelab' && <Check size={14} color="#854d0e" strokeWidth={3} />}
-                  </button>
-                )}
-
-                {isStaff && (
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={activePlatform === 'admin'}
-                    onClick={() => handlePlatformSwitch('admin')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: activePlatform === 'admin' ? '#fee2e2' : 'transparent',
-                      color: activePlatform === 'admin' ? '#991b1b' : '#334155',
-                      fontWeight: activePlatform === 'admin' ? 800 : 650,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      width: '100%',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <ShieldCheck size={15} color={activePlatform === 'admin' ? '#991b1b' : '#64748b'} />
-                      <span>Schulverwaltung</span>
-                    </span>
-                    {activePlatform === 'admin' && <Check size={14} color="#991b1b" strokeWidth={3} />}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+          </div>
         )}
 
-        {/* Right: Parental status, Cloud sync, Bell & Avatar (>=44×44px touch targets) */}
+        {/* Right: Parental status, Cloud sync, iCal Action, Bell & Avatar (>=44×44px touch targets) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
           {parentUnlocked && isStudent && (
             <button
@@ -605,6 +494,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
               )}
             </button>
           )}
+
 
           {/* Unread Notifications Bell Button (44×44px Touch Target) */}
           <button

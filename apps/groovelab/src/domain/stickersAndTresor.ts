@@ -26,16 +26,16 @@ export const ALL_STICKERS = [
   { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs vollständig gemeistert – ein ganzes Konzertprogramm!', equiv: 'Umfangreiches Repertoire auf Auftritts-Niveau – musikalisch vielseitig und spieltechnisch reif.', color: '#137333', bg: 'rgba(19, 115, 51, 0.15)', auto: true, category: 'songs', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Schuljahr-Pioniere (15-Jahre-Zyklus: Zu jedem neuen Campus-Schuljahr ein exklusives Ausbildungs-Wappen)
-  { id: 'schuljahr-1', emoji: '🎒', title: 'Campus-Pionier (1. Campus-Jahr)', desc: 'Instrumentenhaltung, Spieltechnik und die Freude am ersten eigenen Ton entdeckt.', equiv: 'Pioniergeist & Grundsteinlegung', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'schuljahr-2', emoji: '🚀', title: 'Klang-Navigator (2. Campus-Jahr)', desc: 'Notenlesen gefestigt, rhythmisches Pulsgefühl entwickelt und erste Stücke gemeistert.', equiv: 'Routine & Taktgefühl', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'schuljahr-3', emoji: '🌟', title: 'Melodie-Gestalter (3. Campus-Jahr)', desc: 'Dynamik, Tonbildung und musikalische Phrasierung mit eigenem Ausdruck geformt.', equiv: 'Klangkultur & Phrasierung', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'schuljahr-4', emoji: '🎸', title: 'Groove-Kadett (4. Campus-Jahr)', desc: 'Stilsicherheit im Groove, flüssige Spieltechnik und präzises Timing im Metronom-Puls.', equiv: 'Rhythmik & Tempo-Präzision', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'schuljahr-5', emoji: '⚡', title: 'Jubiläums-Alchemist (5. Campus-Jahr)', desc: 'Ein halbes Jahrzehnt Treue: Musik ist ein fester, selbstverständlicher Teil deines Lebens.', equiv: '5-Jahre-Jubiläums-Meilenstein', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'schuljahr-6', emoji: '🔮', title: 'Song-Architekt (6. Campus-Jahr)', desc: 'Harmonien, Songformen und Abläufe intuitiv erfasst und bühnenreif ausgearbeitet.', equiv: 'Repertoire & Abschluss Regelausbildung', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'schuljahr-7', emoji: '🦅', title: 'Klang-Virtuose (7. Campus-Jahr)', desc: 'Schwere Passagen mühelos gemeistert – Technik tritt zurück, purer Ausdruck übernimmt.', equiv: 'Virtuosität & Konzertreife', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'schuljahr-8', emoji: '🌌', title: 'Meister-Grad (8. Campus-Jahr)', desc: 'Umfangreiches Konzertrepertoire, stilistische Reife und meisterhafte Instrumentenbeherrschung.', equiv: 'Vollendeter Campus-Diplomzyklus', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'schuljahr-9', emoji: '🛡️', title: 'Harmonie-Wächter (9. Campus-Jahr)', desc: 'Gemeinschaftliches Musizieren, feinstes Gehör und musikalische Führung im Ensemble.', equiv: 'Hall of Fame & Ensemble-Leader', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'schuljahr-10', emoji: '👑', title: 'Dekaden-König (10. Campus-Jahr)', desc: 'Ein volles Jahrzehnt Hingabe, Beständigkeit und tiefe Liebe zur Musikkultur.', equiv: 'Ewiger Dekaden-Meilenstein', color: '#eab308', bg: 'rgba(234, 179, 8, 0.18)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-1', emoji: '🎒', title: 'Campus-Pionier (1. Campus-Jahr)', desc: 'Dein Begleiter für Instrumentenhaltung, Spieltechnik und die Freude am ersten eigenen Ton.', equiv: 'Pioniergeist & Grundsteinlegung', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'schuljahr-2', emoji: '🚀', title: 'Klang-Navigator (2. Campus-Jahr)', desc: 'Dein Begleiter für Notenlesen, rhythmisches Pulsgefühl und die ersten vollständigen Stücke.', equiv: 'Routine & Taktgefühl', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'schuljahr-3', emoji: '🌟', title: 'Melodie-Gestalter (3. Campus-Jahr)', desc: 'Dein Begleiter für Dynamik, Tonbildung und musikalische Phrasierung mit eigenem Ausdruck.', equiv: 'Klangkultur & Phrasierung', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'schuljahr-4', emoji: '🎸', title: 'Groove-Kadett (4. Campus-Jahr)', desc: 'Dein Begleiter für Stilsicherheit im Groove, flüssige Spieltechnik und präzises Timing.', equiv: 'Rhythmik & Tempo-Präzision', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'schuljahr-5', emoji: '⚡', title: 'Jubiläums-Alchemist (5. Campus-Jahr)', desc: 'Ein halbes Jahrzehnt Treue: Dein Jubiläums-Begleiter für 5 Jahre gelebte Musikbegeisterung.', equiv: '5-Jahre-Jubiläums-Meilenstein', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'schuljahr-6', emoji: '🔮', title: 'Song-Architekt (6. Campus-Jahr)', desc: 'Dein Begleiter für Harmonien, Songformen und den bühnenreifen Abschluss deiner Regelausbildung.', equiv: 'Repertoire & Abschluss Regelausbildung', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'schuljahr-7', emoji: '🦅', title: 'Klang-Virtuose (7. Campus-Jahr)', desc: 'Dein Begleiter in der Hall of Fame: Mühelose Virtuosität und souveräne Konzertreife.', equiv: 'Virtuosität & Konzertreife', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'schuljahr-8', emoji: '🌌', title: 'Meister-Grad (8. Campus-Jahr)', desc: 'Dein Begleiter für anspruchsvolles Konzertrepertoire und stilistische Meisterschaft.', equiv: 'Vollendeter Campus-Diplomzyklus', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'schuljahr-9', emoji: '🛡️', title: 'Harmonie-Wächter (9. Campus-Jahr)', desc: 'Dein Begleiter für Ensemblemusizieren, feinstes Gehör und musikalische Führung.', equiv: 'Hall of Fame & Ensemble-Leader', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'schuljahr-10', emoji: '👑', title: 'Dekaden-König (10. Campus-Jahr)', desc: 'Ein volles Jahrzehnt Hingabe: Dein royaler Begleiter für 10 Jahre gelebte Musikkultur.', equiv: 'Ewiger Dekaden-Meilenstein', color: '#eab308', bg: 'rgba(234, 179, 8, 0.18)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
   { id: 'schuljahr-11', emoji: '🏛️', title: 'Klang-Architekt (11. Campus-Jahr)', desc: 'Reife Werkgestaltung, die auch anspruchsvollste Konzertprogramme souverän trägt.', equiv: 'Monumentale Klangästhetik', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
   { id: 'schuljahr-12', emoji: '🎙️', title: 'Bühnen-Virtuose (12. Campus-Jahr)', desc: 'Authentische Bühnenpräsenz und Charisma, die jedes Publikum im Konzertsaal mitreißen.', equiv: 'Bühnenreife Perfektion', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
   { id: 'schuljahr-13', emoji: '🌋', title: 'Maestro-Mentor (13. Campus-Jahr)', desc: 'Du gibst musikalische Begeisterung weiter und inspirierst jüngere Musikergenerationen.', equiv: 'Mentor & Gemeinschaftssäule', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
@@ -122,8 +122,8 @@ export const calculateCampusSchoolYearNumber = (
     const regDate = registrationDateStr ? new Date(registrationDateStr) : new Date();
     if (isNaN(regDate.getTime())) return 1;
 
-    // School year start year for registration date (Sept-Dec belongs to year Y, Jan-Aug belongs to Y-1)
-    const regStartYear = regDate.getMonth() >= 8 ? regDate.getFullYear() : regDate.getFullYear() - 1;
+    // School year start year for registration date (August/September belongs to year Y, Jan-July belongs to Y-1)
+    const regStartYear = regDate.getMonth() >= 7 ? regDate.getFullYear() : regDate.getFullYear() - 1;
 
     // Target school year start year
     let targetStartYear: number;
@@ -133,11 +133,11 @@ export const calculateCampusSchoolYearNumber = (
         targetStartYear = parts[0];
       } else {
         const now = new Date();
-        targetStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+        targetStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
       }
     } else {
       const now = new Date();
-      targetStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+      targetStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
     }
 
     return Math.max(1, targetStartYear - regStartYear + 1);

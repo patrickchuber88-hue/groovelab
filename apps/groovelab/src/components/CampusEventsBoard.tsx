@@ -83,6 +83,8 @@ import {
 } from '../utils/schoolHolidayEngine';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { supabase as defaultSupabase } from '../lib/supabase';
+import { CampusEventsMobileBottomBar } from './events/CampusEventsMobileBottomBar';
+import { CampusEventsSubscribeBanner } from './events/CampusEventsSubscribeBanner';
 
 export interface CampusEventsBoardProps {
   userId: string;
@@ -2318,6 +2320,40 @@ export function CampusEventsBoard({
       supabase.removeChannel(channel);
     };
   }, [userId, schoolId, role]);
+
+  // 📅 0.1% Goldstandard: Listen for Universal Header iCal Subscription Trigger
+  useEffect(() => {
+    const handleUniversalIcalOpen = () => {
+      const isJuniorStudent = role === 'student' && ((studentUser as any)?.campus_ui_level === 'junior');
+      const isAlreadyParentUnlocked = typeof window !== 'undefined' && (
+        sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+        sessionStorage.getItem(`groovelab_parent_unlocked_${userId}`) === 'true'
+      );
+
+      if (isJuniorStudent && !isAlreadyParentUnlocked) {
+        setPinGatePendingAction(() => () => {
+          setShowIcalModal(true);
+          if (!calendarToken && !generatingToken) {
+            fetchOrCreateCalendarToken(false);
+          }
+        });
+        setPinGateInput('');
+        setPinGateError('');
+        setShowPinGateModal(true);
+        return;
+      }
+
+      setShowIcalModal(true);
+      if (!calendarToken && !generatingToken) {
+        fetchOrCreateCalendarToken(false);
+      }
+    };
+
+    window.addEventListener('campus_open_ical_modal', handleUniversalIcalOpen);
+    return () => {
+      window.removeEventListener('campus_open_ical_modal', handleUniversalIcalOpen);
+    };
+  }, [role, studentUser, userId, calendarToken, generatingToken]);
 
 
   // Handle auto-open of event planning submissions from teacher dashboard
@@ -6351,9 +6387,10 @@ export function CampusEventsBoard({
               </span>
             </div>
 
-            {/* Details */}
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Details (0.1% Goldstandard 3-Tier Hierarchy: Name -> Subject/Room -> Time) */}
+            <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {/* Row 1: Primary Entity Name (Full Width, 100% Legibility) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                 <span style={{ 
                   fontSize: '15px', 
                   fontWeight: 800, 
@@ -6361,59 +6398,119 @@ export function CampusEventsBoard({
                   textDecoration: 'none',
                   overflow: 'hidden', 
                   textOverflow: 'ellipsis', 
-                  whiteSpace: 'nowrap' 
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.25
                 }}>
                   {opponentName}
-                  {displaySubject && (
-                    <span style={{ 
-                      fontSize: '13px', 
-                      fontWeight: 700, 
-                      color: isCanceled ? subColor : brandColor, 
-                      marginLeft: '6px' 
-                    }}>
-                      ({displaySubject})
-                    </span>
-                  )}
                 </span>
+                {isPendingReview && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1px solid #fef3c7',
+                    padding: '1px 6px',
+                    borderRadius: '6px',
+                    textTransform: 'uppercase',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    flexShrink: 0
+                  }} title="Stundenplan befindet sich in der Zuteilung durch das Sekretariat.">
+                    <Hourglass size={10} color="#b45309" style={{ flexShrink: 0 }} />
+                    <span>In Prüfung</span>
+                  </span>
+                )}
+                {isRescheduled && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
+                    color: isGroupOcc ? '#0369a1' : '#b45309',
+                    border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
+                    padding: '1px 6px',
+                    borderRadius: '6px',
+                    textTransform: 'uppercase',
+                    flexShrink: 0
+                  }}>
+                    Verschoben
+                  </span>
+                )}
+                {isCanceled && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    background: '#fee2e2',
+                    color: '#991b1b',
+                    border: '1.5px solid #ef4444',
+                    padding: '1px 6px',
+                    borderRadius: '6px',
+                    textTransform: 'uppercase',
+                    flexShrink: 0
+                  }}>
+                    Entfällt
+                  </span>
+                )}
+              </div>
+
+              {/* Row 2: Didactic Context (Subject Badge) & Room */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {displaySubject && (
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: 800, 
+                    color: isCanceled ? subColor : brandColor,
+                    background: isCanceled ? '#f1f5f9' : `${brandColor}12`,
+                    border: `1px solid ${isCanceled ? '#e2e8f0' : `${brandColor}33`}`,
+                    padding: '1px 7px',
+                    borderRadius: '6px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    lineHeight: '16px'
+                  }}>
+                    {displaySubject}
+                  </span>
+                )}
 
                 {isGroupOcc && (
                   <span style={{
-                    fontSize: '12px',
+                    fontSize: '11px',
                     fontWeight: 800,
                     background: '#eff6ff',
                     color: '#1d4ed8',
                     border: '1px solid #bfdbfe',
-                    padding: '2px 8px',
-                    borderRadius: '8px',
+                    padding: '1px 6px',
+                    borderRadius: '6px',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '3px'
                   }}>
-                    <Users size={12} color="#1d4ed8" style={{ flexShrink: 0 }} />
+                    <Users size={11} color="#1d4ed8" style={{ flexShrink: 0 }} />
                     <span>{groupBadgeLabel}</span>
                   </span>
                 )}
 
-                {/* Minimalist Monochrome Room Display without heavy border */}
+                {/* Minimalist Monochrome Room Display */}
                 {(() => {
                   if (!rName || rName === 'Raum') return null;
                   
                   if (isRoomChanged) {
                     return (
                       <span style={{
-                        fontSize: '13px',
+                        fontSize: '12px',
                         fontWeight: 700,
                         color: '#7c3aed',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '3px'
                       }} title={`Raum geändert zu ${rName}`}>
-                        <DoorClosed size={14} color="#7c3aed" style={{ flexShrink: 0 }} />
+                        <DoorClosed size={13} color="#7c3aed" style={{ flexShrink: 0 }} />
                         {rName}
                         <span 
                           style={{
-                            width: '6px',
-                            height: '6px',
+                            width: '5px',
+                            height: '5px',
                             borderRadius: '50%',
                             background: '#7c3aed',
                             display: 'inline-block',
@@ -6429,78 +6526,32 @@ export function CampusEventsBoard({
 
                   return (
                     <span style={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       fontWeight: 600,
                       color: '#64748b',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px'
+                      gap: '3px'
                     }}>
-                      <DoorClosed size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <DoorClosed size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
                       {rName}
                     </span>
                   );
                 })()}
-
-                {isPendingReview && (
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    background: '#fffbeb',
-                    color: '#b45309',
-                    border: '1px solid #fef3c7',
-                    padding: '2px 6px',
-                    borderRadius: '6px',
-                    textTransform: 'uppercase',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }} title="Stundenplan befindet sich in der Zuteilung durch das Sekretariat.">
-                    <Hourglass size={10} color="#b45309" style={{ flexShrink: 0 }} />
-                    <span>In Prüfung</span>
-                  </span>
-                )}
-                {isRescheduled && (
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
-                    color: isGroupOcc ? '#0369a1' : '#b45309',
-                    border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
-                    padding: '2px 6px',
-                    borderRadius: '6px',
-                    textTransform: 'uppercase'
-                  }}>
-                    Verschoben
-                  </span>
-                )}
-                {isCanceled && (
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    background: '#fee2e2',
-                    color: '#991b1b',
-                    border: '1.5px solid #ef4444',
-                    padding: '2px 6px',
-                    borderRadius: '6px',
-                    textTransform: 'uppercase'
-                  }}>
-                    Entfällt
-                  </span>
-                )}
               </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', color: subColor, fontWeight: 700, marginTop: '4px', flexWrap: 'wrap' }}>
+
+              {/* Row 3: Time & Duration */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.80rem', color: subColor, fontWeight: 700, flexWrap: 'wrap' }}>
                 {isRescheduled && occ.original_date && occ.original_date !== occ.date && (
                   <>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#b45309' }}>
-                      <Calendar size={14} /> (Statt {formatDateGerman(occ.original_date)})
+                      <Calendar size={13} /> (Statt {formatDateGerman(occ.original_date)})
                     </span>
                     <span>•</span>
                   </>
                 )}
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={14} /> {occ.start_time.substring(0, 5)} Uhr
+                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Clock size={13} /> {occ.start_time.substring(0, 5)} Uhr
                 </span>
                 <span>•</span>
                 <span>{occ.duration} Min</span>
@@ -6654,92 +6705,103 @@ export function CampusEventsBoard({
         height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
         overflow: isMobilePortrait ? 'visible' : 'hidden'
       }}>
-        {/* Title & Right-Aligned Subscribe Button (Smartphone Zero-Scrollbar Header) */}
-        <div style={{
-          display: 'flex',
-          flexDirection: isMobilePortrait ? 'column' : 'row',
-          justifyContent: 'space-between',
-          alignItems: isMobilePortrait ? 'stretch' : 'center',
-          gap: '8px',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              <CalendarDays size={20} color={brandColor} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Unterrichtstermine</span>
-              <TourStartButton onClick={startTour} platformTheme={isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))} />
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.80rem', margin: '3px 0 0 0', fontWeight: 550, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Deine persönlichen Stundenplandaten
-            </p>
+        {/* Title & Right-Aligned Subscribe Button (Desktop only; on mobile, canonical title is in GeminiMobileShell) */}
+        {!isMobilePortrait && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '8px',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <CalendarDays size={18} color={brandColor} style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Unterrichtstermine</span>
+                <TourStartButton onClick={startTour} platformTheme={isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))} />
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '2px 0 0 0', fontWeight: 550, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Deine persönlichen Stundenplandaten
+              </p>
+            </div>
+
+            {/* iCal Subscription Button (Desktop) */}
+            {icalActive && (
+              <button
+                onClick={() => {
+                  const isJuniorStudent = role === 'student' && ((studentUser as any)?.campus_ui_level === 'junior');
+                  const isAlreadyParentUnlocked = typeof window !== 'undefined' && (
+                    sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+                    sessionStorage.getItem(`groovelab_parent_unlocked_${userId}`) === 'true'
+                  );
+
+                  if (isJuniorStudent && !isAlreadyParentUnlocked) {
+                    setPinGatePendingAction(() => () => {
+                      setShowIcalModal(true);
+                      if (!calendarToken && !generatingToken) {
+                        fetchOrCreateCalendarToken(false);
+                      }
+                    });
+                    setPinGateInput('');
+                    setPinGateError('');
+                    setShowPinGateModal(true);
+                    return;
+                  }
+
+                  setShowIcalModal(true);
+                  if (!calendarToken && !generatingToken) {
+                    fetchOrCreateCalendarToken(false);
+                  }
+                }}
+                className="hover-scale-subtle"
+                title="Unterrichtstermine abonnieren (iCal Kalender-Feed)"
+                style={{
+                  border: `1px solid ${brandColor}33`,
+                  background: `${brandColor}12`,
+                  color: brandColor,
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  minHeight: '32px',
+                  width: 'auto',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <CalendarPlus size={14} style={{ flexShrink: 0 }} />
+                <span>Abonnieren</span>
+              </button>
+            )}
           </div>
+        )}
 
-          {/* iCal Subscription Button (Adaptive compact label on multi-column layout) */}
-          {icalActive && (
-            <button
-              onClick={() => {
-                const isJuniorStudent = role === 'student' && ((studentUser as any)?.campus_ui_level === 'junior');
-                const isAlreadyParentUnlocked = typeof window !== 'undefined' && (
-                  sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
-                  sessionStorage.getItem(`groovelab_parent_unlocked_${userId}`) === 'true'
-                );
-
-                if (isJuniorStudent && !isAlreadyParentUnlocked) {
-                  setPinGatePendingAction(() => () => {
-                    setShowIcalModal(true);
-                    if (!calendarToken && !generatingToken) {
-                      fetchOrCreateCalendarToken(false);
-                    }
-                  });
-                  setPinGateInput('');
-                  setPinGateError('');
-                  setShowPinGateModal(true);
-                  return;
-                }
-
-                setShowIcalModal(true);
-                if (!calendarToken && !generatingToken) {
-                  fetchOrCreateCalendarToken(false);
-                }
-              }}
-              className="hover-scale"
-              title="Unterrichtstermine abonnieren (iCal)"
-              style={{
-                border: 'none',
-                background: brandColor,
-                color: '#ffffff',
-                padding: '8px 16px',
-                borderRadius: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '7px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                fontSize: '0.84rem',
-                fontWeight: 800,
-                minHeight: '38px',
-                width: isMobilePortrait ? '100%' : 'auto',
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                boxSizing: 'border-box'
-              }}
-            >
-              <CalendarPlus size={16} style={{ flexShrink: 0 }} />
-              <span>{isMobilePortrait ? 'Unterrichtstermine abonnieren' : 'Abonnieren'}</span>
-            </button>
-          )}
-        </div>
+        {/* 📅 0.1% Goldstandard: Termine abonnieren Banner (1. Bereich unterhalb des Headers) */}
+        {icalActive && (
+          <CampusEventsSubscribeBanner
+            brandColor={brandColor}
+            onSubscribe={() => window.dispatchEvent(new CustomEvent('campus_open_ical_modal'))}
+            isMobilePortrait={isMobilePortrait}
+          />
+        )}
 
         {/* Tabs switcher (Segmented Pill Carousel) */}
         <div style={{
           display: 'flex',
           background: '#f1f5f9',
-          padding: '5px',
-          borderRadius: '14px',
-          gap: '5px',
+          padding: '4px',
+          borderRadius: '12px',
+          gap: '4px',
           width: '100%',
           boxSizing: 'border-box'
         }}>
@@ -6756,20 +6818,21 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'upcoming' ? '#ffffff' : 'transparent',
               color: lessonTab === 'upcoming' ? brandColor : '#64748b',
-              padding: '10px 12px',
-              borderRadius: '10px',
+              padding: isMobilePortrait ? '8px 4px' : '9px 12px',
+              borderRadius: '9px',
               fontWeight: 800,
-              fontSize: '0.84rem',
+              fontSize: isMobilePortrait ? '0.78rem' : '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: lessonTab === 'upcoming' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+              boxShadow: lessonTab === 'upcoming' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '7px'
+              gap: isMobilePortrait ? '4px' : '6px',
+              whiteSpace: 'nowrap'
             }}
           >
-            <Calendar size={15} /> Kommende
+            <Calendar size={isMobilePortrait ? 13 : 15} style={{ flexShrink: 0 }} /> Kommend
           </button>
           <button
             onClick={() => {
@@ -6784,20 +6847,21 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'past' ? '#ffffff' : 'transparent',
               color: lessonTab === 'past' ? brandColor : '#64748b',
-              padding: '10px 12px',
-              borderRadius: '10px',
+              padding: isMobilePortrait ? '8px 4px' : '9px 12px',
+              borderRadius: '9px',
               fontWeight: 800,
-              fontSize: '0.84rem',
+              fontSize: isMobilePortrait ? '0.78rem' : '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: lessonTab === 'past' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+              boxShadow: lessonTab === 'past' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '7px'
+              gap: isMobilePortrait ? '4px' : '6px',
+              whiteSpace: 'nowrap'
             }}
           >
-            <History size={15} /> Vergangene
+            <History size={isMobilePortrait ? 13 : 15} style={{ flexShrink: 0 }} /> Vergangen
           </button>
           <button
             onClick={() => {
@@ -6812,25 +6876,26 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'cancelled' ? '#ffffff' : 'transparent',
               color: lessonTab === 'cancelled' ? '#ef4444' : '#64748b',
-              padding: '10px 12px',
-              borderRadius: '10px',
+              padding: isMobilePortrait ? '8px 4px' : '9px 12px',
+              borderRadius: '9px',
               fontWeight: 800,
-              fontSize: '0.84rem',
+              fontSize: isMobilePortrait ? '0.78rem' : '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: lessonTab === 'cancelled' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+              boxShadow: lessonTab === 'cancelled' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '7px'
+              gap: isMobilePortrait ? '4px' : '6px',
+              whiteSpace: 'nowrap'
             }}
           >
-            <FileText size={15} /> Absagen-Log
+            <FileText size={isMobilePortrait ? 13 : 15} style={{ flexShrink: 0 }} /> Absagen
           </button>
         </div>
 
         {/* Scrollable list (Single Source of Scroll on Mobile) */}
-        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : 1, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: isMobilePortrait ? undefined : 'none', msOverflowStyle: isMobilePortrait ? undefined : 'none' }}>
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : 1, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {loadingLessons ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Stundenplan lädt...
@@ -7083,7 +7148,7 @@ export function CampusEventsBoard({
         </div>
 
         {/* Unified Timeline List (Single Source of Scroll on Mobile) */}
-        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : '1 1 0%', minHeight: 0, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: isMobilePortrait ? undefined : 'none', msOverflowStyle: isMobilePortrait ? undefined : 'none' }}>
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : '1 1 0%', minHeight: 0, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {(() => {
             const timelineEvents = getMergedTimelineEvents();
             if (loadingEvents) {
@@ -13861,81 +13926,25 @@ export function CampusEventsBoard({
             width: '100%',
             maxWidth: '740px',
             margin: '0 auto',
-            padding: '0 4px',
+            padding: '0 4px calc(76px + max(20px, env(safe-area-inset-bottom, 20px))) 4px',
             display: 'flex',
             flexDirection: 'column',
             gap: '14px',
             boxSizing: 'border-box'
           }}
         >
-          {/* Segmented Top Pill Switcher */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${mobileTabs.length}, 1fr)`,
-            gap: '4px',
-            background: '#f1f5f9',
-            padding: '4px',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '680px',
-            margin: '0 auto',
-            boxSizing: 'border-box'
-          }}>
-            {mobileTabs.map((tab, idx) => {
-              const TabIcon = tab.icon;
-              const isActive = eventsCardIndex === idx;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setEventsCardIndex(idx)}
-                  style={{
-                    padding: '9px 4px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: isActive ? brandColor : 'transparent',
-                    color: isActive ? '#ffffff' : '#64748b',
-                    fontWeight: isActive ? 800 : 700,
-                    fontSize: '0.78rem',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    transition: 'all 0.2s',
-                    boxShadow: isActive ? `0 2px 8px ${brandColor}40` : 'none',
-                    flexShrink: 0
-                  }}
-                >
-                  <TabIcon size={14} /> {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
           {/* Active Card Body */}
           <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
             {mobileTabs[eventsCardIndex]?.render()}
           </div>
 
-          {/* Instagram Page Indicator Dots */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px 0' }}>
-            {mobileTabs.map((_, idx) => (
-              <div
-                key={idx}
-                onClick={() => setEventsCardIndex(idx)}
-                style={{
-                  width: eventsCardIndex === idx ? '18px' : '6px',
-                  height: '6px',
-                  borderRadius: '4px',
-                  background: eventsCardIndex === idx ? brandColor : '#cbd5e1',
-                  cursor: 'pointer',
-                  transition: 'all 0.25s'
-                }}
-              />
-            ))}
-          </div>
+          {/* 🏛️ 0.1% Goldstandard: Mobiles Termine-Bottom-Dock in der Daumenzone */}
+          <CampusEventsMobileBottomBar
+            tabs={mobileTabs}
+            activeIndex={eventsCardIndex}
+            onSelectTab={setEventsCardIndex}
+            brandColor={brandColor}
+          />
         </div>
       ) : (
         <>

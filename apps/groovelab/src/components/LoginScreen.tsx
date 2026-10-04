@@ -21,6 +21,7 @@ import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { isLocalDevEnvironment } from '../utils/devEnvironment';
 import { invalidateActiveSessionsCache, optimisticallyInjectActiveSession } from '../repositories/scheduleRepository';
+import { CampusLoginSponsorBadge } from './ui/CampusLoginSponsorBadge';
 
 
 
@@ -4205,6 +4206,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }}>
           {qrScanPrompt || (schoolName ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`)}
         </p>
+
+        <CampusLoginSponsorBadge schoolId={schoolData?.id} schoolData={schoolData} isGroovelabKiosk={isGroovelabKiosk} />
 
       {/* Main Standard QR-Scanner Card */}
       {expandedSection === 'none' && (

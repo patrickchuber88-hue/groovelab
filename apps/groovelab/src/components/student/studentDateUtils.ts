@@ -161,8 +161,8 @@ export const getSchoolYearString = (dateInput?: string | Date): string => {
     }
   }
   const year = d.getFullYear();
-  const month = d.getMonth(); // 0-indexed (0 = Jan, 8 = Sept)
-  if (month >= 8) {
+  const month = d.getMonth(); // 0-indexed (0 = Jan, 7 = Aug, 8 = Sept)
+  if (month >= 7) {
     return `${year}/${year + 1}`;
   } else {
     return `${year - 1}/${year}`;

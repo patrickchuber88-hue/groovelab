@@ -349,9 +349,9 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                   width: '32px',
                   height: '32px',
                   borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  background: '#f8fafc',
-                  color: '#475569',
+                  border: activePlatform === 'campus' ? '1.5px solid rgba(52, 168, 83, 0.40)' : '1px solid #e2e8f0',
+                  background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.10)' : '#f8fafc',
+                  color: activePlatform === 'campus' ? '#34a853' : '#475569',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -359,7 +359,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 }}
                 className="hover-scale"
               >
-                <X size={18} strokeWidth={2.4} />
+                <X size={18} strokeWidth={2.4} color={activePlatform === 'campus' ? '#34a853' : 'currentColor'} />
               </div>
             </button>
           </div>

@@ -558,6 +558,37 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
       root.style.setProperty('--safe-top', sat);
       root.style.setProperty('--safe-bottom', sab);
 
+      // 2b. Inject Simulator Viewport Classes into Guest Document
+      const viewportCategoryClass = `sim-viewport-${currentPreset.category}`;
+      const viewportOrientationClass = frameWidth > frameHeight ? 'sim-viewport-landscape' : 'sim-viewport-portrait';
+      const viewportPwaClass = isPwa ? 'sim-viewport-pwa' : 'sim-viewport-browser';
+      [root, doc.body].forEach(el => {
+        if (!el) return;
+        Array.from(el.classList).forEach(cls => {
+          if (cls.startsWith('sim-viewport-') || cls === 'pwa-standalone-mode') {
+            el.classList.remove(cls);
+          }
+        });
+        el.classList.add(viewportCategoryClass, viewportOrientationClass, viewportPwaClass);
+        if (isPwa) el.classList.add('pwa-standalone-mode');
+      });
+
+      // 2c. 🏛️ 0,1% Goldstandard: PWA Scrollbar Suppression in Guest Document
+      let simScrollStyle = doc.getElementById('sim-pwa-scrollbar-suppression') as HTMLStyleElement | null;
+      if (isPwa) {
+        if (!simScrollStyle) {
+          simScrollStyle = doc.createElement('style');
+          simScrollStyle.id = 'sim-pwa-scrollbar-suppression';
+          doc.head.appendChild(simScrollStyle);
+        }
+        simScrollStyle.textContent = `
+          * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+          *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+        `;
+      } else if (simScrollStyle) {
+        simScrollStyle.remove();
+      }
+
       // 3. Inject PWA Standalone flag into iframe window
       try {
         Object.defineProperty(iframe.contentWindow.navigator, 'standalone', {

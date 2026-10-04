@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageSquare,
   X,
+  ArrowLeft,
   RotateCcw,
   Check,
   CheckCheck,
@@ -20,6 +21,7 @@ import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { isWebAuthnSupported, getSanitizedRpId } from '../utils/webauthn';
+import { CampusDynamicAvatar } from './CampusDirectMessages';
 
 export interface CampusAppointmentShoutboxModalProps {
   isOpen: boolean;
@@ -153,11 +155,35 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   const timeLabel = startTimeRaw.includes(':') ? startTimeRaw.slice(0, 5) : `${startTimeRaw.slice(0, 2)}:${startTimeRaw.slice(2, 4)}`;
 
   // Determine participants
+  const [fetchedTeacher, setFetchedTeacher] = useState<any | null>(null);
+
   const studentObj = occurrence.student || occurrence.student_user || (currentUserRole === 'student' ? currentUserProfile : null);
-  const studentId = occurrence.student_id || studentObj?.id || (currentUserRole === 'student' ? currentUserId : null);
+  const studentId = occurrence.student_id || occurrence.studentId || studentObj?.id || (currentUserRole === 'student' ? currentUserId : null);
   
-  const teacherObj = occurrence.teacher || occurrence.teacher_profile || (currentUserRole === 'teacher' ? currentUserProfile : null);
-  const teacherId = occurrence.teacher_id || teacherObj?.id || (currentUserRole === 'teacher' ? currentUserId : null);
+  const teacherObj = occurrence.teacher 
+    || occurrence.teacher_profile 
+    || occurrence.teacherUser 
+    || occurrence.teachers
+    || (currentUserRole === 'teacher' ? currentUserProfile : (currentUserProfile?.teacher || currentUserProfile?.teachers || null))
+    || fetchedTeacher;
+
+  const teacherId = occurrence.teacher_id 
+    || occurrence.teacherId 
+    || teacherObj?.id 
+    || (currentUserRole === 'teacher' ? currentUserId : (currentUserProfile?.teacher_id || studentObj?.teacher_id || null));
+
+  useEffect(() => {
+    if (currentUserRole === 'student' && !teacherObj && teacherId) {
+      supabase
+        .from('users')
+        .select('id, first_name, last_name, role, avatar_url, photo_url')
+        .eq('id', teacherId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setFetchedTeacher(data);
+        });
+    }
+  }, [currentUserRole, teacherObj, teacherId]);
 
   const isGroupOcc = Boolean(
     occurrence.isGroup ||
@@ -173,11 +199,23 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
 
   const teacherDisplayName = teacherObj
     ? formatTeacherFullName(teacherObj)
-    : (occurrence.teacher_name ? formatTeacherFullName(occurrence.teacher_name) : 'Deine Lehrkraft');
+    : (occurrence.teacher_name || occurrence.teacherName || currentUserProfile?.teacher_name || currentUserProfile?.teacherName
+        ? formatTeacherFullName(occurrence.teacher_name || occurrence.teacherName || currentUserProfile?.teacher_name || currentUserProfile?.teacherName)
+        : (fetchedTeacher ? formatTeacherFullName(fetchedTeacher) : 'Deine Lehrkraft'));
 
   const otherPartyDisplayName = currentUserRole === 'student'
     ? teacherDisplayName
     : (isGroupOcc ? (occurrence.group_name || 'Gruppe') : studentDisplayName);
+
+  const otherPartyUser = useMemo(() => {
+    if (isGroupOcc) {
+      return { is_group: true, name: occurrence.group_name || otherPartyDisplayName, role: 'group' };
+    }
+    if (currentUserRole === 'student') {
+      return teacherObj || fetchedTeacher || { first_name: teacherDisplayName, role: 'teacher' };
+    }
+    return studentObj || { first_name: studentDisplayName, role: 'student' };
+  }, [isGroupOcc, currentUserRole, teacherObj, fetchedTeacher, teacherDisplayName, studentObj, studentDisplayName, occurrence.group_name, otherPartyDisplayName]);
 
   const titleText = isGroupOcc ? `Gruppen-Shoutbox: ${otherPartyDisplayName}` : `1:1 Shoutbox: ${otherPartyDisplayName}`;
 
@@ -208,6 +246,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   const occDateObj = (y && m && d) ? new Date(y, m - 1, d) : new Date();
   const weekdayShort = occDateObj.toLocaleDateString('de-DE', { weekday: 'short' });
   const formattedOccDate = occDateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const formattedOccDateShort = occDateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  const appointmentSubject = occurrence.instrument || occurrence.subject || occurrence.title || '';
 
   // 1. Helper to extract date from message content
   const extractDateFromMessage = (msg: any): string | null => {
@@ -996,139 +1036,57 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           }} />
         )}
 
-        {/* Header: Apple HIG Morphing Glass Stage */}
-        <div style={{
-          background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
-          padding: isMobile
-            ? 'calc(12px + env(safe-area-inset-top, 0px)) 16px 13px 16px'
-            : '22px 26px 18px 26px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '14px',
-          color: '#ffffff',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(0,0,0,0.06)',
-          transition: 'background 0.3s ease',
-          flexShrink: 0
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '14px', minWidth: 0, flex: 1 }}>
-            {/* Apple Glas-Squircle */}
-            <div style={{
-              width: isMobile ? '38px' : '50px',
-              height: isMobile ? '38px' : '50px',
-              borderRadius: isMobile ? '13px' : '15px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-            }}>
-              <MessageSquare size={isMobile ? 19 : 25} strokeWidth={2.2} />
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
-                <h3 style={{
-                  margin: 0,
-                  fontSize: isMobile ? '1.08rem' : '1.30rem',
-                  fontWeight: 900,
-                  letterSpacing: '-0.02em',
-                  color: '#ffffff',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {isMobile ? otherPartyDisplayName : titleText}
-                </h3>
-                {/* Translucent Status Badge */}
-                <span style={{
-                  padding: isMobile ? '2.5px 8px' : '4px 10px',
-                  borderRadius: '100px',
-                  background: isCanceled ? 'rgba(220, 38, 38, 0.35)' : 'rgba(255, 255, 255, 0.22)',
-                  backdropFilter: 'blur(6px)',
-                  WebkitBackdropFilter: 'blur(6px)',
-                  color: '#ffffff',
-                  border: isCanceled ? '1px solid rgba(254, 202, 202, 0.4)' : '1px solid rgba(255, 255, 255, 0.3)',
-                  fontSize: isMobile ? '0.68rem' : '0.80rem',
-                  fontWeight: 800,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0
-                }}>
-                  {isCanceled ? <X size={11} strokeWidth={3} /> : (isReactivated ? <RotateCcw size={11} strokeWidth={2.5} /> : (isRescheduled ? <Clock size={11} strokeWidth={2.5} /> : <Check size={11} strokeWidth={3} />))}
-                  <span>{isCanceled ? 'Termin abgesagt' : (isReactivated ? 'Regulär (Reaktiviert)' : (isRescheduled ? 'Verschoben' : 'Regulär'))}</span>
+        {/* Header: Apple HIG Dual-Tier Full-Width Stage */}
+        <div style={{ background: "linear-gradient(135deg, #15803d 0%, #166534 100%)", display: "flex", flexDirection: "column", color: "#ffffff", boxShadow: "0 4px 16px rgba(21, 128, 61, 0.16)", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
+          {/* Tier 1: Identitäts- & Steuerungs-Ebene (100% Breite) */}
+          <div style={{ padding: isMobile ? "calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 10px) 14px 8px 14px" : "14px 24px 10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "9px" : "12px", minWidth: 0, flex: 1, overflow: "hidden" }}>
+              <button type="button" onClick={onClose} aria-label="Zurück" style={{ background: "rgba(255, 255, 255, 0.2)", border: "none", borderRadius: "10px", cursor: "pointer", color: "#ffffff", width: "32px", height: "32px", minWidth: "32px", minHeight: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation" }}>
+                <ArrowLeft size={16} />
+              </button>
+              <CampusDynamicAvatar user={{ ...otherPartyUser, roles: [] }} size={isMobile ? 36 : 40} variant="on-dark" />
+              <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0, overflow: "hidden" }}>
+                <h4 style={{ margin: 0, fontSize: isMobile ? "0.98rem" : "1.10rem", fontWeight: 850, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {otherPartyDisplayName}
+                </h4>
+                <span style={{ fontSize: "0.62rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", background: "rgba(255, 255, 255, 0.22)", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.35)", padding: "2px 6px", borderRadius: "6px", display: "inline-block", flexShrink: 0 }}>
+                  {currentUserRole === "student" ? "Lehrer" : "Schüler"}
                 </span>
               </div>
-
-              <p style={{
-                margin: '3px 0 0 0',
-                color: 'rgba(255, 255, 255, 0.92)',
-                fontSize: isMobile ? '0.76rem' : '0.92rem',
-                fontWeight: 650,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '7px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                <span>{weekdayShort}, {formattedOccDate}</span>
-                <span style={{ opacity: 0.6 }}>•</span>
-                <span>{timeLabel} Uhr</span>
-                {!isMobile && (
-                  <>
-                    <span style={{ opacity: 0.6 }}>•</span>
-                    <span style={{ color: '#ffffff', fontWeight: 800 }}>{otherPartyDisplayName}</span>
-                  </>
-                )}
-                {isGroupOcc && (
-                  <>
-                    <span style={{ opacity: 0.6 }}>•</span>
-                    <span style={{ opacity: 0.9 }}>Gruppe</span>
-                  </>
-                )}
-              </p>
             </div>
           </div>
 
-          {/* Frosted Glass Close Button */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Schließen"
-            style={{
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              background: 'rgba(255, 255, 255, 0.18)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              color: '#ffffff',
-              borderRadius: '50%',
-              width: isMobile ? '34px' : '38px',
-              height: isMobile ? '34px' : '38px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              flexShrink: 0
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.32)';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            <X size={isMobile ? 16 : 19} strokeWidth={2.5} />
-          </button>
+          {/* Tier 2: Termin-Bühne & Status-Ribbon (100% Volle Breite) */}
+          <div style={{ width: "100%", boxSizing: "border-box", background: "rgba(0, 0, 0, 0.14)", borderTop: "1px solid rgba(255, 255, 255, 0.12)", padding: isMobile ? "6px 14px 7px 14px" : "7px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden", color: "rgba(255, 255, 255, 0.95)", fontSize: isMobile ? "0.74rem" : "0.80rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+              <Calendar size={isMobile ? 12 : 13} color="#ffffff" style={{ flexShrink: 0, opacity: 0.9 }} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                {weekdayShort}, {formattedOccDateShort} • {timeLabel} Uhr{appointmentSubject ? ` • ${appointmentSubject}` : ""}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+              <span title="DSGVO-konform geschützt" style={{ fontSize: "0.64rem", fontWeight: 750, background: "rgba(255, 255, 255, 0.16)", border: "1px solid rgba(255, 255, 255, 0.28)", color: "#ffffff", padding: "2px 7px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                <ShieldCheck size={11} color="#ffffff" />
+                <span>DSGVO</span>
+              </span>
+
+              {isCanceled ? (
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(239, 68, 68, 0.25)", border: "1px solid rgba(252, 165, 165, 0.45)", color: "#fecaca", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                  <X size={10} strokeWidth={3} /> <span>Entfällt</span>
+                </span>
+              ) : isRescheduled ? (
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(245, 158, 11, 0.25)", border: "1px solid rgba(253, 230, 138, 0.45)", color: "#fef08a", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                  <RotateCcw size={9} strokeWidth={2.6} /> <span>Verlegt</span>
+                </span>
+              ) : (
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(34, 197, 94, 0.22)", border: "1px solid rgba(134, 239, 172, 0.40)", color: "#bbf7d0", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#86efac", display: "inline-block" }} />
+                  <span>Planmäßig</span>
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Child Protection Banner (§ 8a SGB VIII) - Desktop Only */}
@@ -1264,16 +1222,21 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           )}
 
           {reconciledMessages.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.88rem', textAlign: 'center', padding: '32px 20px', gap: '10px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '20px', margin: 'auto 0' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                <Calendar size={24} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: 'auto 0', padding: isMobile ? '16px 12px' : '26px 20px', gap: '12px', width: '100%', maxWidth: '380px', alignSelf: 'center' }}>
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '14px 18px', width: '100%', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '14px', boxSizing: 'border-box' }}>
+                <div style={{ width: '44px', height: '46px', borderRadius: '12px', background: isCanceled ? '#fef2f2' : '#f0fdf4', border: isCanceled ? '1px solid #fecaca' : '1px solid #bbf7d0', color: isCanceled ? '#dc2626' : '#15803d', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 850, textTransform: 'uppercase', lineHeight: 1 }}>{weekdayShort}</span>
+                  <span style={{ fontSize: '1.08rem', fontWeight: 900, lineHeight: 1.15 }}>{formattedOccDate.split('.')[0]}</span>
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{occurrence.instrument || occurrence.subject || 'Unterrichtstermin'}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 750, padding: '2px 7px', borderRadius: '100px', background: isCanceled ? '#fef2f2' : '#f0fdf4', color: isCanceled ? '#b91c1c' : '#15803d', flexShrink: 0 }}>{isCanceled ? 'Entfällt' : `${timeLabel} Uhr`}</span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>{isCanceled ? 'Termin wurde storniert' : 'Geschützte Direktnachrichten für diesen Termin'}</div>
+                </div>
               </div>
-              <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
-                Termingekoppelter Schulchat
-              </h5>
-              <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.45, maxWidth: '280px' }}>
-                Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
-              </p>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 650, textAlign: 'center' }}>Tippe auf eine Schnellnachricht oder gib unten Text ein:</div>
             </div>
           ) : (
             reconciledMessages.map((msg, idx) => {
@@ -1436,7 +1399,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           flexDirection: 'column',
           gap: isMobile ? '8px' : '10px',
           padding: isMobile
-            ? '10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px'
+            ? '10px 14px calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 10px) 14px'
             : '12px 24px 16px 24px',
           flexShrink: 0
         }}>
@@ -1565,17 +1528,21 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
-              padding: isMobile ? '10px 16px' : '14px 20px',
-              borderRadius: '16px',
-              background: '#eff6ff',
-              border: '1.5px solid #bfdbfe',
+              gap: '10px',
+              padding: isMobile ? '6px 6px 6px 14px' : '8px 8px 8px 16px',
+              borderRadius: '100px',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
               width: '100%',
-              boxSizing: 'border-box'
+              minHeight: isMobile ? '44px' : '48px',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', color: '#1e40af', fontSize: isMobile ? '0.82rem' : '0.94rem', fontWeight: 750 }}>
-                <Lock size={isMobile ? 16 : 18} color="#2563eb" style={{ flexShrink: 0 }} />
-                <span>Antworten durch Eltern geschützt (Lesen frei)</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: isMobile ? '0.78rem' : '0.86rem', fontWeight: 700, minWidth: 0, overflow: 'hidden' }}>
+                <Lock size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Antworten durch Eltern geschützt (Lesen frei)
+                </span>
               </div>
               <button
                 type="button"
@@ -1591,20 +1558,20 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   background: '#2563eb',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '10px',
-                  padding: isMobile ? '7px 14px' : '9px 18px',
-                  minHeight: isMobile ? '38px' : '42px',
-                  fontSize: isMobile ? '0.80rem' : '0.88rem',
+                  borderRadius: '100px',
+                  padding: isMobile ? '6px 13px' : '8px 16px',
+                  fontSize: isMobile ? '0.74rem' : '0.82rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.22)',
                   whiteSpace: 'nowrap',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '5px',
+                  flexShrink: 0
                 }}
               >
-                <ShieldCheck size={15} color="#ffffff" strokeWidth={2.4} />
+                <ShieldCheck size={14} color="#ffffff" strokeWidth={2.4} />
                 <span>Mit PIN freischalten</span>
               </button>
             </div>

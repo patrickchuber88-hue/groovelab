@@ -5,6 +5,7 @@ import {
   Clock, ShieldCheck, HelpCircle, Timer, AlertCircle, Edit3, Sliders, Wrench, Compass
 } from 'lucide-react';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
+import { CampusSponsorIngressBanner } from '../../ui/CampusSponsorIngressBanner';
 import { MobileBriefingCarousel } from '../../ui/MobileBriefingCarousel';
 import { TourStartButton } from '../../PremiumOnboardingTour';
 import { BriefingNotesCard } from '../../notes/BriefingNotesCard';
@@ -1208,6 +1209,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         ) : briefingData ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {renderEmergencyCallout(false)}
+            <CampusSponsorIngressBanner schoolId={schoolData?.id || teacher?.school_id} sponsorSettings={schoolData?.sponsor_settings} isReady={!briefingLoading} />
             <UpdateAnnouncementHero userId={userId} activePlatform={activePlatform} />
 
             {/* Planning Active Banners */}
@@ -1936,15 +1938,15 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             <button
               onClick={() => handleToggleTeacherBriefingSidebar(true)}
               style={{
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
+                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.08)' : '#f8fafc',
+                border: activePlatform === 'campus' ? '1.5px solid rgba(52, 168, 83, 0.30)' : '1.5px solid #e2e8f0',
                 borderRadius: '10px',
                 padding: '6px 10px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
                 cursor: 'pointer',
-                color: '#64748b',
+                color: activePlatform === 'campus' ? '#34a853' : '#64748b',
                 fontSize: '0.72rem',
                 fontWeight: 800,
                 transition: 'all 0.15s ease',
@@ -1955,7 +1957,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               title="Sidebar einklappen"
             >
               <span>Einklappen</span>
-              <ChevronRight size={14} color="#64748b" />
+              <ChevronRight size={14} color={activePlatform === 'campus' ? '#34a853' : '#64748b'} />
             </button>
           </div>
           

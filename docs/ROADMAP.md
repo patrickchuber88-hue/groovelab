@@ -4,6 +4,28 @@ Dieses Dokument dient als zentrale Entwicklungs-Roadmap für geplante, evaluiert
 
 ---
 
+## ☁️ Sovereign Cloud-Infrastruktur: IONOS Basic Cube M ➔ Memory Cube M Roadmap
+
+* **Status:** 🟢 **STRATEGISCH FIXIERT (Launch-Vorbereitung)**
+* **Bereich:** Enterprise Cloud-Infrastruktur, Datensouveränität & ISO/IEC 27001
+* **Zielgruppe:** Plattformbetrieb (Patrick Huber) & Schulträger
+
+### 1. Ausgangsbefund & Strategische Härtung
+Der weltweite KI- und SaaS-Boom führt bei Budget-Hostern zu massiven Verknappungen bei 3-Euro-Cloud-Instanzen durch Hobby-Entwickler und Bot-Farmen. 
+Um für Schulleitungen und kommunale Schulträger absolute Betriebs- und Versorgungssicherheit zu garantieren, setzt Campus-Groovelab auf die deutsche Enterprise- und Mittelstands-Cloud von **IONOS** (ISO/IEC 27001 zertifiziert, Rechenzentren in Frankfurt am Main, Berlin und Karlsruhe, 0 % US-Cloud-Act).
+
+### 2. Zwei-Stufen Skalierungs-Architektur
+1. **Stufe 1: Pilot & Startphase (1 bis 15 Schulen) – `IONOS Basic Cube M`:**
+   - **Spezifikation:** 4 vCPUs, 8 GB RAM, 240 GB NVMe Storage.
+   - **Ressourcen-Puffer:** Der gesamte Docker-Stack (PostgreSQL, PostgREST, GoTrue, Realtime, Storage, Nginx WAF) benötigt im Normalbetrieb ca. 2,5 bis 3,5 GB RAM. Mit 8 GB RAM verfügt das System über **> 50 % Puffer** (Zero Swapping, Zero OOM-Risiko).
+   - **Kosten:** ca. 20–25 € / Monat (perfekt abgedeckt durch den vereinbarten 169 € Infrastruktur-Fixabzug in der Partnervereinbarung).
+2. **Stufe 2: Skalierungs- & Multiplikationsphase (ab 15–20 Schulen) – `IONOS Memory Cube M`:**
+   - **Spezifikation:** 4 vCPUs, 16 GB RAM, 240 GB NVMe Storage.
+   - **Performance-Fokus:** Verdopplung des Arbeitsspeichers auf 16 GB RAM, wodurch PostgreSQL die gesamten aktiven Tabellen, B-Tree-Indexe und Realtime-Verbindungen vollständig im flüchtigen RAM hält (Garantie für Sub-5-Millisekunden-Latenzen bei parallelen Spitzenlasten).
+   - **Reibungslose Migration:** Durch vollständige Containerisierung (Docker Compose) und das automatisierte Backup-Skript `scripts/backup_supabase_enterprise.sh` erfolgt der Umzug auf die neue Cube-Instanz in unter 15 Minuten mit minimaler Ausfallzeit (< 2 Min.).
+
+---
+
 ## 🏆 Priorität 1: Modulare Dashboard-Konsolidierung & Shared Suite Core (Admin / Sekretariat / Master-Admin)
 
 * **Status:** 🚀 **PRIORITÄT 1 (In Vorbereitung / Nächster Kern-Meilenstein)**

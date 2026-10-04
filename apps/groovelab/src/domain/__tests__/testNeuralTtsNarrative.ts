@@ -1,4 +1,4 @@
-import { buildContinuousHomeworkNarrative } from '../../services/neuralTtsService';
+import { buildContinuousHomeworkNarrative, formatSingleBookForSpeech, formatSingleSongForSpeech } from '../../services/neuralTtsService';
 
 function runTests() {
   console.log('🧪 Starting Neural TTS Narrative Tests...\n');
@@ -190,6 +190,53 @@ function runTests() {
     throw new Error('Test 10 Failed: Found repetitive phrase in audio section');
   }
   console.log('✅ Test 10 Passed!\n');
+
+  // Test 11: 0.1% Goldstandard Typo-Tolerance, Audio Dates, and Single Item Formats
+  const t11 = buildContinuousHomeworkNarrative({
+    books: [{ title: 'Guitar Fitness', pages: [1, 2, 3] }],
+    songs: [{ title: 'Numb', artist: 'Linken Park' }],
+    audioRecordings: [{ label: 'Übung · 21. Sep.' }]
+  });
+  console.log('Test 11 (0.1% Goldstandard Typo-Tolerance & Audio Dates):');
+  console.log(t11);
+  if (!t11.includes('Gittahr Fitness')) {
+    throw new Error('Test 11 Failed: Expected Guitar Fitness to be pronounced as Gittahr Fitness');
+  }
+  if (!t11.includes('auf den Seiten 1 bis drei')) {
+    throw new Error('Test 11 Failed: Expected auf den Seiten 1 bis drei');
+  }
+  if (!t11.includes('Namm von Linkin Pahrk')) {
+    throw new Error('Test 11 Failed: Expected typo Linken Park to be transliterated to Linkin Pahrk and Numb to Namm');
+  }
+  if (!t11.includes('Übung, 21. September')) {
+    throw new Error('Test 11 Failed: Expected Übung · 21. Sep. to be smoothed to Übung, 21. September');
+  }
+
+  const singleBook = formatSingleBookForSpeech({ title: 'Guitar Fitness', pages: [1, 2, 3] });
+  if (!singleBook.startsWith('Im Lehrwerk Gittahr Fitness übst du auf den Seiten 1 bis drei.')) {
+    throw new Error('Test 11 Failed: Expected warm single book sentence');
+  }
+
+  const singleSong = formatSingleSongForSpeech({ title: 'Numb', artist: 'Linken Park' });
+  if (!singleSong.startsWith('Beim Song Namm von Linkin Pahrk übst du das Stück weiter.')) {
+    throw new Error('Test 11 Failed: Expected warm single song sentence');
+  }
+  console.log('✅ Test 11 Passed!\n');
+
+  // Test 12: 0.1% Goldstandard Hermetic Exclusion of EarLab and System Tokens
+  const t12 = buildContinuousHomeworkNarrative({
+    books: [{ title: 'Guitar Fitness', pages: [1, 2, 3] }],
+    generalNotes: 'EARLAB_SCORE:D1|Intervalle|100%|+50XP\nWORLDTOUR_MASTERY:FR\nBitte Metronom verwenden'
+  });
+  console.log('Test 12 (Hermetic Exclusion of EarLab & Metadata Tokens):');
+  console.log(t12);
+  if (t12.includes('Intervalle') || t12.includes('EARLAB') || t12.includes('WORLDTOUR')) {
+    throw new Error('Test 12 Failed: Found leaked metadata token in audio stream');
+  }
+  if (!t12.includes('Ein wichtiger Hinweis von deiner Lehrkraft: Bitte Metronom verwenden.')) {
+    throw new Error('Test 12 Failed: Expected genuine didactic note to be spoken');
+  }
+  console.log('✅ Test 12 Passed!\n');
 
   console.log('🎉 ALL NEURAL TTS NARRATIVE TESTS PASSED WITH FLYING COLORS!');
 }

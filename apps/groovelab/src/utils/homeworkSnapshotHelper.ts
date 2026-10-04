@@ -137,7 +137,11 @@ export function isPureDidacticNote(entry: unknown): entry is string {
     'STUDENT_NOTE_PUBLIC:',
     'STUDENT_NOTE_PRIVATE:',
     'STUDENT_QUESTION:',
-    '❓ Frage für den Unterricht:'
+    '❓ Frage für den Unterricht:',
+    'EARLAB_SCORE:',
+    'EARLAB:',
+    'WORLDTOUR_MASTERY:',
+    'RHYTHM_SCORE:'
   ];
 
   return !forbiddenPrefixes.some(pfx => trimmed.startsWith(pfx));

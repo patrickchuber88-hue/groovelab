@@ -121,6 +121,33 @@ export function useAudioBiographyData(
           }));
         }
 
+        // 🌟 Check Supabase audio_milestones for teacher verification status & unerasability (Phase 4)
+        if (studentId && studentId !== 'anonymous_student' && studentId.length >= 20) {
+          try {
+            const { data: dbMilestones } = await supabase
+              .from('audio_milestones')
+              .select('milestone_type, status, is_unerasable, verified_at')
+              .eq('student_id', studentId);
+
+            if (dbMilestones && dbMilestones.length > 0) {
+              const statusMap = new Map(dbMilestones.map((dm: any) => [dm.milestone_type, dm]));
+              loadedMilestones = loadedMilestones.map((lm) => {
+                const dbMatch: any = statusMap.get(lm.type);
+                if (dbMatch) {
+                  return {
+                    ...lm,
+                    isVerified: dbMatch.status === 'verified_masterpiece' || !!dbMatch.verified_at || lm.isVerified,
+                    isUnerasable: dbMatch.is_unerasable ?? lm.isUnerasable
+                  };
+                }
+                return lm;
+              });
+            }
+          } catch (e) {
+            console.warn('[useAudioBiographyData] Note on cloud milestones check:', e);
+          }
+        }
+
         // Hydrate audio blobs from IndexedDB
         const hydratedMilestones = await Promise.all(
           loadedMilestones.map(async (m) => {

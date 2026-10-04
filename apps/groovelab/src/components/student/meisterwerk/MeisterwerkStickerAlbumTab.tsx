@@ -1345,7 +1345,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                         <span style={{ 
                                           fontSize: isCollected ? '2.6rem' : '2.3rem', 
                                           zIndex: 1, 
-                                          filter: isCollected ? 'none' : 'grayscale(15%) brightness(0.85) opacity(0.90)',
+                                          filter: isCollected ? 'none' : 'grayscale(20%) brightness(0.80) opacity(0.65)',
                                           userSelect: 'none'
                                         }}>
                                           {st.emoji}
@@ -1365,7 +1365,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                             objectFit: 'cover',
                                             borderRadius: '50%',
                                             zIndex: 2,
-                                            filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(15%) brightness(0.85) opacity(0.92)',
+                                            filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(20%) brightness(0.80) opacity(0.68)',
                                             transition: 'opacity 0.2s ease-in-out'
                                           }}
                                           onError={(e) => {
@@ -1694,11 +1694,11 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         )
                       ) : isHallOfFameTier ? (
                         <>
-                          <Lock size={11} color="#eab308" /> Legende
+                          <Award size={11} color="#eab308" /> Stufe #{targetYear}
                         </>
                       ) : (
                         <>
-                          <Lock size={11} /> Gesperrt
+                          <Compass size={11} color="#94a3b8" /> Stufe #{targetYear}
                         </>
                       )}
                     </span>
@@ -1740,7 +1740,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                       <span style={{ 
                         fontSize: isCollected ? '3rem' : '2.6rem', 
                         zIndex: 1, 
-                        filter: isCollected ? 'none' : 'grayscale(40%) brightness(0.60) opacity(0.70)',
+                        filter: isCollected ? 'none' : 'grayscale(20%) brightness(0.80) opacity(0.65)',
                         userSelect: 'none'
                       }}>
                         {st.emoji}
@@ -1759,7 +1759,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           objectFit: 'cover',
                           borderRadius: '50%',
                           zIndex: 2,
-                          filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(40%) brightness(0.60) opacity(0.70)',
+                          filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'grayscale(20%) brightness(0.80) opacity(0.68)',
                           transition: 'opacity 0.2s ease-in-out'
                         }}
                         onError={(e) => {
@@ -1775,16 +1775,12 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
 
                     {!isCollected && (
                       <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        borderRadius: '50%',
-                        background: isHallOfFameTier ? 'rgba(25, 20, 10, 0.45)' : 'rgba(8, 13, 24, 0.35)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: isHallOfFameTier ? '#facc15' : '#94a3b8'
+                        position: 'absolute', bottom: '2px', right: '2px', width: '26px', height: '26px', borderRadius: '50%',
+                        background: 'rgba(15, 23, 42, 0.90)', border: isHallOfFameTier ? '1.5px solid rgba(250, 204, 21, 0.7)' : '1px solid rgba(255, 255, 255, 0.2)',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 4, pointerEvents: 'none'
                       }}>
-                        <Lock size={22} color={isHallOfFameTier ? '#eab308' : '#64748b'} />
+                        <Compass size={13} color={isHallOfFameTier ? '#facc15' : '#94a3b8'} />
                       </div>
                     )}
                   </div>
@@ -1824,8 +1820,8 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                       {isCurrentYear 
                         ? '🎒 Dein aktives Campus-Wappen'
                         : isCollected 
-                        ? (isHallOfFameTier ? `👑 Im ${targetYear}. Jahr (Hall of Fame) erreicht` : `✓ Im ${targetYear}. Campus-Schuljahr erhalten`)
-                        : (isHallOfFameTier ? `🏆 Hall of Fame: Freischaltung im ${targetYear}. Jahr` : `🔒 Freischaltung im ${targetYear}. Campus-Jahr`)}
+                        ? (isHallOfFameTier ? `👑 Im ${targetYear}. Jahr (Hall of Fame) erhalten` : `✓ Im ${targetYear}. Campus-Schuljahr erhalten`)
+                        : (isHallOfFameTier ? `🏆 Hall of Fame: Begleitet dich ab dem ${targetYear}. Jahr` : `⏳ Begleitet dich ab dem ${targetYear}. Campus-Jahr`)}
                     </span>
                   </div>
                 </div>
@@ -1976,12 +1972,23 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
                       }} />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '0.68rem', fontWeight: 750, color: '#94a3b8' }}>
-                      <span>🎒 Start (1. Jahr)</span>
-                      <span>🌱 Grundstufe (3. Jahr)</span>
-                      <span>⚡ 5. Jahr (Jubiläum)</span>
-                      <span>🎓 Regelausbildung (6. Jahr)</span>
-                      <span>🏆 Diplom &amp; Hall of Fame (9. Jahr)</span>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: '8px',
+                      fontSize: isMobileOrSim ? '0.62rem' : '0.68rem',
+                      fontWeight: 800,
+                      color: '#94a3b8',
+                      gap: '4px',
+                      overflowX: 'auto',
+                      scrollbarWidth: 'none'
+                    }}>
+                      <span style={{ whiteSpace: 'nowrap' }}>🎒 {isMobileOrSim ? 'Start (J1)' : 'Start (1. Jahr)'}</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>🌱 {isMobileOrSim ? 'Grundstufe (J3)' : 'Grundstufe (3. Jahr)'}</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>⚡ {isMobileOrSim ? 'Jubiläum (J5)' : '5. Jahr (Jubiläum)'}</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>🎓 {isMobileOrSim ? 'Abschluss (J6)' : 'Regelausbildung (6. Jahr)'}</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>🏆 {isMobileOrSim ? 'Diplom (J9)' : 'Diplom & Hall of Fame (9. Jahr)'}</span>
                     </div>
                   </div>
                 </div>
@@ -2034,9 +2041,10 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                       borderRadius: '14px',
                       display: 'inline-flex',
                       alignItems: 'center',
+                      whiteSpace: 'nowrap',
                       gap: '4px'
                     }}>
-                      {unlockedRegularCount} / 6 Wappen
+                      {unlockedRegularCount} / 6 Wappen {unlockedRegularCount > 0 ? `• Stufe #${cycleYear} aktiv` : ''}
                     </span>
                   </div>
 
@@ -2716,7 +2724,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         <span style={{ 
                           fontSize: isCollected ? '3.8rem' : '3.2rem', 
                           zIndex: 1, 
-                          filter: isCollected ? 'none' : 'grayscale(15%) brightness(0.85) contrast(1.1)',
+                          filter: isCollected ? 'none' : 'grayscale(18%) brightness(0.82) opacity(0.75) contrast(1.1)',
                           userSelect: 'none'
                         }}>
                           {st.emoji}
@@ -2728,7 +2736,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           style={{ 
                             position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
                             borderRadius: '50%', zIndex: 2,
-                            filter: isCollected ? 'none' : 'grayscale(15%) brightness(0.88) contrast(1.05)'
+                            filter: isCollected ? 'none' : 'grayscale(18%) brightness(0.82) opacity(0.78) contrast(1.05)'
                           }}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';

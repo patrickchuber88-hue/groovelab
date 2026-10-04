@@ -15,6 +15,7 @@ import {
 import { generateSponsorPitchPDF } from '../../../utils/sponsorPitchPdfGenerator';
 import { UniversalPdfPreviewModal } from '../../modals/UniversalPdfPreviewModal';
 import { supabase as defaultSupabase } from '../../../lib/supabase';
+import { CampusSponsorIngressBanner } from '../../ui/CampusSponsorIngressBanner';
 
 export type SponsorTier = 'foerderer' | 'partner' | 'haupt';
 
@@ -26,6 +27,7 @@ export interface SchoolSponsorItem {
   tier?: SponsorTier;
   customToastText?: string;
   websiteUrl?: string;
+  logoUrl?: string;
   isMainSponsor: boolean;
   isActive: boolean;
   createdAt: string;
@@ -817,7 +819,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                     cursor: 'pointer'
                   }}
                 >
-                  🧒 Schüler-Toast
+                  🧒 Schüler-Banner (0,1% Ingress)
                 </button>
                 <button
                   type="button"
@@ -850,86 +852,35 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
               overflow: 'hidden'
             }}>
               {previewTab === 'toast' ? (
-                /* DER HELLE EDLE TOAST (Frosted Pearl Pill - 48px Tactile Height) */
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.96)',
-                  backdropFilter: 'blur(24px) saturate(190%)',
-                  WebkitBackdropFilter: 'blur(24px) saturate(190%)',
-                  border: '1px solid rgba(255, 255, 255, 0.9)',
-                  boxShadow: '0 16px 40px -6px rgba(15, 23, 42, 0.14), 0 4px 14px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1)',
-                  borderRadius: '100px',
-                  padding: '8px 16px 8px 12px',
-                  minHeight: '48px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  maxWidth: '100%',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  animation: 'fadeIn 0.3s ease'
-                }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '10px',
-                    background: 'rgba(34, 197, 94, 0.14)',
-                    border: '1px solid rgba(34, 197, 94, 0.28)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Sparkles size={16} color="#16a34a" />
-                  </div>
-
-                  <div style={{ fontSize: '0.88rem', fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
-                    <span style={{ color: (mainSponsor || coSponsor) ? '#0f172a' : '#64748b', fontWeight: (mainSponsor || coSponsor) ? 750 : 600, fontStyle: (mainSponsor || coSponsor) ? 'normal' : 'italic' }}>
-                      {(() => {
-                        if (mainSponsor && coSponsor && settings.allowCoSponsorsWithMain !== false) {
-                          if (mainSponsor.city && coSponsor.city && mainSponsor.city.toLowerCase() === coSponsor.city.toLowerCase()) {
-                            return `Ermöglicht durch ${mainSponsor.companyName} & ${coSponsor.companyName}, ${mainSponsor.city}`;
-                          } else if (mainSponsor.city && coSponsor.city) {
-                            return `Ermöglicht durch ${mainSponsor.companyName} (${mainSponsor.city}) & ${coSponsor.companyName} (${coSponsor.city})`;
-                          }
-                          const city = mainSponsor.city || coSponsor.city;
-                          return `Ermöglicht durch ${mainSponsor.companyName} & ${coSponsor.companyName}${city ? `, ${city}` : ''}`;
+                /* 🏛️ 0.1% GOLDSTANDARD INGRESS RIBBON PREVIEW */
+                <div style={{ width: '100%', maxWidth: '780px', animation: 'fadeIn 0.3s ease' }}>
+                  <CampusSponsorIngressBanner
+                    schoolId={schoolId}
+                    previewMode={true}
+                    previewCompanyText={(() => {
+                      if (mainSponsor && coSponsor && settings.allowCoSponsorsWithMain !== false) {
+                        return `${mainSponsor.companyName} & ${coSponsor.companyName}`;
+                      }
+                      const single = mainSponsor || coSponsor;
+                      if (single) {
+                        return single.customToastText
+                          ? single.customToastText.replace(/^Ermöglicht durch\s*/i, '')
+                          : single.companyName;
+                      }
+                      return '[Name Ihres Bildungspartners]';
+                    })()}
+                    previewLocationBadge={(() => {
+                      if (mainSponsor && coSponsor && settings.allowCoSponsorsWithMain !== false) {
+                        if (mainSponsor.city && coSponsor.city && mainSponsor.city.toLowerCase() === coSponsor.city.toLowerCase()) {
+                          return mainSponsor.city;
+                        } else if (mainSponsor.city && coSponsor.city) {
+                          return `${mainSponsor.city} • ${coSponsor.city}`;
                         }
-                        const single = mainSponsor || coSponsor;
-                        if (single) {
-                          return single.customToastText || (single.city ? `Ermöglicht durch ${single.companyName}, ${single.city}` : `Ermöglicht durch ${single.companyName}`);
-                        }
-                        return 'Ermöglicht durch [Name Ihres Bildungspartners – Branche, Ort]';
-                      })()}
-                    </span>
-                  </div>
-
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    background: mainSponsor ? '#f0fdf4' : '#f1f5f9',
-                    border: mainSponsor ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                    color: mainSponsor ? '#15803d' : '#64748b',
-                    padding: '3px 10px',
-                    borderRadius: '100px',
-                    letterSpacing: '0.02em',
-                    flexShrink: 0
-                  }}>
-                    {mainSponsor ? 'Schul-Patenschaft' : 'Vorschau-Muster'}
-                  </span>
-
-                  {/* 2.5px micro-progress bar preview */}
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: '2.5px',
-                      background: 'linear-gradient(90deg, #16a34a, #22c55e)',
-                      opacity: 0.65,
-                      borderRadius: '0 0 100px 100px'
-                    }}
+                        return mainSponsor.city || coSponsor.city || '';
+                      }
+                      const single = mainSponsor || coSponsor;
+                      return single?.city || '[Ort]';
+                    })()}
                   />
                 </div>
               ) : (

@@ -133,7 +133,11 @@ Deno.serve(async (req) => {
 
     // 1% Tier-1 SaaS Query Parameters
     const filterParam = url.searchParams.get('filter')
-    const allowedFilters = filterParam ? filterParam.split(',').map(s => s.trim().toLowerCase()) : ['lessons', 'campus_events']
+    const allowedFilters = filterParam === 'none'
+      ? []
+      : filterParam
+      ? filterParam.split(',').map(s => s.trim().toLowerCase())
+      : ['lessons', 'campus_events']
     const shouldIncludeLessons = allowedFilters.includes('lessons')
     const shouldIncludeCampusEvents = allowedFilters.includes('campus_events')
     const shouldIncludeHolidays = url.searchParams.get('holidays') === '1' || allowedFilters.includes('holidays')

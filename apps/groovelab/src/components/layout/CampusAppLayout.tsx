@@ -4,7 +4,6 @@ import { CampusDesktopSidebar } from './CampusDesktopSidebar';
 import { CampusDesktopHeader } from './CampusDesktopHeader';
 import { CampusMainContentRouter, CampusMainContentRouterProps } from './CampusMainContentRouter';
 import { GeminiMobileShell } from '../navigation/GeminiMobileShell';
-import { MobileBottomNav } from '../ui/MobileBottomNav';
 import { PwaInstallationModals } from '../ui/PwaInstallationModals';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 
@@ -310,12 +309,19 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         onSwitchActiveRole={handleSwitchActiveRole}
       />
 
-      {/* 📱 WhatsApp 0.1% Goldstandard: Hide global shell & bottom nav when a chat is open on mobile */}
+      {/* 📱 0.1% Goldstandard: Mobile Sub-Dock & Chat Isolation */}
       {(() => {
         const isMobileActiveChat = Boolean(isMobile && activeStudentTab === 'messages' && selectedCampusRecipient);
+        const hasDedicatedSubDock = Boolean(
+          isMobile && (
+            activeStudentTab === 'homework_book' ||
+            activeStudentTab === 'events' ||
+            (activeStudentTab === 'briefing' && activePlatform === 'campus')
+          )
+        );
 
         return (
-          <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''}`} style={{ paddingTop: '0' }}>
+          <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''} ${hasDedicatedSubDock ? 'has-mobile-sub-dock' : ''}`} style={{ paddingTop: '0' }}>
             {!isMobileActiveChat && (
               <GeminiMobileShell
                 user={user}
@@ -517,19 +523,6 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
           setSelectedTeacher={setSelectedTeacher}
         />
 
-        {/* Mobile Native Bottom Navigation Bar (Controlled via CSS for Mobile & Simulator) */}
-        {user && !isMobileActiveChat && (
-          <MobileBottomNav
-            activeTab={activeStudentTab}
-            setActiveTab={setActiveStudentTab}
-            activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
-            setActivePlatform={(p) => setActivePlatform(p)}
-            userRole={user?.role?.toLowerCase() || 'student'}
-            hasCampusActive={hasCampusActive}
-            hasGrooveLabActive={hasGrooveLabActive}
-            unreadCount={campusUnreadCount}
-          />
-        )}
 
         {/* Help FAB (Only for logged-in students in Lab Mode with active station on the Groovelab platform) */}
         {user && activePlatform === 'groovelab' && user.role === 'student' && locationMode === 'lab' && session?.station_id && (

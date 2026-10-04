@@ -90,6 +90,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   });
 
   const [, setNavVersion] = useState(0);
+  const [briefingSidebarOpen, setBriefingSidebarOpen] = useState(false);
 
   React.useEffect(() => {
     const handleLevelChangeEvt = (e: any) => {
@@ -106,13 +107,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     const handlePermissionChange = () => {
       setNavVersion(v => v + 1);
     };
+    const handleBriefingSidebarState = (e: any) => {
+      setBriefingSidebarOpen(Boolean(e?.detail?.isOpen));
+    };
     window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
     window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
     window.addEventListener('campus_board_permission_changed', handlePermissionChange);
+    window.addEventListener('campus_briefing_sidebar_state', handleBriefingSidebarState);
     return () => {
       window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
       window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
       window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
+      window.removeEventListener('campus_briefing_sidebar_state', handleBriefingSidebarState);
     };
   }, []);
 
@@ -149,6 +155,30 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     }
   };
 
+  const getBrandColor = () => {
+    switch (activePlatform) {
+      case 'campus': return '#34a853';
+      case 'groovelab': return '#eab308';
+      case 'admin': return '#ea4335';
+      default: return '#34a853';
+    }
+  };
+  const brandColor = getBrandColor();
+
+  const handleTabTap = (tabId: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(10);
+      }
+    } catch {}
+    // 🏛️ 0,1% Goldstandard: Wenn der Schüler im Briefing auf Termine klickt, öffnet sich das native Bottom Sheet
+    if (activeTab === 'briefing' && tabId === 'events' && activePlatform === 'campus' && userRole === 'student') {
+      window.dispatchEvent(new CustomEvent('campus_open_briefing_sidebar'));
+      return;
+    }
+    setActiveTab(tabId);
+  };
+
   // Define 1:1 menu items matching Desktop Left Sidebar in exact order
   const getMenuItems = (): MenuItem[] => {
     if (userRole === 'student') {
@@ -183,7 +213,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           ...(isMeisterwerkEnabled ? [{ id: 'homework_book', label: 'Aufgaben', icon: BookOpen }] : []),
           { id: 'practice_board', label: 'Übe-Pfad', icon: Zap },
           { id: 'events', label: 'Termine', icon: Calendar },
-          { id: 'campus_cup', label: 'Performance', icon: Trophy },
           { id: 'messages', label: 'Nachrichten', icon: Mail, badge: unreadCount },
           { 
             id: 'settings', 
@@ -604,10 +633,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         </div>
       )}
 
-      {/* Responsive Bottom Navigation Bar */}
+      {/* 🏛️ 0.1% Goldstandard: Apple HIG Frosted Pearl Mobile Bottom Dock */}
       <nav 
         className="cg-mobile-bottom-nav" 
-        role="navigation" 
+        role="tablist" 
         aria-label="Hauptnavigation Unten"
         style={{
           display: 'flex',
@@ -622,42 +651,86 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           width: '100%',
           boxSizing: 'border-box',
           gap: isSmartphone ? '2px' : '6px',
-          padding: isSmartphone 
-            ? '0 6px calc(env(safe-area-inset-bottom, 0px) + 4px) 6px'
-            : '0 12px calc(env(safe-area-inset-bottom, 0px) + 4px) 12px'
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
         }}
       >
         {displayedTabs.map(item => {
           const TabIcon = item.icon;
-          const isActive = activeTab === item.id || 
+          const isEventsSidebarActive = item.id === 'events' && activeTab === 'briefing' && briefingSidebarOpen;
+          const isBriefingSuppressed = item.id === 'briefing' && briefingSidebarOpen;
+          const isActive = isEventsSidebarActive || (!isBriefingSuppressed && (
+            activeTab === item.id || 
             (item.id === 'briefing' && activePlatform === 'campus' && (activeTab === 'live' || activeTab === 'compass')) ||
             (item.id === 'homework_book' && (activeTab === 'tasks' || activeTab === 'homework')) ||
             (item.id === 'practice_board' && (activeTab === 'practice' || activeTab === 'focus_timer' || activeTab === 'loopstation')) ||
-            (item.id === 'events' && (activeTab === 'termine' || activeTab === 'all_appointments')) ||
-            (item.id === 'campus_cup' && (activeTab === 'ranking' || activeTab === 'performance'));
+            (item.id === 'events' && (activeTab === 'termine' || activeTab === 'all_appointments'))
+          ));
           return (
             <button
               key={item.id}
               ref={el => { itemRefs.current[item.id] = el; }}
-              className={`cg-bottom-nav-item ${isActive ? getActiveThemeClass() : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={0}
+              onClick={() => handleTabTap(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleTabTap(item.id);
+                }
+              }}
               style={{
                 touchAction: 'manipulation',
                 flex: isSmartphone ? '1 1 0%' : '0 0 auto',
                 minWidth: isSmartphone ? 0 : '68px',
                 width: isSmartphone ? '100%' : 'auto',
-                padding: isSmartphone ? '6px 2px' : '6px 8px'
+                height: '100%',
+                minHeight: '44px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                border: 'none',
+                borderRadius: 0,
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: '2px 0',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                boxSizing: 'border-box'
               }}
-              onClick={() => setActiveTab(item.id)}
             >
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <TabIcon size={20} color="currentColor" />
+              {/* Apple Squircle Pill Indicator */}
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '24px',
+                  borderRadius: '12px',
+                  background: isActive ? `${brandColor}18` : 'transparent',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <TabIcon
+                  size={18}
+                  color={isActive ? brandColor : '#94a3b8'}
+                  strokeWidth={isActive ? 2.4 : 1.9}
+                />
                 {item.badge && item.badge > 0 ? (
                   <span style={{
                     position: 'absolute',
-                    top: '-5px',
-                    right: '-7px',
+                    top: '-4px',
+                    right: '-6px',
                     background: '#ef4444',
-                    color: 'white',
+                    color: '#ffffff',
                     borderRadius: '999px',
                     padding: '1px 5px',
                     fontSize: '9px',
@@ -668,30 +741,101 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   </span>
                 ) : null}
               </div>
-              <span style={isSmartphone ? { fontSize: '10.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' } : undefined}>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: isActive ? 800 : 600,
+                  color: isActive ? brandColor : '#64748b',
+                  letterSpacing: isActive ? '-0.01em' : '0',
+                  transition: 'color 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '100%'
+                }}
+              >
                 {item.label}
               </span>
             </button>
           );
         })}
 
-        {/* Menü Drawer Button as the final item at the end */}
+        {/* Menü Drawer Button as the final 5th item */}
         <button
-          className={`cg-bottom-nav-item ${drawerOpen || (isSmartphone && isSecondaryActive) ? getActiveThemeClass() : ''}`}
+          type="button"
+          role="tab"
+          aria-selected={drawerOpen || (isSmartphone && isSecondaryActive)}
+          aria-label="Gesamtes Menü öffnen"
+          tabIndex={0}
           style={{
             touchAction: 'manipulation',
             flex: isSmartphone ? '1 1 0%' : '0 0 auto',
-            minWidth: isSmartphone ? 0 : undefined,
-            width: isSmartphone ? '100%' : undefined,
-            padding: isSmartphone ? '6px 2px' : undefined
+            minWidth: isSmartphone ? 0 : '68px',
+            width: isSmartphone ? '100%' : 'auto',
+            height: '100%',
+            minHeight: '44px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '3px',
+            border: 'none',
+            borderRadius: 0,
+            background: 'transparent',
+            cursor: 'pointer',
+            padding: '2px 0',
+            transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            boxSizing: 'border-box'
           }}
-          onClick={() => setDrawerOpen(true)}
+          onClick={() => {
+            try {
+              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                navigator.vibrate(10);
+              }
+            } catch {}
+            setDrawerOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setDrawerOpen(true);
+            }
+          }}
           title="Gesamtes Menü öffnen"
         >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Menu size={20} color="currentColor" />
+          <div
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '40px',
+              height: '24px',
+              borderRadius: '12px',
+              background: (drawerOpen || (isSmartphone && isSecondaryActive)) ? `${brandColor}18` : 'transparent',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <Menu
+              size={18}
+              color={(drawerOpen || (isSmartphone && isSecondaryActive)) ? brandColor : '#94a3b8'}
+              strokeWidth={(drawerOpen || (isSmartphone && isSecondaryActive)) ? 2.4 : 1.9}
+            />
           </div>
-          <span style={isSmartphone ? { fontSize: '10.5px' } : undefined}>Menü</span>
+          <span
+            style={{
+              fontSize: '0.68rem',
+              fontWeight: (drawerOpen || (isSmartphone && isSecondaryActive)) ? 800 : 600,
+              color: (drawerOpen || (isSmartphone && isSecondaryActive)) ? brandColor : '#64748b',
+              letterSpacing: (drawerOpen || (isSmartphone && isSecondaryActive)) ? '-0.01em' : '0',
+              transition: 'color 0.15s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Menü
+          </span>
         </button>
       </nav>
     </>

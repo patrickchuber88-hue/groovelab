@@ -43,6 +43,9 @@ import { PlaylistsGridView } from './audioBiography/views/PlaylistsGridView';
 import { JuniorAudioHubView } from './audioBiography/views/JuniorAudioHubView';
 import { FloatingMiniPlayer } from './audioBiography/views/FloatingMiniPlayer';
 
+// 🌟 Domain Services
+import { persistJuniorRecording } from './audioBiography/services/juniorAudioPersistence';
+
 // 🌟 Audio Storage Helper for Dual-Mastering Tri-Storage
 import { getSecureAudioUrl, buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
 import { storeBlob, getBlob } from '../../utils/blobStorage';
@@ -461,39 +464,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     }
   };
 
-  // Junior Save Handler
+  // 🌟 Junior Save Handler (0,1% Enterprise Goldstandard Persistence Engine)
   const handleJuniorSaveCompleted = (savedData: any) => {
-    if (savedData.milestoneId) {
-      const updated = milestones.map((m) =>
-        m.id === savedData.milestoneId
-          ? {
-              ...m,
-              audioUrl: savedData.audioUrl,
-              masteredAudioUrl: savedData.masteredAudioUrl,
-              duration: savedData.duration,
-              recordedAt: new Date().toLocaleDateString('de-DE')
-            }
-          : m
-      );
-      saveMilestones(updated);
-      if (updated.filter((m) => !!m.audioUrl).length === updated.length) {
-        setShowMasteryCompleteModal(true);
-      }
-    } else if (savedData.playlistId) {
-      const newTrack: CustomPlaylistTrack = {
-        id: `track_${Date.now()}`,
-        title: savedData.title || `Stück ${new Date().toLocaleDateString('de-DE')}`,
-        subtitle: savedData.subtitle || 'Aufnahme',
-        audioUrl: savedData.audioUrl,
-        masteredAudioUrl: savedData.masteredAudioUrl,
-        duration: savedData.duration,
-        recordedAt: new Date().toLocaleDateString('de-DE')
-      };
-      const updated = customPlaylists.map((pl) =>
-        pl.id === savedData.playlistId ? { ...pl, tracks: [...pl.tracks, newTrack] } : pl
-      );
-      savePlaylists(updated);
-    }
+    persistJuniorRecording({
+      savedData,
+      milestones,
+      customPlaylists,
+      studentId,
+      student,
+      schoolId: student?.school_id || (student as any)?.schoolId || 'global',
+      saveMilestones,
+      savePlaylists,
+      onMasteryComplete: () => setShowMasteryCompleteModal(true)
+    });
   };
 
   // 🛡️ Audio-Tresor Gate Screen

@@ -3849,15 +3849,14 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               );
             })()}
 
-            {/* ========================================================================= */}
-            {/* 🎓 PRO STUDIO: HELLES APPLE HIG DESIGN (16+ J.) - 1:1 JUNIOR PARITÄT      */}
-            {/* ========================================================================= */}
+            {/* 🎓 PRO STUDIO: HELLES APPLE HIG DESIGN (16+ J.) - 1:1 JUNIOR PARITÄT */}
             {studentUiLevel === 'pro' && (() => {
               const streak = avatar?.streak_flame || 0;
               const targetMins = getTargetMinutes(streak);
               const targetSeconds = targetMins * 60;
               const weekMetrics = getDeterministicWeekMetrics();
               const { weekDays, weekPracticedCount, availableShields } = weekMetrics;
+              const todayProgress = Math.min(1, (weekDays.find((d: any) => d.isToday)?.totalDaySecs || 0) / targetSeconds);
               const elapsedSecs = secondsElapsedRef.current || secondsElapsed;
               const isGoalReached = elapsedSecs >= targetSeconds;
               const currentMins = Math.floor(elapsedSecs / 60);
@@ -4600,7 +4599,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             stroke="rgba(0, 0, 0, 0.03)"
                             strokeWidth="1"
                           />
-                          {/* Active Progress Arc (Apple Health Style) */}
+                          {/* Active Progress Arc (Apple Health Style - Dynamischer Tagesfortschritt) */}
                           <circle
                             cx="100"
                             cy="100"
@@ -4609,8 +4608,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             stroke="url(#proAppleHealthGradient)"
                             strokeWidth="8.5"
                             strokeDasharray={2 * Math.PI * 88}
-                            strokeDashoffset={2 * Math.PI * 88 * 0.18}
+                            strokeDashoffset={2 * Math.PI * 88 * (1 - todayProgress)}
                             strokeLinecap="round"
+                            style={{ opacity: todayProgress > 0 ? 1 : 0, transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }}
                             filter="url(#proDialGlow)"
                           />
                         </svg>

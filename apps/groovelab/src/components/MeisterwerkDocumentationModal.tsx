@@ -56,7 +56,7 @@ import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { resolveCampusStudentAvatar, getEffectiveInstrument } from '../utils/avatarResolutionEngine';
 import { formatTeacherFullName, copyTextToClipboard, capitalizeFirstLetter, formatSongTitleCase } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
-import { getSimulatedNow, CANONICAL_LEHRWERK_COLOR, getLehrwerkColor as getLehrwerkColorUtil, getSongColor, getWeeksBetween, getWeekDateRange } from './student/studentDateUtils';
+import { getSimulatedNow, getSchoolYearString, CANONICAL_LEHRWERK_COLOR, getLehrwerkColor as getLehrwerkColorUtil, getSongColor, getWeeksBetween, getWeekDateRange } from './student/studentDateUtils';
 import { renderSongVinylCover } from './student/CampusVinylCoverArt';
 import { broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 import { useMeisterwerkAudioRecording } from './student/meisterwerk/hooks/useMeisterwerkAudioRecording';
@@ -2797,8 +2797,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         height: isEmbed ? '100%' : (isMobileOrSim ? '100%' : '92vh'),
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        position: 'relative'
+        overflow: isMobileOrSim ? 'visible' : 'hidden',
+        position: isMobileOrSim ? 'static' : 'relative'
       }}
     >
       {/* Embedded Style Block - Universal for ALL Tabs */}
@@ -2929,31 +2929,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           width: auto !important;
           gap: 8px !important;
         }
-        [class*="sim-viewport"] .modal-content-container,
-        .sim-viewport-mobile .modal-content-container,
-        .sim-viewport-portrait .modal-content-container,
-        .sim-viewport-tablet .modal-content-container {
-          flex-direction: column !important;
-          overflow-y: auto !important;
-          height: auto !important;
-          flex: 1 1 0% !important;
-          min-height: 0 !important;
-          -webkit-overflow-scrolling: touch !important;
-        }
-        [class*="sim-viewport"] .modal-content-container > div,
-        .sim-viewport-mobile .modal-content-container > div,
-        .sim-viewport-portrait .modal-content-container > div,
-        .sim-viewport-tablet .modal-content-container > div {
-          width: 100% !important;
-          max-width: 100% !important;
-          height: auto !important;
-          max-height: none !important;
-          flex: none !important;
-          min-height: 0 !important;
-          overflow-y: visible !important;
-          box-sizing: border-box !important;
-          border-right: none !important;
-          border-left: none !important;
+        @media (max-width: 768px), [class*="sim-viewport"], .sim-viewport-mobile, .sim-viewport-portrait {
+          .modal-content-container {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+            height: auto !important;
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+          }
+          .modal-content-container > div {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            flex: none !important;
+            min-height: 0 !important;
+            overflow-y: visible !important;
+            box-sizing: border-box !important;
+            border-right: none !important;
+            border-left: none !important;
+          }
         }
       `}} />
       <MeisterwerkHeader
@@ -3004,10 +3001,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           touchStartXRef.current = null;
           touchStartYRef.current = null;
 
-          if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
-            if (deltaX < -40) {
+          if (Math.abs(deltaX) > 85 && Math.abs(deltaX) > Math.abs(deltaY) * 2.5) {
+            if (deltaX < -85) {
               setMobileProtokollTab('homework');
-            } else if (deltaX > 40) {
+            } else if (deltaX > 85) {
               setMobileProtokollTab('repertoire');
             }
           }
@@ -3021,6 +3018,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             : 'hidden',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
           minHeight: 0,
           background: '#f8fafc',
           padding: '0',
@@ -3416,13 +3414,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               progressItems: progressItems || [],
               studentCreatedAt: student?.activated_at || student?.created_at || (student as any)?.registration_date,
               activatedAt: student?.activated_at || student?.created_at || (student as any)?.registration_date,
-              selectedSchoolYear: '2025/2026'
+              selectedSchoolYear: getSchoolYearString()
             })}
             renderSchoolYearSelector={() => null} awardSticker={() => {}}
             awardedStickerToAnimate={null} setAwardedStickerToAnimate={() => {}}
             downloadShareCard={() => {}} topicName={topicName}
             actualStudentName={displayedStudentName} studentInstrument={(student as any)?.instrument}
-            shareCard={undefined} selectedSchoolYear="2025/2026" currentSchoolYear="2025/2026"
+            shareCard={undefined} selectedSchoolYear={getSchoolYearString()} currentSchoolYear={getSchoolYearString()}
             student={student} schoolName={propSchoolName || ''}
           />
         ) : activeModalTab === 'audiobiography' ? (
@@ -3724,6 +3722,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       {(isMobileOrSim || isMobileView) && activeModalTab !== 'stickeralbum' && (
         <MeisterwerkMobileBottomBar
+          hubTab={hubTab}
           mobileProtokollTab={mobileProtokollTab} setMobileProtokollTab={setMobileProtokollTab}
           activeViewMode={activeViewMode} setActiveViewMode={setActiveViewMode}
           activeModalTab={activeModalTab} setActiveModalTab={setActiveModalTab}

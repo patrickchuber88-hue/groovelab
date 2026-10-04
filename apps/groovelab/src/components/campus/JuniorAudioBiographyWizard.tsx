@@ -66,6 +66,11 @@ export const PRO_COVER_PRESETS = [
   { id: 'cov_current_repertoire', label: 'Mein Repertoire', emoji: '🎼', gradient: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' },
 ];
 
+export const JUNIOR_MILESTONE_SHORT_TITLES: Record<number, string> = {
+  1: 'Erster Ton', 2: 'Tonleiter', 3: 'Happy Birthday', 4: 'Musik-Geschenk', 5: 'Weihnachtslied',
+  6: 'Erstes Solo', 7: 'Eigener Song', 8: 'Lieblingslied', 9: 'Schweres Stück', 10: 'Meisterstück'
+};
+
 export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProps> = ({
   isOpen,
   onClose,
@@ -81,7 +86,13 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
   const instrument = (student?.instrument || student?.main_instrument || 'Gitarre').trim();
 
   // Wizard Steps: 1: Goal Selection, 2: Instrument Ready, 3: Recording, 4: Celebration & Save
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  // Seamless Context Flow: Start at step 2 when opened for a specific milestone or playlist
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(() =>
+    (initialMilestoneId || initialPlaylistId) ? 2 : 1
+  );
+
+  const familyShareMs = useMemo(() => milestones.find(m => m.type === 'family_share'), [milestones]);
+  const isFamilyShareCompleted = Boolean(familyShareMs?.audioUrl);
 
   // 1. Goal Decision: 'milestone' | 'playlist' | 'gift'
   const nextOpenMilestone = useMemo(() => {
@@ -105,6 +116,37 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
 
   // Path 1: Milestone State
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneData>(nextOpenMilestone);
+  const isDirectMilestone4 = Boolean(
+    (initialMilestoneId && (initialMilestoneId === familyShareMs?.id || initialMilestoneId === 'family_share' || initialMilestoneId === selectedMilestone?.id)) ||
+    (selectedMilestone?.type === 'family_share' || selectedMilestone?.stepNumber === 4)
+  );
+  const isMilestone4Selected = (selectedGoalType === 'milestone' || isDirectMilestone4) && (selectedMilestone?.type === 'family_share' || selectedMilestone?.stepNumber === 4);
+  const isGiftFlow = selectedGoalType === 'gift' || isMilestone4Selected;
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep((initialMilestoneId || initialPlaylistId) ? 2 : 1);
+    }
+  }, [isOpen, initialMilestoneId, initialPlaylistId]);
+
+  useEffect(() => {
+    if (initialMilestoneId) {
+      const found = milestones.find(m => m.id === initialMilestoneId || m.type === initialMilestoneId);
+      if (found) {
+        setSelectedMilestone(found);
+        setSelectedGoalType(found.type === 'family_share' ? 'gift' : 'milestone');
+      }
+    } else if (initialPlaylistId) {
+      if (initialPlaylistId === 'pl_gifts') {
+        setSelectedGoalType('gift');
+      } else {
+        setSelectedGoalType('playlist');
+        setSelectedPlaylistId(initialPlaylistId);
+      }
+    } else if (!selectedMilestone && nextOpenMilestone) {
+      setSelectedMilestone(nextOpenMilestone);
+    }
+  }, [initialMilestoneId, initialPlaylistId, milestones, selectedMilestone, nextOpenMilestone]);
 
   // Path 2: Playlist State (Pro-Level Principles)
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>(
@@ -119,8 +161,16 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
   // Path 3: Gift State
   const [selectedRecipient, setSelectedRecipient] = useState(JUNIOR_GIFT_RECIPIENTS[0]);
 
-  // Common Song Title
-  const [songTitle, setSongTitle] = useState<string>('');
+  // Common Song Title (Synchronous default prevents Step 2 title flicker)
+  const [songTitle, setSongTitle] = useState<string>(() => {
+    if (initialMilestoneId) {
+      const found = milestones.find(m => m.id === initialMilestoneId || m.type === initialMilestoneId);
+      if (found?.type === 'family_share') return `Mein Musik-Geschenk für ${JUNIOR_GIFT_RECIPIENTS[0].name} 🎁`;
+      if (found?.title) return found.title;
+    }
+    if (initialPlaylistId === 'pl_gifts') return `Mein Musik-Geschenk für ${JUNIOR_GIFT_RECIPIENTS[0].name} 🎁`;
+    return nextOpenMilestone?.title || 'Mein Meilenstein';
+  });
 
   // Sticker Choice (Step 4)
   const [selectedSticker, setSelectedSticker] = useState(JUNIOR_STICKER_REWARDS[0]);
@@ -152,21 +202,11 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
   // Map instrument to profile and emoji
   const instrumentInfo = useMemo(() => {
     const inst = instrument.toLowerCase();
-    if (inst.includes('klavier') || inst.includes('piano') || inst.includes('flügel') || inst.includes('tasten')) {
-      return { emoji: '🎹', name: 'Klavier', profile: 'grand_piano' as MasteringProfile, tip: 'Stelle dein Tablet links oder rechts neben die Tastatur.' };
-    }
-    if (inst.includes('schlagzeug') || inst.includes('drum') || inst.includes('cajon') || inst.includes('percussion')) {
-      return { emoji: '🥁', name: 'Schlagzeug', profile: 'drums_percussion' as MasteringProfile, tip: 'Stelle dein Tablet 2 Meter vor das Set auf einen Stuhl oder Tisch.' };
-    }
-    if (inst.includes('gesang') || inst.includes('stimme') || inst.includes('sax') || inst.includes('trompete') || inst.includes('posaune') || inst.includes('klarinette')) {
-      return { emoji: '🎷', name: 'Blasinstrument / Gesang', profile: 'brass_vocals' as MasteringProfile, tip: 'Halte ca. 1 Meter Abstand zum Mikrofon.' };
-    }
-    if (inst.includes('geige') || inst.includes('violine') || inst.includes('cello') || inst.includes('bratsche') || inst.includes('kontrabass')) {
-      return { emoji: '🎻', name: 'Streichinstrument', profile: 'acoustic_audiophile' as MasteringProfile, tip: 'Stelle dein Gerät in Notenständer-Höhe auf.' };
-    }
-    if (inst.includes('flöte') || inst.includes('blockflöte') || inst.includes('querflöte')) {
-      return { emoji: '🪈', name: 'Flöte', profile: 'acoustic_audiophile' as MasteringProfile, tip: 'Halte etwas Abstand zum Mikrofon, damit es warm klingt.' };
-    }
+    if (inst.includes('klavier') || inst.includes('piano') || inst.includes('flügel') || inst.includes('tasten')) return { emoji: '🎹', name: 'Klavier', profile: 'grand_piano' as MasteringProfile, tip: 'Stelle dein Tablet links oder rechts neben die Tastatur.' };
+    if (inst.includes('schlagzeug') || inst.includes('drum') || inst.includes('cajon') || inst.includes('percussion')) return { emoji: '🥁', name: 'Schlagzeug', profile: 'drums_percussion' as MasteringProfile, tip: 'Stelle dein Tablet 2 Meter vor das Set auf einen Stuhl oder Tisch.' };
+    if (inst.includes('gesang') || inst.includes('stimme') || inst.includes('sax') || inst.includes('trompete') || inst.includes('posaune') || inst.includes('klarinette')) return { emoji: '🎷', name: 'Blasinstrument / Gesang', profile: 'brass_vocals' as MasteringProfile, tip: 'Halte ca. 1 Meter Abstand zum Mikrofon.' };
+    if (inst.includes('geige') || inst.includes('violine') || inst.includes('cello') || inst.includes('bratsche') || inst.includes('kontrabass')) return { emoji: '🎻', name: 'Streichinstrument', profile: 'acoustic_audiophile' as MasteringProfile, tip: 'Stelle dein Gerät in Notenständer-Höhe auf.' };
+    if (inst.includes('flöte') || inst.includes('blockflöte') || inst.includes('querflöte')) return { emoji: '🪈', name: 'Flöte', profile: 'acoustic_audiophile' as MasteringProfile, tip: 'Halte etwas Abstand zum Mikrofon, damit es warm klingt.' };
     return { emoji: '🎸', name: instrument || 'Gitarre', profile: 'acoustic_audiophile' as MasteringProfile, tip: 'Lege dein Tablet etwa 1 bis 2 Schritte neben dein Instrument.' };
   }, [instrument]);
 
@@ -176,26 +216,17 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
       setSongTitle(selectedMilestone?.title || 'Mein Meilenstein');
     } else if (selectedGoalType === 'gift') {
       setSongTitle(`Mein Musik-Geschenk für ${selectedRecipient.name} 🎁`);
-    } else {
-      if (!songTitle || songTitle.startsWith('Mein Meilenstein') || songTitle.startsWith('Mein Musik-Geschenk')) {
-        setSongTitle('Mein Lieblingssong');
-      }
+    } else if (!songTitle || songTitle.startsWith('Mein Meilenstein') || songTitle.startsWith('Mein Musik-Geschenk')) {
+      setSongTitle('Mein Lieblingssong');
     }
   }, [selectedGoalType, selectedMilestone, selectedRecipient]);
 
   // Clean-up on unmount
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      if (countInIntervalRef.current) clearInterval(countInIntervalRef.current);
-      if (previewAudioRef.current) {
-        previewAudioRef.current.pause();
-        previewAudioRef.current = null;
-      }
-    };
+  useEffect(() => () => {
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (countInIntervalRef.current) clearInterval(countInIntervalRef.current);
+    if (previewAudioRef.current) { previewAudioRef.current.pause(); previewAudioRef.current = null; }
   }, []);
 
   // Web Audio Synth Chime for Celebrations
@@ -206,21 +237,15 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
       const ctx = new AudioCtx();
       const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
       notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = freq;
         gain.gain.setValueAtTime(0, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + idx * 0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.08 + 0.45);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + idx * 0.08);
-        osc.stop(ctx.currentTime + idx * 0.08 + 0.5);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.08); osc.stop(ctx.currentTime + idx * 0.08 + 0.5);
       });
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   };
 
   // Start Count-In with Pre-Warmed Stream
@@ -398,25 +423,22 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
     try {
       const finalTitle = songTitle.trim() || 'Mein Musikstück';
       const isGiftGoal = selectedGoalType === 'gift';
-      const familyShareMs = milestones.find(m => m.type === 'family_share');
-      
-      const targetType: 'milestone' | 'playlist' = (isGiftGoal || selectedGoalType === 'milestone') ? 'milestone' : 'playlist';
-      const targetMilestoneId = isGiftGoal 
-        ? (familyShareMs?.id || selectedMilestone.id) 
-        : (selectedGoalType === 'milestone' ? selectedMilestone.id : undefined);
+      const isMilestoneGoal = selectedGoalType === 'milestone';
+
+      // Harmonize: Link Milestone 4 if gift is recorded and milestone 4 not yet completed, or if milestone 4 itself was chosen
+      const shouldLinkMilestone4 = isMilestone4Selected || (isGiftGoal && !isFamilyShareCompleted && Boolean(familyShareMs));
+      const targetMilestoneId = shouldLinkMilestone4 ? (selectedMilestone?.id || familyShareMs?.id) : (isMilestoneGoal ? selectedMilestone?.id : undefined);
+      const targetType: 'milestone' | 'playlist' = (targetMilestoneId || isGiftFlow) ? 'milestone' : 'playlist';
+      const targetPlaylistId = isGiftFlow ? 'pl_gifts' : (selectedGoalType === 'playlist' && !isCreatingNewPlaylist && selectedPlaylistId !== 'new') ? selectedPlaylistId : undefined;
 
       await onSaveCompleted({
         targetType,
         milestoneId: targetMilestoneId,
-        playlistId: isGiftGoal 
-          ? 'pl_gifts'
-          : (selectedGoalType === 'playlist' && !isCreatingNewPlaylist && selectedPlaylistId !== 'new') 
-          ? selectedPlaylistId 
-          : undefined,
+        playlistId: targetPlaylistId,
         newPlaylistTitle: (selectedGoalType === 'playlist' && isCreatingNewPlaylist) ? (newPlaylistTitle.trim() || 'Meine neue Playlist') : undefined,
         newPlaylistCoverPreset: (selectedGoalType === 'playlist' && isCreatingNewPlaylist) ? newPlaylistCover : undefined,
         title: finalTitle,
-        personalNote: isGiftGoal 
+        personalNote: isGiftFlow 
           ? `Geschenk für ${selectedRecipient.name} • Gespielt von ${studentFirstName} auf ${instrumentInfo.name} ${instrumentInfo.emoji}`
           : `Aufgenommen von ${studentFirstName} mit ${instrumentInfo.name} ${instrumentInfo.emoji}`,
         rawBlob: rawAudioBlob,
@@ -453,76 +475,46 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
 
   return (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 23, 42, 0.85)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 99999,
-      padding: '16px'
+      position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.85)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 99999, padding: '16px'
     }}>
       {showConfetti && (
         <Confetti
           width={typeof window !== 'undefined' ? window.innerWidth : 500}
           height={typeof window !== 'undefined' ? window.innerHeight : 800}
-          recycle={false}
-          numberOfPieces={350}
-          gravity={0.25}
+          recycle={false} numberOfPieces={350} gravity={0.25}
         />
       )}
 
       <div style={{
-        background: '#ffffff',
-        borderRadius: '32px',
-        maxWidth: '580px',
-        width: '100%',
-        maxHeight: '92vh',
-        overflowY: 'auto',
+        background: '#ffffff', borderRadius: '32px', maxWidth: '580px', width: '100%',
+        maxHeight: '92vh', overflowY: 'auto',
         boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0,0,0,0.06)',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
+        display: 'flex', flexDirection: 'column', position: 'relative',
         animation: 'modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
       }}>
         {/* Header Bar */}
         <div style={{
-          padding: '20px 24px 16px 24px',
-          borderBottom: '1px solid #f1f5f9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: '20px 24px 16px 24px', borderBottom: '1px solid #f1f5f9',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
-          borderTopLeftRadius: '32px',
-          borderTopRightRadius: '32px'
+          borderTopLeftRadius: '32px', borderTopRightRadius: '32px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '12px',
-              background: '#ecfdf5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.25rem',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
+              width: '38px', height: '38px', borderRadius: '12px', background: '#ecfdf5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.25rem', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
             }}>
               ✨
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  color: '#10b981',
-                  background: '#d1fae5',
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em'
+                  fontSize: '0.68rem', fontWeight: 900, color: '#10b981', background: '#d1fae5',
+                  padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.04em'
                 }}>
                   Schritt {currentStep} von 4
                 </span>
@@ -534,28 +526,22 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 {currentStep === 1 && 'Was möchtest du aufnehmen?'}
                 {currentStep === 2 && 'Dein Instrument startklar machen'}
                 {currentStep === 3 && 'Studio-Aufnahme'}
-                {currentStep === 4 && (selectedGoalType === 'gift' ? 'Dein fertiges Musik-Geschenk 🎁' : 'Deine Audio-Trophäe 🏆')}
+                {currentStep === 4 && (isGiftFlow ? 'Dein fertiges Musik-Geschenk 🎁' : 'Deine Audio-Trophäe 🏆')}
               </h2>
             </div>
           </div>
 
           <button
+            type="button"
+            aria-label="Aufnahme-Assistent schließen"
             onClick={() => {
               if (previewAudioRef.current) previewAudioRef.current.pause();
               onClose();
             }}
             style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              border: 'none',
-              background: '#f1f5f9',
-              color: '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'background 0.15s ease'
+              width: '34px', height: '34px', borderRadius: '50%', border: 'none',
+              background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', transition: 'background 0.15s ease'
             }}
           >
             <X size={18} />
@@ -579,7 +565,16 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 
                 {/* 🏆 Option 1: Meilenstein einspielen */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedGoalType('milestone')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedGoalType('milestone');
+                    }
+                  }}
+                  aria-label="Option 1: Meilenstein einspielen"
                   style={{
                     padding: '16px',
                     borderRadius: '20px',
@@ -597,17 +592,10 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '16px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.4rem',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-                        flexShrink: 0
+                        width: '48px', height: '48px', borderRadius: '16px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '1.4rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)', flexShrink: 0
                       }}>
                         🏆
                       </div>
@@ -616,18 +604,18 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                           <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#10b981', color: 'white', padding: '1px 7px', borderRadius: '100px' }}>
                             MEILENSTEIN
                           </span>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: selectedMilestone.type === 'first_song' ? '#fef3c7' : '#dcfce7', color: selectedMilestone.type === 'first_song' ? '#b45309' : '#047857', padding: '1px 7px', borderRadius: '100px' }}>
-                            +{selectedMilestone.type === 'first_song' ? 100 : 50} XP
+                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: selectedMilestone?.type === 'first_song' ? '#fef3c7' : '#dcfce7', color: selectedMilestone?.type === 'first_song' ? '#b45309' : '#047857', padding: '1px 7px', borderRadius: '100px' }}>
+                            +{selectedMilestone?.type === 'first_song' ? 100 : 50} XP
                           </span>
                           <span style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 800 }}>
-                            Stufe {selectedMilestone.stepNumber} von {milestones.length}
+                            Stufe {selectedMilestone?.stepNumber ?? 1} von {milestones.length || 10}
                           </span>
                         </div>
                         <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
                           1. Meilenstein einspielen
                         </div>
                         <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                          Aktuell gewählt: <strong>{selectedMilestone.title}</strong>
+                          Aktuell gewählt: <strong>{selectedMilestone?.title ?? 'Erster Ton'}</strong>
                         </div>
                       </div>
                     </div>
@@ -640,47 +628,37 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
 
                   {/* Milestone Picker (if selected) */}
                   {selectedGoalType === 'milestone' && (
-                    <div style={{
-                      paddingTop: '10px',
-                      borderTop: '1px dashed #cbd5e1',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}>
+                    <div style={{ paddingTop: '10px', borderTop: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#047857' }}>
                         Wähle eine der {milestones.length} Stufen aus:
                       </span>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '6px'
-                      }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                         {milestones.map(m => {
-                          const isMSelected = selectedMilestone.id === m.id;
+                          const isMSelected = selectedMilestone?.id === m.id;
+                          const shortTitle = JUNIOR_MILESTONE_SHORT_TITLES[m.stepNumber] || (m.title || '')
+                            .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+                            .replace(/^Mein(?:e|er|es)?\s+/i, '')
+                            .trim();
                           return (
                             <button
                               key={m.id}
                               type="button"
+                              title={m.title}
+                              aria-label={`Stufe ${m.stepNumber}: ${shortTitle}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedMilestone(m);
                               }}
                               style={{
-                                padding: '8px 6px',
-                                borderRadius: '12px',
+                                padding: '8px 6px', borderRadius: '12px', textAlign: 'center',
                                 border: isMSelected ? '2px solid #10b981' : '1px solid #cbd5e1',
                                 background: isMSelected ? '#dcfce7' : '#ffffff',
                                 color: isMSelected ? '#047857' : '#334155',
-                                fontSize: '0.72rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                textAlign: 'center',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
+                                fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                               }}
                             >
-                              <span>{m.stepNumber}. {m.title.split(' ')[0]}</span>
+                              <span>{m.stepNumber}. {shortTitle}</span>
                             </button>
                           );
                         })}
@@ -689,9 +667,18 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   )}
                 </div>
 
-                {/* 🎵 Option 2: Zu Playlists hinzufügen oder neue anlegen (Pro-Level Prinzip) */}
+                {/* 🎵 Option 2: Zu Playlists hinzufügen oder neue anlegen */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedGoalType('playlist')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedGoalType('playlist');
+                    }
+                  }}
+                  aria-label="Option 2: Zu Playlist hinzufügen oder neu erstellen"
                   style={{
                     padding: '16px',
                     borderRadius: '20px',
@@ -709,24 +696,17 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '16px',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.4rem',
-                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)',
-                        flexShrink: 0
+                        width: '48px', height: '48px', borderRadius: '16px',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '1.4rem', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)', flexShrink: 0
                       }}>
                         🎵
                       </div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#8b5cf6', color: 'white', padding: '1px 7px', borderRadius: '100px' }}>
-                            PRO-ALBEN
+                            MUSIK-ALBUM
                           </span>
                           <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: '100px' }}>
                             +30 XP
@@ -736,7 +716,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                           2. Zu Playlist hinzufügen / Neu erstellen
                         </div>
                         <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                          Echte Playlists wie im Pro-Level (Weihnachten, Lieblingssongs & Alben)
+                          Deine eigenen Alben & Playlisten (z. B. Sommer-Hits, Meine Band)
                         </div>
                       </div>
                     </div>
@@ -862,19 +842,15 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                                   <button
                                     key={cov.id}
                                     type="button"
+                                    title={cov.label}
+                                    aria-label={`Cover: ${cov.label}`}
                                     onClick={() => setNewPlaylistCover(cov.id)}
                                     style={{
-                                      padding: '8px 10px',
-                                      borderRadius: '10px',
+                                      padding: '8px 10px', borderRadius: '10px',
                                       border: isCovChosen ? '2px solid #8b5cf6' : '1px solid #e2e8f0',
-                                      background: isCovChosen ? '#f3e8ff' : '#ffffff',
-                                      color: isCovChosen ? '#6d28d9' : '#334155',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
+                                      background: isCovChosen ? '#f3e8ff' : '#ffffff', color: isCovChosen ? '#6d28d9' : '#334155',
+                                      fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
+                                      display: 'flex', alignItems: 'center', gap: '6px'
                                     }}
                                   >
                                     <span>{cov.emoji}</span>
@@ -914,7 +890,16 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
 
                 {/* 🎁 Option 3: Geschenk für Mama, Papa, Oma... */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedGoalType('gift')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedGoalType('gift');
+                    }
+                  }}
+                  aria-label="Option 3: Musik-Geschenk für Familie und Freunde"
                   style={{
                     padding: '16px',
                     borderRadius: '20px',
@@ -932,17 +917,10 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '16px',
-                        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.4rem',
-                        boxShadow: '0 4px 12px rgba(249, 115, 22, 0.35)',
-                        flexShrink: 0
+                        width: '48px', height: '48px', borderRadius: '16px',
+                        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '1.4rem', boxShadow: '0 4px 12px rgba(249, 115, 22, 0.35)', flexShrink: 0
                       }}>
                         🎁
                       </div>
@@ -954,12 +932,19 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                           <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#ffedd5', color: '#c2410c', padding: '1px 7px', borderRadius: '100px' }}>
                             +50 XP
                           </span>
+                          {!isFamilyShareCompleted && (
+                            <span style={{ fontSize: '0.64rem', fontWeight: 800, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: '100px' }}>
+                              Schaltet Meilenstein 4 frei
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
                           3. Musik-Geschenk für Familie & Freunde
                         </div>
                         <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                          Nimm ein Lied für deine Familie auf & teile es direkt mit ihnen
+                          {!isFamilyShareCompleted
+                            ? 'Nimm ein persönliches Lied für deine Familie auf – schaltet automatisch Meilenstein 4 frei & speichert es in deiner Geschenk-Sammlung'
+                            : 'Nimm ein weiteres persönliches Geschenk für deine Familie & Freunde auf & teile es direkt mit ihnen'}
                         </div>
                       </div>
                     </div>
@@ -990,23 +975,18 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                             <button
                               key={rec.id}
                               type="button"
+                              title={rec.label}
+                              aria-label={`Geschenk für: ${rec.label}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedRecipient(rec);
                               }}
                               style={{
-                                padding: '10px 8px',
-                                borderRadius: '12px',
+                                padding: '10px 8px', borderRadius: '12px',
                                 border: isRecChosen ? '2px solid #f97316' : '1px solid #e2e8f0',
-                                background: isRecChosen ? '#ffedd5' : '#ffffff',
-                                color: isRecChosen ? '#9a3412' : '#334155',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px'
+                                background: isRecChosen ? '#ffedd5' : '#ffffff', color: isRecChosen ? '#9a3412' : '#334155',
+                                fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
                               }}
                             >
                               <span style={{ fontSize: '1.2rem' }}>{rec.emoji}</span>
@@ -1342,7 +1322,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   </div>
                   <div>
                     <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#92400e' }}>
-                      +{selectedGoalType === 'milestone' ? (selectedMilestone.type === 'first_song' ? 100 : 50) : 30} Campus XP Belohnung! 🎉
+                      +{isGiftFlow ? 50 : selectedGoalType === 'milestone' ? (selectedMilestone?.type === 'first_song' || selectedMilestone?.stepNumber === 10 ? 100 : 50) : 30} Campus XP Belohnung! 🎉
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>
                       Wird direkt deinem Schüler-Profil gutgeschrieben
@@ -1357,18 +1337,18 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   padding: '4px 12px',
                   borderRadius: '100px'
                 }}>
-                  +{selectedGoalType === 'milestone' ? (selectedMilestone.type === 'first_song' ? 100 : 50) : 30} XP
+                  +{isGiftFlow ? 50 : selectedGoalType === 'milestone' ? (selectedMilestone?.type === 'first_song' || selectedMilestone?.stepNumber === 10 ? 100 : 50) : 30} XP
                 </div>
               </div>
 
               {/* Studio Master Audio Card */}
               <div style={{
-                background: selectedGoalType === 'gift' 
+                background: isGiftFlow 
                   ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)' 
                   : 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
                 borderRadius: '24px',
                 padding: '18px',
-                border: `1.5px solid ${selectedGoalType === 'gift' ? '#fdba74' : '#86efac'}`,
+                border: `1.5px solid ${isGiftFlow ? '#fdba74' : '#86efac'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1379,7 +1359,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     width: '46px',
                     height: '46px',
                     borderRadius: '16px',
-                    background: selectedGoalType === 'gift' 
+                    background: isGiftFlow 
                       ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
                       : selectedSticker.gradient,
                     display: 'flex',
@@ -1389,10 +1369,10 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
                     flexShrink: 0
                   }}>
-                    {selectedGoalType === 'gift' ? '🎁' : selectedSticker.emoji}
+                    {isGiftFlow ? '🎁' : selectedSticker.emoji}
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: selectedGoalType === 'gift' ? '#ea580c' : '#059669', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: isGiftFlow ? '#ea580c' : '#059669', textTransform: 'uppercase' }}>
                       ✨ Studio-Klang veredelt • {formatSec(recordedDuration)} Min.
                     </div>
                     <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
@@ -1410,7 +1390,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     height: '48px',
                     borderRadius: '50%',
                     border: 'none',
-                    background: isPlayingPreview ? '#ef4444' : (selectedGoalType === 'gift' ? '#f97316' : '#10b981'),
+                    background: isPlayingPreview ? '#ef4444' : (isGiftFlow ? '#f97316' : '#10b981'),
                     color: 'white',
                     display: 'flex',
                     alignItems: 'center',
@@ -1425,7 +1405,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
               </div>
 
               {/* 🎁 FALL 1: GESCHENK-FLOW -> DIRECT FAMILY SHARING CARD */}
-              {selectedGoalType === 'gift' ? (
+              {isGiftFlow ? (
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
@@ -1508,6 +1488,8 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                         <button
                           key={stk.id}
                           type="button"
+                          title={stk.label}
+                          aria-label={`Sticker: ${stk.label}`}
                           onClick={() => setSelectedSticker(stk)}
                           style={{
                             aspectRatio: '1 / 1',
@@ -1587,7 +1569,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   className="hover-scale"
                 >
                   <Trophy size={20} />
-                  <span>{isSaving ? 'Speichere...' : (selectedGoalType === 'gift' ? 'Geschenk sichern & bereitstellen! 🎁' : 'In Schatztruhe sichern! 🏆')}</span>
+                  <span>{isSaving ? 'Speichere...' : (isGiftFlow ? 'Geschenk sichern & bereitstellen! 🎁' : 'In Schatztruhe sichern! 🏆')}</span>
                 </button>
               </div>
             </div>

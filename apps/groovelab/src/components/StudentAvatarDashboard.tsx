@@ -30,7 +30,6 @@ const StudentBriefingTab = lazy(() => import('./student/tabs/StudentBriefingTab'
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
 const StudentProfileTab = lazy(() => import('./student/tabs/StudentProfileTab').then(m => ({ default: m.StudentProfileTab })));
 const StudentSettingsTab = lazy(() => import('./student/tabs/StudentSettingsTab').then(m => ({ default: m.StudentSettingsTab })));
-const StudentCampusCupTab = lazy(() => import('./student/tabs/StudentCampusCupTab').then(m => ({ default: m.StudentCampusCupTab })));
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal || (m as any).default })));
 import { StudentScreenTimeGate, useStudentScreenTimeLock } from './student/gates/StudentScreenTimeGate';
@@ -399,30 +398,6 @@ export function StudentAvatarDashboard({
 
 
 
-      {/* 3. Campus Cup Tab */}
-      {profile.activeTab === 'campus_cup' && (
-        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Campus Cup...</div>}>
-          <StudentCampusCupTab
-            activeTab={profile.activeTab}
-            rankingLoading={false}
-            studentUser={profile.studentUser}
-            sessionActive={practice.sessionActive}
-            secondsElapsed={practice.secondsElapsed}
-            classMins={0}
-            classWeeklyFocus={0}
-            otherClassMins={0}
-            classmateIds={[]}
-            studentId={studentId}
-            classFocusLogs={[]}
-            classCount={1}
-            classGoals={[]}
-            classHighlights={[]}
-            highlightsLoading={false}
-            isMobile={profile.isMobile}
-          />
-        </Suspense>
-      )}
-
       {/* 4. Events Board */}
       <div style={{ display: profile.activeTab === 'events' ? 'block' : 'none', width: '100%', boxSizing: 'border-box' }}>
         {profile.activeTab === 'events' && (
@@ -463,7 +438,7 @@ export function StudentAvatarDashboard({
           return null;
         }
         return (
-          <div style={{ display: (profile.activeTab === 'homework_book' && profile.studentUser) ? 'block' : 'none', marginTop: '0px', width: '100%' }}>
+          <div style={{ display: (profile.activeTab === 'homework_book' && profile.studentUser) ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: '0px', width: '100%', height: '100%' }}>
             {profile.activeTab === 'homework_book' && profile.studentUser && (
               <HomeworkBookErrorBoundary key={homeworkRetryKey} onRetry={() => setHomeworkRetryKey(k => k + 1)}>
                 <Suspense fallback={<HomeworkBookLoadingFallback onReload={() => setHomeworkRetryKey(k => k + 1)} />}>

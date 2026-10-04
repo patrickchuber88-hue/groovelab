@@ -15,7 +15,8 @@ import {
   ChevronUp,
   Globe,
   QrCode,
-  Laptop
+  Laptop,
+  Info
 } from 'lucide-react';
 
 export interface CampusCalendarSyncHubModalProps {
@@ -81,9 +82,18 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
     return { platform: 'apple', deviceName: 'Computer', isMobileOrTablet: false };
   }, []);
 
+  // 🏛️ 0,1% Responsive Viewport & Device Triade (Immunität gegen QR-Paradoxon auf Mobile)
+  const isMobile = useMemo(() => {
+    if (isMobilePortrait) return true;
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) return true;
+    return detectedDevice.isMobileOrTablet;
+  }, [isMobilePortrait, detectedDevice.isMobileOrTablet]);
+
   const [activePlatform, setActivePlatform] = useState<Platform>(detectedDevice.platform);
   const [copiedStatus, setCopiedStatus] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [showMobileQr, setShowMobileQr] = useState<boolean>(false);
+  const [outlookType, setOutlookType] = useState<'personal' | 'work'>('personal');
 
   // Sane Defaults (für Musikschüler vorkonfiguriert)
   const [includeLessons, setIncludeLessons] = useState<boolean>(true);
@@ -111,11 +121,17 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
   const queryParams = new URLSearchParams();
   if (token) queryParams.set('token', token);
 
+  // 🏛️ 0,1% Deterministische Filter-Zustandsmaschine (Kein Fallback-Bug bei Ferien-only)
   const filterParts: string[] = [];
   if (includeLessons) filterParts.push('lessons');
   if (includeBands) filterParts.push('campus_events');
-  if (filterParts.length > 0 && filterParts.length < 2) {
-    queryParams.set('filter', filterParts.join(','));
+  if (filterParts.length === 2) {
+    // Beide aktiv: Standardfall
+  } else if (filterParts.length === 1) {
+    queryParams.set('filter', filterParts[0]);
+  } else {
+    // Beide abgewählt: Explizites 'none', damit das Backend NICHT auf Defaults zurückfällt!
+    queryParams.set('filter', 'none');
   }
   if (includeHolidays) queryParams.set('holidays', '1');
   if (alarmOption !== '30m_morning') queryParams.set('alarm', alarmOption);
@@ -124,7 +140,9 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
   const httpsUrl = `${supabaseUrlStr}/functions/v1/ical-feed?${queryString}`;
   const webcalUrl = `webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?${queryString}`;
   const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(httpsUrl)}`;
-  const outlookWebUrl = `https://outlook.live.com/calendar/0/addcalendar?url=${encodeURIComponent(httpsUrl)}&name=Campus-Groovelab`;
+  const outlookPersonalUrl = `https://outlook.live.com/calendar/0/addcalendar?url=${encodeURIComponent(httpsUrl)}&name=Campus-Groovelab`;
+  const outlookWorkUrl = `https://outlook.office.com/calendar/0/addcalendar?url=${encodeURIComponent(httpsUrl)}&name=Campus-Groovelab`;
+  const outlookWebUrl = outlookType === 'personal' ? outlookPersonalUrl : outlookWorkUrl;
 
   const handleCopyLink = async (key: string, urlToCopy: string) => {
     try {
@@ -157,54 +175,16 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
     }
   };
 
+  // 🏛️ 0,1% Goldstandard: 100% SSOT Direktdownload via autoritative Edge Function (garantiert Zeitzonen, Alarme, Ausfälle & Ferien)
   const handleDirectIcsDownload = () => {
-    const icsLines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Campus-Groovelab//Stundenplan Export//DE',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'X-WR-CALNAME:Campus-Groovelab Stundenplan'
-    ];
-
-    const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    const targetList = (lessons && lessons.length > 0) ? lessons : [];
-
-    targetList.forEach((occ: any, idx: number) => {
-      const occDate = occ.date || occ.start_date;
-      if (!occDate) return;
-      const datePart = String(occDate).split('T')[0].replace(/-/g, '');
-      const startTimeStr = (occ.start_time || '14:00').replace(':', '') + '00';
-      const endTimeStr = (occ.end_time || '14:45').replace(':', '') + '00';
-      const uid = `cgl-${occ.id || idx}-${datePart}@campus-groovelab.de`;
-      const studentName = studentUser?.first_name || 'Schüler';
-      const instrument = occ.instrument || studentUser?.instrument || '';
-      const summary = `${instrument ? `${instrument}-Unterricht` : 'Musikunterricht'}${role !== 'student' ? `: ${studentName}` : ''}`;
-      const location = occ.room_name || occ.room?.name || 'Musikschule';
-
-      icsLines.push('BEGIN:VEVENT');
-      icsLines.push(`UID:${uid}`);
-      icsLines.push(`DTSTAMP:${nowStr}`);
-      icsLines.push(`DTSTART:${datePart}T${startTimeStr}`);
-      icsLines.push(`DTEND:${datePart}T${endTimeStr}`);
-      icsLines.push(`SUMMARY:${summary}`);
-      if (location) icsLines.push(`LOCATION:${location}`);
-      icsLines.push('DESCRIPTION:Unterrichtstermin über Campus-Groovelab');
-      icsLines.push('STATUS:CONFIRMED');
-      icsLines.push('END:VEVENT');
-    });
-
-    icsLines.push('END:VCALENDAR');
-
-    const blob = new Blob([icsLines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-    const downloadUrl = window.URL.createObjectURL(blob);
+    const studentName = studentUser?.first_name?.toLowerCase() || 'unterricht';
+    const downloadUrl = `${httpsUrl}&dl=1`;
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.setAttribute('download', `campus-groovelab-stundenplan-${new Date().toISOString().slice(0, 10)}.ics`);
+    link.setAttribute('download', `campus-groovelab-${studentName}-stundenplan.ics`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
   };
 
   const handleRotateKey = async () => {
@@ -223,6 +203,27 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
     await executeRevoke();
   };
 
+  // WAI-ARIA Keyboard-Navigation für Plattform-Tabs (WCAG 2.2 AA)
+  const platforms: Platform[] = ['apple', 'google', 'outlook'];
+  const handleTabKeyDown = (e: React.KeyboardEvent, currentPlatform: Platform) => {
+    const currentIndex = platforms.indexOf(currentPlatform);
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextIndex = (currentIndex + 1) % platforms.length;
+      setActivePlatform(platforms[nextIndex]);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevIndex = (currentIndex - 1 + platforms.length) % platforms.length;
+      setActivePlatform(platforms[prevIndex]);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActivePlatform(platforms[0]);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActivePlatform(platforms[platforms.length - 1]);
+    }
+  };
+
   // Primärer Aktions-Link & Label je nach Plattform
   const primaryAction = useMemo(() => {
     if (activePlatform === 'google') {
@@ -236,7 +237,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
     }
     if (activePlatform === 'outlook') {
       return {
-        label: 'In Outlook Kalender öffnen',
+        label: outlookType === 'personal' ? 'In Outlook.com öffnen' : 'In Microsoft 365 öffnen',
         icon: <Laptop size={18} strokeWidth={2.2} />,
         href: outlookWebUrl,
         bg: '#0078d4',
@@ -244,7 +245,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
       };
     }
     return {
-      label: detectedDevice.isMobileOrTablet
+      label: isMobile
         ? `1-Tap in ${detectedDevice.deviceName}-Kalender`
         : 'Zu Apple Kalender hinzufügen',
       icon: <CalendarPlus size={18} strokeWidth={2.2} />,
@@ -252,7 +253,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
       bg: brandColor,
       shadow: '0 4px 14px rgba(52, 168, 83, 0.25)'
     };
-  }, [activePlatform, detectedDevice, googleCalendarUrl, outlookWebUrl, webcalUrl, brandColor]);
+  }, [activePlatform, isMobile, detectedDevice.deviceName, googleCalendarUrl, outlookWebUrl, outlookType, webcalUrl, brandColor]);
 
   if (!isOpen) return null;
 
@@ -393,7 +394,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
             </div>
           ) : (
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
-              {/* Kompakte Plattform-Auswahl (Apple / Google / Outlook) */}
+              {/* Kompakte Plattform-Auswahl (Apple / Google / Outlook) mit WAI-ARIA Keyboard-Navigation */}
               <div
                 role="tablist"
                 aria-label="Kalender-App wählen"
@@ -412,6 +413,8 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                     key={plat}
                     role="tab"
                     aria-selected={activePlatform === plat}
+                    tabIndex={activePlatform === plat ? 0 : -1}
+                    onKeyDown={e => handleTabKeyDown(e, plat)}
                     onClick={() => setActivePlatform(plat)}
                     style={{
                       border: 'none',
@@ -430,6 +433,52 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                   </button>
                 ))}
               </div>
+
+              {/* Microsoft Outlook Dual-Account-Weiche (Personal vs. M365 Schule) */}
+              {activePlatform === 'outlook' && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  fontSize: '0.74rem',
+                  color: '#475569',
+                  background: '#f8fafc',
+                  padding: '7px 12px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontWeight: outlookType === 'personal' ? 750 : 500 }}>
+                    <input
+                      type="radio"
+                      name="cgl_outlook_type"
+                      checked={outlookType === 'personal'}
+                      onChange={() => setOutlookType('personal')}
+                      style={{ accentColor: '#0078d4' }}
+                    />
+                    <span>Outlook.com (Privat)</span>
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontWeight: outlookType === 'work' ? 750 : 500 }}>
+                    <input
+                      type="radio"
+                      name="cgl_outlook_type"
+                      checked={outlookType === 'work'}
+                      onChange={() => setOutlookType('work')}
+                      style={{ accentColor: '#0078d4' }}
+                    />
+                    <span>Schule / M365</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Google Kalender Android-Hinweis */}
+              {activePlatform === 'google' && (
+                <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.3, marginTop: '-4px' }}>
+                  Synchronisiert sich mit deinem Google-Konto & erscheint automatisch in der Google Kalender App auf Android.
+                </div>
+              )}
 
               {/* Hero 1-Tap Button */}
               <a
@@ -461,8 +510,89 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                 <span>{primaryAction.label}</span>
               </a>
 
-              {/* Desktop/Tablet: QR-Code Block für schnellen Handy-Scan (für Schüler & Eltern) */}
-              {!detectedDevice.isMobileOrTablet ? (
+              {/* 🏛️ 0,1% Responsive Viewport Immunität (QR-Code vs. Mobile Share) */}
+              {isMobile ? (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Mobile: Direkter Teilen-Button an Eltern */}
+                  <button
+                    onClick={handleShareWithFamily}
+                    style={{
+                      width: '100%',
+                      border: copiedStatus === 'share' ? '1px solid #86efac' : '1px solid #e2e8f0',
+                      background: copiedStatus === 'share' ? '#f0fdf4' : '#f8fafc',
+                      color: copiedStatus === 'share' ? '#16a34a' : '#1e293b',
+                      padding: '11px 16px',
+                      borderRadius: '14px',
+                      fontWeight: 750,
+                      fontSize: '0.84rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      minHeight: '44px',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {copiedStatus === 'share' ? <Check size={16} color="#16a34a" /> : <Share2 size={16} color="#475569" />}
+                    <span aria-live="polite">{copiedStatus === 'share' ? 'Familien-Link kopiert!' : 'Mit Eltern / Familie teilen'}</span>
+                  </button>
+
+                  {/* Diskreter Umschalter: QR-Code für Eltern zum Abscannen einblenden */}
+                  <button
+                    onClick={() => setShowMobileQr(!showMobileQr)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.73rem',
+                      fontWeight: 650,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '4px'
+                    }}
+                  >
+                    <QrCode size={13} />
+                    <span>{showMobileQr ? 'QR-Code ausblenden' : 'QR-Code für Eltern zum Abscannen einblenden'}</span>
+                    {showMobileQr ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+
+                  {showMobileQr && (
+                    <div style={{
+                      width: '100%',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '18px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxSizing: 'border-box',
+                      animation: 'fadeIn 0.15s ease'
+                    }}>
+                      <div style={{
+                        background: '#ffffff',
+                        padding: '8px',
+                        borderRadius: '14px',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        display: 'inline-flex'
+                      }}>
+                        <QRCode value={httpsUrl} size={106} viewBox="0 0 106 106" level="M" />
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
+                        Handykamera der Eltern auf diesen Code richten
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Desktop/Tablet: QR-Code Block für schnellen Handy-Scan (für Schüler & Eltern) */
                 <div style={{
                   width: '100%',
                   background: '#f8fafc',
@@ -492,32 +622,6 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                     Mit Handykamera scannen · Für dich & deine Eltern
                   </div>
                 </div>
-              ) : (
-                /* Mobile: Direkter Teilen-Button an Eltern */
-                <button
-                  onClick={handleShareWithFamily}
-                  style={{
-                    width: '100%',
-                    border: copiedStatus === 'share' ? '1px solid #86efac' : '1px solid #e2e8f0',
-                    background: copiedStatus === 'share' ? '#f0fdf4' : '#f8fafc',
-                    color: copiedStatus === 'share' ? '#16a34a' : '#1e293b',
-                    padding: '11px 16px',
-                    borderRadius: '14px',
-                    fontWeight: 750,
-                    fontSize: '0.84rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    cursor: 'pointer',
-                    minHeight: '44px',
-                    boxSizing: 'border-box',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  {copiedStatus === 'share' ? <Check size={16} color="#16a34a" /> : <Share2 size={16} color="#475569" />}
-                  <span>{copiedStatus === 'share' ? 'Familien-Link kopiert!' : 'Mit Eltern / Familie teilen'}</span>
-                </button>
               )}
 
               {/* Link kopieren (Sekundäre Aktion) */}
@@ -543,7 +647,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                 }}
               >
                 {copiedStatus === 'feed' ? <Check size={15} color="#16a34a" /> : <Copy size={15} color="#64748b" />}
-                <span>{copiedStatus === 'feed' ? 'Link kopiert!' : 'Kalender-Link manuell kopieren'}</span>
+                <span aria-live="polite">{copiedStatus === 'feed' ? 'Link kopiert!' : 'Kalender-Link manuell kopieren'}</span>
               </button>
 
               {/* Diskrete Optionen (Progressive Disclosure) */}
@@ -656,6 +760,28 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                 )}
               </div>
 
+              {/* 🏛️ 0,1% Latenz-Disclaimer & Haftungsschutz (§ 280 BGB) */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '8px 10px',
+                fontSize: '0.71rem',
+                color: '#475569',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '7px',
+                textAlign: 'left',
+                lineHeight: 1.35,
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                <Info size={14} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  <strong>Synchronisation:</strong> Externe Kalender (Apple, Google) aktualisieren sich in Intervallen (15 Min. bis 12 Std.). Verbindlich bei Ausfällen ist stets die Campus-App.
+                </span>
+              </div>
+
               {/* Subtiler Vertrauens-Hinweis */}
               <div style={{
                 display: 'flex',
@@ -663,21 +789,21 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                 gap: '5px',
                 fontSize: '0.70rem',
                 color: '#64748b',
-                marginTop: '4px'
+                marginTop: '2px'
               }}>
                 <ShieldCheck size={13} color={brandColor} style={{ flexShrink: 0 }} />
                 <span>Automatisch synchronisiert · Keine Noten oder Chats</span>
               </div>
 
-              {/* Diskreter Schlüssel-Reset */}
+              {/* Diskreter Schlüssel-Reset (WCAG AA Kontrast 4,6:1) */}
               <button
                 onClick={handleRotateKey}
                 disabled={generatingToken}
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#94a3b8',
-                  fontSize: '0.69rem',
+                  color: '#64748b',
+                  fontSize: '0.71rem',
                   fontWeight: 600,
                   cursor: 'pointer',
                   display: 'inline-flex',
@@ -688,9 +814,9 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                   transition: 'color 0.15s'
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
               >
-                <RefreshCw size={10} style={{ animation: generatingToken ? 'spin 1s linear infinite' : 'none' }} />
+                <RefreshCw size={11} style={{ animation: generatingToken ? 'spin 1s linear infinite' : 'none' }} />
                 <span>Abonnement widerrufen / Schlüssel neu erstellen</span>
               </button>
             </div>

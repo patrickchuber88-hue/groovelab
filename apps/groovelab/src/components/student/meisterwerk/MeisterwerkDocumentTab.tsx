@@ -57,7 +57,7 @@ import {
   filterNotesForStudent,
   isInternalMetadataNote
 } from '../../../domain/stickersAndTresor';
-import { formatPageNumbersGerman } from '../../../services/neuralTtsService';
+import { formatPageNumbersGerman, formatSingleBookForSpeech, formatSingleSongForSpeech } from '../../../services/neuralTtsService';
 import {
   levenshteinDistance,
   normalizeSongStr,
@@ -4634,7 +4634,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
             ) : (
               <>
                 {/* Hub-view inner scrollable area */}
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px 24px', paddingBottom: '16px', overflowY: 'auto' }}>
+                <div className="no-scrollbar" style={{ flex: isMobileOrSim ? 'none' : 1, minHeight: 0, height: isMobileOrSim ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '16px', padding: isMobileOrSim ? '16px 14px calc(88px + env(safe-area-inset-bottom, 24px)) 14px' : '20px 24px 24px 24px', overflowY: isMobileOrSim ? 'visible' : 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                 
                 {hubTab === 'modules' ? (
                   /* ========================================================================= */
@@ -4962,9 +4962,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           {/* 🧩 KACHEL-RASTER */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
-                            gap: '14px 12px',
-                            padding: '4px 0 12px 0'
+                            gridTemplateColumns: isMobileOrSim ? 'repeat(3, minmax(0, 1fr))' : 'repeat(3, 1fr)',
+                            gap: isMobileOrSim ? '12px 10px' : '14px 12px',
+                            padding: '4px 0 12px 0',
+                            touchAction: 'pan-y'
                           }}>
                             {gridModuleKeys.map((moduleKey) => {
                               const mod = moduleDefinitions[moduleKey];
@@ -5003,14 +5004,17 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     background: isGhosted ? '#f8fafc' : '#ffffff',
                                     border: isDraggingCurrent ? '2px dashed #3b82f6' : (mod.borderOverride || '1.5px solid #e2e8f0'),
                                     borderRadius: '18px',
-                                    padding: '16px 8px 14px 8px',
+                                    padding: isMobileOrSim ? '14px 6px 12px 6px' : '16px 8px 14px 8px',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
                                     textAlign: 'center',
                                     cursor: isModuleEditMode ? 'grab' : 'pointer',
                                     opacity: isDraggingCurrent ? 0.35 : (isGhosted ? 0.55 : 1),
-                                    position: 'relative',
+                                    position: 'relative', minWidth: 0, overflow: 'hidden',
+                                    touchAction: isModuleEditMode ? 'none' : 'pan-y',
+                                    userSelect: 'none',
+                                    WebkitUserSelect: 'none',
                                     boxShadow: isGhosted ? 'none' : '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
                                     transition: isModuleEditMode ? 'transform 0.15s ease' : 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                                   }}
@@ -5077,12 +5081,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     isGhosted={isGhosted}
                                     uiLevel={uiLevel}
                                   />
-                                  <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                    <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  <div style={{ marginTop: '10px', padding: '0 2px', minWidth: 0, width: '100%' }}>
+                                    <div style={{ fontSize: isMobileOrSim ? (mod.title.length > 10 ? '0.78rem' : '0.84rem') : '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2', wordBreak: 'normal', overflowWrap: 'break-word', hyphens: 'none' }}>
                                       {mod.title}
                                     </div>
                                     {mod.subtitle && (
-                                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginTop: '3px' }}>
+                                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {mod.subtitle}
                                       </div>
                                     )}
@@ -5104,17 +5108,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   }
                                 }}
                                 style={{
-                                  background: 'rgba(248, 250, 252, 0.7)',
-                                  border: '2px dashed #94a3b8',
+                                  background: '#f8fafc',
+                                  border: '1.5px solid #cbd5e1',
                                   borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
+                                  padding: isMobileOrSim ? '14px 6px 12px 6px' : '16px 8px 14px 8px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
                                   textAlign: 'center',
-                                  cursor: 'pointer',
+                                  cursor: 'pointer', minWidth: 0, overflow: 'hidden',
                                   boxShadow: '0 2px 8px -2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                                  touchAction: 'pan-y', userSelect: 'none', WebkitUserSelect: 'none'
                                 }}
                                 className="hover-scale"
                                 title="Module hinzufügen oder Studio-Erweiterungen freischalten"
@@ -5125,11 +5130,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   size="lg"
                                   uiLevel={uiLevel}
                                 />
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#334155', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                <div style={{ marginTop: '10px', padding: '0 2px', minWidth: 0, width: '100%' }}>
+                                  <div style={{ fontSize: isMobileOrSim ? '0.84rem' : '0.90rem', fontWeight: 900, color: '#334155', letterSpacing: '-0.02em', lineHeight: '1.2', wordBreak: 'normal', overflowWrap: 'break-word', hyphens: 'none' }}>
                                     {hasHiddenModules ? 'Module verwalten' : 'Modul freischalten'}
                                   </div>
-                                  <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                  <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {hasHiddenModules ? (
                                       <span>{customModuleLayout.hidden.length} ausgeblendet</span>
                                     ) : (
@@ -5177,7 +5182,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     opacity: isArchiveGhosted ? 0.55 : 1,
                                     position: 'relative',
                                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                                    touchAction: 'pan-y', userSelect: 'none', WebkitUserSelect: 'none'
                                   }}
                                   className="hover-scale"
                                   aria-label="Unterrichts-Archiv & Verlauf öffnen"
@@ -5214,7 +5220,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     </button>
                                   )}
 
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, marginRight: '8px' }}>
                                     <CampusStudioModuleCover
                                       moduleKey="archive"
                                       size="sm"
@@ -5222,14 +5228,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       isGhosted={isArchiveGhosted}
                                       uiLevel={uiLevel}
                                     />
-                                    <div style={{ textAlign: 'left' }}>
+                                    <div style={{ textAlign: 'left', minWidth: 0, flex: 1 }}>
                                       <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span>Unterrichts-Archiv</span>
-                                        <span style={{ fontSize: '0.62rem', fontWeight: 750, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '100px', border: '1px solid #e2e8f0' }}>
+                                        <span style={{ whiteSpace: 'nowrap' }}>Unterrichts-Archiv</span>
+                                        <span style={{ fontSize: '0.62rem', fontWeight: 750, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '100px', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
                                           Chronik
                                         </span>
                                       </div>
-                                      <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '1px' }}>
+                                      <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         Frühere Wochen, Notizen &amp; Hausaufgaben-Historie
                                       </div>
                                     </div>
@@ -5245,7 +5251,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     fontSize: '0.72rem',
                                     fontWeight: 750,
                                     color: '#334155',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                    flexShrink: 0, whiteSpace: 'nowrap'
                                   }}>
                                     <span>Öffnen</span>
                                     <span style={{ color: '#64748b' }}>➜</span>
@@ -10272,7 +10279,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             audioRecordings: audioNotes.map(a => ({
                                               label: a.label || 'Aufnahme'
                                             })),
-                                            generalNotes: homeworkNoteItems.length > 0 ? homeworkNoteItems.join('. ') : generalHomeworkNotes
+                                            generalNotes: (homeworkNoteItems.length > 0 ? homeworkNoteItems : [generalHomeworkNotes]).filter(n => n && !isInternalMetadataNote(n)).join('. ')
                                           });
                                          handleSpeakText(speechPhrases, 'global_homework');
                                        } else {
@@ -10932,8 +10939,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         <HelpCircle size={12} color="#0f172a" strokeWidth={2.5} />
                                         <span>Frage</span>
                                       </span>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#854d0e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        an {effectiveTeacherFullName}
+                                      <span title={`Frage an ${effectiveTeacherFullName}`} style={{ fontSize: '0.78rem', fontWeight: 800, color: '#854d0e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                                        an {effectiveTeacherFullName?.replace(/^deine\s+lehrkraft\b/i, 'Lehrkraft') || 'Lehrkraft'}
                                       </span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -11305,7 +11312,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       const parsedAnn = parseStudentAnnotation(noteText, studentFirstName, isTeacherMode);
                                       return parsedAnn.cleanText ? `Seite ${p}: ${parsedAnn.cleanText}` : '';
                                     }).filter(Boolean);
-                                    const bookSpeechText = [`Lehrwerk: ${item.title}, ${pagesGerman}.`, ...bookNotesPhrases].join(' ');
+                                    const bookSpeechText = formatSingleBookForSpeech({ title: item.title, pages: item.pages, formattedPages: pagesGerman, notes: bookNotesPhrases });
                                     const isSpeakingThisBook = isTtsSpeaking && activeTtsKey === `book_head_${item.title}`;
 
                                     return (
@@ -11637,7 +11644,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           const songColor = getSongColor(songTitle);
                                           const isSpeakingThisSongRow = isTtsSpeaking && activeTtsKey === `song_head_${idx}`;
                                           const isSpeakingThisSong = isTtsSpeaking && activeTtsKey === `song_note_${idx}`;
-                                          const songSpeechText = songNote ? `Song: ${songTitle}${songArtist ? ' von ' + songArtist : ''}. Fahrplan: ${songNote}` : `Song: ${songTitle}${songArtist ? ' von ' + songArtist : ''}.`;
+                                          const songSpeechText = formatSingleSongForSpeech({ title: songTitle, artist: songArtist, note: songNote });
 
                                           return (
                                             <div key={`song-hw-${idx}`} style={{

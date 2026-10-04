@@ -309,12 +309,12 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       {/* 🛡️ Persistent Sticky Safety Banner when Parent Mode is active */}
       {parentUnlocked && user?.role?.toLowerCase() === 'student' && (
         <div style={{
-          position: 'sticky',
-          top: windowWidth <= 768 ? 'calc(54px + env(safe-area-inset-top, 0px))' : 0,
+          position: windowWidth <= 768 ? 'relative' : 'sticky',
+          top: 0,
           zIndex: 890,
           background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
           color: '#ffffff',
-          padding: '8px 16px',
+          padding: windowWidth <= 768 ? '10px 14px' : '8px 16px',
           borderRadius: '14px',
           marginBottom: '12px',
           display: 'flex',
@@ -334,11 +334,10 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
             </div>
 
             {/* If active tab is a togglable board, show quick release toggle in the header */}
-            {['practice_board', 'events', 'campus_cup', 'messages'].includes(activeStudentTab) && (() => {
+            {['practice_board', 'events', 'messages'].includes(activeStudentTab) && (() => {
               const boardNames: Record<string, string> = {
                 practice_board: 'Übe-Pfad',
                 events: 'Termine',
-                campus_cup: 'Klassen-Highlights & Team-Power',
                 messages: 'Nachrichten'
               };
               let allowed = true;
@@ -355,9 +354,6 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
                 localStorage.setItem(`campus_board_override_${activeStudentTab}`, String(next));
                 if (activeStudentTab === 'messages') {
                   localStorage.setItem('campus_allow_chat', String(next));
-                }
-                if (activeStudentTab === 'campus_cup') {
-                  localStorage.setItem('campus_allow_leaderboard', String(next));
                 }
                 if (user?.id) {
                   const nextPerms = {

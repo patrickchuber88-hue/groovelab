@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { UpdateAnnouncementHero } from '../common/UpdateAnnouncementHero';
+import { CampusSponsorIngressBanner } from '../ui/CampusSponsorIngressBanner';
 import { getDynamicAnnualPrice } from './licenses/licenseUtils';
 import { formatCleanNoteContent } from '../notes/notesConstants';
 import { notesService } from '../../services/notesService';
@@ -362,6 +363,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* 🏛️ 0,1% Goldstandard: Offizielle Bildungsförderung im Briefing Board */}
+                  <CampusSponsorIngressBanner schoolId={schoolId} sponsorSettings={currentSchoolProfile?.sponsor_settings} supabase={supabase} />
+
                   {/* Community Update & Helden-Moment Hero */}
                   <UpdateAnnouncementHero userId={userId} activePlatform={activeTab} />
 

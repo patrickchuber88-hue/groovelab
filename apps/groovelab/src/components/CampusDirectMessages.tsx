@@ -2790,7 +2790,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       }}>
         {/* Search & Header */}
         <div style={{ 
-          padding: isMobile ? '24px 20px 16px 20px' : '16px', 
+          padding: isMobile ? '14px 16px 14px 16px' : '16px', 
           borderBottom: '1px solid #f1f5f9', 
           background: '#f8fafc', 
           display: 'flex', 
@@ -2800,29 +2800,26 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           width: '100%',
           minWidth: 0
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', minWidth: 0 }}>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                <MessageSquare size={22} color="#1e293b" style={{ flexShrink: 0 }} />
-                <h2 style={{ fontSize: isMobile ? '20px' : '22px', fontWeight: 900, color: '#1e293b', margin: '0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Nachrichten {isStudent ? '' : activeMainTab === 'groups' ? `(${campusGroups.length})` : `(${assignedStudents.length})`}
-                </h2>
+          {!isMobile ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                  <MessageSquare size={22} color="#1e293b" style={{ flexShrink: 0 }} />
+                  <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#1e293b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Nachrichten {isStudent ? '' : activeMainTab === 'groups' ? `(${campusGroups.length})` : `(${assignedStudents.length})`}
+                  </h2>
+                </div>
+                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {isStudent ? 'Kommunikation mit deinen Lehrern & Gruppen' : activeMainTab === 'groups' ? 'Ensembles, Bands & Projektgruppen' : 'Kommunikation mit deinen Schülern'}
+                </p>
               </div>
-              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {isStudent ? 'Kommunikation mit deinen Lehrern & Gruppen' : activeMainTab === 'groups' ? 'Ensembles, Bands & Projektgruppen' : 'Kommunikation mit deinen Schülern'}
-              </p>
             </div>
-          </div>
+          ) : <h2 className="sr-only">Nachrichten</h2>}
 
           {/* Teacher Main Switch: Schüler vs. Gruppen */}
           {!isStudent && (
             <div style={{
-              display: 'flex',
-              background: '#e2e8f0',
-              padding: '3px',
-              borderRadius: '12px',
-              width: '100%',
-              boxSizing: 'border-box'
+              display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '12px', width: '100%', boxSizing: 'border-box'
             }}>
               <button
                 type="button"

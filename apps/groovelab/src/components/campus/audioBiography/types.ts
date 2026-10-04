@@ -33,6 +33,7 @@ export interface MilestoneData {
   preferredVersion?: 'master' | 'raw';
   reverbRoomType?: ReverbRoomType;
   reverbWetMix?: number;
+  stickerEmoji?: string;
   history?: AudioVersion[];
 }
 

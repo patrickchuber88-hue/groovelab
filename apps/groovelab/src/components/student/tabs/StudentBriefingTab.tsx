@@ -10,6 +10,7 @@ import {
 import { useNetworkProfile } from '../../../hooks/useNetworkProfile';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
+import { CampusSponsorIngressBanner } from '../../ui/CampusSponsorIngressBanner';
 import { AudioTrackCarousel, AudioTrackItem } from '../../AudioTrackCarousel';
 import { usePwaWakeLock } from '../../../hooks/usePwaWakeLock';
 import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
@@ -23,7 +24,10 @@ import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
 import { useDictationInput } from '../../../hooks/useVoiceToText';
 import { StudentBriefingModalsHub } from './briefing/StudentBriefingModalsHub';
 import { StudentBriefingRightSidebar } from './briefing/StudentBriefingRightSidebar';
+import { StudentBriefingSidebarBottomSheet } from './briefing/StudentBriefingSidebarBottomSheet';
+import { StudentBriefingMobileBottomBar } from './briefing/StudentBriefingMobileBottomBar';
 import { deriveActiveHomeworkSummary, deriveJuniorHomeworkSummary } from './briefing/homeworkSummaryHelper';
+import { StudentBriefingActionButtons } from './briefing/StudentBriefingActionButtons';
 
 export interface StudentBriefingTabProps {
   studentId: string;
@@ -310,6 +314,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
   // 📱 Prevent tablet display sleep during music practice on music stand
   usePwaWakeLock(true);
+
+  // 📱 0,1% Goldstandard: Mobiler Termine & Mitteilungen Bottom Sheet State
+  const [isMobileSidebarSheetOpen, setIsMobileSidebarSheetOpen] = useState<boolean>(false);
+  const [mobileSidebarInitialTab, setMobileSidebarInitialTab] = useState<'appointments' | 'news'>('appointments');
+  useEffect(() => {
+    const handleOpenSheet = (e?: any) => {
+      if (e?.detail?.tab === 'news' || e?.detail?.tab === 'appointments') {
+        setMobileSidebarInitialTab(e.detail.tab);
+      }
+      setIsMobileSidebarSheetOpen(prev => !prev);
+    };
+    window.addEventListener('campus_open_briefing_sidebar', handleOpenSheet);
+    return () => window.removeEventListener('campus_open_briefing_sidebar', handleOpenSheet);
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('campus_briefing_sidebar_state', { detail: { isOpen: isMobileSidebarSheetOpen } }));
+  }, [isMobileSidebarSheetOpen]);
 
   // 📶 1% Goldstandard Network Awareness for Mobile Audio Recording & Streaming
   const { isCellular, formatBytes, badgeText } = useNetworkProfile();
@@ -1226,7 +1247,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             display: 'flex', 
             flexDirection: 'column', 
             gap: '24px', 
-            position: 'relative',
+            position: isMobile ? 'static' : 'relative',
             paddingBottom: isMobile ? 'calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 36px)' : '32px'
           }}>
           <style>{`
@@ -1253,6 +1274,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             
             {/* MAIN COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', minWidth: 0, width: '100%' }}>
+              {/* 🏛️ 0,1% Goldstandard: Offizielle Bildungsförderung im Briefing Board */}
+              <CampusSponsorIngressBanner schoolId={studentUser?.school_id} sponsorSettings={studentUser?.schools?.sponsor_settings} supabase={supabase} isReady={Boolean(briefingData)} />
+
               {/* Community Update & Helden-Moment Hero */}
               <UpdateAnnouncementHero userId={studentId} activePlatform={currentPlatform} />
               
@@ -1692,7 +1716,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setAppointmentChatData({
-                                        teacherId,
+                                        teacherId, teacher_id: teacherId, teacher: hasToday ? briefingData.todayLesson?.teacher : nextOcc?.teacher, teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextOcc?.teacher_name || nextOcc?.teacher),
                                         date: targetDateStr,
                                         start_time: timeLabel,
                                         label,
@@ -5434,47 +5458,49 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           ⚡ TEEN LEVEL • 11–15 JAHRE
                         </div>
 
-                        {/* TOGGLE RIGHT SIDEBAR (Termine & News) */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleRightSidebar(!isRightSidebarCollapsed)}
-                          style={{
-                            marginLeft: 'auto',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            background: '#ffffff',
-                            color: '#0f172a',
-                            padding: '7px 16px',
-                            borderRadius: '12px',
-                            fontSize: '0.84rem',
-                            fontWeight: 850,
-                            border: '1.5px solid #e2e8f0',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                          className="hover-scale"
-                          title={isRightSidebarCollapsed ? "Termine, Neuigkeiten & Mitteilungen einblenden" : "Seitenleiste ausblenden"}
-                          aria-label={isRightSidebarCollapsed ? "Termine und Neuigkeiten einblenden" : "Seitenleiste ausblenden"}
-                        >
-                          <Calendar size={15} color="#0284c7" />
-                          <span>Termine & News</span>
-                          {sidebarTotalAlertsCount > 0 && (
-                            <span style={{
-                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                              color: '#ffffff',
-                              fontSize: '0.68rem',
-                              fontWeight: 950,
-                              padding: '2px 7px',
-                              borderRadius: '100px',
-                              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
-                              letterSpacing: '-0.01em'
-                            }}>
-                              {sidebarTotalAlertsCount}
-                            </span>
-                          )}
-                        </button>
+                        {/* TOGGLE RIGHT SIDEBAR (Termine & News - Desktop Sidebar Toggle, auf Mobile ergonomisch in der Bottom Bar) */}
+                        {!isMobile && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRightSidebar(!isRightSidebarCollapsed)}
+                            style={{
+                              marginLeft: 'auto',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: '#ffffff',
+                              color: '#0f172a',
+                              padding: '7px 16px',
+                              borderRadius: '12px',
+                              fontSize: '0.84rem',
+                              fontWeight: 850,
+                              border: '1.5px solid #e2e8f0',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                              transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
+                            className="hover-scale"
+                            title={isRightSidebarCollapsed ? "Termine, Neuigkeiten & Mitteilungen einblenden" : "Seitenleiste ausblenden"}
+                            aria-label={isRightSidebarCollapsed ? "Termine und Neuigkeiten einblenden" : "Seitenleiste ausblenden"}
+                          >
+                            <Calendar size={15} color="#0284c7" />
+                            <span>Termine & News</span>
+                            {sidebarTotalAlertsCount > 0 && (
+                              <span style={{
+                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                color: '#ffffff',
+                                fontSize: '0.68rem',
+                                fontWeight: 950,
+                                padding: '2px 7px',
+                                borderRadius: '100px',
+                                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
+                                letterSpacing: '-0.01em'
+                              }}>
+                                {sidebarTotalAlertsCount}
+                              </span>
+                            )}
+                          </button>
+                        )}
                       </div>
 
                       <h3 style={{ 
@@ -5538,143 +5564,35 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
 
                         return (
-                          <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            {/* 1. Next Lesson Status & Action Button */}
-                            {nextOcc ? (
-                              <button 
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedAppointmentForDetail(nextOcc);
-                                  setShowCancelConfirmStep(false);
-                                }}
-                                style={{ 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  background: isCanceled ? '#fee2e2' : 'rgba(52, 168, 83, 0.08)', 
-                                  color: isCanceled ? '#dc2626' : '#2e7d32', 
-                                  padding: '8px 16px', 
-                                  minHeight: '38px', 
-                                  boxSizing: 'border-box', 
-                                  borderRadius: '12px', 
-                                  fontSize: '0.78rem', 
-                                  fontWeight: 800, 
-                                  border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1px solid rgba(52, 168, 83, 0.2)',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                }}
-                                className="hover-scale"
-                                title="Nächste Session – Klicke für Details & Aktionen"
-                              >
-                                {(() => {
-                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
-                                  if (isCanceled) {
-                                    return (
-                                      <>
-                                        {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
-                                        <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
-                                      </>
-                                    );
-                                  }
-                                  return (
-                                    <>
-                                      <Calendar size={14} color="#34a853" />
-                                      <span>Nächste Session: {lessonText}</span>
-                                    </>
-                                  );
-                                })()}
-                              </button>
-                            ) : (
-                              <div style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                background: 'rgba(52, 168, 83, 0.08)', 
-                                color: '#34a853', 
-                                padding: '8px 16px', 
-                                minHeight: '38px', 
-                                boxSizing: 'border-box', 
-                                borderRadius: '12px', 
-                                fontSize: '0.78rem', 
-                                fontWeight: 800, 
-                                border: '1px solid rgba(52, 168, 83, 0.15)'
-                              }}>
-                                <Calendar size={14} color="#34a853" />
-                                <span>Nächste Session: Demnächst</span>
-                              </div>
-                            )}
-
-                            {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
-                            {teacherId && (
-                              <button 
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAppointmentChatData({
-                                    teacherId,
-                                    date: targetDateStr,
-                                    start_time: timeLabel,
-                                    label,
-                                    occurrenceId: finalOccurId,
-                                    status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
-                                    isCancelled: isCanceled
-                                  });
-                                  setShowAppointmentChat(true);
-                                }}
-                                style={{ 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
-                                  color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
-                                  padding: isMusicStandMode ? '10px 18px' : '9px 16px', 
-                                  minHeight: '44px', 
-                                  boxSizing: 'border-box', 
-                                  borderRadius: '14px', 
-                                  fontSize: isMusicStandMode ? '0.90rem' : '0.84rem', 
-                                  fontWeight: 900, 
-                                  border: unreadMsgCount > 0 ? '1.5px solid #86efac' : '1px solid #cbd5e1', 
-                                  cursor: 'pointer',
-                                  boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
-                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
-                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
-                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
-                                }}
-                                title="1:1 Shoutbox zum Unterrichtstermin"
-                                aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
-                              >
-                                <MessageSquare 
-                                  size={16} 
-                                  color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
-                                  fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
-                                />
-                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? 'Nachricht von Lehrkraft' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft')}</span>
-                                {unreadMsgCount > 0 && (
-                                  <span style={{
-                                    background: '#15803d',
-                                    color: '#ffffff',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 950,
-                                    padding: '2px 8px',
-                                    borderRadius: '100px',
-                                    letterSpacing: '0.02em',
-                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
-                                  }}>
-                                    {unreadMsgCount === 1 ? '1 neu' : `${unreadMsgCount} neu`}
-                                  </span>
-                                )}
-                              </button>
-                            )}
+                          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <StudentBriefingActionButtons
+                              isMobile={isMobile}
+                              nextOcc={nextOcc}
+                              lessonText={lessonText}
+                              isCanceled={isCanceled}
+                              isUnlocked={isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()}
+                              teacherId={teacherId}
+                              hasMessage={hasMessage}
+                              unreadMsgCount={unreadMsgCount}
+                              isMusicStandMode={isMusicStandMode}
+                              onOpenAppointmentDetail={(occ) => {
+                                setSelectedAppointmentForDetail(occ);
+                                setShowCancelConfirmStep(false);
+                              }}
+                              onOpenChat={() => {
+                                setAppointmentChatData({
+                                  teacherId, teacher_id: teacherId, teacher: hasToday ? briefingData.todayLesson?.teacher : nextOcc?.teacher, teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextOcc?.teacher_name || nextOcc?.teacher),
+                                  date: targetDateStr,
+                                  start_time: timeLabel,
+                                  label,
+                                  occurrenceId: finalOccurId,
+                                  status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
+                                  isCancelled: isCanceled
+                                });
+                                setShowAppointmentChat(true);
+                              }}
+                              onOpenToolbox={setShowStudentToolbox ? () => setShowStudentToolbox(true) : undefined}
+                            />
 
                             {/* 4. Wochenfokus / Skill-Radar Badge */}
                             {weeklyFocusMeta && (
@@ -7491,49 +7409,49 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           </button>
                         )}
 
-
-
-                        {/* TOGGLE RIGHT SIDEBAR (Termine & News) */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleRightSidebar(!isRightSidebarCollapsed)}
-                          style={{
-                            marginLeft: 'auto',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            background: '#ffffff',
-                            color: '#0f172a',
-                            padding: '7px 16px',
-                            borderRadius: '12px',
-                            fontSize: '0.84rem',
-                            fontWeight: 850,
-                            border: '1.5px solid #e2e8f0',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                          className="hover-scale"
-                          title={isRightSidebarCollapsed ? "Termine, Neuigkeiten & Mitteilungen einblenden" : "Seitenleiste ausblenden"}
-                          aria-label={isRightSidebarCollapsed ? "Termine und Neuigkeiten einblenden" : "Seitenleiste ausblenden"}
-                        >
-                          <Calendar size={15} color="currentColor" />
-                          <span>Termine & News</span>
-                          {sidebarTotalAlertsCount > 0 && (
-                            <span style={{
-                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                              color: '#ffffff',
-                              fontSize: '0.68rem',
-                              fontWeight: 950,
-                              padding: '2px 7px',
-                              borderRadius: '100px',
-                              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
-                              letterSpacing: '-0.01em'
-                            }}>
-                              {sidebarTotalAlertsCount}
-                            </span>
-                          )}
-                        </button>
+                        {/* TOGGLE RIGHT SIDEBAR (Termine & News - Desktop Sidebar Toggle, auf Mobile ergonomisch in der Bottom Bar) */}
+                        {!isMobile && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRightSidebar(!isRightSidebarCollapsed)}
+                            style={{
+                              marginLeft: 'auto',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: '#ffffff',
+                              color: '#0f172a',
+                              padding: '7px 16px',
+                              borderRadius: '12px',
+                              fontSize: '0.84rem',
+                              fontWeight: 850,
+                              border: '1.5px solid #e2e8f0',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                              transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
+                            className="hover-scale"
+                            title={isRightSidebarCollapsed ? "Termine, Neuigkeiten & Mitteilungen einblenden" : "Seitenleiste ausblenden"}
+                            aria-label={isRightSidebarCollapsed ? "Termine und Neuigkeiten einblenden" : "Seitenleiste ausblenden"}
+                          >
+                            <Calendar size={15} color="currentColor" />
+                            <span>Termine & News</span>
+                            {sidebarTotalAlertsCount > 0 && (
+                              <span style={{
+                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                color: '#ffffff',
+                                fontSize: '0.68rem',
+                                fontWeight: 950,
+                                padding: '2px 7px',
+                                borderRadius: '100px',
+                                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
+                                letterSpacing: '-0.01em'
+                              }}>
+                                {sidebarTotalAlertsCount}
+                              </span>
+                            )}
+                          </button>
+                        )}
                       </div>
 
                       <h3 style={{ 
@@ -7583,183 +7501,35 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
 
                         return (
-                          <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            {/* 1. Next Lesson Status & Action Button */}
-                            {nextOcc ? (
-                              <button 
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedAppointmentForDetail(nextOcc);
-                                  setShowCancelConfirmStep(false);
-                                }}
-                                style={{ 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  background: isCanceled ? '#fee2e2' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-                                  color: isCanceled ? '#dc2626' : '#2e7d32', 
-                                  padding: '8px 16px', 
-                                  minHeight: '38px', 
-                                  boxSizing: 'border-box', 
-                                  borderRadius: '12px', 
-                                  fontSize: '0.78rem', 
-                                  fontWeight: 800, 
-                                  border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1px solid rgba(52, 168, 83, 0.2)',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                }}
-                                className="hover-scale"
-                                title="Nächster Unterricht – Klicke für Details & Aktionen"
-                              >
-                                {(() => {
-                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
-                                  if (isCanceled) {
-                                    return (
-                                      <>
-                                        {!isUnlocked ? <Lock size={14} color="currentColor" /> : <CalendarX size={14} color="currentColor" />}
-                                        <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
-                                      </>
-                                    );
-                                  }
-                                  return (
-                                    <>
-                                      <Calendar size={14} color="currentColor" />
-                                      <span>Nächster Unterricht: {lessonText}</span>
-                                    </>
-                                  );
-                                })()}
-                              </button>
-                            ) : (
-                              <div style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-                                color: '#34a853', 
-                                padding: '8px 16px', 
-                                minHeight: '38px', 
-                                boxSizing: 'border-box', 
-                                borderRadius: '12px', 
-                                fontSize: '0.78rem', 
-                                fontWeight: 800, 
-                                border: '1px solid rgba(52, 168, 83, 0.18)'
-                              }}>
-                                <Calendar size={14} color="currentColor" />
-                                <span>Nächster Unterricht: Demnächst</span>
-                              </div>
-                            )}
-
-                            {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
-                            {teacherId && (
-                              <button 
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAppointmentChatData({
-                                    teacherId,
-                                    date: targetDateStr,
-                                    start_time: timeLabel,
-                                    label,
-                                    occurrenceId: finalOccurId,
-                                    status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
-                                    isCancelled: isCanceled
-                                  });
-                                  setShowAppointmentChat(true);
-                                }}
-                                style={{ 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
-                                  color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
-                                  padding: isMusicStandMode ? '10px 18px' : '9px 16px', 
-                                  minHeight: '44px', 
-                                  boxSizing: 'border-box', 
-                                  borderRadius: '14px', 
-                                  fontSize: isMusicStandMode ? '0.90rem' : '0.84rem', 
-                                  fontWeight: 900, 
-                                  border: unreadMsgCount > 0 ? '1.5px solid #86efac' : '1px solid #cbd5e1', 
-                                  cursor: 'pointer',
-                                  boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
-                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
-                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
-                                  e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
-                                }}
-                                title="1:1 Shoutbox zum Unterrichtstermin"
-                                aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
-                              >
-                                <MessageSquare 
-                                  size={16} 
-                                  color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
-                                  fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
-                                />
-                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? 'Nachricht von Lehrkraft' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft')}</span>
-                                {unreadMsgCount > 0 && (
-                                  <span style={{
-                                    background: '#15803d',
-                                    color: '#ffffff',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 950,
-                                    padding: '2px 8px',
-                                    borderRadius: '100px',
-                                    letterSpacing: '0.02em',
-                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
-                                  }}>
-                                    {unreadMsgCount === 1 ? '1 neu' : `${unreadMsgCount} neu`}
-                                  </span>
-                                )}
-                              </button>
-                            )}
-
-                            {/* 3. Praxis-Toolbox (Metronom & Stimmgerät) Button */}
-                            <button 
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowStudentToolbox(true);
+                          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <StudentBriefingActionButtons
+                              isMobile={isMobile}
+                              nextOcc={nextOcc}
+                              lessonText={lessonText}
+                              isCanceled={isCanceled}
+                              isUnlocked={isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()}
+                              teacherId={teacherId}
+                              hasMessage={hasMessage}
+                              unreadMsgCount={unreadMsgCount}
+                              isMusicStandMode={isMusicStandMode}
+                              onOpenAppointmentDetail={(occ) => {
+                                setSelectedAppointmentForDetail(occ);
+                                setShowCancelConfirmStep(false);
                               }}
-                              style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                background: '#ffffff', 
-                                color: '#0f172a', 
-                                padding: '8px 16px', 
-                                minHeight: '38px', 
-                                boxSizing: 'border-box', 
-                                borderRadius: '14px', 
-                                fontSize: '0.80rem', 
-                                fontWeight: 900, 
-                                border: '1px solid #cbd5e1', 
-                                cursor: 'pointer', 
-                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)', 
-                                transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                              onOpenChat={() => {
+                                setAppointmentChatData({
+                                  teacherId, teacher_id: teacherId, teacher: hasToday ? briefingData.todayLesson?.teacher : nextOcc?.teacher, teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextOcc?.teacher_name || nextOcc?.teacher),
+                                  date: targetDateStr,
+                                  start_time: timeLabel,
+                                  label,
+                                  occurrenceId: finalOccurId,
+                                  status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
+                                  isCancelled: isCanceled
+                                });
+                                setShowAppointmentChat(true);
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
-                                e.currentTarget.style.borderColor = '#34a853';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                              }}
-                              title="Praxis-Toolbox: Metronom & Stimmgerät öffnen"
-                            >
-                              <Sliders size={14} color="currentColor" />
-                              <span>Praxis-Toolbox</span>
-                            </button>
+                              onOpenToolbox={() => setShowStudentToolbox(true)}
+                            />
 
                             {/* 4. Wochenfokus / Kompetenz-Radar Badge */}
                             {weeklyFocusMeta && (
@@ -9070,44 +8840,47 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
             </div>
 
-            {/* RIGHT COLUMN (Only for Teen Level 2 and Pro Level 3 - Junior Level 1 gets full width) */}
-            {studentUiLevel !== 'junior' && (
-              <StudentBriefingRightSidebar
-                isRightSidebarCollapsed={isRightSidebarCollapsed}
-                handleToggleRightSidebar={handleToggleRightSidebar}
-                sidebarTotalAlertsCount={sidebarTotalAlertsCount}
-                hasSidebarAppointmentAlerts={hasSidebarAppointmentAlerts}
-                handleTabChangeLocal={handleTabChangeLocal}
-                scheduleOccurrences={scheduleOccurrences}
-                schoolYearOccurrences={schoolYearOccurrences}
-                isMusicStandMode={isMusicStandMode}
-                getOccRoomName={getOccRoomName}
-                checkOccurrenceHasMessages={checkOccurrenceHasMessages}
-                getOccurrenceUnreadCount={getOccurrenceUnreadCount}
-                setAppointmentChatData={setAppointmentChatData}
-                setShowAppointmentChat={setShowAppointmentChat}
-                handleTriggerConfirmReschedule={handleTriggerConfirmReschedule}
-                handleRejectReschedule={handleRejectReschedule}
-                handleAcknowledgeCancellation={handleAcknowledgeCancellation}
-                onOpenRescheduleBottomSheet={onOpenRescheduleBottomSheet}
-                studentFeedTab={studentFeedTab}
-                setStudentFeedTab={setStudentFeedTab}
-                campusFeedAnnouncements={campusFeedAnnouncements}
-                classFeedPosts={classFeedPosts}
-                classFeedInteractions={classFeedInteractions}
-                unreadClassFeedCount={unreadClassFeedCount}
-                studentId={studentId}
-                handleReactToPost={handleReactToPost}
-                handleSubmitClassFeedInteraction={handleSubmitClassFeedInteraction}
-                handleOpenContributions={handleOpenContributions}
-                isStudentRescheduleAllowed={isStudentRescheduleAllowed}
-                classGoals={classGoals}
-                classWeeklyMins={classWeeklyMins}
-                feedInteractions={feedInteractions}
-                effectiveLevel={effectiveLevel}
-              />
-            )}
-
+            {/* RIGHT COLUMN (Desktop Sidebar & 0,1% Goldstandard Mobile Bottom Sheet) */}
+            {(() => {
+              const sharedSidebarProps = {
+                sidebarTotalAlertsCount, hasSidebarAppointmentAlerts, handleTabChangeLocal,
+                scheduleOccurrences, schoolYearOccurrences, isMusicStandMode, getOccRoomName,
+                checkOccurrenceHasMessages, getOccurrenceUnreadCount, setAppointmentChatData, setShowAppointmentChat,
+                handleTriggerConfirmReschedule, handleRejectReschedule, handleAcknowledgeCancellation,
+                onOpenRescheduleBottomSheet, studentFeedTab, setStudentFeedTab, campusFeedAnnouncements,
+                classFeedPosts, classFeedInteractions, unreadClassFeedCount, studentId,
+                handleReactToPost, handleSubmitClassFeedInteraction, handleOpenContributions,
+                isStudentRescheduleAllowed, classGoals, classWeeklyMins, feedInteractions, effectiveLevel
+              };
+              return (
+                <>
+                  {studentUiLevel !== 'junior' && (
+                    <StudentBriefingRightSidebar
+                      {...sharedSidebarProps}
+                      isRightSidebarCollapsed={isRightSidebarCollapsed}
+                      handleToggleRightSidebar={handleToggleRightSidebar}
+                    />
+                  )}
+                  {/* 📱 0,1% Goldstandard: Mobiler Slide-Up Bottom Sheet für Termine & Mitteilungen */}
+                  <StudentBriefingSidebarBottomSheet
+                    {...sharedSidebarProps}
+                    isOpen={isMobileSidebarSheetOpen}
+                    onClose={() => setIsMobileSidebarSheetOpen(false)}
+                    initialTab={mobileSidebarInitialTab}
+                    appointmentAlertsCount={sidebarAppointmentChanges.length}
+                    feedAlertsCount={unreadClassFeedCount}
+                  />
+                  {/* 📱 0,1% Goldstandard: Symmetrisches 2-Button Bottom-Dock für Termine & News */}
+                  {isMobile && (
+                    <StudentBriefingMobileBottomBar
+                      appointmentAlertsCount={sidebarAppointmentChanges.length} feedAlertsCount={unreadClassFeedCount} hasSidebarAppointmentAlerts={hasSidebarAppointmentAlerts}
+                      onOpenAppointments={() => { setMobileSidebarInitialTab('appointments'); setIsMobileSidebarSheetOpen(true); }}
+                      onOpenNews={() => { setMobileSidebarInitialTab('news'); setIsMobileSidebarSheetOpen(true); }}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
         );
@@ -9115,47 +8888,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
       {/* 🎧 Hidden Quickie Audio Element */}
       <audio
-        ref={quickieAudioRef}
+        ref={quickieAudioRef} style={{ display: 'none' }}
         onTimeUpdate={(e) => setQuickieCurrentTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setQuickieDuration(e.currentTarget.duration)}
         onEnded={() => setQuickiePlaying(false)}
-        style={{ display: 'none' }}
       />
 
       {/* 🚀 0.1% GOLDSTANDARD: MODALS HUB (Leaf Extraction) */}
       <StudentBriefingModalsHub
-        showQuestionModal={showQuestionModal}
-        setShowQuestionModal={setShowQuestionModal}
-        questionInput={questionInput}
-        setQuestionInput={setQuestionInput}
-        handleQuestionInputChange={handleQuestionInputChange}
-        isSavingQuestion={isSavingQuestion}
-        handleSaveQuestion={handleSaveQuestion}
-        questionToast={questionToast}
-        isListeningSpeech={isListeningSpeech}
-        toggleSpeechRecognition={toggleSpeechRecognition}
-
-        selectedAppointmentForDetail={selectedAppointmentForDetail}
-        setSelectedAppointmentForDetail={setSelectedAppointmentForDetail}
-        showCancelConfirmStep={showCancelConfirmStep}
-        setShowCancelConfirmStep={setShowCancelConfirmStep}
-        handleTriggerCancelOccurrence={handleTriggerCancelOccurrence}
-        handleTriggerUndoCancelOccurrence={handleTriggerUndoCancelOccurrence}
-        studentUser={studentUser}
-        briefingData={briefingData}
-        studentInstrumentName={studentInstrumentName}
-        setAppointmentChatData={setAppointmentChatData}
-        setShowAppointmentChat={setShowAppointmentChat}
-
-        showRecordingsModal={showRecordingsModal}
-        setShowRecordingsModal={setShowRecordingsModal}
-        recordingsModalTracks={recordingsModalTracks}
-        activeRecordingTrack={activeRecordingTrack}
-        setActiveRecordingTrack={setActiveRecordingTrack}
-        getJuniorWeeklyHomeworkSummary={getJuniorWeeklyHomeworkSummary}
-        handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
-        handleTabChangeLocal={handleTabChangeLocal}
-        studentUiLevel={studentUiLevel}
+        showQuestionModal={showQuestionModal} setShowQuestionModal={setShowQuestionModal} questionInput={questionInput} setQuestionInput={setQuestionInput} handleQuestionInputChange={handleQuestionInputChange} isSavingQuestion={isSavingQuestion} handleSaveQuestion={handleSaveQuestion} questionToast={questionToast} isListeningSpeech={isListeningSpeech} toggleSpeechRecognition={toggleSpeechRecognition}
+        selectedAppointmentForDetail={selectedAppointmentForDetail} setSelectedAppointmentForDetail={setSelectedAppointmentForDetail} showCancelConfirmStep={showCancelConfirmStep} setShowCancelConfirmStep={setShowCancelConfirmStep} handleTriggerCancelOccurrence={handleTriggerCancelOccurrence} handleTriggerUndoCancelOccurrence={handleTriggerUndoCancelOccurrence} studentUser={studentUser} briefingData={briefingData} studentInstrumentName={studentInstrumentName} setAppointmentChatData={setAppointmentChatData} setShowAppointmentChat={setShowAppointmentChat} showRecordingsModal={showRecordingsModal} setShowRecordingsModal={setShowRecordingsModal} recordingsModalTracks={recordingsModalTracks} activeRecordingTrack={activeRecordingTrack} setActiveRecordingTrack={setActiveRecordingTrack} getJuniorWeeklyHomeworkSummary={getJuniorWeeklyHomeworkSummary} handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView} handleTabChangeLocal={handleTabChangeLocal} studentUiLevel={studentUiLevel}
       />
       </div>
   );
