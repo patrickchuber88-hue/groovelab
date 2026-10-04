@@ -1903,6 +1903,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               const parsedSongs = JSON.parse(jsonStr);
                               if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
                                 parsedSongs.forEach((song: any) => {
+                                  if (song.is_campus_active === false) return;
                                   const tName = cleanTitle(song.topic_name || song.title || '');
                                   if (tName && !activeJuniorSongs.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
                                     activeJuniorSongs.push({
@@ -8876,6 +8877,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       appointmentAlertsCount={sidebarAppointmentChanges.length} feedAlertsCount={unreadClassFeedCount} hasSidebarAppointmentAlerts={hasSidebarAppointmentAlerts}
                       onOpenAppointments={() => { setMobileSidebarInitialTab('appointments'); setIsMobileSidebarSheetOpen(true); }}
                       onOpenNews={() => { setMobileSidebarInitialTab('news'); setIsMobileSidebarSheetOpen(true); }}
+                      isOpen={isMobileSidebarSheetOpen}
+                      activeTab={mobileSidebarInitialTab}
                     />
                   )}
                 </>

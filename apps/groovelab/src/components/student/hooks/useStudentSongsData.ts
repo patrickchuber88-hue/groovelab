@@ -79,15 +79,15 @@ export function useStudentSongsData({
     // ⚡ 1. Ultra-Fast Parallel SWR Supabase Queries
     try {
       const teacherId = studentUser?.teacher_id || (studentUser as any)?.teacherId;
-      let lehrwerkeQuery = supabase.from('lehrwerke').select('*');
+      let lehrwerkeQuery = supabase.from('lehrwerke').select('id, title, author, total_pages, teacher_id, school_id');
       const orParts: string[] = ['school_id.is.null'];
       if (schoolId) orParts.push(`school_id.eq.${schoolId}`);
       if (teacherId) orParts.push(`teacher_id.eq.${teacherId}`);
       const lehrwerkePromise = lehrwerkeQuery.or(orParts.join(',')).order('title');
 
       const songsPromise = schoolId
-        ? supabase.from('songs').select('*').or(`school_id.eq.${schoolId},school_id.is.null`).order('title')
-        : supabase.from('songs').select('*').order('title');
+        ? supabase.from('songs').select('id, title, artist, audio_url, tempo_bpm, genre, color_scheme, is_campus_active, school_id').eq('is_campus_active', true).or(`school_id.eq.${schoolId},school_id.is.null`).order('title')
+        : supabase.from('songs').select('id, title, artist, audio_url, tempo_bpm, genre, color_scheme, is_campus_active, school_id').eq('is_campus_active', true).order('title');
 
       const skillsPromise = supabase
         .from('user_song_skills')
@@ -149,16 +149,18 @@ export function useStudentSongsData({
       }
 
       if (songsRes.status === 'fulfilled' && (songsRes.value as any)?.data) {
-        loadedSongs = (songsRes.value as any).data || [];
+        // 🛡️ Bounded Context Isolation: Im Campus-Modul dürfen ausschließlich Songs mit is_campus_active geladen werden
+        loadedSongs = ((songsRes.value as any).data || []).filter((s: any) => s.is_campus_active === true);
         if (loadedSongs.length > 0) {
           setSongs(loadedSongs);
         }
       }
 
       if (skillsRes.status === 'fulfilled' && (skillsRes.value as any)?.data) {
+        // 🛡️ Bounded Context Isolation: Ausschließlich Songs, die explizit is_campus_active sind
         loadedSkills = ((skillsRes.value as any).data || []).filter((skill: any) => {
           if (!skill.songs) return false;
-          return skill.songs.is_campus_active === true || skill.is_current_homework === true || Boolean(skill.homework_notes) || Boolean(skill.teacher_notes);
+          return skill.songs.is_campus_active === true;
         });
         setActiveSongSkills(loadedSkills);
       }
@@ -447,12 +449,21 @@ export function useStudentSongsData({
         if (item.homework_notes || item.teacher_notes) existing.homework_notes = item.homework_notes || item.teacher_notes;
         if (item.progress_percent !== undefined) existing.progress_percent = item.progress_percent;
       } else {
+        // 🛡️ Bounded Context Isolation: Im Campus-Modul dürfen nur Songs zugeordnet werden, die in Campus aktiv sind
         const catalogSong = (songs || []).find(s => 
-          s.id === item.song_id || 
+          (s.id === item.song_id || 
           s.title.toLowerCase() === normKey || 
           normKey.includes(s.title.toLowerCase()) || 
-          s.title.toLowerCase().includes(normKey)
+          s.title.toLowerCase().includes(normKey)) &&
+          s.is_campus_active === true
         );
+
+        // Falls item ein Song ist, aber in der Songs-Tabelle als reiner GrooveLab-Song (is_campus_active=false) existiert, verwerfen!
+        const isForbiddenGrooveLabOnlySong = (songs || []).some(s =>
+          (s.id === item.song_id || s.title.toLowerCase() === normKey) &&
+          s.is_campus_active !== true
+        );
+        if (isForbiddenGrooveLabOnlySong) return;
 
         let title = cleanT;
         let artist = 'Unbekannt';
@@ -484,7 +495,7 @@ export function useStudentSongsData({
 
     // 3. Check songs catalog for any is_campus_active songs matching assigned items
     (songs || []).forEach((s: any) => {
-      if (!s.title) return;
+      if (!s.title || s.is_campus_active !== true) return;
       const normKey = s.title.toLowerCase().trim();
       if (songsMap.has(normKey)) return;
       const isAssigned = (progressItems || []).some(item => 
@@ -499,7 +510,7 @@ export function useStudentSongsData({
       }
     });
 
-    // 4. Unpack SNAPSHOT_SONGS from progressItems snapshots (Fail-Safe Server Hydration)
+    // 4. Unpack SNAPSHOT_SONGS from progressItems snapshots (Fail-Safe Server Hydration with Campus Verification)
     (progressItems || []).forEach((item: any) => {
       if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return;
       const rawNotes = item.homework_notes || item.teacher_notes;
@@ -528,6 +539,10 @@ export function useStudentSongsData({
               const sTitle = song.topic_name || song.title || '';
               if (!sTitle) return;
               const normKey = sTitle.toLowerCase().trim();
+
+              // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht über Snapshots in Campus gelangen
+              if (song.is_campus_active === false) return;
+
               const existing = songsMap.get(normKey);
               if (existing) {
                 existing.is_current_homework = true;

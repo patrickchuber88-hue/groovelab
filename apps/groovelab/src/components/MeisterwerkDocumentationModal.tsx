@@ -281,10 +281,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, [propActiveSongSkills]);
 
   useEffect(() => {
-    if (propAssignedCampusSongs && Array.isArray(propAssignedCampusSongs) && propAssignedCampusSongs.length > 0) {
+    const songsMap = new Map<string, any>();
+
+    // 1. Add from activeSongSkills
+    (activeSongSkills || []).forEach((skill: any) => {
+      const songObj = skill.songs || {};
+      const songId = skill.song_id || songObj.id;
+      if (!songId) return;
+      if (!songsMap.has(String(songId))) {
+        songsMap.set(String(songId), {
+          ...songObj,
+          id: songId,
+          skillId: skill.id,
+          title: songObj.title || `Song (ID: ${songId})`,
+          is_current_homework: true
+        });
+      }
+    });
+
+    // 2. Add from progressItems (Fallback)
+    (progressItems || []).forEach((item: any) => {
+      if (item.topic_name && !item.topic_name.includes(' - Seite ') && !item.topic_name.startsWith('Hausaufgabe KW ')) {
+        const title = item.topic_name.trim();
+        const existing = Array.from(songsMap.values()).find(s => (s.title || '').trim().toLowerCase() === title.toLowerCase());
+        if (!existing && title) {
+          songsMap.set(`prog-${item.id}`, {
+            id: `prog-${item.id}`,
+            title: title,
+            is_current_homework: Boolean(item.is_current_homework)
+          });
+        }
+      }
+    });
+
+    // 3. Fallback to prop if we computed nothing and we have a prop (e.g. from Dashboard)
+    const computed = Array.from(songsMap.values());
+    if (computed.length > 0) {
+      setAssignedCampusSongs(computed);
+    } else if (propAssignedCampusSongs && Array.isArray(propAssignedCampusSongs) && propAssignedCampusSongs.length > 0) {
       setAssignedCampusSongs(propAssignedCampusSongs);
     }
-  }, [propAssignedCampusSongs]);
+  }, [activeSongSkills, progressItems, propAssignedCampusSongs]);
   const [activeItem, setActiveItem] = useState<ProgressItem | null>(null);
   const [topicName, setTopicName] = useState('');
   const [status, setStatus] = useState<'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED'>('IN_PROGRESS');
@@ -489,11 +526,81 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       } catch {}
       setGlobalLehrwerke(combined);
 
+      let localAssigned: any[] = [];
       const stored = localStorage.getItem('student_lehrwerke_progress');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setAssignedLehrwerke(parsed.filter((item: any) => item.studentId === student.id));
+        localAssigned = parsed.filter((item: any) => item.studentId === student.id);
       }
+
+      // 🛡️ Auto-healing: Merge any Lehrwerk found in progress_matrix into assignedLehrwerke (Server Sync Parity)
+      try {
+        const { data: pmData } = await supabase
+          .from('progress_matrix')
+          .select('*')
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false });
+        
+        if (pmData && pmData.length > 0) {
+          const healed = [...localAssigned].map((a: any) => ({ ...a, pageStates: { ...(a.pageStates || {}) } }));
+          let needsUpdate = false;
+          
+          pmData.forEach((item: any) => {
+            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+              const parts = item.topic_name.split(' - Seite ');
+              const bookTitle = parts[0].trim();
+              const pageNum = parseInt(parts[1], 10);
+              const book = combined.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+              const targetId = book?.id || `custom-${bookTitle.toLowerCase()}`;
+              
+              let assignment = healed.find((a: any) => 
+                String(a.lehrwerkId) === String(targetId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase())
+              );
+              
+              if (!assignment) {
+                assignment = {
+                  studentId: student.id,
+                  lehrwerkId: targetId,
+                  bookTitle: book?.title || bookTitle,
+                  lehrwerkTitle: book?.title || bookTitle,
+                  totalPages: book?.totalPages || book?.total_pages || 50,
+                  assignedAt: item.created_at || item.updated_at || new Date().toISOString(),
+                  pageStates: {}
+                };
+                healed.push(assignment);
+                needsUpdate = true;
+              }
+              
+              if (!isNaN(pageNum) && assignment.pageStates) {
+                if (!assignment.pageStates[pageNum] || item.is_current_homework) {
+                  assignment.pageStates[pageNum] = {
+                    ...(assignment.pageStates[pageNum] || {}),
+                    status: item.status === 'MASTERED' ? 'mastered' : (item.status === 'THEORY_DONE' ? 'purple' : (item.is_current_homework ? 'homework' : 'locked')),
+                    isCurrentHomework: Boolean(item.is_current_homework),
+                    notes: item.teacher_notes || assignment.pageStates[pageNum]?.notes || '',
+                    homework_notes: item.homework_notes || item.teacher_notes || assignment.pageStates[pageNum]?.homework_notes || ''
+                  };
+                  needsUpdate = true;
+                }
+              }
+            }
+          });
+          
+          if (needsUpdate) {
+            localAssigned = healed;
+            try {
+              const fullStored = localStorage.getItem('student_lehrwerke_progress');
+              const fullParsed = fullStored ? JSON.parse(fullStored) : [];
+              const withoutStudent = fullParsed.filter((i: any) => i.studentId !== student.id);
+              localStorage.setItem('student_lehrwerke_progress', JSON.stringify([...withoutStudent, ...healed]));
+            } catch (e) {}
+          }
+        }
+      } catch (pmErr) {
+        console.warn('[Meisterwerk] Lehrwerke auto-healing failed', pmErr);
+      }
+      
+      setAssignedLehrwerke(localAssigned);
     } catch (e) {
       console.warn('[Meisterwerk] Error in loadLehrwerke:', e);
     }
@@ -2784,9 +2891,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       role={isEmbed ? undefined : "dialog"}
       aria-modal={isEmbed ? undefined : "true"}
       aria-label="Meisterwerk- & Hausaufgabendokumentation"
-      className={isMobileOrSim ? "mobile-modal-shell" : "animation-slide-up"}
+      className={isEmbed ? "mobile-modal-embed-shell" : (isMobileOrSim ? "mobile-modal-shell" : "animation-slide-up")}
       style={{
-        background: '#ffffff',
+        background: activeModalTab === 'stickeralbum' ? '#0f172a' : '#ffffff',
         border: isMobileOrSim ? 'none' : '1px solid #e2e8f0',
         borderRadius: isMobileOrSim ? '0' : '20px',
         boxShadow: isMobileOrSim
@@ -3020,7 +3127,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-y',
           minHeight: 0,
-          background: '#f8fafc',
+          background: activeModalTab === 'stickeralbum' ? '#0f172a' : '#f8fafc',
           padding: '0',
           position: 'relative'
         }}
@@ -3721,6 +3828,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       </div>
 
       {(isMobileOrSim || isMobileView) && activeModalTab !== 'stickeralbum' && (
+        (hubTab === 'modules' || (hubTab === 'protocol' && mobileProtokollTab === 'homework')) && 
+        activeViewMode === 'document' && 
+        activeModalTab === 'document' && 
+        activeSubView === 'hub'
+      ) && (
         <MeisterwerkMobileBottomBar
           hubTab={hubTab}
           mobileProtokollTab={mobileProtokollTab} setMobileProtokollTab={setMobileProtokollTab}
@@ -3737,7 +3849,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   if (isEmbed && !isFullscreen) {
     return (
       <>
-        <div style={{ width: '100%', height: (isMobileOrSim || isMobileView) ? '100%' : 'calc(100vh - 120px)', minHeight: (isMobileOrSim || isMobileView) ? '100%' : '600px', fontFamily: '"Inter", sans-serif' }}>
+        <div style={{ width: '100%', height: (isMobileOrSim || isMobileView) ? '100%' : 'calc(100vh - 120px)', minHeight: (isMobileOrSim || isMobileView) ? '100%' : '600px', fontFamily: '"Inter", sans-serif', background: activeModalTab === 'stickeralbum' ? '#0f172a' : undefined }}>
           {content}
         </div>
 

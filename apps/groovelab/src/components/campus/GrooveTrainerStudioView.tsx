@@ -989,46 +989,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             created_at: nowIso
           });
 
-          // 3. Update avatars table (authoritative SSOT for XP)
-          let nextAvXp = updated;
-          try {
-            const { data: avData } = await supabase
-              .from('avatars')
-              .select('xp')
-              .or(`user_id.eq.${student.id},student_id.eq.${student.id}`)
-              .order('updated_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            const currentAvXp = avData?.xp || 0;
-            nextAvXp = currentAvXp + xpToCommit;
-            await supabase
-              .from('avatars')
-              .update({
-                xp: nextAvXp,
-                updated_at: nowIso
-              })
-              .or(`user_id.eq.${student.id},student_id.eq.${student.id}`);
-          } catch (_) {}
-
-          // 4. Update student_stats table
-          let nextStatsXp = updated;
-          try {
-            const { data: statsRecord } = await supabase
-              .from('student_stats')
-              .select('current_xp, total_focus_minutes')
-              .eq('student_id', student.id)
-              .maybeSingle();
-            nextStatsXp = (statsRecord?.current_xp || 0) + xpToCommit;
-            const currentFocusMins = (statsRecord?.total_focus_minutes || 0) + minutesToAdd;
-            await supabase
-              .from('student_stats')
-              .upsert({
-                student_id: student.id,
-                current_xp: nextStatsXp,
-                total_focus_minutes: currentFocusMins,
-                updated_at: nowIso
-              }, { onConflict: 'student_id' });
-          } catch (_) {}
+          // 3 & 4. Update avatars table and student_stats table are completely handled automatically
+          // by the 0.1% Goldstandard Backend-Trigger (trg_fokus_logs_stats_sync)
 
           // 5. Update students practice_minutes_today
           try {
@@ -1047,8 +1009,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               .eq('id', student.id);
           } catch (_) {}
 
-          // 6. Reconcile authoritative total XP to localStorage & local state
-          const authoritativeTotalXp = Math.max(nextAvXp, nextStatsXp);
+          // 6. Reconcile authoritative total XP to local state
+          const cachedAvXp = Number(localStorage.getItem(`campus_bonus_xp_${student.id}`) || 0);
+          const authoritativeTotalXp = cachedAvXp + xpToCommit;
           localStorage.setItem(`campus_bonus_xp_${student.id}`, String(authoritativeTotalXp));
           setStudentBaseXp(authoritativeTotalXp);
         } catch (err) {

@@ -10,6 +10,8 @@ export interface StudentBriefingMobileBottomBarProps {
   // Abwärtskompatibilität
   sidebarTotalAlertsCount?: number;
   onOpenSidebar?: () => void;
+  isOpen?: boolean;
+  activeTab?: 'appointments' | 'news';
 }
 
 /**
@@ -28,7 +30,9 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
   onOpenAppointments,
   onOpenNews,
   sidebarTotalAlertsCount,
-  onOpenSidebar
+  onOpenSidebar,
+  isOpen = false,
+  activeTab = 'appointments'
 }) => {
   const triggerHaptic = () => {
     try {
@@ -61,6 +65,9 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
   const effFeedCount = feedAlertsCount || (!hasSidebarAppointmentAlerts ? (sidebarTotalAlertsCount || 0) : 0);
 
   const BRAND_COLOR = '#34a853';
+  
+  const isAppointmentsActive = isOpen && activeTab === 'appointments';
+  const isNewsActive = isOpen && activeTab === 'news';
 
   return (
     <nav
@@ -95,6 +102,7 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
       <button
         type="button"
         role="tab"
+        aria-selected={isAppointmentsActive}
         tabIndex={0}
         onClick={handleTapAppointments}
         onKeyDown={(e) => {
@@ -134,12 +142,12 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
             width: '42px',
             height: '24px',
             borderRadius: '12px',
-            background: `${BRAND_COLOR}15`,
+            background: isAppointmentsActive ? `${BRAND_COLOR}18` : 'transparent',
             position: 'relative',
             transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
-          <Calendar size={17} color={BRAND_COLOR} strokeWidth={2.4} />
+          <Calendar size={17} color={isAppointmentsActive ? BRAND_COLOR : '#94a3b8'} strokeWidth={isAppointmentsActive ? 2.4 : 1.9} />
           {effAppointmentCount > 0 && (
             <span
               style={{
@@ -170,9 +178,9 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
         <span
           style={{
             fontSize: '0.68rem',
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.01em',
+            fontWeight: isAppointmentsActive ? 800 : 600,
+            color: isAppointmentsActive ? BRAND_COLOR : '#64748b',
+            letterSpacing: isAppointmentsActive ? '-0.01em' : '0',
             lineHeight: 1
           }}
         >
@@ -267,9 +275,9 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
         <span
           style={{
             fontSize: '0.68rem',
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.01em',
+            fontWeight: isNewsActive ? 800 : 600,
+            color: isNewsActive ? BRAND_COLOR : '#64748b',
+            letterSpacing: isNewsActive ? '-0.01em' : '0',
             lineHeight: 1
           }}
         >

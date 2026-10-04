@@ -298,10 +298,10 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       display: 'flex', 
       flexDirection: 'column', 
       padding: windowWidth <= 768 
-        ? (isMobileActiveChat ? '0px' : (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px)) 4px')) 
+        ? ((isMobileActiveChat || activeStudentTab === 'homework_book' || activeStudentTab === 'homework') ? '0px' : (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px)) 4px')) 
         : (['homework', 'homework_book'].includes(activeStudentTab) ? '12px 16px' : (user?.role?.toLowerCase() === 'student' ? '20px 24px 32px 24px' : '10px')),
-      scrollPaddingTop: windowWidth <= 768 ? (isMobileActiveChat ? '0px' : 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))') : undefined,
-      scrollPaddingBottom: windowWidth <= 768 ? (isMobileActiveChat ? '0px' : 'var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px))') : undefined,
+      scrollPaddingTop: windowWidth <= 768 ? ((isMobileActiveChat || activeStudentTab === 'homework_book' || activeStudentTab === 'homework') ? '0px' : 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))') : undefined,
+      scrollPaddingBottom: windowWidth <= 768 ? ((isMobileActiveChat || activeStudentTab === 'homework_book' || activeStudentTab === 'homework') ? '0px' : 'var(--mobile-scroll-clearance-bottom, calc(var(--mobile-bottom-nav-h, 64px) + env(safe-area-inset-bottom, 16px) + 24px))') : undefined,
       boxSizing: 'border-box',
       minWidth: 0,
       width: '100%'

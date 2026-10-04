@@ -696,16 +696,34 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 40);
 
     try {
-      const { data, error } = await supabase.from('campus_direct_messages').insert({
-        sender_id: currentUserId,
-        recipient_id: recipientId,
-        content: text,
-        occurrence_id: occRefId,
-        is_read: false,
-        is_system: false,
-        sender_role: isParentSender ? 'parent' : (currentUserRole === 'teacher' ? 'teacher' : 'student')
-      }).select().single();
-      if (error) throw error;
+      let data, error;
+      if (isParentSender) {
+        const leaseToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_parent_session_lease') : null;
+        if (!leaseToken) {
+          throw new Error('Lease-Token abgelaufen oder nicht gefunden. Bitte PIN erneut eingeben.');
+        }
+        const res = await supabase.rpc('send_campus_message_as_parent', {
+          p_recipient_id: recipientId,
+          p_content: text,
+          p_occurrence_id: occRefId,
+          p_lease_token: leaseToken
+        });
+        if (res.error) throw res.error;
+      } else {
+        const res = await supabase.from('campus_direct_messages').insert({
+          sender_id: currentUserId,
+          recipient_id: recipientId,
+          content: text,
+          occurrence_id: occRefId,
+          is_read: false,
+          is_system: false,
+          sender_role: currentUserRole === 'teacher' ? 'teacher' : 'student'
+        }).select().single();
+        data = res.data;
+        error = res.error;
+        if (error) throw error;
+      }
+      
       const effectiveSchoolId = currentUserProfile?.school_id || 
         (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
         occurrence?.school_id;

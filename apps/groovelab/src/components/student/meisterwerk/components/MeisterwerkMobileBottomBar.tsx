@@ -47,6 +47,7 @@ export const MeisterwerkMobileBottomBar: React.FC<MeisterwerkMobileBottomBarProp
     setActiveViewMode('document');
     setActiveSubView('hub');
     setMobileProtokollTab('homework');
+    setHubTab('protocol');
   };
 
   const handleSelectModules = () => {

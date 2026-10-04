@@ -171,7 +171,7 @@ export function useStudentPracticeSession({
 
     setSessionActive(false);
     const durationMinutes = Math.max(1, Math.floor(elapsed / 60));
-    const xpGained = typeof customXp === 'number' ? customXp : durationMinutes * 10;
+    const xpGained = typeof customXp === 'number' ? customXp : durationMinutes; // 1 XP pro Minute (Goldstandard SSOT)
 
     try {
       const simNow = getSimulatedNow();
@@ -192,18 +192,8 @@ export function useStudentPracticeSession({
         setFokusLogs(prev => [logData, ...prev]);
       }
 
-      // Update avatar XP
       const currentStreak = avatar?.streak_flame || 0;
       const newStreak = currentStreak === 0 ? 1 : currentStreak;
-      const newXp = (avatar?.xp || 0) + xpGained;
-
-      await supabase
-        .from('avatars')
-        .update({
-          xp: newXp,
-          streak_flame: newStreak
-        })
-        .eq('user_id', studentId);
 
       setCelebrationDetails({
         durationMinutes,

@@ -142,6 +142,9 @@ export function deriveActiveHomeworkSummary({
         }
       }
     } else {
+      // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht als Campus-Hausaufgabe erscheinen
+      if (item.is_campus_active === false) return;
+
       const localHw = currentStudentId
         ? (localStorage.getItem(`song_hw_${currentStudentId}_${item.id}`) ??
            (item.song_id ? localStorage.getItem(`song_hw_${currentStudentId}_${item.song_id}`) : null))
@@ -170,6 +173,9 @@ export function deriveActiveHomeworkSummary({
 
   // 3. Also incorporate student's activeSongSkills
   (activeSongSkills || []).forEach((skill: any) => {
+    // 🛡️ Bounded Context Isolation: Reine GrooveLab-Skills dürfen nicht im Campus-Modul erscheinen
+    if (skill.songs && skill.songs.is_campus_active === false) return;
+
     const localHw = currentStudentId
       ? (localStorage.getItem(`song_hw_${currentStudentId}_${skill.id}`) ??
          (skill.song_id ? localStorage.getItem(`song_hw_${currentStudentId}_${skill.song_id}`) : null) ??
@@ -209,6 +215,9 @@ export function deriveActiveHomeworkSummary({
 
   // 4. Also incorporate student's assignedCampusSongs
   (assignedCampusSongs || []).forEach((cSong: any) => {
+    // 🛡️ Bounded Context Isolation: Explizite Campus-Zuordnung vorausgesetzt
+    if (cSong.is_campus_active === false) return;
+
     const localHw = currentStudentId
       ? (localStorage.getItem(`song_hw_${currentStudentId}_${cSong.id}`) ??
          (cSong.song_id ? localStorage.getItem(`song_hw_${currentStudentId}_${cSong.song_id}`) : null) ??
@@ -321,6 +330,9 @@ export function deriveActiveHomeworkSummary({
           const parsedSongs = JSON.parse(jsonStr);
           if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
             parsedSongs.forEach((song: any) => {
+              // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht über Snapshots in Campus gelangen
+              if (song.is_campus_active === false) return;
+
               const tName = cleanTitle(song.topic_name || song.title || '');
               if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
                 otherActiveHWItems.push({
@@ -463,6 +475,10 @@ export function deriveJuniorHomeworkSummary({
   const activeJuniorSongs: any[] = [];
   (progressItems || []).forEach(item => {
     if (item.topic_name.startsWith('Hausaufgabe KW ') || item.topic_name.includes(' - Seite ')) return;
+    
+    // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht als Campus-Hausaufgabe erscheinen
+    if (item.is_campus_active === false) return;
+
     const localHw = studentId
       ? (localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
          (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null))
@@ -482,6 +498,9 @@ export function deriveJuniorHomeworkSummary({
   });
 
   (activeSongSkills || []).forEach((skill: any) => {
+    // 🛡️ Bounded Context Isolation: Reine GrooveLab-Skills dürfen nicht im Campus-Modul erscheinen
+    if (skill.songs && skill.songs.is_campus_active === false) return;
+
     const localHw = studentId
       ? (localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
          (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
@@ -518,6 +537,9 @@ export function deriveJuniorHomeworkSummary({
   });
 
   (assignedCampusSongs || []).forEach((cSong: any) => {
+    // 🛡️ Bounded Context Isolation: Explizite Campus-Zuordnung vorausgesetzt
+    if (cSong.is_campus_active === false) return;
+
     const localHw = studentId
       ? (localStorage.getItem(`song_hw_${studentId}_${cSong.id}`) ??
          (cSong.song_id ? localStorage.getItem(`song_hw_${studentId}_${cSong.song_id}`) : null))

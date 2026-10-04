@@ -312,6 +312,7 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
       {/* 📱 0.1% Goldstandard: Mobile Sub-Dock & Chat Isolation */}
       {(() => {
         const isMobileActiveChat = Boolean(isMobile && activeStudentTab === 'messages' && selectedCampusRecipient);
+        const isMobileHomeworkBook = Boolean(isMobile && (activeStudentTab === 'homework_book' || activeStudentTab === 'homework'));
         const hasDedicatedSubDock = Boolean(
           isMobile && (
             activeStudentTab === 'homework_book' ||
@@ -321,7 +322,7 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         );
 
         return (
-          <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''} ${hasDedicatedSubDock ? 'has-mobile-sub-dock' : ''}`} style={{ paddingTop: '0' }}>
+          <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''} ${isMobileHomeworkBook ? 'homework-book-active' : ''} ${hasDedicatedSubDock ? 'has-mobile-sub-dock' : ''}`} style={{ paddingTop: '0' }}>
             {!isMobileActiveChat && (
               <GeminiMobileShell
                 user={user}

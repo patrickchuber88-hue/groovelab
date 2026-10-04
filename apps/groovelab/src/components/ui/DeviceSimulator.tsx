@@ -1143,7 +1143,7 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
                 position: 'relative',
                 width: `${frameWidth}px`,
                 height: `${frameHeight}px`,
-                background: '#ffffff',
+                background: '#000000',
                 borderRadius: currentPreset.borderRadius || '36px',
                 boxShadow:
                   '0 0 0 12px #1e293b, 0 0 0 14px #0f172a, 0 25px 65px -10px rgba(0, 0, 0, 0.8), 0 0 45px rgba(59, 130, 246, 0.15)',
@@ -1272,7 +1272,7 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
                     height: '100%',
                     flex: 1,
                     border: 'none',
-                    background: '#ffffff',
+                    background: '#000000',
                     display: 'block'
                   }}
                 />

@@ -2110,14 +2110,19 @@ select option {
 .sim-viewport-portrait .main-wrapper.messages-chat-active #main-content,
 .sim-viewport-portrait .main-wrapper.messages-chat-active .main-content,
 .main-wrapper.messages-chat-active #main-content,
-.main-wrapper.messages-chat-active .main-content {
+.main-wrapper.messages-chat-active .main-content,
+.sim-viewport-mobile .main-wrapper.homework-book-active #main-content,
+.sim-viewport-mobile .main-wrapper.homework-book-active .main-content,
+.sim-viewport-portrait .main-wrapper.homework-book-active #main-content,
+.sim-viewport-portrait .main-wrapper.homework-book-active .main-content,
+.main-wrapper.homework-book-active #main-content,
+.main-wrapper.homework-book-active .main-content {
   padding: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: 0 !important;
   padding-top: 0 !important;
   margin: 0 !important;
-  overflow: hidden !important;
 }
 
 @media (max-width: 768px) {
@@ -3220,6 +3225,20 @@ input[type="range"]::-moz-range-thumb {
       box-sizing: border-box !important;
       padding-left: env(safe-area-inset-left, 0px) !important;
       padding-right: env(safe-area-inset-right, 0px) !important;
+    }
+
+    .mobile-modal-embed-shell {
+      display: flex !important;
+      flex-direction: column !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      border-radius: 0 !important;
+      box-sizing: border-box !important;
+      padding: 0 !important;
+      margin: 0 !important;
     }
 
     .mobile-scroll-container {

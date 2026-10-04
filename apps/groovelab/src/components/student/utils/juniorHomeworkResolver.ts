@@ -116,6 +116,9 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
         }
       }
     } else {
+      // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht als Campus-Hausaufgabe erscheinen
+      if (item.is_campus_active === false) return;
+
       const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${item.id}`) ??
                       (item.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${item.song_id}`) : null)) : null;
       if (localHw !== 'false') {
@@ -147,6 +150,9 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
 
   // Also incorporate student's activeSongSkills
   (activeSongSkills || []).forEach((skill: any) => {
+    // 🛡️ Bounded Context Isolation: Reine GrooveLab-Skills dürfen nicht im Campus-Modul erscheinen
+    if (skill.songs && skill.songs.is_campus_active === false) return;
+
     const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${skill.id}`) ??
                     (skill.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.song_id}`) : null) ??
                     (skill.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.songs.id}`) : null)) : null;
@@ -191,6 +197,9 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
 
   // Also check assignedCampusSongs
   (assignedCampusSongs || []).forEach((cSong: any) => {
+    // 🛡️ Bounded Context Isolation: Explizite Campus-Zuordnung vorausgesetzt
+    if (cSong.is_campus_active === false) return;
+
     const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${cSong.id}`) ??
                     (cSong.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.song_id}`) : null) ??
                     (cSong.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.songs.id}`) : null)) : null;
@@ -300,6 +309,9 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
             const parsedSongs = JSON.parse(jsonStr);
             if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
               parsedSongs.forEach((song: any) => {
+                // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht in Campus-Zusammenfassungen gelangen
+                if (song.is_campus_active === false) return;
+
                 const tName = cleanTitle(song.topic_name || song.title || '');
                 if (tName && !otherActiveSongs.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
                   otherActiveSongs.push({
