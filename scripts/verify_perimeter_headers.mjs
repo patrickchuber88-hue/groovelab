@@ -227,14 +227,14 @@ function auditMozillaObservatory(headers, httpRedirectResponse) {
 
   // 6. Permissions-Policy
   const permPol = headers['permissions-policy'] || '';
-  const hasCameraDisabled = /camera=\(\)/i.test(permPol);
+  const hasCameraPolicy = /camera=\(self\)|camera=\(\)/i.test(permPol);
   const hasMicrophoneSelf = /microphone=\(self\)/i.test(permPol);
   const hasGeolocationDisabled = /geolocation=\(\)/i.test(permPol);
   const hasSensorsDisabled = /gyroscope=\(\)/i.test(permPol) && /accelerometer=\(\)/i.test(permPol) && /magnetometer=\(\)/i.test(permPol);
   record(
     'PERM-01',
     'Permissions-Policy (Hardware Sandbox & TDDDG § 25)',
-    permPol.length > 0 && hasCameraDisabled && hasMicrophoneSelf && hasGeolocationDisabled && hasSensorsDisabled,
+    permPol.length > 0 && hasCameraPolicy && hasMicrophoneSelf && hasGeolocationDisabled && hasSensorsDisabled,
     10,
     permPol ? `Wert: "${permPol}"` : 'Header fehlt',
     'Permissions-Policy vollständig absichern.'
