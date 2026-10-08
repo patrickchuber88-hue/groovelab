@@ -744,7 +744,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale"

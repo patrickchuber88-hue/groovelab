@@ -456,7 +456,7 @@ export const FeedbackTab: React.FC = () => {
           border: '1.5px solid #10b981',
           borderRadius: '16px',
           padding: '16px 18px',
-          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
+          boxShadow: 'none'
         }}>
           <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Zap size={14} /> 60-Min. SLA Quote
@@ -829,7 +829,7 @@ export const FeedbackTab: React.FC = () => {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
+                          boxShadow: 'none'
                         }}
                       >
                         <ShieldCheck size={12} />
@@ -961,7 +961,7 @@ export const FeedbackTab: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
-                boxShadow: '0 4px 12px rgba(8, 145, 178, 0.08)'
+                boxShadow: 'none'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1002,7 +1002,7 @@ export const FeedbackTab: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
@@ -1240,7 +1240,7 @@ export const FeedbackTab: React.FC = () => {
                     fontWeight: 800,
                     cursor: (isSendingResponse || !currentResponseText.trim()) ? 'not-allowed' : 'pointer',
                     opacity: (!currentResponseText.trim()) ? 0.6 : 1,
-                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -1289,7 +1289,7 @@ export const FeedbackTab: React.FC = () => {
                   fontSize: '0.88rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+                  boxShadow: 'none'
                 }}
               >
                 <Sparkles size={16} />

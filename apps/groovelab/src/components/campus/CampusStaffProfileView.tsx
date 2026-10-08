@@ -59,7 +59,7 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
           borderRadius: '32px',
           display: 'flex',
           alignItems: 'stretch',
-          boxShadow: '0 8px 32px rgba(52, 168, 83, 0.08)',
+          boxShadow: 'none',
           overflow: 'hidden',
           minHeight: '222px',
           boxSizing: 'border-box',
@@ -120,7 +120,7 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
                 fontWeight: 900,
                 textTransform: 'uppercase',
                 letterSpacing: '0.1em',
-                boxShadow: '0 4px 10px rgba(52, 168, 83, 0.25)',
+                boxShadow: 'none',
               }}
             >
               Campus Lehrkraft
@@ -195,7 +195,7 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
                   fontWeight: 800,
                   border: 'none',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s',
                   touchAction: 'manipulation',
                   minHeight: '44px',

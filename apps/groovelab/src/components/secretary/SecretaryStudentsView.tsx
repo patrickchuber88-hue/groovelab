@@ -484,7 +484,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
-                    boxShadow: '0 2px 6px rgba(52, 168, 83,0.15)',
+                    boxShadow: 'none',
                     transition: 'all 0.2s'
                   }}
                 >
@@ -514,7 +514,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
-                  boxShadow: '0 4px 16px rgba(52,168,83,0.06)'
+                  boxShadow: 'none'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -634,7 +634,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         fontWeight: 800,
                         cursor: isImportingStudentsBatch || !studentCsvText.trim() ? 'not-allowed' : 'pointer',
                         opacity: isImportingStudentsBatch || !studentCsvText.trim() ? 0.6 : 1,
-                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)',
+                        boxShadow: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px'

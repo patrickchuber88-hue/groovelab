@@ -178,7 +178,7 @@ export const JuniorAudioHubView: React.FC<JuniorAudioHubViewProps> = ({
           maxHeight: '58px',
           padding: isMobileOrSim ? '0 12px' : '0 18px',
           color: '#ffffff',
-          boxShadow: '0 4px 16px rgba(52, 168, 83, 0.22)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -500,7 +500,7 @@ export const JuniorAudioHubView: React.FC<JuniorAudioHubViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >

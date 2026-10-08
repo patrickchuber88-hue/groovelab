@@ -303,7 +303,7 @@ export const SpacedRepetitionRepertoireCard: React.FC<SpacedRepetitionRepertoire
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+                      boxShadow: 'none',
                       transition: 'background 0.2s ease'
                     }}
                     className="hover-scale"

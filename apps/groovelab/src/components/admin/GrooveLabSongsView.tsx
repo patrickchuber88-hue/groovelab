@@ -137,7 +137,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
               gap: "8px",
               fontSize: "0.88rem",
               fontWeight: 900,
-              boxShadow: "0 4px 14px rgba(234, 179, 8, 0.35)",
+              boxShadow: "none",
               transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
             onMouseEnter={(e) => {
@@ -236,7 +236,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
               background: "#ffffff",
               borderRadius: "20px",
               border: "1.5px solid rgba(234, 179, 8, 0.3)",
-              boxShadow: "0 12px 36px rgba(234, 179, 8, 0.08)",
+              boxShadow: "none",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -506,7 +506,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                   fontWeight: 900,
                   fontSize: "0.92rem",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(234, 179, 8, 0.3)",
+                  boxShadow: 'none',
                 }}
               >
                 {bulkModeSongs ? "Sammel-Import starten" : "Song speichern"}
@@ -549,7 +549,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
               background: "#fffbeb",
               borderRadius: "20px",
               border: "1.5px solid #fef08a",
-              boxShadow: "0 12px 36px rgba(234, 179, 8, 0.08)",
+              boxShadow: "none",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -745,7 +745,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                   fontWeight: 900,
                   fontSize: "0.92rem",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(234, 179, 8, 0.3)",
+                  boxShadow: 'none',
                 }}
               >
                 Änderungen speichern

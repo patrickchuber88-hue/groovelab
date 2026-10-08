@@ -875,7 +875,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '16px',
-              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
+              boxShadow: 'none'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -921,7 +921,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(234, 67, 53, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s'
               }}
               className="hover-scale"
@@ -2036,7 +2036,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 2px 8px rgba(234, 67, 53, 0.08)'
+                      boxShadow: 'none'
                     }}
                     className="hover-scale"
                   >

@@ -456,7 +456,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                           cursor: 'pointer',
                           flexShrink: 0,
                           transition: 'all 0.15s ease',
-                          boxShadow: '0 1px 2px rgba(220, 38, 38, 0.06)'
+                          boxShadow: 'none'
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.background = '#fecaca';
@@ -794,7 +794,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                       background: '#ea580c',
                       padding: '2px 8px',
                       borderRadius: '100px',
-                      boxShadow: '0 2px 6px rgba(234, 88, 12, 0.3)'
+                      boxShadow: 'none'
                     }}>
                       {totalOpenCount} offen
                     </span>

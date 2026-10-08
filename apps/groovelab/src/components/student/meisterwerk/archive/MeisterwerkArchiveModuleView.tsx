@@ -740,7 +740,7 @@ export const MeisterwerkArchiveModuleView: React.FC<MeisterwerkArchiveModuleView
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+              boxShadow: 'none',
               opacity: isSavingFeedback ? 0.7 : 1,
               transition: 'all 0.15s ease'
             }}

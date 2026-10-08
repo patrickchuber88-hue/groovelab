@@ -80,7 +80,7 @@ export const DigitalDetoxOverlay: React.FC<DigitalDetoxOverlayProps> = ({
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
+                boxShadow: 'none'
               }}>
                 <Smartphone size={38} color="#ef4444" className="animate-bounce" />
               </div>

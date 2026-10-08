@@ -357,7 +357,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                       style={{
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         border: 'none',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)',
+                        boxShadow: 'none',
                         borderRadius: '12px',
                         padding: '12px',
                         textAlign: 'center',
@@ -436,7 +436,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px',
-                          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+                          boxShadow: 'none'
                         }}
                         className="hover-scale"
                       >
@@ -899,7 +899,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                     fontSize: '0.84rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px'
@@ -921,7 +921,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                     fontSize: '0.86rem',
                     fontWeight: 900,
                     cursor: 'pointer',
-                    boxShadow: '0 6px 18px rgba(52, 168, 83, 0.3)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
@@ -948,7 +948,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
             color: '#ffffff',
             padding: '12px 24px',
             borderRadius: '100px',
-            boxShadow: '0 12px 36px rgba(22, 163, 74, 0.4), 0 4px 12px rgba(0,0,0,0.18)',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
@@ -976,7 +976,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
             color: '#ffffff',
             padding: '10px 20px',
             borderRadius: '100px',
-            boxShadow: '0 8px 24px rgba(2, 132, 199, 0.35)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',

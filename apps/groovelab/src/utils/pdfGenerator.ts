@@ -4,6 +4,7 @@ import { generateLocalQrDataUrl } from './localQrGenerator';
 import { generateEpcGiroCodePayload, formatIbanWithSpaces } from './epcGiroCode';
 import { ACTIVE_LEGAL_VERSION } from '../legal/legalContent';
 import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
+import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../config/operatorBanking';
 
 export const generateConsentPDF = async (
   schoolName: string, 
@@ -1874,7 +1875,7 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
   doc.text(cleanInvoiceId, 185, metaY + 12, { align: 'right' });
   doc.text(params.invoiceDate || new Date().toLocaleDateString('de-DE'), 185, metaY + 17, { align: 'right' });
-  doc.text(params.dueDateStr || '14 Tage', 185, metaY + 22, { align: 'right' });
+  doc.text(params.dueDateStr || '30 Tage', 185, metaY + 22, { align: 'right' });
 
   // Table of Items
   y = 85;
@@ -2513,6 +2514,7 @@ export interface B2BInvoiceParams {
     active_students_count?: number;
     storage_addon_gb?: number;
     storage_addon_price?: number;
+    currency?: 'EUR' | 'CHF' | string;
   };
   stats?: {
     teachers?: number;
@@ -2529,10 +2531,10 @@ export interface B2BInvoiceParams {
 
 /**
  * Berechnet das kalendermäßige Zahlungsziel unter Beachtung von § 193 BGB.
- * Fällt der 14. Tag auf einen Samstag oder Sonntag, verschiebt sich die Fälligkeit
+ * Fällt der 30. Tag auf einen Samstag oder Sonntag, verschiebt sich die Fälligkeit
  * automatisch auf den nächsten Bankarbeitstag (Montag).
  */
-export function calculateDueDateWithBgb193(startDate: Date, days: number = 14): Date {
+export function calculateDueDateWithBgb193(startDate: Date, days: number = 30): Date {
   const date = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
   const dayOfWeek = date.getDay(); // 0 = Sonntag, 6 = Samstag
   if (dayOfWeek === 6) {
@@ -2612,7 +2614,7 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.text(servicePeriod, 170, 41);
 
   doc.text(`Zahlungsziel:`, 140, 46);
-  const dueDate = calculateDueDateWithBgb193(now, 14);
+  const dueDate = calculateDueDateWithBgb193(now, 30);
   doc.text(dueDate.toLocaleDateString('de-DE'), 170, 46);
 
   // 3. Recipient Address
@@ -2647,7 +2649,23 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   const passiveStudents = params.stats?.passiveStudents ?? Math.max(0, totalStudents - activeStudentsMax);
 
   const storageGb = params.school.storage_addon_gb ?? 0;
-  const storagePrice = params.school.storage_addon_price ?? (storageGb > 0 ? 5.90 : 0);
+  const isChf = params.school.currency === 'CHF';
+  const getStorageAddonPrice = (gb: number, chf: boolean): number => {
+    if (gb <= 0) return 0;
+    if (chf) {
+      if (gb <= 10) return 3.80;
+      if (gb <= 25) return 6.40;
+      if (gb <= 50) return 11.60;
+      if (gb <= 100) return 19.40;
+      return 25.90;
+    }
+    if (gb <= 10) return 2.90;
+    if (gb <= 25) return 4.90;
+    if (gb <= 50) return 8.90;
+    if (gb <= 100) return 14.90;
+    return 19.90;
+  };
+  const storagePrice = params.school.storage_addon_price ?? getStorageAddonPrice(storageGb, isChf);
 
   interface InvoiceLine {
     pos: number;
@@ -2861,8 +2879,8 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFontSize(7.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text(`Bitte überweisen Sie den Rechnungsbetrag von ${grandTotal.toFixed(2).replace('.', ',')} € bis zum ${dueDate.toLocaleDateString('de-DE')} (§ 193 BGB Werktagsfrist).`, 20, currentY + 5);
-  doc.text('Zahlungsempfänger: Patrick Huber (Campus-Groovelab Plattformbetrieb)', 20, currentY + 9);
-  doc.text(`IBAN: ${formatIbanWithSpaces('DE89370400440532948211')}   •   BIC: GENODEFFXXX`, 20, currentY + 13);
+  doc.text(`Zahlungsempfänger: ${OPERATOR_BANKING_CONFIG.companyName}`, 20, currentY + 9);
+  doc.text(`IBAN: ${formatIbanWithSpaces(OPERATOR_BANKING_CONFIG.iban)}   •   BIC: ${OPERATOR_BANKING_CONFIG.bic}`, 20, currentY + 13);
   doc.text(`Verwendungszweck: ${invoiceNumber} (${params.school.name})`, 20, currentY + 17);
 
   doc.setFont('helvetica', 'bold');
@@ -2876,9 +2894,9 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   // EPC-GiroCode QR Rendering for instant mobile banking scan
   try {
     const epcPayload = generateEpcGiroCodePayload({
-      iban: 'DE89370400440532948211',
-      bic: 'GENODEFFXXX',
-      recipientName: 'Campus-Groovelab Plattformbetrieb',
+      iban: OPERATOR_BANKING_CONFIG.iban,
+      bic: OPERATOR_BANKING_CONFIG.bic,
+      recipientName: OPERATOR_BANKING_CONFIG.companyName,
       amount: grandTotal,
       referenceCode: invoiceNumber
     });
@@ -3097,15 +3115,8 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text('Dieses Zertifikat wird automatisiert aus den revisionssicheren Telemetrie- und Audit-Protokollen der Plattform generiert.', 20, currentY + 5);
 
-  let sha256Seal = '';
-  try {
-    const encoder = new TextEncoder();
-    const rawPayload = `${schoolName}-${uptime}-${period}-${now.toISOString()}`;
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(rawPayload));
-    sha256Seal = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch (e) {
-    sha256Seal = 'a4f8b9e6c2d10398f5b4e7a2c1d0987654321fedcba0987654321abcdef01234';
-  }
+  const rawPayload = { schoolName, uptime, period, timestamp: now.toISOString() };
+  const sha256Seal = await computeCanonicalPayloadHash(rawPayload);
 
   doc.setFont('courier', 'normal');
   doc.setFontSize(6.5);
@@ -3266,15 +3277,8 @@ export const generateIncidentReportPDF = async (params: IncidentReportParams) =>
   doc.text(splitGdpr, 20, currentY + 5);
   currentY += 5 + splitGdpr.length * 3.8;
 
-  let sha256Seal = '';
-  try {
-    const encoder = new TextEncoder();
-    const rawPayload = `${params.incidentTitle}-${params.incidentDate}-${reportNumber}-${now.toISOString()}`;
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(rawPayload));
-    sha256Seal = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch (e) {
-    sha256Seal = 'b5f9c0e7d3e21409f6c5f8b3d2e10987654321fedcba0987654321abcdef01235';
-  }
+  const rawPayload = { incidentTitle: params.incidentTitle, incidentDate: params.incidentDate, reportNumber, timestamp: now.toISOString() };
+  const sha256Seal = await computeCanonicalPayloadHash(rawPayload);
 
   doc.setFont('courier', 'normal');
   doc.setFontSize(6.5);
@@ -4112,18 +4116,12 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   const period = params.periodDescription || `Schuljahr bis 31.07.${new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)}`;
   const months = params.remainingMonths ?? 11;
   const rate = params.monthlyRate || (params.isHardship ? '0,00 €' : params.isDirectBilled ? '0,49 €' : '0,00 €');
-  const iban = params.iban || 'DE02 1203 0000 0000 0000 00';
-  const recipient = params.recipientName || 'Patrick Huber – Campus-Groovelab';
+  const iban = params.iban || (params.isDirectBilled ? formatOperatorIban() : '');
+  const recipient = params.recipientName || (params.isDirectBilled ? OPERATOR_BANKING_CONFIG.companyName : (params.schoolName || 'Musikschule'));
 
   // Calculate cryptographic GoBD seal
-  let sha256Seal = refCode;
-  try {
-    if (typeof window !== 'undefined' && window.crypto?.subtle) {
-      const raw = `${refCode}:${params.studentId}:${totalAmount}:${iban}:${period}`;
-      const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
-      sha256Seal = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (e) {}
+  const rawGoBdPayload = { refCode, studentId: params.studentId, totalAmount, iban, period };
+  const sha256Seal = await computeCanonicalPayloadHash(rawGoBdPayload);
 
   // ==============================================================================
   // SEITE 1: Abrechnungs- & Bereitstellungsübersicht
@@ -4192,7 +4190,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${recipient} • IBAN: ${iban}`, 28, 128);
+  doc.text(iban ? `${recipient} • IBAN: ${iban}` : `${recipient} • Zahlungsart: Sammelübernahme Schule`, 28, 128);
 
   doc.setTextColor(71, 85, 105);
   doc.setFontSize(8);
@@ -4221,7 +4219,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   doc.setFont('courier', 'normal');
   doc.setFontSize(6.8);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Revisionssicheres GoBD-Prüfsiegel (§§ 146, 147 AO): SHA256-${sha256Seal.slice(0, 32)}...`, 22, 248);
+  doc.text(`Revisionssicheres GoBD-Prüfsiegel (§§ 146, 147 AO): SHA256:${sha256Seal}`, 22, 248);
 
   // Statutory note
   doc.setFont('helvetica', 'normal');

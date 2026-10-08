@@ -244,7 +244,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                     fontSize: '0.78rem',
                     fontWeight: 850,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(220, 38, 38, 0.12)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px'
@@ -467,7 +467,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                 border: '1px solid #fecaca',
                 background: '#fef2f2',
                 borderRadius: '20px',
-                boxShadow: '0 4px 16px rgba(234, 67, 53, 0.1)',
+                boxShadow: 'none',
                 boxSizing: 'border-box',
                 width: '100%'
               }}>
@@ -486,7 +486,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                     fontWeight: 800,
                     fontSize: '0.84rem',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                    boxShadow: 'none',
                     transition: 'all 0.2s',
                     opacity: isSavingSettings ? 0.7 : 1
                   }}
@@ -803,11 +803,11 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           <div>
                             <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Aktive Zahlungsart</strong>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
-                              Die Abrechnung für Cloud-Hosting und Bereitstellung erfolgt transparent per Sammelrechnung (14 Tage Zahlungsziel). Es fallen keine gesonderten Lizenzkaufgebühren an.
+                              Die Abrechnung für Cloud-Hosting und Bereitstellung erfolgt transparent per Sammelrechnung (30 Tage Zahlungsziel). Es fallen keine gesonderten Lizenzkaufgebühren an.
                             </span>
                           </div>
                           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em', whiteSpace: 'nowrap', marginLeft: '12px' }}>
-                            RECHNUNG (14 TAGE)
+                            RECHNUNG (30 TAGE)
                           </div>
                         </div>
                       </div>
@@ -840,7 +840,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: isCurrentDevicePasskeyActive ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
+                                boxShadow: 'none'
                               }}>
                                 <Fingerprint size={24} />
                               </div>
@@ -931,7 +931,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                                    boxShadow: 'none'
                                   }}
                                   className="hover-scale"
                                 >
@@ -1334,7 +1334,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 background: '#ea4335',
                                 color: '#ffffff',
                                 cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(234, 67, 53, 0.1)'
+                                boxShadow: 'none'
                               }}
                             >
                               Hinzufügen
@@ -1365,7 +1365,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           alignItems: 'center',
                           flexWrap: 'wrap',
                           gap: '16px',
-                          boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)'
+                          boxShadow: 'none'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                             <div style={{
@@ -1378,7 +1378,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               alignItems: 'center',
                               justifyContent: 'center',
                               color: '#ffffff',
-                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                              boxShadow: 'none'
                             }}>
                               <ShieldCheck size={24} />
                             </div>
@@ -1413,7 +1413,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale"
                             >
@@ -1455,7 +1455,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 alignItems: 'center',
                                 gap: '6px',
 
-                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale"
                             >
@@ -1480,7 +1480,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale"
                             >
@@ -1584,7 +1584,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                           display: 'inline-flex',
                                           alignItems: 'center',
                                           gap: '4px',
-                                          boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
+                                          boxShadow: 'none'
                                         }}
                                       >
                                         <ShieldCheck size={11} /> AVV-Siegeldokument (PDF)
@@ -1603,7 +1603,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                         borderRadius: '100px', 
                                         textTransform: 'uppercase',
                                         cursor: 'pointer',
-                                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.15)'
+                                        boxShadow: 'none'
                                       }}
                                     >
                                       Jetzt unterzeichnen
@@ -1770,7 +1770,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 style={{ 
                                   padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
                                   border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.15s',
-                                  display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(234, 67, 53, 0.15)'
+                                  display: 'flex', alignItems: 'center', gap: '6px', boxShadow: 'none'
                                 }}
                                 className="hover-scale"
                               >
@@ -1872,7 +1872,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxShadow: autoDeleteExpiredUsers ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
+                                  boxShadow: 'none'
                                 }}>
                                   <ShieldCheck size={24} />
                                 </div>
@@ -1916,7 +1916,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   flexShrink: 0,
-                                  boxShadow: autoDeleteExpiredUsers ? '0 2px 8px rgba(34, 197, 94, 0.4)' : 'none'
+                                  boxShadow: 'none'
                                 }}
                               >
                                 <div style={{
@@ -1963,7 +1963,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s ease'
                                 }}
                                 className="hover-scale"
@@ -2019,7 +2019,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   border: 'none',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s ease',
-                                  boxShadow: '0 2px 6px rgba(234, 67, 53, 0.25)'
+                                  boxShadow: 'none'
                                 }}
                                 className="hover-scale"
                               >
@@ -2089,7 +2089,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               fontWeight: 800,
                               cursor: 'pointer',
                               transition: 'all 0.2s',
-                              boxShadow: '0 2px 6px rgba(229, 62, 62, 0.25)'
+                              boxShadow: 'none'
                             }}
                             className="hover-scale"
                           >
@@ -2143,7 +2143,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           fontSize: '0.82rem',
                           fontWeight: 800,
                           cursor: isSettingsDirty ? 'pointer' : 'default',
-                          boxShadow: isSettingsDirty ? '0 4px 12px rgba(234, 67, 53, 0.25)' : 'none'
+                          boxShadow: 'none'
                         }}
                         className={isSettingsDirty ? "hover-scale" : ""}
                       >

@@ -1316,7 +1316,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: isDirty ? `0 2px 10px ${brandColor}40` : 'none',
+                    boxShadow: 'none',
                     opacity: isDirty ? 1 : 0.6,
                     transition: 'all 0.15s'
                   }}

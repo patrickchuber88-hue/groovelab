@@ -119,7 +119,7 @@ export const MilestoneReflectionModal: React.FC<MilestoneReflectionModalProps> =
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+            boxShadow: 'none'
           }}
           className="hover-scale"
         >

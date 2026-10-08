@@ -332,7 +332,7 @@ export const EarLeaderboardWidget: React.FC<EarLeaderboardWidgetProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.40)'
+              boxShadow: 'none'
             }}>
               <Trophy size={18} strokeWidth={2.4} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
             </div>

@@ -90,38 +90,34 @@ export function useCampusPwaAndSystemEvents({
           navigator.serviceWorker.addEventListener('message', handleSwMessage);
 
           const handleControllerChange = () => {
-            console.log('[PWA] Service Worker controller changed.');
-            setShowPwaUpdateToast(true);
+            console.log('[PWA] Service Worker controller updated successfully.');
           };
           navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
-          // Fast version checker via /version.json
+          // Fast version checker via /version.json (Bypasses SW cache via sw.js exception rule)
           const checkServerVersion = async () => {
             try {
               const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
               if (res.ok) {
                 const data = await res.json();
-                const currentAppVer = sessionStorage.getItem('campus_app_loaded_version');
-                const installedCacheVer = localStorage.getItem('campus_installed_cache_version');
+                if (!data?.version) return;
 
-                if (!currentAppVer) {
+                const currentLoadedVer = sessionStorage.getItem('campus_app_loaded_version');
+
+                // Initialer Kaltstart: Verankere Version der aktuell geladenen Session
+                if (!currentLoadedVer) {
                   sessionStorage.setItem('campus_app_loaded_version', data.version);
+                  localStorage.setItem('campus_installed_cache_version', data.version);
+                  return;
                 }
 
-                if (installedCacheVer && installedCacheVer !== data.version) {
-                  console.log('[PWA] Stale cache detected! Server:', data.version, 'Local cache:', installedCacheVer);
+                // Autoritativer Versions-Unterschied zwischen Server und laufender SPA
+                if (currentLoadedVer !== data.version) {
+                  console.log('[PWA] New server version detected via version.json:', data.version, 'Running:', currentLoadedVer);
                   setShowPwaUpdateToast(true);
                   if (reg && reg.update) {
                     reg.update().catch(() => {});
                   }
-                } else if (currentAppVer && currentAppVer !== data.version) {
-                  console.log('[PWA] New server version detected via version.json:', data.version);
-                  setShowPwaUpdateToast(true);
-                  if (reg && reg.update) {
-                    reg.update().catch(() => {});
-                  }
-                } else {
-                  localStorage.setItem('campus_installed_cache_version', data.version);
                 }
               }
             } catch {}

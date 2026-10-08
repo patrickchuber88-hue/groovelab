@@ -1398,7 +1398,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
               fontWeight: 850,
               fontSize: '0.78rem',
               cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(30, 58, 138, 0.35)',
+              boxShadow: 'none',
               touchAction: 'manipulation'
             }}
             className="hover-scale"
@@ -2355,7 +2355,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                           fontWeight: 900,
                           fontSize: '0.84rem',
                           cursor: 'pointer',
-                          boxShadow: '0 3px 12px rgba(2, 132, 199, 0.32)',
+                          boxShadow: 'none',
                           touchAction: 'manipulation',
                           whiteSpace: 'nowrap'
                         }}
@@ -2381,7 +2381,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                           fontWeight: 900,
                           fontSize: '0.84rem',
                           cursor: isFlying ? 'not-allowed' : 'pointer',
-                          boxShadow: '0 3px 14px rgba(2, 132, 199, 0.35)',
+                          boxShadow: 'none',
                           touchAction: 'manipulation',
                           whiteSpace: 'nowrap'
                         }}

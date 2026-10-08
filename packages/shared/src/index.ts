@@ -4,4 +4,5 @@
 
 export * from './types';
 export * from './data/musicQuotes';
+export * from './utils/pricingEngine';
 

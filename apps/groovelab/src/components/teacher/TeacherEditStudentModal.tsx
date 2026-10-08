@@ -193,7 +193,7 @@ export const TeacherEditStudentModal: React.FC<TeacherEditStudentModalProps> = (
             </button>
             <button 
               type="submit" 
-              style={{ flex: 1, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
+              style={{ flex: 1, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: 'none' }}
             >
               Speichern
             </button>

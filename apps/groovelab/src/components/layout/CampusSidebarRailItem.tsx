@@ -178,7 +178,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
+                boxShadow: 'none',
                 border: 'none',
                 pointerEvents: 'none',
                 boxSizing: 'border-box'
@@ -201,7 +201,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
                 height: '8px',
                 borderRadius: '50%',
                 background: '#ef4444',
-                boxShadow: '0 0 6px #ef4444',
+                boxShadow: 'none',
                 pointerEvents: 'none'
               }}
             />
@@ -326,7 +326,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             marginLeft: 'auto',
-            boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
+            boxShadow: 'none',
             flexShrink: 0
           }}
         >
@@ -343,7 +343,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
             height: '7px',
             borderRadius: '50%',
             background: '#ef4444',
-            boxShadow: '0 0 6px #ef4444',
+            boxShadow: 'none',
             marginLeft: 'auto',
             flexShrink: 0
           }}

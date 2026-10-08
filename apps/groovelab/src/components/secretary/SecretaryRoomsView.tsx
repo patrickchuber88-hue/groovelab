@@ -63,13 +63,7 @@ export function SecretaryRoomsView({
   // Room state
   const [roomFilterFloor, setRoomFilterFloor] = useState<string>('All');
   const [roomFilterStatus, setRoomFilterStatus] = useState<string>('All');
-  const [addedFloors, setAddedFloors] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`groovelab_added_floors_${schoolId}`) || '[]');
-    } catch {
-      return [];
-    }
-  });
+  const [addedFloors, setAddedFloors] = useState<string[]>([]);
   const [dragHoveredFloor, setDragHoveredFloor] = useState<string | null>(null);
   const [isRoomCsvExpanded, setIsRoomCsvExpanded] = useState<boolean>(false);
   const [roomCsvText, setRoomCsvText] = useState<string>('');
@@ -96,6 +90,7 @@ export function SecretaryRoomsView({
   const [roomFormMaxTeachers, setRoomFormMaxTeachers] = useState<number>(1);
   const [roomFormEquipment, setRoomFormEquipment] = useState<string[]>([]);
   const [roomFormQm, setRoomFormQm] = useState<number | string>('');
+  const [roomFormWeeklyCapacityMinutes, setRoomFormWeeklyCapacityMinutes] = useState<number | string>(2400);
   const [roomFormIsCampusActive, setRoomFormIsCampusActive] = useState(true);
   const [roomFormIsGroovelabActive, setRoomFormIsGroovelabActive] = useState(false);
   const [roomSaving, setRoomSaving] = useState(false);
@@ -143,40 +138,17 @@ export function SecretaryRoomsView({
     setRoomSaving(true);
     const finalMaxStudents = roomFormMaxStudents === '' ? 1 : (parseInt(roomFormMaxStudents as string) || 1);
     const finalQm = roomFormQm === '' ? 0 : (parseFloat(roomFormQm as string) || 0);
+    const finalWeeklyCapacity = roomFormWeeklyCapacityMinutes === '' ? 2400 : (parseInt(roomFormWeeklyCapacityMinutes as string) || 2400);
     try {
       if (editingRoom) {
-        // Update local mapping fallback first
-        try {
-          const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
-          mappings[editingRoom.id] = roomFormFloor;
-          localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
-
-          const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
-          bMappings[editingRoom.id] = roomFormBuildingId || null;
-          localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
-
-          const unsuitable = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-          unsuitable[editingRoom.id] = roomFormUnsuitableInstruments;
-          localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
-
-          const instruments = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-          instruments[editingRoom.id] = roomFormRoomInstruments;
-          localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
-
-          const sonstiges = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
-          sonstiges[editingRoom.id] = roomFormSonstiges;
-          localStorage.setItem(`groovelab_room_sonstiges_mappings_${schoolId}`, JSON.stringify(sonstiges));
-        } catch (err) {
-          console.error(err);
-        }
-
-        // Try updating including floor and new fields
+        // Try updating including floor, weekly_capacity_minutes, and didactic fields
         let { error } = await supabase.from('rooms').update({
           name: roomFormName.trim(),
           allowed_instruments: roomFormEquipment,
           max_teachers: roomFormMaxTeachers,
           max_students: finalMaxStudents,
           qm: finalQm,
+          weekly_capacity_minutes: finalWeeklyCapacity,
           is_campus_active: roomFormIsCampusActive,
           is_groovelab_active: roomFormIsGroovelabActive,
           floor: roomFormFloor,
@@ -187,7 +159,7 @@ export function SecretaryRoomsView({
         }).eq('id', editingRoom.id);
         
         // Fallback: If floor column or new properties columns are missing
-        if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges"))) {
+        if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges") || error.message.includes("weekly_capacity_minutes"))) {
           console.warn("Supabase floor/new columns missing, retrying edit save without them...");
           const { error: retryError } = await supabase.from('rooms').update({
             name: roomFormName.trim(),
@@ -213,6 +185,7 @@ export function SecretaryRoomsView({
               max_teachers: roomFormMaxTeachers,
               max_students: finalMaxStudents,
               qm: finalQm,
+              weekly_capacity_minutes: finalWeeklyCapacity,
               is_campus_active: roomFormIsCampusActive,
               is_groovelab_active: roomFormIsGroovelabActive,
               floor: roomFormFloor,
@@ -230,6 +203,7 @@ export function SecretaryRoomsView({
           max_teachers: roomFormMaxTeachers,
           max_students: finalMaxStudents,
           qm: finalQm,
+          weekly_capacity_minutes: finalWeeklyCapacity,
           sort_order: rooms.length,
           is_campus_active: roomFormIsCampusActive,
           is_groovelab_active: roomFormIsGroovelabActive,
@@ -243,7 +217,7 @@ export function SecretaryRoomsView({
         let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();
         
         // Fallback: If floor column or new columns are missing
-        if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges"))) {
+        if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges") || error.message.includes("weekly_capacity_minutes"))) {
           console.warn("Supabase floor/new columns missing, retrying insert save without them...");
           const insertPayloadWithoutNewFields = {
             school_id: schoolId,
@@ -264,31 +238,6 @@ export function SecretaryRoomsView({
 
         if (error) throw error;
         if (data) {
-          // Update local mapping fallback for the new room ID
-          try {
-            const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
-            mappings[data.id] = roomFormFloor;
-            localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
-
-            const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
-            bMappings[data.id] = roomFormBuildingId || null;
-            localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
-
-            const unsuitable = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-            unsuitable[data.id] = roomFormUnsuitableInstruments;
-            localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
-
-            const instruments = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-            instruments[data.id] = roomFormRoomInstruments;
-            localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
-
-            const sonstiges = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
-            sonstiges[data.id] = roomFormSonstiges;
-            localStorage.setItem(`groovelab_room_sonstiges_mappings_${schoolId}`, JSON.stringify(sonstiges));
-          } catch (err) {
-            console.error(err);
-          }
-
           await fetchDashboardData();
         }
       }
@@ -298,6 +247,7 @@ export function SecretaryRoomsView({
       setRoomFormMaxTeachers(1);
       setRoomFormMaxStudents(1);
       setRoomFormQm(0);
+      setRoomFormWeeklyCapacityMinutes(2400);
       setRoomFormFloor('Allgemein');
       setRoomFormBuildingId('');
       setRoomFormUnsuitableInstruments([]);
@@ -483,15 +433,6 @@ export function SecretaryRoomsView({
 
         if (error) throw error;
         if (data) {
-          // Update local mapping fallback for the new room ID
-          try {
-            const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
-            mappings[data.id] = assignedFloor;
-            localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
-          } catch (err) {
-            console.error(err);
-          }
-
           insertedRooms.push({
             ...data,
             equipment: data.allowed_instruments || []
@@ -531,36 +472,11 @@ export function SecretaryRoomsView({
       setRoomFormIsGroovelabActive(!!room.is_groovelab_active);
       setRoomFormFloor((room.floor && room.floor !== 'Allgemein') ? room.floor : 'EG');
 
-      const localBuilding = (() => {
-        try {
-          const map = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
-          return map[room.id] || '';
-        } catch { return ''; }
-      })();
-      setRoomFormBuildingId(room.building_id || localBuilding || '');
-
-      const localUnsuitable = (() => {
-        try {
-          const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-          return map[room.id] || [];
-        } catch { return []; }
-      })();
-      const localInstruments = (() => {
-        try {
-          const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-          return map[room.id] || [];
-        } catch { return []; }
-      })();
-      const localSonstiges = (() => {
-        try {
-          const map = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
-          return map[room.id] || '';
-        } catch { return ''; }
-      })();
-
-      setRoomFormUnsuitableInstruments(Array.isArray(room.unsuitable_instruments) ? room.unsuitable_instruments : localUnsuitable);
-      setRoomFormRoomInstruments(Array.isArray(room.room_instruments) ? room.room_instruments : localInstruments);
-      setRoomFormSonstiges(room.sonstiges || localSonstiges || '');
+      setRoomFormWeeklyCapacityMinutes(room.weekly_capacity_minutes || 2400);
+      setRoomFormBuildingId(room.building_id || '');
+      setRoomFormUnsuitableInstruments(Array.isArray(room.unsuitable_instruments) ? room.unsuitable_instruments : []);
+      setRoomFormRoomInstruments(Array.isArray(room.room_instruments) ? room.room_instruments : []);
+      setRoomFormSonstiges(room.sonstiges || '');
       setNewInstrumentName('');
       setNewInstrumentModel('');
     } else {
@@ -570,9 +486,11 @@ export function SecretaryRoomsView({
       setRoomFormMaxTeachers(1);
       setRoomFormMaxStudents(1);
       setRoomFormQm(0);
+      setRoomFormWeeklyCapacityMinutes(2400);
       setRoomFormIsCampusActive(true);
       setRoomFormIsGroovelabActive(false);
       setRoomFormFloor('EG');
+      setRoomFormBuildingId('');
       setRoomFormUnsuitableInstruments([]);
       setRoomFormRoomInstruments([]);
       setRoomFormSonstiges('');
@@ -592,26 +510,6 @@ export function SecretaryRoomsView({
             Saxophon: '#f97316', Bass: '#64748b', Keyboard: '#ec4899', Trompete: '#eab308',
           };
 
-          // Local floor mappings fallback if schema cache is missing the floor column
-          const localFloorMappings = (() => {
-            try {
-              const maps = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
-              let changed = false;
-              Object.keys(maps).forEach(k => {
-                if (maps[k] === 'Allgemein') {
-                  maps[k] = 'EG';
-                  changed = true;
-                }
-              });
-              if (changed) {
-                localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(maps));
-              }
-              return maps;
-            } catch {
-              return {};
-            }
-          })();
-
           // Reference all rooms directly without deduplicating by name, so rooms with same names in different buildings are not hidden
           const uniqueRooms = rooms;
 
@@ -628,7 +526,7 @@ export function SecretaryRoomsView({
             const query = roomSearchQuery.toLowerCase().trim();
             const matchesSearch = !query || name.includes(query);
             
-            const fRaw = r.floor || localFloorMappings[r.id];
+            const fRaw = r.floor;
             const floorName = (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
             const matchesFloor = roomFilterFloor === 'All' || floorName === roomFilterFloor;
             
@@ -668,7 +566,7 @@ export function SecretaryRoomsView({
           const allFloorsList = Array.from(new Set([
             'EG',
             ...buildingRooms.map(r => {
-              const fRaw = r.floor || localFloorMappings[r.id];
+              const fRaw = r.floor;
               return (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
             }), 
             ...addedFloors.filter((f: string) => f !== 'Allgemein')
@@ -783,7 +681,7 @@ export function SecretaryRoomsView({
                               border: 'none',
                               cursor: 'pointer',
                               fontFamily: 'Urbanist',
-                              boxShadow: '0 4px 10px rgba(234,67,53,0.15)',
+                              boxShadow: 'none',
                               transition: 'all 0.2s'
                             }}
                           >
@@ -905,7 +803,7 @@ export function SecretaryRoomsView({
                       background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white',
                       borderRadius: '16px', padding: '12px 16px',
                       display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: '0 8px 20px -5px rgba(234, 67, 53, 0.3)',
+                      boxShadow: 'none',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       transition: 'all 0.2s ease'
                     }} className="hover-scale">
@@ -918,7 +816,7 @@ export function SecretaryRoomsView({
                       background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
                       borderRadius: '16px', padding: '12px 16px',
                       display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: '0 8px 20px -5px rgba(99, 102, 241, 0.3)',
+                      boxShadow: 'none',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       transition: 'all 0.2s ease'
                     }} className="hover-scale">
@@ -931,7 +829,7 @@ export function SecretaryRoomsView({
                       background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
                       borderRadius: '16px', padding: '12px 16px',
                       display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: '0 8px 20px -5px rgba(52, 168, 83, 0.3)',
+                      boxShadow: 'none',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       transition: 'all 0.2s ease'
                     }} className="hover-scale">
@@ -944,7 +842,7 @@ export function SecretaryRoomsView({
                       background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
                       borderRadius: '16px', padding: '12px 16px',
                       display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: '0 8px 20px -5px rgba(234, 179, 8, 0.35)',
+                      boxShadow: 'none',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       transition: 'all 0.2s ease'
                     }} className="hover-scale">
@@ -974,11 +872,23 @@ export function SecretaryRoomsView({
                       <Activity size={13} style={{ color: '#475569' }} /> Auslastung:
                     </span>
                     {(() => {
-                      const totalSlots = matrixAllocations.filter(p => p.roomId).length;
                       const roomEntries = (rooms || []).slice(0, 5).map((rm) => {
-                        const count = matrixAllocations.filter(p => p.roomId === rm.id).length;
-                        const pct = totalSlots > 0 ? Math.min(100, Math.round((count / Math.max(1, (totalSlots / Math.max(1, rooms.length)))) * 65)) : 0;
-                        return { name: rm.name, pct: Math.max(15, pct) };
+                        const roomAllocs = matrixAllocations.filter(p => p.roomId === rm.id);
+                        const bookedMinutes = roomAllocs.reduce((sum: number, p: any) => {
+                          if (Array.isArray(p.slots) && p.slots.length > 0) {
+                            return sum + p.slots.reduce((slotSum: number, s: any) => slotSum + (s.duration || 30), 0);
+                          }
+                          if (p.startTime && p.endTime) {
+                            const [sh, sm] = p.startTime.split(':').map(Number);
+                            const [eh, em] = p.endTime.split(':').map(Number);
+                            const diff = (eh * 60 + em) - (sh * 60 + sm);
+                            return sum + (diff > 0 ? diff : 45);
+                          }
+                          return sum + 45;
+                        }, 0);
+                        const weeklyCap = rm.weekly_capacity_minutes || 2400;
+                        const pct = Math.min(100, Math.round((bookedMinutes / weeklyCap) * 100));
+                        return { name: rm.name, pct };
                       });
                       const avgPct = roomEntries.length > 0 ? Math.round(roomEntries.reduce((a, b) => a + b.pct, 0) / roomEntries.length) : 0;
 
@@ -1439,11 +1349,6 @@ export function SecretaryRoomsView({
                                 if (roomId) {
                                   const previousRooms = rooms;
                                   setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: null } : r));
-                                  try {
-                                    const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
-                                    bMappings[roomId] = null;
-                                    localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
-                                  } catch (err) { console.error(err); }
                                   const { error } = await supabase.from('rooms').update({ building_id: null }).eq('id', roomId);
                                   if (error) {
                                     setRooms(previousRooms);
@@ -1509,11 +1414,6 @@ export function SecretaryRoomsView({
                                 if (roomId) {
                                   const previousRooms = rooms;
                                   setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: b.id } : r));
-                                  try {
-                                    const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
-                                    bMappings[roomId] = b.id;
-                                    localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
-                                  } catch (err) { console.error(err); }
                                   const { error } = await supabase.from('rooms').update({ building_id: b.id }).eq('id', roomId);
                                   if (error) {
                                     setRooms(previousRooms);
@@ -1764,7 +1664,7 @@ export function SecretaryRoomsView({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              boxShadow: '0 1px 2px rgba(29, 78, 216, 0.08)'
+                              boxShadow: 'none'
                             }}
                           >
                             <X size={12} />
@@ -1816,7 +1716,7 @@ export function SecretaryRoomsView({
                                 cursor: 'pointer',
                                 fontFamily: 'Urbanist',
                                 transition: 'all 0.2s',
-                                boxShadow: '0 4px 10px rgba(234,67,53,0.15)'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale"
                             >
@@ -1831,12 +1731,7 @@ export function SecretaryRoomsView({
                             const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
                             const unsuitableInsts: string[] = Array.isArray(room.unsuitable_instruments) 
                               ? room.unsuitable_instruments 
-                              : (() => {
-                                  try {
-                                    const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-                                    return map[room.id] || [];
-                                  } catch { return []; }
-                                })();
+                              : [];
 
                             return (
                               <div 
@@ -1964,7 +1859,7 @@ export function SecretaryRoomsView({
                                       </div>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700 }}>
-                                          {room.floor || localFloorMappings[room.id] || 'Allgemein'}
+                                          {room.floor || 'EG'}
                                         </span>
                                         {room.building_id && (
                                           <span style={{ fontSize: '0.65rem', color: '#ea4335', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -2192,7 +2087,6 @@ export function SecretaryRoomsView({
 
                             const updated = [...addedFloors, finalName];
                             setAddedFloors(updated);
-                            localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
                           }
                         }}
                         style={{
@@ -2266,7 +2160,7 @@ export function SecretaryRoomsView({
                           const isActive = roomFilterFloor === flName;
                           const isHovered = dragHoveredFloor === flName;
                           const floorRoomCount = uniqueRooms.filter(r => {
-                            const fRaw = r.floor || localFloorMappings[r.id];
+                            const fRaw = r.floor;
                             const fName = (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
                             return fName === flName;
                           }).length;
@@ -2285,15 +2179,6 @@ export function SecretaryRoomsView({
                               onDrop={async (e) => {
                                 const roomId = e.dataTransfer.getData("roomId");
                                 if (roomId) {
-                                  // Update local floor mapping immediately as robust fallback
-                                  try {
-                                    const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
-                                    mappings[roomId] = flName;
-                                    localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
-                                  } catch (err) {
-                                    console.error(err);
-                                  }
-
                                   // Update local state instantly so UI responds immediately
                                   const previousRooms = rooms;
                                   setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: flName } : r));
@@ -2371,7 +2256,6 @@ export function SecretaryRoomsView({
                                               setRooms(prev => prev.map(r => (r.floor || 'EG') === flName ? { ...r, floor: 'EG' } : r));
                                               const updated = addedFloors.filter(f => f !== flName);
                                               setAddedFloors(updated);
-                                              localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
                                               if (roomFilterFloor === flName) setRoomFilterFloor('All');
                                             });
                                           }
@@ -2502,8 +2386,8 @@ export function SecretaryRoomsView({
                           </select>
                         </div>
 
-                        {/* Max students & QM */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        {/* Max students & QM & Capacity */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                           <div>
                             <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                               <Users size={12} color="#475569" /> Max. Schüler
@@ -2533,6 +2417,24 @@ export function SecretaryRoomsView({
                                 setRoomFormQm(val === '' ? '' : parseFloat(val));
                               }}
                               min="0"
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                              <Activity size={12} color="#475569" /> Kapazität (Min./Woche)
+                            </label>
+                            <input
+                              type="number"
+                              aria-label="Wöchentliche Kapazität in Minuten"
+                              value={roomFormWeeklyCapacityMinutes}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setRoomFormWeeklyCapacityMinutes(val === '' ? '' : parseInt(val));
+                              }}
+                              min="60"
+                              step="60"
+                              placeholder="2400"
                               style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
                             />
                           </div>
@@ -2754,7 +2656,7 @@ export function SecretaryRoomsView({
                           fontSize: '0.82rem',
                           cursor: 'pointer',
                           opacity: roomSaving || !roomFormName.trim() ? 0.6 : 1,
-                          boxShadow: '0 4px 12px rgba(234,67,53,0.15)',
+                          boxShadow: 'none',
                           transition: 'all 0.2s'
                         }}
                       >
@@ -2875,7 +2777,7 @@ export function SecretaryRoomsView({
                         <button
                           type="submit"
                           aria-label="Gebäude speichern"
-                          style={{ padding: '10px 20px', border: 'none', background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 12px rgba(234,67,53,0.2)' }}
+                          style={{ padding: '10px 20px', border: 'none', background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: 'none' }}
                         >
                           Speichern
                         </button>

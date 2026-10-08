@@ -67,6 +67,10 @@ export async function resolvePlayableAudioSource(
         };
       }
     } catch {}
+
+    // 🛡️ Fail-Closed: Unresolvable offline URL should not attempt invalid Supabase Storage requests
+    console.warn('[AudioStorageHelper] Offline audio record not present in local vault:', recordId);
+    return { src: '', isBlobUrl: false };
   }
 
   // 3. Raw audio record ID without offline:// prefix (e.g. "audio_172703..._abc")
@@ -263,8 +267,9 @@ export async function resolvePlayableAudioSource(
     }
   } catch {}
 
-  // 8. If all else fails, return trimmed URL as-is
-  return { src: trimmed, isBlobUrl: false };
+  // 8. If all else fails, only return if it is a genuinely playable URL (not an internal unresolvable path)
+  const isDirect = trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('data:');
+  return { src: isDirect ? trimmed : '', isBlobUrl: false };
 }
 
 /**
@@ -326,12 +331,17 @@ export async function getSecureAudioUrl(
       return signedData.signedUrl;
     }
 
-    // 2. Fallback to public URL only if signed url fails
+    // 2. Fallback to public URL ONLY if the bucket is genuinely public.
+    // For private ASVS L3 buckets ('campus-assets', 'groovelab-assets'), a public URL returns 400/403.
+    // Fail-Closed Doktrin: Return empty string so caller triggers offline fallback or honest error.
+    if (actualBucket === 'campus-assets' || actualBucket === 'groovelab-assets') {
+      return '';
+    }
     const { data: pubData } = supabase.storage.from(actualBucket).getPublicUrl(relativePath);
-    return pubData?.publicUrl || filePath;
+    return pubData?.publicUrl || '';
   } catch (err) {
-    console.warn('[AudioStorageHelper] Error generating secure signed URL, returning fallback:', err);
-    return filePath;
+    console.warn('[AudioStorageHelper] Error generating secure signed URL:', err);
+    return '';
   }
 }
 

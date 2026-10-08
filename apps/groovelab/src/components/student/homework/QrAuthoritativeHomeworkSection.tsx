@@ -190,7 +190,7 @@ export const ArchiveAudioPlayerRow: React.FC<{ track: ArchiveAudioTrackItem; aId
             justifyContent: 'center',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 1px 3px rgba(22, 163, 74, 0.15)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease'
           }}
           className="hover-scale-mini"
@@ -992,7 +992,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
+            boxShadow: 'none',
             flexShrink: 0
           }}>
             <Calendar size={14} strokeWidth={2.5} />
@@ -1218,7 +1218,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
             border: '1.5px solid #fde047',
             borderRadius: '12px',
             padding: '9px 14px',
-            boxShadow: '0 2px 8px rgba(250, 204, 21, 0.12)',
+            boxShadow: 'none',
             display: 'flex',
             flexDirection: 'column',
             gap: '5px'
@@ -1237,7 +1237,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                   letterSpacing: '0.03em',
                   padding: '2px 7px',
                   borderRadius: '100px',
-                  boxShadow: '0 1px 3px rgba(250, 204, 21, 0.35)',
+                  boxShadow: 'none',
                   flexShrink: 0
                 }}>
                   <HelpCircle size={11} color="#0f172a" strokeWidth={2.5} />
@@ -1317,7 +1317,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 5px rgba(225, 29, 72, 0.15)',
+                      boxShadow: 'none',
                       color: bookColor.text
                     }}>
                       <BookOpen size={14} strokeWidth={2.4} color={bookColor.text} />
@@ -1772,7 +1772,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(100, 116, 139, 0.25)',
+                boxShadow: 'none',
                 color: '#ffffff',
                 flexShrink: 0
               }}>
@@ -2123,7 +2123,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                 gap: '6px',
                 transition: 'all 0.15s ease',
                 minHeight: '44px',
-                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                boxShadow: 'none'
               }}
               className="hover-scale-mini"
             >

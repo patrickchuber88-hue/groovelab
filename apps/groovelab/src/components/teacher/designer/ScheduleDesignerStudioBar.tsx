@@ -286,7 +286,7 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
                         borderRadius: '50%',
                         background: '#22c55e',
                         display: 'inline-block',
-                        boxShadow: '0 0 4px rgba(34, 197, 94, 0.5)',
+                        boxShadow: 'none',
                         flexShrink: 0
                       }}
                     />
@@ -354,7 +354,7 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)',
+              boxShadow: 'none',
               transition: 'all 0.16s ease',
               flexShrink: 0
             }}

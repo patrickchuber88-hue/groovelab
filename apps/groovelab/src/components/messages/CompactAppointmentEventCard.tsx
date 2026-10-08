@@ -144,7 +144,7 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
             border: '1px solid #bbf7d0',
             borderRadius: '100px',
             padding: '4px 10px 4px 8px',
-            boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
+            boxShadow: 'none',
             maxWidth: '100%',
             boxSizing: 'border-box'
           }}
@@ -228,7 +228,7 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
             border: '1px solid #fecaca',
             borderRadius: '100px',
             padding: '4px 10px 4px 8px',
-            boxShadow: '0 1px 3px rgba(220, 38, 38, 0.08)',
+            boxShadow: 'none',
             maxWidth: '100%',
             boxSizing: 'border-box'
           }}
@@ -475,7 +475,7 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
             >

@@ -37,21 +37,21 @@ async function runForensicSuite() {
     global: { fetch: authFetch }
   });
 
-  // TEST 1: Find Teachers and Peter Pan
-  console.log('--- TEST 1: Query Peter Pan Profile & Planned Boards ---');
+  // TEST 1: Find Teachers and Patrick Huber
+  console.log('--- TEST 1: Query Patrick Huber Profile & Planned Boards ---');
   const { data: users, error: userErr } = await client
     .from('users')
     .select('id, school_id, first_name, last_name, role, planned_boards')
     .eq('school_id', schoolId)
-    .ilike('last_name', '%pan%');
+    .or('id.eq.11079eae-664a-49a4-8692-771d83a3193c,last_name.ilike.%huber%');
 
   if (userErr) console.error('User query error:', userErr);
-  console.log(`Found ${users?.length || 0} Peter Pan records.`);
-  const peterPan: any = (users as any)?.[0];
-  if (peterPan) {
-    console.log(`ID: ${peterPan.id}`);
-    console.log(`Role: ${peterPan.role}`);
-    const pb = peterPan.planned_boards || peterPan.campus_räume;
+  console.log(`Found ${users?.length || 0} Patrick Huber records.`);
+  const teacherUser: any = (users as any)?.[0];
+  if (teacherUser) {
+    console.log(`ID: ${teacherUser.id}`);
+    console.log(`Role: ${teacherUser.role}`);
+    const pb = teacherUser.planned_boards || teacherUser.campus_räume;
     console.log(`planned_boards status: ${(pb as any)?.status}`);
     console.log(`submittedDraftId: ${(pb as any)?.submittedDraftId}`);
     console.log(`submittedAt: ${(pb as any)?.submittedAt}`);
@@ -89,9 +89,9 @@ async function runForensicSuite() {
     .select('*')
     .eq('school_id', schoolId);
   console.log(`Total schedules in DB for school: ${currentScheds?.length || 0}`);
-  if (peterPan) {
-    const ppScheds = (currentScheds || []).filter(s => s.teacher_id === peterPan.id);
-    console.log(`Schedules for Peter Pan in DB: ${ppScheds.length}`);
+  if (teacherUser) {
+    const ppScheds = (currentScheds || []).filter(s => s.teacher_id === teacherUser.id);
+    console.log(`Schedules for Patrick Huber in DB: ${ppScheds.length}`);
     ppScheds.forEach(s => {
       console.log(`  Slot: Day ${s.day_of_week} at ${s.time_slot} (Room: ${s.room_id}, Status: ${s.status}, Student: ${s.student_id})`);
     });
@@ -113,7 +113,7 @@ async function runForensicSuite() {
     user_id: authData.user?.id,
     action: 'TEST_SCHEDULE_ALLOCATION_AUDIT',
     entity_type: 'schedule_board',
-    entity_id: peterPan?.id || schoolId,
+    entity_id: teacherUser?.id || schoolId,
     details: {
       test: true,
       description: 'Revisionssichere Zuweisung Prüftest',
@@ -133,10 +133,10 @@ async function runForensicSuite() {
     console.log('[PASS] Test audit log cleaned up.');
   }
 
-  // TEST 6: Simulate Exact Schedule Save & Occurrence Generation for Peter Pan
-  if (peterPan) {
-    console.log('\n--- TEST 6: Simulate Save & Approve Pipeline for Peter Pan ---');
-    const pb = peterPan.planned_boards || peterPan.campus_räume;
+  // TEST 6: Simulate Exact Schedule Save & Occurrence Generation for Patrick Huber
+  if (teacherUser) {
+    console.log('\n--- TEST 6: Simulate Save & Approve Pipeline for Patrick Huber ---');
+    const pb = teacherUser.planned_boards || teacherUser.campus_räume;
     const drafts = (pb as any)?.drafts || [];
     const activeDraft = Array.isArray(drafts) ? (drafts.find((d: any) => d.id === (pb as any)?.submittedDraftId) || drafts[0]) : null;
 

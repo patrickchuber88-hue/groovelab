@@ -57,7 +57,7 @@ class StudioKeyboardEngineService {
     const voiceGain = ctx.createGain();
     const dest = opts.destination ?? ctx.destination;
 
-    // 1. Operator 1: Grundton (Warmer Sinus)
+    // 1. Operator 1: Grundton (Warmer Sinuskörper)
     const oscFund = ctx.createOscillator();
     oscFund.type = 'sine';
     oscFund.frequency.setValueAtTime(freqHz, playTime);
@@ -68,10 +68,10 @@ class StudioKeyboardEngineService {
     oscTine1.frequency.setValueAtTime(freqHz * 2.76, playTime);
 
     const tine1Gain = ctx.createGain();
-    const tine1Atk = Math.min(0.008, dur * 0.1);
-    const tine1Dec = Math.min(dur * 0.6, 0.45);
+    const tine1Atk = 0.004;
+    const tine1Dec = Math.min(dur * 0.7, 0.65);
     tine1Gain.gain.setValueAtTime(0.0001, playTime);
-    tine1Gain.gain.linearRampToValueAtTime(vel * 0.35, playTime + tine1Atk);
+    tine1Gain.gain.linearRampToValueAtTime(vel * 0.42, playTime + tine1Atk);
     tine1Gain.gain.exponentialRampToValueAtTime(0.0001, playTime + tine1Atk + tine1Dec);
 
     // 3. Operator 3: Tine Harmonic 2 (5.4x Kristalliner Bell-Ping)
@@ -80,41 +80,43 @@ class StudioKeyboardEngineService {
     oscTine2.frequency.setValueAtTime(freqHz * 5.40, playTime);
 
     const tine2Gain = ctx.createGain();
-    const tine2Atk = Math.min(0.005, dur * 0.1);
+    const tine2Atk = 0.003;
+    const tine2Dec = Math.min(dur * 0.45, 0.28);
     tine2Gain.gain.setValueAtTime(0.0001, playTime);
-    tine2Gain.gain.linearRampToValueAtTime(vel * 0.18, playTime + tine2Atk);
-    tine2Gain.gain.exponentialRampToValueAtTime(0.0001, playTime + Math.min(0.18, dur * 0.8));
+    tine2Gain.gain.linearRampToValueAtTime(vel * 0.22, playTime + tine2Atk);
+    tine2Gain.gain.exponentialRampToValueAtTime(0.0001, playTime + tine2Atk + tine2Dec);
 
-    // 4. Operator 4: Filz-Hammer Klick (Holz-Anschlagstransiente)
+    // 4. Operator 4: Filz-/Neopren-Hammer Klick (Holz-Anschlagstransiente ohne Subbass-Wummern)
     const oscHammer = ctx.createOscillator();
     oscHammer.type = 'triangle';
-    oscHammer.frequency.setValueAtTime(320, playTime);
-    oscHammer.frequency.exponentialRampToValueAtTime(60, playTime + 0.012);
+    const hammerStartFreq = Math.min(2400, Math.max(800, freqHz * 3.0));
+    const hammerEndFreq = Math.max(280, freqHz * 0.9);
+    oscHammer.frequency.setValueAtTime(hammerStartFreq, playTime);
+    oscHammer.frequency.exponentialRampToValueAtTime(hammerEndFreq, playTime + 0.012);
 
     const hammerGain = ctx.createGain();
-    hammerGain.gain.setValueAtTime(vel * 0.22, playTime);
-    hammerGain.gain.exponentialRampToValueAtTime(0.0001, playTime + 0.015);
+    hammerGain.gain.setValueAtTime(vel * 0.24, playTime);
+    hammerGain.gain.exponentialRampToValueAtTime(0.0001, playTime + 0.014);
 
-    // 5. Body Envelope: Hold-then-Release (Sustain-Plateau über Zählzeit + Dämpfer-Release)
+    // 5. Body Envelope: Organisches Tine-Decay (wie ein frei schwingender Klangstab statt Orgel-Plateau)
     const fundGain = ctx.createGain();
-    const fundAtk = Math.min(0.015, dur * 0.15);
-    const fundDec = Math.min(0.12, dur * 0.35);
-    const fundSustain = Math.max(0.001, vel * 0.62);
+    const fundAtk = 0.008;
+    const peakVol = vel * 0.88;
+    const sustainVol = Math.max(0.001, vel * 0.28); // Kontinuierlicher Ausklang
 
     fundGain.gain.setValueAtTime(0.0001, playTime);
-    fundGain.gain.linearRampToValueAtTime(vel * 0.85, playTime + fundAtk);
-    fundGain.gain.exponentialRampToValueAtTime(fundSustain, playTime + fundAtk + fundDec);
-    // Hält den Ton bis zum Ende der rhythmischen Zählzeit
-    fundGain.gain.setValueAtTime(fundSustain, Math.max(playTime + fundAtk + fundDec, noteEndTime));
-    // Dämpfer fällt auf Tine/Klangstab (sanfter Ausklang)
+    fundGain.gain.linearRampToValueAtTime(peakVol, playTime + fundAtk);
+    fundGain.gain.exponentialRampToValueAtTime(sustainVol, noteEndTime);
+    // Dämpfer fällt auf Tine/Klangstab (sanfter Ausklang beim Key-Off)
     fundGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + releaseTime);
 
-    // 6. Klangfärbungs-Tiefpass (Dynamische Filteröffnung bei höherer Velocity)
+    // 6. Klangfärbungs-Tiefpass (Dynamische Filteröffnung bei höherer Velocity mit sanfter Flanke)
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    const cutoffBase = Math.min(6500, Math.max(1200, freqHz * 4.5 * (0.8 + vel * 0.4)));
+    const cutoffBase = Math.min(8500, Math.max(2200, freqHz * 4.8 * (0.85 + vel * 0.35)));
     filter.frequency.setValueAtTime(cutoffBase, playTime);
-    filter.frequency.exponentialRampToValueAtTime(cutoffBase * 0.65, playTime + Math.min(0.35, dur));
+    filter.frequency.exponentialRampToValueAtTime(Math.max(1400, cutoffBase * 0.6), playTime + Math.min(0.6, dur));
+    filter.Q.setValueAtTime(0.707, playTime); // Butterworth Q für natürliche Wärme
 
     // Routing
     oscFund.connect(fundGain);
@@ -224,14 +226,12 @@ class StudioKeyboardEngineService {
 
       const strGain = ctx.createGain();
       const strVol = vel * 0.32;
-      const atk = Math.min(0.007, gateDur * 0.08);
-      const dec = Math.min(0.22, gateDur * 0.4);
-      const sustain = Math.max(0.001, strVol * 0.65);
+      const atk = 0.006;
+      const sustainVol = Math.max(0.0005, strVol * 0.22); // Kontinuierliches physikalisches Saitenausklingen
 
       strGain.gain.setValueAtTime(0.0001, playTime);
       strGain.gain.linearRampToValueAtTime(strVol, playTime + atk);
-      strGain.gain.exponentialRampToValueAtTime(sustain, playTime + atk + dec);
-      strGain.gain.setValueAtTime(sustain, Math.max(playTime + atk + dec, noteEndTime));
+      strGain.gain.exponentialRampToValueAtTime(sustainVol, noteEndTime);
       strGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + releaseTime);
 
       oscFund.connect(strGain);
@@ -253,9 +253,8 @@ class StudioKeyboardEngineService {
     const harmGain = ctx.createGain();
     const harmVol = vel * 0.16;
     harmGain.gain.setValueAtTime(0.0001, playTime);
-    harmGain.gain.linearRampToValueAtTime(harmVol, playTime + 0.006);
-    harmGain.gain.exponentialRampToValueAtTime(harmVol * 0.35, playTime + Math.min(0.25, gateDur * 0.5));
-    harmGain.gain.setValueAtTime(harmVol * 0.35, Math.max(playTime + 0.25, noteEndTime));
+    harmGain.gain.linearRampToValueAtTime(harmVol, playTime + 0.005);
+    harmGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, harmVol * 0.15), noteEndTime);
     harmGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + releaseTime);
 
     oscHarm2.connect(harmGain);
@@ -266,14 +265,16 @@ class StudioKeyboardEngineService {
     oscHarm2.stop(stopTime);
     oscHarm3.stop(stopTime);
 
-    // 3. Hammerfilz-Anschlagstransiente (Acoustic Felt Strike Impulse)
+    // 3. Hammerfilz-Anschlagstransiente (Acoustic Felt Strike Impulse ohne Subbass-Rumpeln)
     const hammerOsc = ctx.createOscillator();
     hammerOsc.type = 'triangle';
-    hammerOsc.frequency.setValueAtTime(Math.min(2800, freqHz * 3.5), playTime);
-    hammerOsc.frequency.exponentialRampToValueAtTime(80, playTime + 0.014);
+    const hammerStart = Math.min(3200, Math.max(1200, freqHz * 3.8));
+    const hammerEnd = Math.max(380, freqHz * 1.1);
+    hammerOsc.frequency.setValueAtTime(hammerStart, playTime);
+    hammerOsc.frequency.exponentialRampToValueAtTime(hammerEnd, playTime + 0.014);
 
     const hammerGain = ctx.createGain();
-    hammerGain.gain.setValueAtTime(vel * 0.28, playTime);
+    hammerGain.gain.setValueAtTime(vel * 0.26, playTime);
     hammerGain.gain.exponentialRampToValueAtTime(0.0001, playTime + 0.016);
 
     hammerOsc.connect(hammerGain);
@@ -284,10 +285,10 @@ class StudioKeyboardEngineService {
     // 4. Flügelkorpus- & Fichtenboden-Akustikfilter
     const bodyFilter = ctx.createBiquadFilter();
     bodyFilter.type = 'lowpass';
-    const cutoff = Math.min(9000, Math.max(1600, freqHz * 4.2 * (0.8 + vel * 0.4)));
+    const cutoff = Math.min(10000, Math.max(2600, freqHz * 4.6 * (0.8 + vel * 0.4)));
     bodyFilter.frequency.setValueAtTime(cutoff, playTime);
-    bodyFilter.frequency.exponentialRampToValueAtTime(Math.max(900, cutoff * 0.55), playTime + 0.45);
-    bodyFilter.Q.setValueAtTime(0.9, playTime);
+    bodyFilter.frequency.exponentialRampToValueAtTime(Math.max(1200, cutoff * 0.52), playTime + Math.min(0.65, gateDur));
+    bodyFilter.Q.setValueAtTime(0.707, playTime); // Butterworth Q für natürliche Holzresonanz
 
     masterGain.connect(bodyFilter);
     bodyFilter.connect(dest);

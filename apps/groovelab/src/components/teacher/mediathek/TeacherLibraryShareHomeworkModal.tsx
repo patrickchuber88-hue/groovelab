@@ -336,7 +336,7 @@ export const TeacherLibraryShareHomeworkModal: React.FC<TeacherLibraryShareHomew
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)'
+              boxShadow: 'none'
             }}>
               <Send size={18} />
             </div>
@@ -701,7 +701,7 @@ export const TeacherLibraryShareHomeworkModal: React.FC<TeacherLibraryShareHomew
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
             >

@@ -166,7 +166,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
         }
 
         if (cleanData.length > 0) {
-          const filtered = cleanData.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
+          const filtered = cleanData.filter((s: any) => !s.is_demo_tenant && s.status !== 'archived');
           if (isMounted) {
             setAllSchools(filtered);
           }
@@ -190,7 +190,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
   // Compute filtered search results seamlessly
   const searchResults = useMemo(() => {
     const baseList = (allSchools.length > 0 ? allSchools : FALLBACK_SCHOOLS)
-      .filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
+      .filter((s: any) => !s.is_demo_tenant && s.status !== 'archived');
     
     // 1. Filter by selected module
     let filtered = baseList;
@@ -577,7 +577,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
         }
         .magic-search-input:focus {
           border-color: rgba(16, 185, 129, 0.6);
-          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(16, 185, 129, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.15);
           background: rgba(24, 24, 30, 0.9);
         }
         .magic-search-input::placeholder {
@@ -730,7 +730,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
           background: rgba(28, 28, 36, 0.85);
           border-color: rgba(16, 185, 129, 0.4);
           transform: translateY(-2px);
-          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 20px rgba(16, 185, 129, 0.08);
+          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
         }
 
         .school-logo-placeholder {
@@ -804,10 +804,10 @@ export const Startseite: React.FC<StartseiteProps> = ({
           border-color: rgba(52, 168, 83, 0.55);
           color: #34d399;
           transform: translateY(-1px);
-          box-shadow: 0 4px 14px rgba(52, 168, 83, 0.25);
+          box-shadow: none;
         }
         .footer-link-b2b:focus-visible {
-          box-shadow: 0 0 0 2px #3b82f6;
+          box-shadow: none;
         }
         .footer-link {
           color: #a1a1aa;
@@ -828,7 +828,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
           background: rgba(255, 255, 255, 0.06);
         }
         .footer-link:focus-visible {
-          box-shadow: 0 0 0 2px #3b82f6;
+          box-shadow: none;
         }
         
         /* Custom Scrollbar */
@@ -871,7 +871,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               borderRadius: '100px',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)',
+              boxShadow: 'none',
               cursor: 'default',
               userSelect: 'none'
             }}>
@@ -1371,7 +1371,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               padding: '36px 32px 32px',
               maxWidth: '440px',
               width: '100%',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(234, 179, 8, 0.12)',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9)',
               position: 'relative',
               textAlign: 'center',
               color: '#ffffff'
@@ -1459,7 +1459,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                     fontSize: '0.95rem',
                     fontWeight: 800,
                     cursor: (isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.35)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1647,7 +1647,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                     fontSize: '0.95rem',
                     fontWeight: 800,
                     cursor: (isLoggingInMaster || totpInput.length !== 6) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 8px 24px rgba(34, 197, 94, 0.35)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1787,7 +1787,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                     fontSize: '0.95rem',
                     fontWeight: 800,
                     cursor: (isLoggingInMaster || !recoveryCodeInput.trim()) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 8px 24px rgba(239, 68, 68, 0.35)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

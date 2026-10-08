@@ -345,7 +345,7 @@ export const StudentCampusCupTab: React.FC<StudentCampusCupTabProps> = ({
                               display: 'flex',
                               flexDirection: 'column',
                               background: '#34a853',
-                              boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                              boxShadow: 'none',
                               borderRadius: '16px',
                               padding: '14px 16px',
                               gap: '10px'
@@ -422,7 +422,7 @@ export const StudentCampusCupTab: React.FC<StudentCampusCupTabProps> = ({
                                   display: 'flex',
                                   flexDirection: 'column',
                                   background: '#34a853',
-                                  boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                                  boxShadow: 'none',
                                   borderRadius: '16px',
                                   padding: '12px 14px',
                                   gap: '8px'

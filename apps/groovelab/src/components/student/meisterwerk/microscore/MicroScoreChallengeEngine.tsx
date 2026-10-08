@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, Play, Square, Award, Volume2, RotateCcw, Circle, Sparkles } from 'lucide-react';
 import { RealtimePitchStream, YinPitchResult, evaluatePitchMatch, freqToMidi } from '../../../../services/audio/YinPitchDetectionEngine';
+import { acquireAudioStream } from '../../../../services/audioPermissionService';
 import { MicroScoreChallengeFeedback, MicroScoreNote, MicroScoreSnippet } from './microScore.types';
 import { getPitchHz, getSoundingHz } from './microScoreAudioSynthesizer';
 
@@ -154,9 +155,14 @@ export const MicroScoreChallengeEngine: React.FC<MicroScoreChallengeEngineProps>
   // Metronom-Only Playalong-Aufnahme (100% lokal im RAM, DSGVO Art. 8 & 9)
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await acquireAudioStream({ audio: true });
       recordedChunksRef.current = [];
-      const mr = new MediaRecorder(stream);
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+      }
+      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
       mr.ondataavailable = e => {
         if (e.data && e.data.size > 0) {
@@ -165,7 +171,7 @@ export const MicroScoreChallengeEngine: React.FC<MicroScoreChallengeEngineProps>
       };
 
       mr.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(recordedChunksRef.current, { type: mr.mimeType || mimeType || 'audio/webm' });
         const url = URL.createObjectURL(blob);
         setRecordedAudioUrl(url);
         stream.getTracks().forEach(t => t.stop());

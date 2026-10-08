@@ -42,18 +42,18 @@ async function runRevisionssicherSuite() {
     global: { fetch: authFetch }
   });
 
-  // TEST 1: Locate Peter Pan Teacher Profile
-  console.log('--- TEST 1: Retrieve Peter Pan Teacher Profile ---');
+  // TEST 1: Locate Patrick Huber Teacher Profile
+  console.log('--- TEST 1: Retrieve Patrick Huber Teacher Profile ---');
   const { data: users, error: userErr } = await client
     .from('users')
     .select('id, school_id, first_name, last_name, role, planned_boards')
     .eq('school_id', schoolId)
-    .ilike('last_name', '%pan%');
+    .or('id.eq.11079eae-664a-49a4-8692-771d83a3193c,last_name.ilike.%huber%');
 
   if (userErr) throw userErr;
   const teacher: any = (users as any)?.[0];
   if (!teacher) {
-    console.error('Teacher Peter Pan not found!');
+    console.error('Teacher Patrick Huber not found!');
     process.exit(1);
   }
   console.log(`[PASS] Teacher found: ${teacher.first_name} ${teacher.last_name} (ID: ${teacher.id})`);
@@ -248,7 +248,7 @@ async function runRevisionssicherSuite() {
   // TEST 3: Verification of System Invariants
   console.log('\n--- TEST 3: System Invariant Verifications ---');
 
-  // Check 1: 0 unresolved submission alerts for Peter Pan
+  // Check 1: 0 unresolved submission alerts for Patrick Huber
   const { data: openAlerts } = await client
     .from('system_alerts')
     .select('id, type, message')

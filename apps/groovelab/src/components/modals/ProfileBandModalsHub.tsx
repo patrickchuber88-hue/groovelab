@@ -240,7 +240,7 @@ export const ProfileBandModalsHub: React.FC<ProfileBandModalsHubProps> = ({
                   fontSize: '1rem', 
                   fontWeight: 850, 
                   cursor: 'pointer', 
-                  boxShadow: '0 8px 20px rgba(59,130,246,0.3)', 
+                  boxShadow: 'none', 
                   transition: 'all 0.2s', 
                   textAlign: 'center',
                   display: 'flex',
@@ -408,7 +408,7 @@ export const ProfileBandModalsHub: React.FC<ProfileBandModalsHubProps> = ({
               )}
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', boxShadow: `0 8px 24px ${brandColor}25`, transition: 'all 0.2s', minHeight: '44px', touchAction: 'manipulation' }}>Speichern</button>
+                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', boxShadow: 'none', transition: 'all 0.2s', minHeight: '44px', touchAction: 'manipulation' }}>Speichern</button>
                 <button type="button" onClick={() => setShowEditProfile(false)} style={{ flex: 1, background: 'rgba(0, 0, 0, 0.05)', color: '#48484a', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', transition: 'all 0.2s', minHeight: '44px', touchAction: 'manipulation' }}>Abbrechen</button>
               </div>
             </div>
@@ -755,7 +755,7 @@ export const ProfileBandModalsHub: React.FC<ProfileBandModalsHubProps> = ({
               <div style={{ display: 'flex', gap: '16px', marginTop: '20px' }}>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, background: brandColor, color: '#0f172a', border: 'none', padding: '18px', borderRadius: '16px', fontWeight: 900, cursor: 'pointer', fontSize: '1.1rem', boxShadow: `0 10px 30px ${brandColor}40`, transition: 'transform 0.2s', letterSpacing: '0.02em', minHeight: '44px', touchAction: 'manipulation' }}
+                  style={{ flex: 1, background: brandColor, color: '#0f172a', border: 'none', padding: '18px', borderRadius: '16px', fontWeight: 900, cursor: 'pointer', fontSize: '1.1rem', boxShadow: 'none', transition: 'transform 0.2s', letterSpacing: '0.02em', minHeight: '44px', touchAction: 'manipulation' }}
                   onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
                   onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                 >

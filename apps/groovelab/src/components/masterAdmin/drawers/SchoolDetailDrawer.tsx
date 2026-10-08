@@ -338,7 +338,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               justifyContent: 'center',
               fontWeight: 900,
               fontSize: '1.2rem',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+              boxShadow: 'none'
             }}>
               {school.name ? school.name.charAt(0).toUpperCase() : 'M'}
             </div>
@@ -436,7 +436,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
@@ -461,7 +461,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
@@ -1552,7 +1552,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"

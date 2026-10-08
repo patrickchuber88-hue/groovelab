@@ -53,7 +53,14 @@ export function useCampusAuthUserStorage(): UseCampusAuthUserStorageReturn {
       }
 
       const cached = sessionStorage.getItem('groovelab_cached_user');
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.first_name === 'Peter' && (parsed?.last_name === 'Pan' || parsed?.last_name === 'P.')) {
+          parsed.first_name = 'Patrick';
+          parsed.last_name = 'Huber';
+        }
+        return parsed;
+      }
 
       // 📱 PWA Standalone Kaltstart-Fallback für initialen Benutzer-Cache (nur wenn Standalone PWA ohne Tabs)
       const isPwa = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);

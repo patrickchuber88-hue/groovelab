@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote, SlidersHorizontal, Loader2, AlertCircle, RotateCw } from 'lucide-react';
 import { getBlob, storeBlob } from '../utils/blobStorage';
 import { harmonizeAudioList, formatHarmonizedAudioTitle } from '../utils/audioNamingHelper';
 import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNotesStorage';
@@ -70,21 +70,15 @@ const playCountInBeep = (isAccent: boolean) => {
   try {
     const ctx = SharedAudioEngine.getContext();
     if (!ctx) return;
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     scheduleCountInBeep(ctx, ctx.currentTime, isAccent);
-  } catch {
-    // silent fallback
-  }
+  } catch {}
 };
 
 // 36 organic voice-memo waveform amplitude heights (0–100%) mit 0,1% perzeptiver Dynamik
 const ORGANIC_WAVEFORM = [
-  28, 42, 58, 38, 62, 82, 94, 72, 48, 65,
-  78, 96, 88, 64, 52, 74, 86, 62, 90, 76,
-  48, 68, 84, 95, 74, 56, 82, 68, 46, 72,
-  54, 38, 52, 44, 32, 24
+  28, 42, 58, 38, 62, 82, 94, 72, 48, 65, 78, 96, 88, 64, 52, 74, 86, 62,
+  90, 76, 48, 68, 84, 95, 74, 56, 82, 68, 46, 72, 54, 38, 52, 44, 32, 24
 ];
 
 export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
@@ -110,9 +104,38 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
 
   const effectiveUiLevel: 'junior' | 'teen' | 'pro' = resolveAuthoritativeUiLevel(uiLevel);
 
+  const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    const set = new Set<string>();
+    (tracks || []).forEach(t => {
+      const u = (t.url || '').replace(/^["']|["']$/g, '').trim();
+      if (u) {
+        try {
+          if (localStorage.getItem(`campus_dismissed_audio_${u}`) === '1') set.add(u);
+        } catch {}
+      }
+    });
+    return set;
+  });
+
+  useEffect(() => {
+    const handleDismissed = (e: any) => {
+      if (e?.detail?.url) {
+        const u = (e.detail.url || '').replace(/^["']|["']$/g, '').trim();
+        if (u) setDismissedUrls(prev => new Set(prev).add(u));
+      }
+    };
+    window.addEventListener('campus-audio-dismissed', handleDismissed);
+    return () => window.removeEventListener('campus-audio-dismissed', handleDismissed);
+  }, []);
+
   const harmonizedTracks = React.useMemo(() => {
-    return harmonizeAudioList(tracks || [], isTeacher, activeTopicContext);
-  }, [tracks, isTeacher, activeTopicContext]);
+    const active = (tracks || []).filter(t => {
+      const u = (t.url || '').replace(/^["']|["']$/g, '').trim();
+      return !u || !dismissedUrls.has(u);
+    });
+    return harmonizeAudioList(active, isTeacher, activeTopicContext);
+  }, [tracks, isTeacher, activeTopicContext, dismissedUrls]);
 
   const hasCarriedOverTracks = isCarriedOver || harmonizedTracks.some(t => Boolean(t.isCarriedOver));
 
@@ -122,7 +145,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
     }
   }, [harmonizedTracks.length, activeIndex]);
 
-  if (!tracks || tracks.length === 0) return null;
+  if (!tracks || tracks.length === 0 || harmonizedTracks.length === 0) return null;
 
   if (layoutMode === 'vertical-list') {
     const INITIAL_LIMIT = 3;
@@ -286,7 +309,6 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
     if (e) e.stopPropagation();
     switchTrack((activeIndex - 1 + harmonizedTracks.length) % harmonizedTracks.length);
   };
-
   const handleNext = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     switchTrack((activeIndex + 1) % harmonizedTracks.length);
@@ -296,21 +318,14 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
     touchStartXRef.current = e.targetTouches[0].clientX;
     touchEndXRef.current = null;
   };
-
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndXRef.current = e.targetTouches[0].clientX;
   };
-
   const handleTouchEnd = () => {
     if (!touchStartXRef.current || !touchEndXRef.current) return;
     const distance = touchStartXRef.current - touchEndXRef.current;
-    const minSwipeDistance = 35;
-
-    if (distance > minSwipeDistance) {
-      handleNext();
-    } else if (distance < -minSwipeDistance) {
-      handlePrev();
-    }
+    if (distance > 35) handleNext();
+    else if (distance < -35) handlePrev();
     touchStartXRef.current = null;
     touchEndXRef.current = null;
   };
@@ -321,14 +336,12 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
     const targetIdx = currentTrack.originalIdx !== undefined ? currentTrack.originalIdx : currentTrack.idx;
     onDelete(targetIdx ?? activeIndex, currentTrack.url);
   };
-
   const handleKeepCurrent = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onKeep) return;
     const targetIdx = currentTrack.originalIdx !== undefined ? currentTrack.originalIdx : currentTrack.idx;
     onKeep(targetIdx ?? activeIndex, currentTrack.url);
   };
-
   const handleHideCurrent = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onHide) return;
@@ -397,6 +410,23 @@ const useIsMobileAudio = () => {
   return isMobile;
 };
 
+const fetchAudioArrayBuffer = async (targetUrl: string): Promise<ArrayBuffer | null> => {
+  if (!targetUrl) return null;
+  try {
+    if (targetUrl.startsWith('campus_blob_') || targetUrl.startsWith('campus_audio_') || targetUrl.startsWith('offline://')) {
+      const raw = await getBlob(targetUrl).catch(() => null);
+      if (raw instanceof Blob) return await raw.arrayBuffer();
+      if (raw instanceof ArrayBuffer) return raw;
+      return null;
+    }
+    if (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:') || isPlayableUrl(targetUrl)) {
+      const res = await fetch(targetUrl, targetUrl.startsWith('http') ? { mode: 'cors' } : undefined);
+      if (res.ok) return await res.arrayBuffer();
+    }
+  } catch {}
+  return null;
+};
+
 interface CompactAudioStripProps {
   url: string;
   label: string;
@@ -444,6 +474,16 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [hasError, setHasError] = useState<boolean>(false);
+  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !url) return false;
+    try { return localStorage.getItem(`campus_dismissed_audio_${url}`) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    const handleDismissed = (e: any) => { if (e?.detail?.url === url) setIsDismissed(true); };
+    window.addEventListener('campus-audio-dismissed', handleDismissed);
+    return () => window.removeEventListener('campus-audio-dismissed', handleDismissed);
+  }, [url]);
 
   const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(url || resolvedUrl));
   useEffect(() => {
@@ -507,27 +547,32 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     }
   };
 
+  const refreshAudioSource = async (): Promise<string | null> => {
+    if (!url) return null;
+    try {
+      const res = await resolvePlayableAudioSource(url, 'campus-assets', 1800);
+      const finalRes = res.src ? res : await resolvePlayableAudioSource(url, 'groovelab-assets', 1800).catch(() => res);
+      if (finalRes.src) {
+        setResolvedUrl(finalRes.src);
+        setHasError(false);
+        if (audioRef.current) { audioRef.current.src = finalRes.src; audioRef.current.load(); }
+        return finalRes.src;
+      }
+    } catch {}
+    setHasError(true);
+    return null;
+  };
+
   const loadAudioBuffer = async (): Promise<AudioBuffer | null> => {
     if (audioBufferRef.current) return audioBufferRef.current;
     const ctx = SharedAudioEngine.getContext();
     if (!ctx) return null;
     try {
-      let targetUrl = resolvedUrl || url;
-      if (!targetUrl) return null;
-      let arrayBuffer: ArrayBuffer | null = null;
-      if (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) {
-        const resp = await fetch(targetUrl);
-        arrayBuffer = await resp.arrayBuffer();
-      } else {
-        const resp = await fetch(targetUrl, { mode: 'cors' });
-        arrayBuffer = await resp.arrayBuffer();
-      }
-      if (arrayBuffer) {
-        const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
+      const buf = await fetchAudioArrayBuffer(resolvedUrl || url);
+      if (buf) {
+        const decoded = await safeDecodeAudioData(ctx, buf);
         audioBufferRef.current = decoded;
-        if (decoded.duration && isFinite(decoded.duration)) {
-          setDuration(Math.round(decoded.duration));
-        }
+        if (decoded.duration && isFinite(decoded.duration)) setDuration(Math.round(decoded.duration));
         return decoded;
       }
     } catch (err) {
@@ -541,15 +586,29 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     const audio = audioRef.current;
     if (audio) {
       if (options.offsetSec !== undefined) {
-        audio.currentTime = options.offsetSec;
+        try { audio.currentTime = options.offsetSec; } catch {}
       }
       audio.loop = options.loop && (!loopLocator || !loopLocator.enabled);
       applyPitchPreservation(audio, playbackRate);
       audio.volume = 1;
-      audio.play().then(() => setIsPlaying(true)).catch(err => {
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        setHasError(false);
+      } catch (err: any) {
         console.warn('[CompactAudioStrip] Playback prevented:', err);
         setIsPlaying(false);
-      });
+        const fresh = await refreshAudioSource();
+        if (fresh && audioRef.current) {
+          try {
+            await audioRef.current.play();
+            setIsPlaying(true);
+            setHasError(false);
+            return;
+          } catch {}
+        }
+        setHasError(true);
+      }
     }
   };
 
@@ -561,11 +620,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     const handleOtherPlay = (e: any) => {
       if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
         if (countInTimerRef.current) {
-          if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
-            countInTimerRef.current.clear();
-          } else {
-            clearTimeout(countInTimerRef.current);
-          }
+          countInTimerRef.current.clear ? countInTimerRef.current.clear() : clearTimeout(countInTimerRef.current);
           countInTimerRef.current = null;
           setCountInStep(null);
         }
@@ -585,15 +640,21 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     let active = true;
     let cleanupFn: (() => void) | undefined;
 
-    resolvePlayableAudioSource(url, 'campus-assets', 1800).then((res) => {
-      if (active && res.src) {
-        setResolvedUrl(res.src);
-        cleanupFn = res.cleanup;
+    resolvePlayableAudioSource(url, 'campus-assets', 1800).then(async (res) => {
+      const finalRes = res.src ? res : await resolvePlayableAudioSource(url, 'groovelab-assets', 1800).catch(() => res);
+      if (active && finalRes.src) {
+        setResolvedUrl(finalRes.src);
+        setHasError(false);
+        cleanupFn = finalRes.cleanup;
+      } else if (active) {
+        if (isPlayableUrl(url)) { setResolvedUrl(url); setHasError(false); }
+        else { setHasError(true); }
       }
     }).catch((err) => {
       console.warn('[CompactAudioStrip] Failed to resolve playable audio source:', err);
-      if (active && isPlayableUrl(url)) {
-        setResolvedUrl(url);
+      if (active) {
+        if (isPlayableUrl(url)) { setResolvedUrl(url); setHasError(false); }
+        else { setHasError(true); }
       }
     });
 
@@ -602,11 +663,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       if (cleanupFn) cleanupFn();
       stopWebAudio();
       if (countInTimerRef.current) {
-        if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
-          countInTimerRef.current.clear();
-        } else {
-          clearTimeout(countInTimerRef.current);
-        }
+        countInTimerRef.current.clear ? countInTimerRef.current.clear() : clearTimeout(countInTimerRef.current);
         countInTimerRef.current = null;
       }
     };
@@ -709,11 +766,6 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
     }
 
-    setCountInStep(1);
-    const timers: any[] = [];
-    const clearTimers = () => timers.forEach(t => clearTimeout(t));
-    countInTimerRef.current = { clear: clearTimers };
-
     const playNative = () => {
       startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
     };
@@ -722,6 +774,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       playNative();
       return;
     }
+
+    setCountInStep(1);
+    const timers: any[] = [];
+    const clearTimers = () => timers.forEach(t => clearTimeout(t));
+    countInTimerRef.current = { clear: clearTimers };
 
     const leadTimeMs = Math.round(leadTime * 1000);
     timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
@@ -813,66 +870,37 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       {/* 🔁 Loop Toggle Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsLooping(!isLooping);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsLooping(!isLooping); }}
         aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
           border: isLooping ? 'none' : (hasActiveLocator ? '1.5px solid #10b981' : '1px solid #cbd5e1'),
           background: isLooping ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasActiveLocator ? '#ecfdf5' : '#ffffff'),
           color: isLooping ? '#ffffff' : (hasActiveLocator ? '#059669' : '#64748b'),
-          height: isMobile ? '44px' : '36px',
-          minWidth: isMobile ? '44px' : '36px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '3px',
+          height: isMobile ? '44px' : '36px', minWidth: isMobile ? '44px' : '36px', padding: '0 8px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
           boxShadow: isLooping ? '0 0 0 2px rgba(34, 197, 94, 0.3), 0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={
-          hasActiveLocator
-            ? `A/B Loop (${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s) ${isLooping ? 'aktiv' : 'bereit'}`
-            : (isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)')
-        }
+        title={hasActiveLocator ? `A/B Loop (${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s) ${isLooping ? 'aktiv' : 'bereit'}` : (isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)')}
       >
         <Repeat size={16} strokeWidth={isLooping ? 2.8 : 2.2} />
-        {hasActiveLocator && (
-          <span style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '-0.02em' }}>A⇄B</span>
-        )}
+        {hasActiveLocator && <span style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '-0.02em' }}>A⇄B</span>}
       </button>
 
-      {/* ⏱️ Vorzähler-Metronom Sound Button (Standardmäßig deaktiviert, optional mit Metronom-Klick) */}
+      {/* ⏱️ Vorzähler-Metronom Sound Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setCountInSoundActive(!countInSoundActive);
-        }}
+        onClick={(e) => { e.stopPropagation(); setCountInSoundActive(!countInSoundActive); }}
         aria-label={countInSoundActive ? 'Einzähler-Metronom aktiv' : 'Einzähler-Metronom aktivieren'}
         style={{
           border: countInSoundActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: countInSoundActive ? '#dcfce7' : '#ffffff',
           color: countInSoundActive ? '#15803d' : '#64748b',
-          fontSize: '0.80rem',
-          fontWeight: 850,
-          height: isMobile ? '44px' : '36px',
-          minWidth: isMobile ? '44px' : '36px',
-          padding: isMobile ? '0 10px' : '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
+          fontSize: '0.80rem', fontWeight: 850, height: isMobile ? '44px' : '36px', minWidth: isMobile ? '44px' : '36px',
+          padding: isMobile ? '0 10px' : '0 8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
           boxShadow: countInSoundActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title={countInSoundActive ? 'Einzähler-Metronom aktiv (Ton an)' : 'Einzähler-Metronom stumm (Klicken für Metronom-Ton)'}
@@ -881,7 +909,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         <span>4</span>
       </button>
 
-      {/* Speed Button (Level-adaptive & pitch-preserved) */}
+      {/* Speed Button */}
       <button
         type="button"
         onClick={handleCycleSpeed}
@@ -890,56 +918,30 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
           color: playbackRate !== 1 ? '#15803d' : '#64748b',
-          fontSize: '0.78rem',
-          fontWeight: 850,
-          height: isMobile ? '44px' : '36px',
-          minWidth: isMobile ? '48px' : '42px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          fontSize: '0.78rem', fontWeight: 850, height: isMobile ? '44px' : '36px', minWidth: isMobile ? '48px' : '42px',
+          padding: '0 8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: playbackRate !== 1 ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={
-          playbackRate === 1
-            ? 'Originaltempo (100%)'
-            : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`
-        }
+        title={playbackRate === 1 ? 'Originaltempo (100%)' : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`}
       >
         {getSpeedLabel()}
       </button>
 
-      {/* 💬 Timeline Notizen / Marker Button (SoundCloud-Style) */}
+      {/* 💬 Timeline Notizen Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsNotesModalOpen(true);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsNotesModalOpen(true); }}
         aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
         style={{
           border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
           background: notesCount > 0 ? '#fff7ed' : '#ffffff',
           color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '44px' : '36px',
-          minWidth: isMobile ? '44px' : '36px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
-          fontSize: '0.75rem',
-          fontWeight: 750,
+          height: isMobile ? '44px' : '36px', minWidth: isMobile ? '44px' : '36px', padding: '0 8px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 750,
           boxShadow: notesCount > 0 ? '0 1px 3px rgba(234, 88, 12, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
@@ -948,50 +950,43 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         {notesCount > 0 && <span>{notesCount}</span>}
       </button>
 
-      {/* 🎛️ A/B Loop-Studio / Trimmer Button */}
+      {/* 🎛️ A/B Loop-Studio Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsEditorOpen(true);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsEditorOpen(true); }}
         aria-label={hasActiveLocator ? 'A/B Loop-Schleife bearbeiten' : 'A/B Loop-Schleife einstellen'}
         style={{
           border: hasActiveLocator ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: hasActiveLocator ? '#f0fdf4' : '#ffffff',
           color: hasActiveLocator ? '#16a34a' : '#6366f1',
-          height: isMobile ? '44px' : '36px',
-          minWidth: isMobile ? '44px' : '36px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
+          height: isMobile ? '44px' : '36px', minWidth: isMobile ? '44px' : '36px', padding: '0 8px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           boxShadow: hasActiveLocator ? '0 0 0 2px rgba(34, 197, 94, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={
-          hasActiveLocator
-            ? `A/B Loop aktiv: ${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s (Tippen zum Ändern)`
-            : 'A/B Loop-Bereich festlegen (Schleife für schwere Takte)'
-        }
+        title={hasActiveLocator ? `A/B Loop aktiv: ${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s (Tippen zum Ändern)` : 'A/B Loop-Bereich festlegen (Schleife für schwere Takte)'}
       >
         <SlidersHorizontal size={15} strokeWidth={hasActiveLocator ? 2.5 : 2.2} />
-        {hasActiveLocator && (
-          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#16a34a' }}>A/B</span>
-        )}
+        {hasActiveLocator && <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#16a34a' }}>A/B</span>}
       </button>
     </div>
   );
 
   const renderTriageHub = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-      {/* Delete Button */}
-      {onDelete && (
+      {hasError && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setHasError(false); refreshAudioSource(); }}
+          style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer', height: isMobile ? '38px' : '34px', padding: '0 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, touchAction: 'manipulation' }}
+          className="hover-scale-mini"
+          title="Erneut versuchen zu laden"
+        >
+          <RotateCw size={13} strokeWidth={2.4} /><span>Prüfen</span>
+        </button>
+      )}
+      {(onDelete || hasError) && (
         <button
           type="button"
           disabled={isDeleting}
@@ -1000,42 +995,33 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             if (isDeleting) return;
             setIsDeleting(true);
             try {
-              await Promise.resolve(onDelete());
+              if (onDelete) await Promise.resolve(onDelete());
+              else {
+                if (url) {
+                  try { localStorage.setItem(`campus_dismissed_audio_${url}`, '1'); } catch {}
+                  window.dispatchEvent(new CustomEvent('campus-audio-dismissed', { detail: { url } }));
+                }
+                setIsDismissed(true);
+              }
             } catch (err) {
               console.error('[CompactAudioStrip] Delete error:', err);
               setIsDeleting(false);
             }
           }}
-          style={{
-            border: 'none',
-            background: isDeleting ? '#fee2e2' : 'none',
-            color: '#ef4444',
-            cursor: isDeleting ? 'wait' : 'pointer',
-            height: isMobile ? '38px' : '34px',
-            width: isMobile ? '36px' : '32px',
-            padding: 0,
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: isDeleting ? 1 : 0.6,
-            transition: 'opacity 0.15s ease',
-            touchAction: 'manipulation'
-          }}
+          style={{ border: hasError ? '1px solid #fca5a5' : 'none', background: isDeleting ? '#fee2e2' : (hasError ? '#fef2f2' : 'none'), color: '#ef4444', cursor: isDeleting ? 'wait' : 'pointer', height: isMobile ? '38px' : '34px', padding: hasError ? '0 8px' : 0, width: hasError ? 'auto' : (isMobile ? '36px' : '32px'), borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: isDeleting ? 1 : (hasError ? 1 : 0.6), transition: 'opacity 0.15s ease', touchAction: 'manipulation' }}
           onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
-          onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = '0.6'; }}
-          title={isDeleting ? "Wird gelöscht..." : "Aufnahme entfernen"}
-          aria-label={isDeleting ? "Aufnahme wird gelöscht..." : "Aufnahme entfernen"}
+          onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = hasError ? '1' : '0.6'; }}
+          title={isDeleting ? "Wird gelöscht..." : (hasError ? "Defekte Aufnahme entfernen" : "Aufnahme entfernen")}
+          aria-label={isDeleting ? "Aufnahme wird gelöscht..." : (hasError ? "Defekte Aufnahme entfernen" : "Aufnahme entfernen")}
         >
-          {isDeleting ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Trash2 size={16} />
-          )}
+          {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+          {hasError && <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>Entfernen</span>}
         </button>
       )}
     </div>
   );
+
+  if (isDismissed) return null;
 
   return (
     <div 
@@ -1078,12 +1064,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         }}
         onError={() => {
           console.warn('[CompactAudioStrip] Audio stream error for:', resolvedUrl);
-          if (resolvedUrl && resolvedUrl.includes('/storage/v1/object/sign/')) {
-            const pubUrl = resolvedUrl.replace('/storage/v1/object/sign/', '/storage/v1/object/public/').split('?')[0];
-            if (pubUrl && pubUrl !== resolvedUrl) {
-              setResolvedUrl(pubUrl);
-            }
-          }
+          refreshAudioSource().catch(() => setHasError(true));
         }}
       />
 
@@ -1101,6 +1082,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         {/* Play/Pause Button or Count-In Overlay (Mobile & Tablet ergonomisch: 42px) */}
         <button
           type="button"
+          disabled={hasError}
           onClick={togglePlay}
           style={{
             width: '42px',
@@ -1108,31 +1090,27 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             minWidth: '42px',
             minHeight: '42px',
             borderRadius: '50%',
-            background: countInStep !== null 
-              ? '#f59e0b' 
-              : (isPlaying 
-                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
-                  : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'),
-            color: '#ffffff',
+            background: hasError ? '#fee2e2' : (countInStep !== null ? '#f59e0b' : (isPlaying ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)')),
+            color: hasError ? '#ef4444' : '#ffffff',
             border: 'none',
-            cursor: 'pointer',
+            cursor: hasError ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            boxShadow: isPlaying 
-              ? '0 0 12px rgba(34, 197, 94, 0.4)' 
-              : '0 2px 8px rgba(22, 163, 74, 0.32)',
+            boxShadow: hasError ? 'none' : (isPlaying ? '0 0 12px rgba(34, 197, 94, 0.4)' : '0 2px 8px rgba(22, 163, 74, 0.32)'),
             transition: 'all 0.15s ease',
             padding: 0,
             fontSize: countInStep !== null ? '0.88rem' : undefined,
             fontWeight: 900,
             touchAction: 'manipulation'
           }}
-          className="hover-scale"
-          title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
+          className={hasError ? undefined : "hover-scale"}
+          title={hasError ? 'Aufnahme nicht verfügbar oder beschädigt' : (countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen'))}
         >
-          {countInStep !== null ? (
+          {hasError ? (
+            <AlertCircle size={16} strokeWidth={2.5} />
+          ) : countInStep !== null ? (
             <span>{countInStep}</span>
           ) : isPlaying ? (
             <Pause size={16} fill="currentColor" strokeWidth={0} />
@@ -1158,11 +1136,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             <span style={{
               fontSize: '0.68rem',
               fontWeight: 750,
-              color: '#64748b',
+              color: hasError ? '#ef4444' : '#64748b',
               fontVariantNumeric: 'tabular-nums',
               flexShrink: 0
             }}>
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {hasError ? 'Nicht verfügbar' : `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </span>
           </div>
 
@@ -1193,7 +1171,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             />
           ) : (
             <>
-              {renderSecondaryTools()}
+              {!hasError && renderSecondaryTools()}
               {renderTriageHub()}
             </>
           )
@@ -1205,14 +1183,14 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: hasError ? 'flex-end' : 'space-between',
           gap: '6px',
           width: '100%',
           paddingTop: '6px',
           borderTop: '1px solid rgba(0, 0, 0, 0.05)',
           boxSizing: 'border-box'
         }}>
-          {renderSecondaryTools()}
+          {!hasError && renderSecondaryTools()}
           {renderTriageHub()}
         </div>
       )}
@@ -1245,19 +1223,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
               if (res.loop_locator !== undefined) {
                 setLoopLocator(res.loop_locator);
                 if (res.loop_locator?.enabled) {
-                  setIsLooping(true); // ⚡ SOFORTIGE AKTIVIERUNG DES A/B LOOPS
+                  setIsLooping(true);
                   const startPos = res.loop_locator.startSec || 0;
                   setCurrentTime(startPos);
-                  if (audioRef.current) {
-                    audioRef.current.currentTime = startPos;
-                  }
+                  if (audioRef.current) audioRef.current.currentTime = startPos;
                 } else if (res.loop_locator === null) {
                   setIsLooping(false);
                 }
               }
-              if (onSaveEdited) {
-                onSaveEdited(res);
-              }
+              if (onSaveEdited) onSaveEdited(res);
               setIsEditorOpen(false);
             }}
           />
@@ -1332,6 +1306,16 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [hasError, setHasError] = useState<boolean>(false);
+  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !url) return false;
+    try { return localStorage.getItem(`campus_dismissed_audio_${url}`) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    const handleDismissed = (e: any) => { if (e?.detail?.url === url) setIsDismissed(true); };
+    window.addEventListener('campus-audio-dismissed', handleDismissed);
+    return () => window.removeEventListener('campus-audio-dismissed', handleDismissed);
+  }, [url]);
 
   const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(url || resolvedUrl));
   useEffect(() => {
@@ -1396,27 +1380,32 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     }
   };
 
+  const refreshAudioSource = async (): Promise<string | null> => {
+    if (!url) return null;
+    try {
+      const res = await resolvePlayableAudioSource(url, 'campus-assets', 1800);
+      const finalRes = res.src ? res : await resolvePlayableAudioSource(url, 'groovelab-assets', 1800).catch(() => res);
+      if (finalRes.src) {
+        setResolvedUrl(finalRes.src);
+        setHasError(false);
+        if (audioRef.current) { audioRef.current.src = finalRes.src; audioRef.current.load(); }
+        return finalRes.src;
+      }
+    } catch {}
+    setHasError(true);
+    return null;
+  };
+
   const loadAudioBuffer = async (): Promise<AudioBuffer | null> => {
     if (audioBufferRef.current) return audioBufferRef.current;
     const ctx = SharedAudioEngine.getContext();
     if (!ctx) return null;
     try {
-      let targetUrl = resolvedUrl || url;
-      if (!targetUrl) return null;
-      let arrayBuffer: ArrayBuffer | null = null;
-      if (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) {
-        const resp = await fetch(targetUrl);
-        arrayBuffer = await resp.arrayBuffer();
-      } else {
-        const resp = await fetch(targetUrl, { mode: 'cors' });
-        arrayBuffer = await resp.arrayBuffer();
-      }
-      if (arrayBuffer) {
-        const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
+      const buf = await fetchAudioArrayBuffer(resolvedUrl || url);
+      if (buf) {
+        const decoded = await safeDecodeAudioData(ctx, buf);
         audioBufferRef.current = decoded;
-        if (decoded.duration && isFinite(decoded.duration)) {
-          setDuration(Math.round(decoded.duration));
-        }
+        if (decoded.duration && isFinite(decoded.duration)) setDuration(Math.round(decoded.duration));
         return decoded;
       }
     } catch (err) {
@@ -1430,15 +1419,29 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     const audio = audioRef.current;
     if (audio) {
       if (options.offsetSec !== undefined) {
-        audio.currentTime = options.offsetSec;
+        try { audio.currentTime = options.offsetSec; } catch {}
       }
       audio.loop = options.loop && (!loopLocator || !loopLocator.enabled);
       applyPitchPreservation(audio, playbackRate);
       audio.volume = 1;
-      audio.play().then(() => setIsPlaying(true)).catch(err => {
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        setHasError(false);
+      } catch (err: any) {
         console.warn('[AppleSplitCapsulePlayer] Playback prevented:', err);
         setIsPlaying(false);
-      });
+        const fresh = await refreshAudioSource();
+        if (fresh && audioRef.current) {
+          try {
+            await audioRef.current.play();
+            setIsPlaying(true);
+            setHasError(false);
+            return;
+          } catch {}
+        }
+        setHasError(true);
+      }
     }
   };
 
@@ -1450,11 +1453,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     const handleOtherPlay = (e: any) => {
       if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
         if (countInTimerRef.current) {
-          if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
-            countInTimerRef.current.clear();
-          } else {
-            clearTimeout(countInTimerRef.current);
-          }
+          countInTimerRef.current.clear ? countInTimerRef.current.clear() : clearTimeout(countInTimerRef.current);
           countInTimerRef.current = null;
           setCountInStep(null);
         }
@@ -1474,15 +1473,21 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     let active = true;
     let cleanupFn: (() => void) | undefined;
 
-    resolvePlayableAudioSource(url, 'campus-assets', 1800).then((res) => {
-      if (active && res.src) {
-        setResolvedUrl(res.src);
-        cleanupFn = res.cleanup;
+    resolvePlayableAudioSource(url, 'campus-assets', 1800).then(async (res) => {
+      const finalRes = res.src ? res : await resolvePlayableAudioSource(url, 'groovelab-assets', 1800).catch(() => res);
+      if (active && finalRes.src) {
+        setResolvedUrl(finalRes.src);
+        setHasError(false);
+        cleanupFn = finalRes.cleanup;
+      } else if (active) {
+        if (isPlayableUrl(url)) { setResolvedUrl(url); setHasError(false); }
+        else { setHasError(true); }
       }
     }).catch((err) => {
       console.warn('[SplitCapsulePlayer] Failed to resolve playable audio source:', err);
-      if (active && isPlayableUrl(url)) {
-        setResolvedUrl(url);
+      if (active) {
+        if (isPlayableUrl(url)) { setResolvedUrl(url); setHasError(false); }
+        else { setHasError(true); }
       }
     });
 
@@ -1491,11 +1496,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       if (cleanupFn) cleanupFn();
       stopWebAudio();
       if (countInTimerRef.current) {
-        if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
-          countInTimerRef.current.clear();
-        } else {
-          clearTimeout(countInTimerRef.current);
-        }
+        countInTimerRef.current.clear ? countInTimerRef.current.clear() : clearTimeout(countInTimerRef.current);
         countInTimerRef.current = null;
       }
     };
@@ -1598,11 +1599,6 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     }
 
-    setCountInStep(1);
-    const timers: any[] = [];
-    const clearTimers = () => timers.forEach(t => clearTimeout(t));
-    countInTimerRef.current = { clear: clearTimers };
-
     const playNative = () => {
       startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
     };
@@ -1611,6 +1607,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       playNative();
       return;
     }
+
+    setCountInStep(1);
+    const timers: any[] = [];
+    const clearTimers = () => timers.forEach(t => clearTimeout(t));
+    countInTimerRef.current = { clear: clearTimers };
 
     const leadTimeMs = Math.round(leadTime * 1000);
     timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
@@ -1702,66 +1703,37 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       {/* 🔁 Loop Toggle Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsLooping(!isLooping);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsLooping(!isLooping); }}
         aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
           border: isLooping ? 'none' : (hasActiveLocator ? '1.5px solid #10b981' : '1px solid #cbd5e1'),
           background: isLooping ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasActiveLocator ? '#ecfdf5' : '#ffffff'),
           color: isLooping ? '#ffffff' : (hasActiveLocator ? '#059669' : '#64748b'),
-          height: isMobile ? '44px' : '34px',
-          minWidth: isMobile ? '44px' : '34px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '3px',
+          height: isMobile ? '44px' : '34px', minWidth: isMobile ? '44px' : '34px', padding: '0 8px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
           boxShadow: isLooping ? '0 0 0 2px rgba(34, 197, 94, 0.3), 0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={
-          hasActiveLocator
-            ? `A/B Loop (${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s) ${isLooping ? 'aktiv' : 'bereit'}`
-            : (isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)')
-        }
+        title={hasActiveLocator ? `A/B Loop (${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s) ${isLooping ? 'aktiv' : 'bereit'}` : (isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)')}
       >
         <Repeat size={16} strokeWidth={isLooping ? 2.8 : 2.2} />
-        {hasActiveLocator && (
-          <span style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '-0.02em' }}>A⇄B</span>
-        )}
+        {hasActiveLocator && <span style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '-0.02em' }}>A⇄B</span>}
       </button>
 
-      {/* ⏱️ Vorzähler-Metronom Sound Button (Standardmäßig deaktiviert, optional mit Metronom-Klick) */}
+      {/* ⏱️ Vorzähler-Metronom Sound Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setCountInSoundActive(!countInSoundActive);
-        }}
+        onClick={(e) => { e.stopPropagation(); setCountInSoundActive(!countInSoundActive); }}
         aria-label={countInSoundActive ? 'Einzähler-Metronom aktiv' : 'Einzähler-Metronom aktivieren'}
         style={{
           border: countInSoundActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: countInSoundActive ? '#dcfce7' : '#ffffff',
           color: countInSoundActive ? '#15803d' : '#64748b',
-          fontSize: '0.80rem',
-          fontWeight: 850,
-          height: isMobile ? '44px' : '34px',
-          minWidth: isMobile ? '44px' : '34px',
-          padding: isMobile ? '0 10px' : '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
+          fontSize: '0.80rem', fontWeight: 850, height: isMobile ? '44px' : '34px', minWidth: isMobile ? '44px' : '34px',
+          padding: isMobile ? '0 10px' : '0 8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
           boxShadow: countInSoundActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title={countInSoundActive ? 'Einzähler-Metronom aktiv (Ton an)' : 'Einzähler-Metronom stumm (Klicken für Metronom-Ton)'}
@@ -1770,7 +1742,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         <span>4</span>
       </button>
 
-      {/* Speed Button (Level-adaptive & pitch-preserved) */}
+      {/* Speed Button */}
       <button
         type="button"
         onClick={handleCycleSpeed}
@@ -1779,56 +1751,30 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
           color: playbackRate !== 1 ? '#15803d' : '#64748b',
-          fontSize: '0.78rem',
-          fontWeight: 850,
-          height: isMobile ? '44px' : '34px',
-          minWidth: isMobile ? '48px' : '40px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          fontSize: '0.78rem', fontWeight: 850, height: isMobile ? '44px' : '34px', minWidth: isMobile ? '48px' : '40px',
+          padding: '0 8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: playbackRate !== 1 ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={
-          playbackRate === 1
-            ? 'Originaltempo (100%)'
-            : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`
-        }
+        title={playbackRate === 1 ? 'Originaltempo (100%)' : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`}
       >
         {getSpeedLabel()}
       </button>
 
-      {/* 💬 Timeline Notizen / Marker Button (SoundCloud-Style) */}
+      {/* 💬 Timeline Notizen Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsNotesModalOpen(true);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsNotesModalOpen(true); }}
         aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
         style={{
           border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
           background: notesCount > 0 ? '#fff7ed' : '#ffffff',
           color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '44px' : '34px',
-          minWidth: isMobile ? '44px' : '34px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
-          fontSize: '0.75rem',
-          fontWeight: 750,
+          height: isMobile ? '44px' : '34px', minWidth: isMobile ? '44px' : '34px', padding: '0 8px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 750,
           boxShadow: notesCount > 0 ? '0 1px 3px rgba(234, 88, 12, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
@@ -1837,92 +1783,78 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         {notesCount > 0 && <span>{notesCount}</span>}
       </button>
 
-      {/* 🎛️ A/B Loop-Studio / Trimmer Button */}
+      {/* 🎛️ A/B Loop-Studio Button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsEditorOpen(true);
-        }}
+        onClick={(e) => { e.stopPropagation(); setIsEditorOpen(true); }}
         aria-label={hasActiveLocator ? 'A/B Loop-Schleife bearbeiten' : 'A/B Loop-Schleife einstellen'}
         style={{
           border: hasActiveLocator ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: hasActiveLocator ? '#f0fdf4' : '#ffffff',
           color: hasActiveLocator ? '#16a34a' : '#6366f1',
-          height: isMobile ? '44px' : '34px',
-          minWidth: isMobile ? '44px' : '34px',
-          padding: '0 8px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
+          height: isMobile ? '44px' : '34px', minWidth: isMobile ? '44px' : '34px', padding: '0 8px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           boxShadow: hasActiveLocator ? '0 0 0 2px rgba(34, 197, 94, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation'
+          transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={
-          hasActiveLocator
-            ? `A/B Loop aktiv: ${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s (Tippen zum Ändern)`
-            : 'A/B Loop-Bereich festlegen (Schleife für schwere Takte)'
-        }
+        title={hasActiveLocator ? `A/B Loop aktiv: ${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s (Tippen zum Ändern)` : 'A/B Loop-Bereich festlegen (Schleife für schwere Takte)'}
       >
         <SlidersHorizontal size={15} strokeWidth={hasActiveLocator ? 2.5 : 2.2} />
-        {hasActiveLocator && (
-          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#16a34a' }}>A/B</span>
-        )}
+        {hasActiveLocator && <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#16a34a' }}>A/B</span>}
       </button>
     </div>
   );
 
   const renderDeleteButton = () => (
-    onDelete ? (
-      <button
-        type="button"
-        disabled={isDeleting}
-        onClick={async (e) => {
-          e.stopPropagation();
-          if (isDeleting) return;
-          setIsDeleting(true);
-          try {
-            await Promise.resolve(onDelete(e));
-          } catch (err) {
-            console.error('[AppleSplitCapsulePlayer] Delete error:', err);
-            setIsDeleting(false);
-          }
-        }}
-        style={{
-          border: 'none',
-          background: isDeleting ? '#fee2e2' : 'none',
-          color: '#ef4444',
-          cursor: isDeleting ? 'wait' : 'pointer',
-          height: isMobile ? '38px' : '34px',
-          width: isMobile ? '36px' : '32px',
-          padding: 0,
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: isDeleting ? 1 : 0.6,
-          transition: 'opacity 0.15s ease',
-          flexShrink: 0,
-          touchAction: 'manipulation'
-        }}
-        onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
-        onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = '0.6'; }}
-        title={isDeleting ? "Wird gelöscht..." : "Aufnahme entfernen"}
-        aria-label={isDeleting ? "Aufnahme wird gelöscht..." : "Aufnahme entfernen"}
-      >
-        {isDeleting ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Trash2 size={16} />
-        )}
-      </button>
-    ) : null
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+      {hasError && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setHasError(false); refreshAudioSource(); }}
+          style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer', height: isMobile ? '38px' : '34px', padding: '0 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, touchAction: 'manipulation' }}
+          className="hover-scale-mini"
+          title="Erneut versuchen zu laden"
+        >
+          <RotateCw size={13} strokeWidth={2.4} /><span>Prüfen</span>
+        </button>
+      )}
+      {(onDelete || hasError) && (
+        <button
+          type="button"
+          disabled={isDeleting}
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (isDeleting) return;
+            setIsDeleting(true);
+            try {
+              if (onDelete) await Promise.resolve(onDelete(e));
+              else {
+                if (url) {
+                  try { localStorage.setItem(`campus_dismissed_audio_${url}`, '1'); } catch {}
+                  window.dispatchEvent(new CustomEvent('campus-audio-dismissed', { detail: { url } }));
+                }
+                setIsDismissed(true);
+              }
+            } catch (err) {
+              console.error('[AppleSplitCapsulePlayer] Delete error:', err);
+              setIsDeleting(false);
+            }
+          }}
+          style={{ border: hasError ? '1px solid #fca5a5' : 'none', background: isDeleting ? '#fee2e2' : (hasError ? '#fef2f2' : 'none'), color: '#ef4444', cursor: isDeleting ? 'wait' : 'pointer', height: isMobile ? '38px' : '34px', padding: hasError ? '0 8px' : 0, width: hasError ? 'auto' : (isMobile ? '36px' : '32px'), borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: isDeleting ? 1 : (hasError ? 1 : 0.6), transition: 'opacity 0.15s ease', flexShrink: 0, touchAction: 'manipulation' }}
+          onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
+          onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = hasError ? '1' : '0.6'; }}
+          title={isDeleting ? "Wird gelöscht..." : (hasError ? "Defekte Aufnahme entfernen" : "Aufnahme entfernen")}
+          aria-label={isDeleting ? "Aufnahme wird gelöscht..." : (hasError ? "Defekte Aufnahme entfernen" : "Aufnahme entfernen")}
+        >
+          {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+          {hasError && <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>Entfernen</span>}
+        </button>
+      )}
+    </div>
   );
+
+  if (isDismissed) return null;
 
   return (
     <div 
@@ -1966,12 +1898,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         }}
         onError={() => {
           console.warn('[AppleSplitCapsulePlayer] Audio stream error for:', resolvedUrl);
-          if (resolvedUrl && resolvedUrl.includes('/storage/v1/object/sign/')) {
-            const pubUrl = resolvedUrl.replace('/storage/v1/object/sign/', '/storage/v1/object/public/').split('?')[0];
-            if (pubUrl && pubUrl !== resolvedUrl) {
-              setResolvedUrl(pubUrl);
-            }
-          }
+          refreshAudioSource().catch(() => setHasError(true));
         }}
       />
 
@@ -2109,8 +2036,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
                 }
               }}
               style={{
-                border: 'none',
-                background: isDeleting ? '#fee2e2' : 'none',
+                border: hasError ? '1px solid #fca5a5' : 'none',
+                background: isDeleting ? '#fee2e2' : (hasError ? '#fef2f2' : 'none'),
                 color: '#ef4444',
                 cursor: isDeleting ? 'wait' : 'pointer',
                 padding: '4px',
@@ -2118,20 +2045,16 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: isDeleting ? 1 : 0.6,
+                opacity: isDeleting ? 1 : (hasError ? 1 : 0.6),
                 flexShrink: 0,
                 transition: 'opacity 0.15s ease'
               }}
               onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
-              onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = '0.6'; }}
-              title={isDeleting ? "Wird gelöscht..." : "Diese Aufnahme löschen"}
-              aria-label={isDeleting ? "Aufnahme wird gelöscht..." : "Diese Aufnahme löschen"}
+              onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = hasError ? '1' : '0.6'; }}
+              title={isDeleting ? "Wird gelöscht..." : (hasError ? "Defekte Aufnahme löschen" : "Diese Aufnahme löschen")}
+              aria-label={isDeleting ? "Aufnahme wird gelöscht..." : (hasError ? "Defekte Aufnahme löschen" : "Diese Aufnahme löschen")}
             >
-              {isDeleting ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Trash2 size={13} />
-              )}
+              {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>
           )}
         </div>
@@ -2147,6 +2070,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }}>
         <button
           type="button"
+          disabled={hasError}
           onClick={togglePlay}
           style={{
             width: '42px',
@@ -2154,21 +2078,25 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             minWidth: '42px',
             minHeight: '42px',
             borderRadius: '50%',
-            background: countInStep !== null
-              ? '#f59e0b'
-              : (isPlaying 
-                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
-                  : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'),
-            color: '#ffffff',
+            background: hasError
+              ? '#fee2e2'
+              : (countInStep !== null
+                ? '#f59e0b'
+                : (isPlaying 
+                    ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
+                    : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)')),
+            color: hasError ? '#ef4444' : '#ffffff',
             border: 'none',
-            cursor: 'pointer',
+            cursor: hasError ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            boxShadow: isPlaying 
-              ? '0 0 14px rgba(34, 197, 94, 0.5), 0 2px 6px rgba(0,0,0,0.1)' 
-              : '0 2px 6px rgba(22, 163, 74, 0.28), inset 0 1px 1px rgba(255,255,255,0.4)',
+            boxShadow: hasError
+              ? 'none'
+              : (isPlaying 
+                  ? '0 0 14px rgba(34, 197, 94, 0.5), 0 2px 6px rgba(0,0,0,0.1)' 
+                  : '0 2px 6px rgba(22, 163, 74, 0.28), inset 0 1px 1px rgba(255,255,255,0.4)'),
             transition: 'all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)',
             transform: isPlaying ? 'scale(0.96)' : 'scale(1)',
             padding: 0,
@@ -2176,10 +2104,12 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             fontWeight: 900,
             touchAction: 'manipulation'
           }}
-          className="hover-scale"
-          title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
+          className={hasError ? undefined : "hover-scale"}
+          title={hasError ? 'Aufnahme nicht verfügbar oder beschädigt' : (countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen'))}
         >
-          {countInStep !== null ? (
+          {hasError ? (
+            <AlertCircle size={16} strokeWidth={2.5} />
+          ) : countInStep !== null ? (
             <span>{countInStep}</span>
           ) : isPlaying ? (
             <Pause size={16} fill="currentColor" strokeWidth={0} />
@@ -2204,11 +2134,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             <span style={{
               fontSize: '0.66rem',
               fontWeight: 750,
-              color: '#64748b',
+              color: hasError ? '#ef4444' : '#64748b',
               fontVariantNumeric: 'tabular-nums',
               flexShrink: 0
             }}>
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {hasError ? 'Nicht verfügbar' : `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </span>
           </div>
 
@@ -2239,7 +2169,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             />
           ) : (
             <>
-              {renderSecondaryTools()}
+              {!hasError && renderSecondaryTools()}
               {renderDeleteButton()}
             </>
           )
@@ -2251,14 +2181,14 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: hasError ? 'flex-end' : 'space-between',
           gap: '6px',
           width: '100%',
           paddingTop: '6px',
           borderTop: '1px solid rgba(0, 0, 0, 0.05)',
           boxSizing: 'border-box'
         }}>
-          {renderSecondaryTools()}
+          {!hasError && renderSecondaryTools()}
           {renderDeleteButton()}
         </div>
       )}
@@ -2291,12 +2221,10 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
               if (res.loop_locator !== undefined) {
                 setLoopLocator(res.loop_locator);
                 if (res.loop_locator?.enabled) {
-                  setIsLooping(true); // ⚡ SOFORTIGE AKTIVIERUNG DES A/B LOOPS
+                  setIsLooping(true);
                   const startPos = res.loop_locator.startSec || 0;
                   setCurrentTime(startPos);
-                  if (audioRef.current) {
-                    audioRef.current.currentTime = startPos;
-                  }
+                  if (audioRef.current) audioRef.current.currentTime = startPos;
                 } else if (res.loop_locator === null) {
                   setIsLooping(false);
                 }

@@ -106,7 +106,7 @@ export const WorldTourMasteryNoteCard: React.FC<WorldTourMasteryNoteCardProps> =
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     color: '#ffffff',
                     border: 'none',
-                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.28)',
+                    boxShadow: 'none',
                     borderRadius: '6px',
                     padding: '2px 8px',
                     fontWeight: 800
@@ -226,7 +226,7 @@ export const WorldTourMasteryNoteCard: React.FC<WorldTourMasteryNoteCardProps> =
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.20)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease',
                 touchAction: 'manipulation'
               }}
@@ -248,7 +248,7 @@ export const WorldTourMasteryNoteCard: React.FC<WorldTourMasteryNoteCardProps> =
         border: '1.5px solid #fde047',
         borderRadius: '14px',
         padding: '10px 14px',
-        boxShadow: '0 2px 8px rgba(250, 204, 21, 0.10)',
+        boxShadow: 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: '6px',
@@ -271,7 +271,7 @@ export const WorldTourMasteryNoteCard: React.FC<WorldTourMasteryNoteCardProps> =
               letterSpacing: '0.04em',
               padding: '2px 8px',
               borderRadius: '100px',
-              boxShadow: '0 1px 3px rgba(250, 204, 21, 0.3)',
+              boxShadow: 'none',
               flexShrink: 0
             }}
           >

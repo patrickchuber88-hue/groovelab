@@ -273,7 +273,7 @@ export const SongChordGridEditor: React.FC<SongChordGridEditorProps> = ({
                   borderRadius: '50%',
                   background: '#16a34a',
                   border: 'none',
-                  boxShadow: '0 0 8px rgba(22, 163, 74, 0.6)'
+                  boxShadow: 'none'
                 }} />
               )}
             </div>
@@ -290,7 +290,7 @@ export const SongChordGridEditor: React.FC<SongChordGridEditorProps> = ({
             background: '#ffffff',
             borderRadius: '16px',
             border: '1.5px solid #93c5fd',
-            boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.15)',
+            boxShadow: 'none',
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',

@@ -138,7 +138,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 6px 16px -2px rgba(2, 132, 199, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <Network size={24} />
@@ -169,7 +169,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '7px',
-                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.2s ease'
               }}
             >

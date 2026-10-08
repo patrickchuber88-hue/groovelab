@@ -13,6 +13,8 @@ import {
   getDynamicAnnualPrice as calcDynamicAnnualPrice
 } from './licenses/licenseUtils';
 import { ACTIVE_LEGAL_VERSION } from '../../legal/legalContent';
+import { SecretaryInvoiceHistorySection } from './SecretaryInvoiceHistorySection';
+import { SecretaryBookingSuccessModal } from './licenses/SecretaryBookingSuccessModal';
 
 export interface SecretaryLicensesViewProps {
   loading?: boolean;
@@ -345,7 +347,6 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
   const [selectedDashboardMonth, setSelectedDashboardMonth] = useState<number>(() => new Date().getMonth());
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<number>(() => new Date().getFullYear());
   const [activationSearchQuery, setActivationSearchQuery] = useState<string>('');
-  const successModalRef = useModalA11y(showSuccessModal, () => setShowSuccessModal(false));
 
   // 🏛️ Universal High-Fidelity PDF Preview Modal State (0,1% Goldstandard)
   const [pdfPreviewState, setPdfPreviewState] = useState<{
@@ -592,7 +593,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 fontSize: '0.74rem',
                                 color: '#854d0e',
                                 fontWeight: 700,
-                                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.08)'
+                                boxShadow: 'none'
                               }}>
                                 <Sparkles size={18} color="#854d0e" style={{ flexShrink: 0 }} />
                                 <div>
@@ -735,7 +736,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: (!hasCampusSub && !hasGroovelabSub) ? 'not-allowed' : 'pointer',
-                                    boxShadow: (!hasCampusSub && !hasGroovelabSub) ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                    boxShadow: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -779,7 +780,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     border: '2px solid',
                                     background: '#ffffff',
                                     borderColor: billingPayer === 'school' ? '#34a853' : 'rgba(0,0,0,0.06)',
-                                    boxShadow: billingPayer === 'school' ? '0 10px 25px rgba(52, 168, 83, 0.05)' : 'none',
+                                    boxShadow: 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -832,7 +833,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     border: '2px solid',
                                     background: '#ffffff',
                                     borderColor: billingPayer === 'student' ? '#eab308' : 'rgba(0,0,0,0.06)',
-                                    boxShadow: billingPayer === 'student' ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
+                                    boxShadow: 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -897,7 +898,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       borderRadius: '12px',
                                       padding: '12px',
                                       transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'option2' ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
+                                      boxShadow: 'none'
                                     }}>
                                       <input
                                         type="radio"
@@ -928,7 +929,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       borderRadius: '12px',
                                       padding: '12px',
                                       transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'option3_2' ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
+                                      boxShadow: 'none'
                                     }}>
                                       <input
                                         type="radio"
@@ -959,7 +960,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       borderRadius: '12px',
                                       padding: '12px',
                                       transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'option3_3' ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
+                                      boxShadow: 'none'
                                     }}>
                                       <input
                                         type="radio"
@@ -1011,7 +1012,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       border: '1.5px solid #f59e0b',
                                       borderRadius: '14px',
                                       padding: '14px',
-                                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.05)'
+                                      boxShadow: 'none'
                                     }}>
                                       <div style={{
                                         width: '24px',
@@ -1079,7 +1080,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                    boxShadow: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -1121,7 +1122,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '14px',
-                                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
+                                    boxShadow: 'none'
                                   }}>
                                     <div style={{
                                       width: '40px',
@@ -1234,7 +1235,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         textAlign: 'center',
                                         transition: 'all 0.2s',
                                         opacity: isDowngradeBlocked ? 0.6 : 1,
-                                        boxShadow: isSel ? '0 6px 16px rgba(52, 168, 83, 0.12)' : 'none',
+                                        boxShadow: 'none',
                                         position: 'relative'
                                       }}
                                     >
@@ -1354,7 +1355,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                    boxShadow: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -1405,9 +1406,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   flexDirection: 'column',
                                   gap: '2px'
                                 }}>
-                                  <strong style={{ color: '#0f172a' }}>{schoolName || 'Patrick Huber Musikschule'}</strong>
-                                  <span>{schoolStreet || 'Karl-Fürstenberg-Str.'} {schoolHouseNumber || '59'}</span>
-                                  <span>{schoolZipCode || '79618'} {schoolCity || 'Rheinfelden'} • Deutschland</span>
+                                  <strong style={{ color: '#0f172a' }}>{schoolName || 'Musikschule'}</strong>
+                                  <span>{schoolStreet ? `${schoolStreet} ${schoolHouseNumber || ''}`.trim() : 'Keine Straßenanschrift hinterlegt'}</span>
+                                  <span>{schoolZipCode || schoolCity ? `${schoolZipCode || ''} ${schoolCity || ''}`.trim() : 'Kein Ort hinterlegt'} • Deutschland</span>
                                 </div>
 
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', marginTop: '2px' }}>
@@ -1596,7 +1597,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                    boxShadow: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -2056,7 +2057,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       fontSize: '0.8rem',
                                       fontWeight: 800,
                                       cursor: (!agreedToSepa || !agreedToTerms) ? 'not-allowed' : 'pointer',
-                                      boxShadow: (!agreedToSepa || !agreedToTerms) ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                      boxShadow: 'none',
                                       display: 'flex',
                                       alignItems: 'center',
                                       gap: '8px',
@@ -2224,89 +2225,12 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                           </div>
                         </div>
 
-                    {/* Success Modal Overlay */}
-                    {showSuccessModal && (
-                      <div 
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="license-booking-success-title"
-                        ref={successModalRef}
-                        onClick={(e) => {
-                          if (e.target === e.currentTarget) setShowSuccessModal(false);
-                        }}
-                        style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(15, 23, 42, 0.6)',
-                        backdropFilter: 'blur(8px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 99999,
-                        padding: '20px'
-                      }}>
-                        <div className="glass-panel" style={{
-                          background: '#ffffff',
-                          border: '2px solid #34a853',
-                          borderRadius: '24px',
-                          padding: '40px 32px',
-                          maxWidth: '480px',
-                          width: '100%',
-                          textAlign: 'center',
-                          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '20px'
-                        }}>
-                          <div style={{
-                            width: '72px',
-                            height: '72px',
-                            borderRadius: '50%',
-                            background: '#e6f4ea',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#34a853',
-                            fontSize: '2.5rem',
-                            fontWeight: 900,
-                            boxShadow: '0 10px 20px rgba(52, 168, 83, 0.15)'
-                          }}>
-                            ✓
-                          </div>
-                          <div>
-                            <h3 id="license-booking-success-title" style={{ margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Buchung erfolgreich abgeschlossen!</h3>
-                            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
-                              Dein Abonnement wurde erfolgreich eingerichtet. Die Freischaltung aller Module und die Verbuchung sind abgeschlossen.
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setShowSuccessModal(false);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '14px 24px',
-                              borderRadius: '12px',
-                              border: 'none',
-                              background: '#34a853',
-                              color: '#ffffff',
-                              fontSize: '0.86rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Zum Dashboard wechseln ➔
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                       </div>
+                    {/* Success Modal: 0,1% Feature-Monolith */}
+                    <SecretaryBookingSuccessModal
+                      isOpen={showSuccessModal}
+                      onClose={() => setShowSuccessModal(false)}
+                    />
+                  </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', fontFamily: 'Inter', textAlign: 'left' }}>
                         
@@ -2325,7 +2249,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               gap: '16px',
-                              boxShadow: '0 4px 16px rgba(52, 168, 83, 0.04)'
+                              boxShadow: 'none'
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
                                 <div style={{ 
@@ -2583,7 +2507,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       gap: '6px'
                                     }}
                                   >
-                                    <ShieldCheck size={14} style={{ verticalAlign: 'middle' }} /> Recht &amp; Compliance (B2B)
+                                    <ShieldCheck size={14} style={{ verticalAlign: 'middle' }} /> B2B-Vertrag &amp; Compliance
                                   </button>
                                 </div>
                               </div>
@@ -2612,7 +2536,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                           {/* Campus Module */}
                                           {hasCampusSub ? (
                                             <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 0 3px rgba(52, 168, 83, 0.25)' }} />
+                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#34a853', boxShadow: 'none' }} />
                                               <div>
                                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#166534' }}>Campus Modul</div>
                                                 <div style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 500 }}>Stundenplan &amp; Protokoll aktiv</div>
@@ -2628,7 +2552,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
                                               gap: '12px',
-                                              boxShadow: '0 2px 8px rgba(52, 168, 83, 0.04)'
+                                              boxShadow: 'none'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#cbd5e1' }} />
@@ -2659,7 +2583,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   fontWeight: 800,
                                                   cursor: 'pointer',
                                                   whiteSpace: 'nowrap',
-                                                  boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)'
+                                                  boxShadow: 'none'
                                                 }}
                                               >
                                                 Hinzubuchen ➔
@@ -2670,7 +2594,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                           {/* GrooveLab Module */}
                                           {hasGroovelabSub ? (
                                             <div style={{ background: '#fefce8', border: '1.5px solid #fef08a', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#eab308', boxShadow: '0 0 0 3px rgba(234, 179, 8, 0.25)' }} />
+                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#eab308', boxShadow: 'none' }} />
                                               <div>
                                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#854d0e' }}>GrooveLab Modul</div>
                                                 <div style={{ fontSize: '0.74rem', color: '#a16207', fontWeight: 500 }}>Live-Lab &amp; Bands aktiv</div>
@@ -2686,7 +2610,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
                                               gap: '12px',
-                                              boxShadow: '0 2px 8px rgba(234, 179, 8, 0.04)'
+                                              boxShadow: 'none'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#cbd5e1' }} />
@@ -2717,7 +2641,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   fontWeight: 800,
                                                   cursor: 'pointer',
                                                   whiteSpace: 'nowrap',
-                                                  boxShadow: '0 2px 8px rgba(234, 179, 8, 0.25)'
+                                                  boxShadow: 'none'
                                                 }}
                                               >
                                                 Hinzubuchen ➔
@@ -2749,7 +2673,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   minWidth: '8px',
                                                   borderRadius: '50%',
                                                   background: billingPayer === 'school' ? '#7e22ce' : '#0284c7',
-                                                  boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(126, 34, 206, 0.18)' : 'rgba(2, 132, 199, 0.18)'}`
+                                                  boxShadow: 'none'
                                                 }} />
                                                 <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                                   Zahlungsmodell
@@ -2823,7 +2747,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   minWidth: '8px',
                                                   borderRadius: '50%',
                                                   background: billingPayer === 'school' ? '#16a34a' : '#0284c7',
-                                                  boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(22, 163, 74, 0.18)' : 'rgba(2, 132, 199, 0.18)'}`
+                                                  boxShadow: 'none'
                                                 }} />
                                                 <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                                   Kosten pro Schüler
@@ -2896,7 +2820,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                         minWidth: '8px',
                                                         borderRadius: '50%',
                                                         background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : '#10b981',
-                                                        boxShadow: `0 0 0 3px ${isCritical ? 'rgba(220, 38, 38, 0.18)' : isWarning ? 'rgba(245, 158, 11, 0.18)' : 'rgba(16, 185, 129, 0.18)'}`
+                                                        boxShadow: 'none'
                                                       }} />
                                                       <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                                         Audio-Tresor Speicher
@@ -3502,41 +3426,92 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                         {/* Slider & Invoices in dashboard */}
                         {activeBillingSubTab === 'history' && (
                           <div style={{ display: 'block', marginTop: '12px' }}>
-                          {/* Aktive Schüler Info Card */}
+                          {/* 0,1% Goldstandard B2B Infrastruktur- & Schüler-KPIs (3er Grid) */}
                           <div style={{
-                            padding: '20px',
-                            borderRadius: '24px',
-                            border: '1px solid #e2e8f0',
-                            background: '#ffffff',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px',
-                            boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '14px',
                             marginBottom: '16px'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#64748b'
-                              }}>
-                                <Users size={20} />
+                            {/* Card 1: Aktive Schülerzugänge */}
+                            <div style={{
+                              padding: '18px 20px',
+                              borderRadius: '20px',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '0.66rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schülerzugänge</span>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+                                  <Users size={16} />
+                                </div>
                               </div>
                               <div>
-                                <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schülerzugänge</span>
-                                <strong style={{ display: 'block', fontSize: '1.2rem', color: '#0f172a', marginTop: '2px', fontFamily: 'Urbanist' }}>
-                                  Aktive Schüler: <span style={{ color: '#ea4335' }}>{activeStudentsCount_global}</span>
+                                <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}>
+                                  {activeStudentsCount_global} {activeStudentsCount_global === 1 ? 'Aktiver Schüler' : 'Aktive Schüler'}
                                 </strong>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                                  Monatsbeitrag: {(activeStudentsCount_global * 0.49).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € Netto (0,49 € / Schüler)
+                                </span>
                               </div>
                             </div>
-                            <div style={{ fontSize: '0.76rem', color: '#475569', lineHeight: '1.5', background: '#f8fafc', padding: '14px', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
-                              Hier siehst du, wie viele deiner Schüler **Campus-Groovelab** nutzen. Neue Schüler kannst du ganz einfach in der Schülerverwaltung eintragen.
+
+                            {/* Card 2: Cloud-Infrastruktur & Audio-Tresor */}
+                            <div style={{
+                              padding: '18px 20px',
+                              borderRadius: '20px',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '0.66rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Audio-Tresor &amp; Speicher</span>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+                                  <HardDrive size={16} />
+                                </div>
+                              </div>
+                              <div>
+                                <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}>
+                                  {10 + (selectedStorageAddonGb || 0)} GB Inklusive
+                                </strong>
+                                <span style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <ShieldCheck size={13} color="#16a34a" /> Frankfurt a. M. • 0% US-Cloud
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Card 3: Kostenairbag & Schutzgarantie */}
+                            <div style={{
+                              padding: '18px 20px',
+                              borderRadius: '20px',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '0.66rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schutzgarantie</span>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+                                  <Zap size={16} />
+                                </div>
+                              </div>
+                              <div>
+                                <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}>
+                                  Kostenairbag Aktiv
+                                </strong>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                                  Automatischer Kosten-Stopp nach 2 Monaten Inaktivität
+                                </span>
+                              </div>
                             </div>
                           </div>
 
@@ -3552,9 +3527,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)'
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fce8e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Search size={15} color="#ea4335" />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Search size={15} color="#64748b" />
                                 </div>
                                 <div>
                                   <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, fontFamily: 'Urbanist', color: '#0f172a' }}>
@@ -3642,7 +3617,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
                                     const actDateStr = actDate ? actDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Automatisch aktiv';
                                     const firstMonth = actDate ? `${deMonthsLocal[actDate.getMonth() + 1]} ${actDate.getFullYear()}` : null;
-                                    const firstInvoiceId = actDate ? `AKT-${formattedSchoolNumericId}-${String(actDate.getFullYear()).slice(-2)}${String(actDate.getMonth() + 1).padStart(2, '0')}-01` : null;
+                                    const firstInvoicePrefix = (!isCampus && isGroovelab) ? 'INF' : 'AKT';
+                                    const firstInvoiceId = actDate ? `${firstInvoicePrefix}-${formattedSchoolNumericId}-${String(actDate.getFullYear()).slice(-2)}${String(actDate.getMonth() + 1).padStart(2, '0')}-01` : null;
 
                                     return (
                                       <div key={s.id} style={{
@@ -3722,514 +3698,38 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             })()}
                           </div>
                           
-                          {/* Rechnungen list */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <h4 style={{ margin: '0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist', color: '#1e293b' }}>Rechnungs-Historie</h4>
-                            <div style={{ border: '1px solid #e2e8f0', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
-                              {(() => {
-                                const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
-                                const annualPricePerStudent = (studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
-                                const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
-                                
-                                const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
-                                const extraAnnualPrice = extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
-                                const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
-                                const totalB2BWithEinmalzahlung = currentTotalB2B + einmalzahlungTotal + extraEinmalzahlungTotal;
-
-                                // Helper function to get last day of month as string
-                                const getLastDayOfMonth = (monthName: string, yearVal: string) => {
-                                  const monthsMap: Record<string, number> = {
-                                    'Januar': 1, 'Februar': 2, 'März': 3, 'April': 4, 'Mai': 5, 'Juni': 6,
-                                    'Juli': 7, 'August': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Dezember': 12
-                                  };
-                                  const m = monthsMap[monthName] || 6;
-                                  const y = parseInt(yearVal, 10);
-                                  const lastDay = new Date(y, m, 0).getDate();
-                                  return `${lastDay}. ${monthName} ${y}`;
-                                };
-
-                                // Parse contractStartDate or default to June 12, 2026
-                                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date();
-                                const startYear = contractDateObj.getFullYear();
-                                const startMonth = contractDateObj.getMonth() + 1; // 1-indexed
-
-                                const systemDate = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
-                                const currentYear = systemDate.getFullYear();
-                                const currentMonth = systemDate.getMonth() + 1;
-
-                                const deMonths = [
-                                  '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
-                                  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-                                ];
-
-                                const invoicesData: any[] = [];
-                                let y = startYear;
-                                let m = startMonth;
-
-                                while (y < currentYear || (y === currentYear && m <= currentMonth)) {
-                                  const monthStr = m < 10 ? `0${m}` : `${m}`;
-                                  const yearShort = String(y).slice(-2);
-                                  
-                                  const lastDay = new Date(y, m, 0).getDate();
-                                  const monthName = deMonths[m];
-                                  const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
-                                  
-                                  const isCurrent = (y === currentYear && m === currentMonth);
-                                  
-                                  // The invoice is created at 23:58 on the last day of the month
-                                  const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
-                                  const isCreated = systemDate.getTime() >= creationTime.getTime();
-                                  
-                                  const dueDateObj = new Date(y, m - 1, lastDay);
-                                  dueDateObj.setDate(dueDateObj.getDate() + 14);
-                                  const dueDay = dueDateObj.getDate();
-                                  const dueMonthName = deMonths[dueDateObj.getMonth() + 1];
-                                  const dueYear = dueDateObj.getFullYear();
-                                  const dueDateStr = `${dueDay}. ${dueMonthName} ${dueYear}`;
-
-                                  const infId = `INF-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`;
-                                  const aktId = `AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`;
-
-                                  // Payment Status Invariant: Invoices are 'Versendet' (open) until actually marked as paid via bank reconciliation!
-                                  let paidInvoicesList: string[] = [];
-                                  try {
-                                    const storedPaid = localStorage.getItem(`paid_invoices_${schoolId}`);
-                                    paidInvoicesList = storedPaid ? JSON.parse(storedPaid) : [];
-                                  } catch {}
-
-                                  const isInfPaid = paidInvoicesList.includes(infId) || paidInvoicesList.includes(`RE-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`);
-                                  const isAktPaid = paidInvoicesList.includes(aktId);
-
-                                  const infStatus = isInfPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
-                                  const aktStatus = isAktPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
-
-                                  // Calculate clean 2-Rechnung-Trennung (INF vs. AKT)
-                                  const targetMonthZeroIndexed = m - 1;
-                                  const targetYear = y;
-                                  const targetMonthEnd = new Date(y, m, 0, 23, 59, 59, 999);
-                                  const targetMonthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
-
-                                  // Calculate exact historical active students for this specific month
-                                  const studentsActiveInMonth = students.filter((s: any) => {
-                                    const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
-                                    if (actDate && actDate > targetMonthEnd) return false;
-                                    if (s.contract_ends_at && new Date(s.contract_ends_at) < targetMonthStart) return false;
-                                    return s.isCampusActive || s.isGroovelabActive || s.is_campus_active || s.is_groovelab_active;
-                                  });
-
-                                  const monthCampusActiveCount = isCurrent 
-                                    ? activeStudentsCount_global 
-                                    : studentsActiveInMonth.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
-
-                                  const monthGroovelabActiveCount = isCurrent 
-                                    ? activeGroovelabStudentsCount_global 
-                                    : studentsActiveInMonth.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length;
-
-                                  const monthTotalStudents = isCurrent 
-                                    ? students.length 
-                                    : students.filter((s: any) => {
-                                        const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
-                                        if (actDate && actDate > targetMonthEnd) return false;
-                                        return true;
-                                      }).length;
-
-                                  const monthPassiveCount = isCurrent 
-                                    ? passiveStudentsCount_global 
-                                    : Math.max(0, monthTotalStudents - Math.max(monthCampusActiveCount, monthGroovelabActiveCount));
-
-                                  const monthPassiveFee = parseFloat((monthPassiveCount * 0.09).toFixed(2));
-                                  const monthGroovelabStudentFee = parseFloat((monthGroovelabActiveCount * (effectiveSchoolRates.priceStudent || 0.49)).toFixed(2));
-
-                                  // 1. Infrastruktur-Rechnung enthält Software, Hosting, Lehrkräfte, Basis-Bereitstellung, Audio-Tresor UND GrooveLab-Schüleraktivierungen (da GrooveLab immer von Musikschule getragen wird)
-                                  const infPureAmount = subscriptionBypass ? 0 : parseFloat((moduleCost_global + teacherServiceFeeTotal_global + monthPassiveFee + storageAddonFee_global + monthGroovelabStudentFee).toFixed(2));
-
-                                  // 2. Sammelrechnung Schüleraktivierungen enthält ab sofort NUR noch die Campus-Schüleraktivierungen
-                                  const monthAktPureAmount = subscriptionBypass ? 0 : parseFloat((
-                                    monthCampusActiveCount * (effectiveSchoolRates.priceStudent || 0.49)
-                                  ).toFixed(2));
-
-                                  const monthActivations = students.filter((s: any) => {
-                                    const isCurrentlyActive = s.isCampusActive || s.isCampusActive || s.is_campus_active;
-                                    if (!isCurrentlyActive) return false;
-                                    const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
-                                    if (!actDate) return false;
-                                    return actDate.getMonth() === targetMonthZeroIndexed && actDate.getFullYear() === targetYear;
-                                  });
-                                  const monthActivationsCount = monthActivations.length;
-
-                                  const monthsMapLocal: Record<number, number> = {
-                                    9: 12, 10: 11, 11: 10, 12: 9, 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1
-                                  };
-                                  const restmonate = monthsMapLocal[m] !== undefined ? monthsMapLocal[m] : 12;
-                                  let studentFee = effectiveSchoolRates.priceStudent || 0.49;
-                                  let effectiveActivationsCount = monthCampusActiveCount;
-                                  let invoiceStudentsList: any[] = [];
-
-                                  if (studentBillingOption === "option3_3") {
-                                    studentFee = effectiveSchoolRates.priceStudent ? effectiveSchoolRates.priceStudent * 0.8 : 0.39;
-                                    effectiveActivationsCount = monthTotalStudents;
-                                    invoiceStudentsList = isCurrent ? students : students.filter((s: any) => {
-                                      const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
-                                      if (actDate && actDate > targetMonthEnd) return false;
-                                      return true;
-                                    });
-                                  } else if (studentBillingOption === "option3_2") {
-                                    studentFee = effectiveSchoolRates.priceStudent ? effectiveSchoolRates.priceStudent * 0.9 : 0.44;
-                                    effectiveActivationsCount = isCurrent ? monthActivationsCount : studentsActiveInMonth.length;
-                                    invoiceStudentsList = isCurrent ? monthActivations : studentsActiveInMonth;
-                                  } else {
-                                    studentFee = effectiveSchoolRates.priceStudent || 0.49;
-                                    effectiveActivationsCount = monthCampusActiveCount;
-                                    invoiceStudentsList = isCurrent ? students.filter((s: any) => s.isCampusActive || s.is_campus_active) : studentsActiveInMonth.filter((s: any) => s.isCampusActive || s.is_campus_active);
-                                  }
-                                  
-                                  let aktAmount = monthAktPureAmount;
-                                  if (studentBillingOption === "option3_3") {
-                                    aktAmount = subscriptionBypass ? 0 : parseFloat((monthTotalStudents * studentFee * 12).toFixed(2));
-                                  } else if (studentBillingOption === "option3_2") {
-                                    aktAmount = subscriptionBypass ? 0 : parseFloat((effectiveActivationsCount * studentFee * restmonate).toFixed(2));
-                                  }
-
-                                  // GoBD Revisionssicherheit: Snapshotting for completed months (v5)
-                                  let infRecord: any = {
-                                    id: infId,
-                                    type: "INF",
-                                    year: String(y),
-                                    monthName: monthName,
-                                    date: invoiceDateStr,
-                                    dueDateStr: dueDateStr,
-                                    isCurrentMonth: isCurrent,
-                                    b2b: infPureAmount,
-                                    amount: infPureAmount,
-                                    schoolStudentCost: 0,
-                                    schoolStudentLevy: 0,
-                                    schoolExtraCost: 0,
-                                    extraLevyMonthly: 0,
-                                    extraEinmalzahlung: 0,
-                                    b2c: 0,
-                                    einmalzahlung: 0,
-                                    status: infStatus,
-                                    paid: isInfPaid,
-                                    creationTime: creationTime,
-                                    totalTeachersCount: billableTeachersCount,
-                                    passiveStudentsCount: monthPassiveCount,
-                                    passiveStudentsHostingFee: monthPassiveFee,
-                                    activeGroovelabCount: monthGroovelabActiveCount,
-                                    groovelabStudentsHostingFee: monthGroovelabStudentFee,
-                                    storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
-                                    storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
-                                    auditHash: `CG-INF-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
-                                    gobd_version: 5,
-                                    activatedStudentsList: []
-                                  };
-
-                                  let aktRecord: any = {
-                                    id: aktId,
-                                    type: "AKT",
-                                    year: String(y),
-                                    monthName: monthName,
-                                    date: invoiceDateStr,
-                                    dueDateStr: dueDateStr,
-                                    isCurrentMonth: isCurrent,
-                                    b2b: 0,
-                                    amount: aktAmount,
-                                    schoolStudentCost: 0,
-                                    schoolStudentLevy: 0,
-                                    schoolExtraCost: 0,
-                                    extraLevyMonthly: 0,
-                                    extraEinmalzahlung: 0,
-                                    b2c: aktAmount,
-                                    einmalzahlung: (studentBillingOption === "option3_2" || studentBillingOption === "option3_3") ? aktAmount : 0,
-                                    status: aktStatus,
-                                    paid: isAktPaid,
-                                    creationTime: creationTime,
-                                    activeCampusCount: monthCampusActiveCount,
-                                    activeGroovelabCount: 0,
-                                    passiveStudentsCount: 0,
-                                    activationsCount: effectiveActivationsCount,
-                                    restmonate: restmonate,
-                                    studentFee: studentFee,
-                                    auditHash: `CG-AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
-                                    gobd_version: 5,
-                                    activatedStudentsList: invoiceStudentsList.map((s: any) => {
-                                      const isNewlyActivated = (() => {
-                                        if (!s.activated_at) return false;
-                                        const d = new Date(s.activated_at);
-                                        return d.getMonth() === targetMonthZeroIndexed && d.getFullYear() === targetYear;
-                                      })();
-                                      return {
-                                        id: s.id,
-                                        first_name: s.first_name || s.vorname || '',
-                                        last_name: s.last_name || s.nachname || '',
-                                        instrument: s.instrument || s.instrument_name || s.fach || s.subject || 'Schülerprofil',
-                                        isCampusActive: !!(s.isCampusActive || s.is_campus_active),
-                                        isGroovelabActive: !!(s.isGroovelabActive || s.is_groovelab_active),
-                                        activated_at: s.activated_at || s.created_at || null,
-                                        isNewlyActivated: isNewlyActivated
-                                      };
-                                    })
-                                  };
-
-                                  // GoBD Freeze: If month is closed, read from or persist to immutable snapshot (v5)
-                                  if (typeof window !== "undefined" && !isCurrent) {
-                                    try {
-                                      const snapInfKey = `campus_gobd_v5_${schoolId}_${infId}`;
-                                      const snapAktKey = `campus_gobd_v5_${schoolId}_${aktId}`;
-                                      const storedInf = localStorage.getItem(snapInfKey);
-                                      const storedAkt = localStorage.getItem(snapAktKey);
-                                      if (storedInf) {
-                                        const parsed = JSON.parse(storedInf);
-                                        if (parsed && parsed.gobd_version === 5 && parsed.amount > 0) {
-                                          infRecord = { ...infRecord, ...parsed, isCurrentMonth: false };
-                                        } else if (infRecord.amount > 0) {
-                                          localStorage.setItem(snapInfKey, JSON.stringify(infRecord));
-                                        }
-                                      } else if (infRecord.amount > 0) {
-                                        localStorage.setItem(snapInfKey, JSON.stringify(infRecord));
-                                      }
-                                      if (storedAkt) {
-                                        const parsed = JSON.parse(storedAkt);
-                                        if (parsed && parsed.gobd_version === 5 && parsed.amount !== undefined && parsed.amount > 0) {
-                                          aktRecord = { 
-                                            ...aktRecord, 
-                                            ...parsed, 
-                                            amount: parsed.amount, 
-                                            isCurrentMonth: false,
-                                            activatedStudentsList: (parsed.activatedStudentsList && parsed.activatedStudentsList.length > 0)
-                                              ? parsed.activatedStudentsList
-                                              : aktRecord.activatedStudentsList
-                                          };
-                                        } else if (aktRecord.amount > 0 && students.length > 0) {
-                                          localStorage.setItem(snapAktKey, JSON.stringify(aktRecord));
-                                        }
-                                      } else if (aktRecord.amount > 0 && students.length > 0) {
-                                        localStorage.setItem(snapAktKey, JSON.stringify(aktRecord));
-                                      }
-                                       // Synchronize GoBD snapshot to Supabase invoices table
-                                       if (supabase && schoolId) {
-                                         if (infRecord.amount > 0) {
-                                           supabase.from('invoices').upsert({
-                                             id: infId,
-                                             school_id: schoolId,
-                                             type: 'INF',
-                                             amount: infRecord.amount,
-                                             status: infRecord.status || (isInfPaid ? 'Bezahlt' : 'Versendet'),
-                                             billing_date: `${y}-${monthStr}-01`,
-                                             due_date: `${y}-${monthStr}-15`,
-                                             items: {
-                                               amount: infRecord.amount,
-                                               id: infRecord.id,
-                                               status: infRecord.status || (isInfPaid ? 'Bezahlt' : 'Versendet'),
-                                               totalTeachersCount: infRecord.totalTeachersCount,
-                                               passiveStudentsCount: infRecord.passiveStudentsCount,
-                                               activeGroovelabCount: infRecord.activeGroovelabCount,
-                                               groovelabStudentsHostingFee: infRecord.groovelabStudentsHostingFee,
-                                               storageAddonGb: infRecord.storageAddonGb,
-                                               storageAddonMonthlyFee: infRecord.storageAddonMonthlyFee,
-                                               auditHash: infRecord.auditHash,
-                                               gobd_version: 5
-                                             }
-                                           }, { onConflict: 'id' }).then(() => {});
-                                         }
-                                         if (aktRecord.amount > 0) {
-                                           supabase.from('invoices').upsert({
-                                             id: aktId,
-                                             school_id: schoolId,
-                                             type: 'AKT',
-                                             amount: aktRecord.amount,
-                                             status: aktRecord.status || (isAktPaid ? 'Bezahlt' : 'Versendet'),
-                                             billing_date: `${y}-${monthStr}-01`,
-                                             due_date: `${y}-${monthStr}-15`,
-                                             items: {
-                                               amount: aktRecord.amount,
-                                               id: aktRecord.id,
-                                               status: aktRecord.status || (isAktPaid ? 'Bezahlt' : 'Versendet'),
-                                               activeCampusCount: aktRecord.activeCampusCount,
-                                               activeGroovelabCount: 0,
-                                               passiveStudentsCount: 0,
-                                               activationsCount: aktRecord.activationsCount,
-                                               studentFee: aktRecord.studentFee,
-                                               auditHash: aktRecord.auditHash,
-                                               gobd_version: 5,
-                                               activatedStudentsList: aktRecord.activatedStudentsList
-                                             }
-                                           }, { onConflict: 'id' }).then(() => {});
-                                         }
-                                       }
-                                    } catch (e) {
-                                      // Non-blocking
-                                    }
-                                  }
-
-                                  // 1. Infrastruktur-Rechnung (INF)
-                                  invoicesData.push(infRecord);
-
-                                  // 2. Sammelrechnung Schüleraktivierungen (AKT)
-                                  if (aktRecord.amount > 0 && (billingPayer === "school" || studentBillingOption === "option2" || studentBillingOption === "option3_2" || studentBillingOption === "option3_3")) {
-                                    invoicesData.push(aktRecord);
-                                  }
-                                                                  // Increment month
-                                  m++;
-                                  if (m > 12) {
-                                    m = 1;
-                                    y++;
-                                  }
-                                }
-
-                                // Reverse order so the newest is on top
-                                invoicesData.reverse();
-
-                                const grouped: Record<string, typeof invoicesData> = {};
-                                const monthKeys: string[] = [];
-                                invoicesData.forEach(inv => {
-                                  const key = `${inv.monthName} ${inv.year}`;
-                                  if (!grouped[key]) {
-                                    grouped[key] = [];
-                                    monthKeys.push(key);
-                                  }
-                                  grouped[key].push(inv);
-                                });
-
-                                return (
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {monthKeys.map((monthKey) => {
-                                      const isExpanded = expandedYears[monthKey] !== false;
-                                      return (
-                                        <div key={monthKey} id={`month-section-${monthKey.replace(/\s+/g, '-')}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                          <div 
-                                            onClick={() => setExpandedYears(prev => ({ ...prev, [monthKey]: !isExpanded }))}
-                                            style={{
-                                              background: '#f8fafc',
-                                              padding: '12px 20px',
-                                              display: 'flex',
-                                              justifyContent: 'space-between',
-                                              alignItems: 'center',
-                                              cursor: 'pointer',
-                                              fontWeight: 800,
-                                              fontSize: '0.8rem',
-                                              color: '#475569',
-                                              userSelect: 'none'
-                                            }}
-                                          >
-                                            <span><Calendar size={13} style={{ marginRight: '6px', color: '#ea4335', verticalAlign: 'middle' }} />Abrechnungsmonat {monthKey}</span>
-                                            <span>{isExpanded ? '▼' : '▶'}</span>
-                                          </div>
-                                          
-                                          {isExpanded && grouped[monthKey].map((inv) => (
-                                            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
-                                              <div>
-                                                <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>
-                                                  {inv.amount < 0 
-                                                    ? inv.id.replace('INV-', 'GS-') 
-                                                    : inv.id.replace('INV-', 'RE-')}
-                                                </strong>
-                                                <span style={{ fontSize: '0.65rem', color: inv.type === 'INF' ? '#0369a1' : '#6b21a8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700, marginTop: '2px' }}>
-                                                   {inv.type === 'INF' ? (
-                                                     <>
-                                                       <CreditCard size={12} style={{ verticalAlign: 'middle', color: '#0369a1' }} />
-                                                       Service- &amp; Infrastrukturgebühren
-                                                     </>
-                                                   ) : (
-                                                     <>
-                                                       <Users size={12} style={{ verticalAlign: 'middle', color: '#6b21a8' }} />
-                                                       {billingPayer === 'student' ? 'Direktabrechnung Schüleraktivierungen' : 'Sammelabrechnung Schüleraktivierungen'}
-                                                     </>
-                                                   )}
-                                                </span>
-                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
-                                                   Rechnungsdatum: {getLastDayOfMonth(inv.monthName, inv.year)}
-                                                 </span>
-                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
-                                                   Zahlbar bis: {inv.dueDateStr}
-                                                 </span>
-                                              </div>
-                                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
-                                                <div style={{ color: inv.type === 'INF' ? '#0369a1' : '#34a853', fontWeight: 800 }}>
-                                                  Betrag: {inv.amount.toFixed(2).replace('.', ',')} €
-                                                </div>
-                                                {(inv.type === 'AKT' || (inv.type === 'INF' && (inv.activatedStudentsList?.length || 0) > 0)) && (
-                                                   <div style={{ 
-                                                     fontSize: '0.58rem', 
-                                                     color: billingPayer === 'student' ? '#34a853' : '#ea580c', 
-                                                     background: billingPayer === 'student' ? '#e6f4ea' : '#ffedd5', 
-                                                     border: billingPayer === 'student' ? '1px solid #e6f4ea' : '1px solid #fed7aa',
-                                                     padding: '4px 8px', 
-                                                     borderRadius: '6px', 
-                                                     fontWeight: 800 
-                                                   }}>
-                                                     {billingPayer === 'student' ? 'Direktabrechnung (keine Kosten für Schule)' : 'Sammelabrechnung (Kosten trägt Musikschule)'}
-                                                   </div>
-                                                 )}
-                                              </div>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                {(() => {
-                                                  const isPaid = inv.status === 'Bezahlt' || inv.status === 'paid' || inv.paid === true;
-                                                  const isSent = inv.status === 'Versendet' || inv.status === 'sent';
-                                                  const isPreview = inv.status === 'Vorschau' || inv.status === 'preview' || inv.isCurrentMonth;
-                                                  const statusLabel = isPaid ? 'Bezahlt' : isSent ? 'Versendet' : isPreview ? 'Vorschau' : inv.status;
-                                                  const badgeBg = isPaid ? '#e0f2fe' : isSent ? '#e6f4ea' : '#fef3c7';
-                                                  const badgeColor = isPaid ? '#0369a1' : isSent ? '#34a853' : '#d97706';
-                                                  return (
-                                                    <span style={{ 
-                                                      background: badgeBg, 
-                                                      color: badgeColor, 
-                                                      fontSize: '0.62rem', 
-                                                      padding: '6px 14px', 
-                                                      borderRadius: '100px', 
-                                                      fontWeight: 800 
-                                                    }}>{statusLabel}</span>
-                                                  );
-                                                })()}
-{inv.type === 'AKT' && (
-                                                  <button 
-                                                    onClick={() => setActiveStudentsModalList({ 
-                                                      list: inv.activatedStudentsList || [], 
-                                                      month: monthKey,
-                                                      amount: inv.amount,
-                                                      campusCount: inv.activeCampusCount,
-                                                      groovelabCount: inv.activeGroovelabCount,
-                                                      passiveCount: inv.passiveStudentsCount
-                                                    })} 
-                                                    className="hover-scale font-bold"
-                                                    style={{ border: '1px solid #ea4335', background: '#fce8e6', color: '#ea4335', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s', marginRight: '6px' }}
-                                                  >
-                                                    Schüler auflisten
-                                                  </button>
-                                                )}
-                                                {(() => {
-                                                  const isPaid = inv.status === 'Bezahlt' || inv.status === 'paid' || inv.paid === true;
-                                                  return (
-                                                    <>
-                                                      {!isPaid && onOpenDunningPayModal && (
-                                                        <button 
-                                                          onClick={() => onOpenDunningPayModal(inv)} 
-                                                          className="hover-scale font-bold"
-                                                          style={{ border: '1px solid #16a34a', background: '#dcfce7', color: '#15803d', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s', marginRight: '6px' }}
-                                                        >
-                                                          ⚡ Bezahlen
-                                                        </button>
-                                                      )}
-                                                      <button 
-                                                        onClick={() => setSelectedInvoice(inv)} 
-                                                        className="hover-scale font-bold"
-                                                        style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                                                      >
-                                                        PDF
-                                                      </button>
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
+                          {/* Rechnungen list: 0,1% Enterprise Feature-Monolith */}
+                          <SecretaryInvoiceHistorySection
+                            schoolId={schoolId}
+                            formattedSchoolNumericId={formattedSchoolNumericId}
+                            students={students}
+                            contractStartDate={contractStartDate}
+                            simulatedToday={simulatedToday}
+                            studentBillingOption={studentBillingOption}
+                            extraBillingOption={extraBillingOption}
+                            bookedExtraUsers={bookedExtraUsers}
+                            currentTotalB2B={baseB2B_global}
+                            subscriptionBypass={subscriptionBypass}
+                            activeStudentsCount_global={activeStudentsCount_global}
+                            activeGroovelabStudentsCount_global={activeGroovelabStudentsCount_global}
+                            passiveStudentsCount_global={passiveStudentsCount_global}
+                            billableTeachersCount={billableTeachersCount}
+                            moduleCost_global={moduleCost_global}
+                            teacherServiceFeeTotal_global={teacherServiceFeeTotal_global}
+                            storageAddonFee_global={storageAddonFee_global}
+                            effectiveSchoolRates={effectiveSchoolRates}
+                            currentSchoolProfile={currentSchoolProfile}
+                            selectedStorageAddonGb={selectedStorageAddonGb}
+                            selectedStorageAddonFee={selectedStorageAddonFee}
+                            billingPayer={billingPayer}
+                            expandedYears={expandedYears}
+                            setExpandedYears={setExpandedYears}
+                            setActiveStudentsModalList={setActiveStudentsModalList}
+                            onOpenDunningPayModal={onOpenDunningPayModal}
+                            setSelectedInvoice={setSelectedInvoice}
+                            agreedToSepa={agreedToSepa}
+                            supabase={supabase}
+                          />
 
                           
                         </div>
@@ -4591,7 +4091,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
-                              boxShadow: '0 4px 12px -2px rgba(16, 185, 129, 0.06)'
+                              boxShadow: 'none'
                             }}>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
@@ -4604,7 +4104,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     color: '#ffffff',
-                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
+                                    boxShadow: 'none'
                                   }}>
                                     <Award size={20} />
                                   </div>
@@ -4662,7 +4162,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     fontWeight: 800,
                                     border: 'none',
                                     cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
+                                    boxShadow: 'none',
                                     transition: 'all 0.15s'
                                   }}
                                 >

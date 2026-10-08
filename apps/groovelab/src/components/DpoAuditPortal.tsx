@@ -35,7 +35,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
   const [copiedClauseDpo, setCopiedClauseDpo] = useState<boolean>(false);
 
   // Real school name
-  const cleanSchoolName = schoolName || 'Musäk Bad Säckingen';
+  const cleanSchoolName = schoolName || 'Musikschule';
 
   // Helper to format timestamps strictly in German Local Time (Europe/Berlin CEST/MESZ)
   const formatGermanTime = (dateObj: Date = new Date()) => {
@@ -308,7 +308,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#047857',
-                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                boxShadow: 'none',
                 position: 'relative'
               }}>
                 <ShieldCheck size={24} />
@@ -322,7 +322,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   borderRadius: '50%',
                   background: '#22c55e',
                   border: 'none',
-                  boxShadow: '0 0 8px rgba(34, 197, 94, 0.8)'
+                  boxShadow: 'none'
                 }} />
               </div>
 
@@ -482,7 +482,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                       onFocus={e => {
                         e.target.style.borderColor = '#34a853';
                         e.target.style.background = '#ffffff';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.12)';
+                        e.target.style.boxShadow = 'none';
                       }}
                       onBlur={e => {
                         e.target.style.borderColor = '#e2e8f0';
@@ -533,7 +533,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s ease'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
@@ -900,7 +900,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale no-print"
@@ -928,7 +928,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 12px rgba(51, 65, 85, 0.20)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale no-print"
@@ -1236,7 +1236,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 4px 12px rgba(2, 132, 199, 0.20)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s ease'
                       }}
                       className="hover-scale no-print"
@@ -1459,7 +1459,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)'
+                  boxShadow: 'none'
                 }}
               >
                 <Printer size={16} /> AVV Als PDF Speichern / Drucken

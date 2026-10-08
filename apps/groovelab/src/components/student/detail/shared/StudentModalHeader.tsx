@@ -423,7 +423,7 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.15s',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
             title="Ausweis-QR für Schüler-Handy vorzeigen"

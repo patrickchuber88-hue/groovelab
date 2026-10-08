@@ -246,7 +246,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                 color: '#6d28d9',
                 fontWeight: 900,
                 fontSize: '0.86rem',
-                boxShadow: '0 2px 6px rgba(109, 40, 217, 0.12)'
+                boxShadow: 'none'
               }}
             >
               <Sparkles size={16} />
@@ -450,7 +450,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                 fontSize: '0.86rem',
                 cursor: 'pointer',
                 touchAction: 'manipulation',
-                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.30)',
+                boxShadow: 'none',
                 minHeight: '44px'
               }}
               className="hover-scale"

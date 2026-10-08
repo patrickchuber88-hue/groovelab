@@ -525,7 +525,7 @@ export function StudentLibraryTab({
                             alignItems: 'center', 
                             justifyContent: isMobile ? 'center' : 'flex-start', 
                             gap: '8px', 
-                            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.12)', 
+                            boxShadow: 'none', 
                             transition: 'all 0.2s ease',
                             width: isMobile ? '100%' : 'auto',
                             minHeight: '44px',

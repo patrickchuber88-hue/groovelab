@@ -179,7 +179,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
           maxHeight: '92vh',
           background: '#fbf9f4',
           borderRadius: '16px',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(226, 218, 201, 0.8)',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -362,7 +362,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                       fontWeight: 950,
                       letterSpacing: '0.05em',
                       transform: 'rotate(-10deg)',
-                      boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)',
+                      boxShadow: 'none',
                       pointerEvents: 'none',
                       textTransform: 'uppercase'
                     }}
@@ -802,7 +802,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '10px',
-                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                  boxShadow: 'none',
                   animation: 'fade-in 0.2s ease-out'
                 }}
               >
@@ -859,7 +859,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)'
+                  boxShadow: 'none'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

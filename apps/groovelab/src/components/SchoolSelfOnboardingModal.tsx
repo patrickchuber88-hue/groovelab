@@ -388,7 +388,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         .lean-input:focus {
           border-color: #34a853;
           background: #ffffff;
-          box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.14);
+          box-shadow: none;
         }
         .lean-btn-primary {
           background: linear-gradient(135deg, #15803d 0%, #34a853 100%);
@@ -403,12 +403,12 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           alignItems: center;
           justify-content: center;
           gap: 10px;
-          box-shadow: 0 8px 20px rgba(21, 128, 61, 0.25);
+          box-shadow: none;
           transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .lean-btn-primary:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 12px 28px rgba(21, 128, 61, 0.35);
+          box-shadow: none;
           filter: brightness(1.04);
         }
         .lean-btn-primary:active:not(:disabled) {
@@ -450,7 +450,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
               justifyContent: 'center',
               color: '#ffffff',
               fontWeight: 900,
-              boxShadow: '0 4px 10px rgba(21, 128, 61, 0.2)'
+              boxShadow: 'none'
             }}>
               <GraduationCap size={20} />
             </div>
@@ -832,7 +832,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   padding: '18px',
                   width: '100%',
                   maxWidth: '290px',
-                  boxShadow: '0 16px 36px rgba(21, 128, 61, 0.22)',
+                  boxShadow: 'none',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',

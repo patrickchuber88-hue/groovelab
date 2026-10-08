@@ -58,55 +58,21 @@ export function useBankReconciliation(
       let b2bBooked = 0;
       let b2cBooked = 0;
 
-      // 1. Verbucht B2B-Zahlungen
-      camtParsedResult.b2bMatches.forEach(tx => {
-        if (tx.matchedId) {
-          const invMatch = invoices.find(inv => {
-            const numId = getSchoolNumericId(inv.schoolId);
-            const regex = new RegExp(`^RE-${numId}-\\d{4}-\\d{2}$`);
-            return regex.test(tx.matchedId || '');
-          });
-          if (invMatch) {
-            let currentPaid: string[] = [];
-            try {
-              const raw = localStorage.getItem(`paid_invoices_${invMatch.schoolId}`);
-              currentPaid = raw ? JSON.parse(raw) : [];
-            } catch {
-              currentPaid = [];
-            }
-            if (!currentPaid.includes(tx.matchedId)) {
-              localStorage.setItem(`paid_invoices_${invMatch.schoolId}`, JSON.stringify([...currentPaid, tx.matchedId]));
-              b2bBooked++;
-            }
-          }
-        }
+      // Autoritativer Server-RPC Aufruf (Zero-Trust, Zero localStorage)
+      const allMatches = [...camtParsedResult.b2bMatches, ...camtParsedResult.b2cMatches];
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('reconcile_camt_bank_statement', {
+        p_statement_id: camtParsedResult.statementId,
+        p_transactions: allMatches
       });
 
-      // 2. Verbucht B2C-Zahlungen
-      for (const tx of camtParsedResult.b2cMatches) {
-        if (tx.matchedId) {
-          const rawHash = tx.matchedId.replace(/[^A-Z0-9]/gi, '').substring(2, 10).toUpperCase();
-          const { data: matchedUsers } = await supabase
-            .from('users')
-            .select('id, ausweis_nummer')
-            .eq('is_active', false);
-          
-          const found = (matchedUsers || []).find(u => 
-            (u.ausweis_nummer || u.id).replace(/[^A-Z0-9]/gi, '').toUpperCase().startsWith(rawHash)
-          );
-
-          if (found) {
-            await supabase.from('users').update({
-              is_active: true,
-              is_campus_active: true,
-              student_billing_cash_paid: true
-            }).eq('id', found.id);
-            b2cBooked++;
-          }
-        }
+      if (rpcErr || !rpcRes?.success) {
+        throw new Error(rpcErr?.message || rpcRes?.error || 'Fehler beim Abgleich über Server-RPC reconcile_camt_bank_statement.');
       }
 
-      showActionToast(`✓ Automatischer Zahlungsabgleich: ${b2bBooked} Schulrechnungen & ${b2cBooked} Schülerzugänge aktiviert!`);
+      b2bBooked = rpcRes.b2b_reconciled || 0;
+      b2cBooked = rpcRes.b2c_reconciled || 0;
+
+      showActionToast(`✓ Automatischer Zahlungsabgleich: ${b2bBooked} Schulrechnungen & ${b2cBooked} Schülerzugänge in PostgreSQL aktiviert!`);
       setCamtUploadModalOpen(false);
       setCamtParsedResult(null);
       setCamtRawInput('');

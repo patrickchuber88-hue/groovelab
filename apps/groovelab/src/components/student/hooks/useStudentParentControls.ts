@@ -4,6 +4,21 @@ import { useParentSessionLock } from '../../../hooks/useParentSessionLock';
 import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics } from '../../../utils/webauthn';
 import { getOrCreateDeviceKey } from '../../../utils/sessionLeaseManager';
 
+export interface StudentFamilyProfileDto {
+  id: string;
+  first_name: string;
+  last_name?: string | null;
+  instrument?: string | null;
+  avatar_url?: string | null;
+  photo_url?: string | null;
+  is_campus_active?: boolean;
+  payment_status?: string | null;
+  campus_ui_level?: 'junior' | 'teen' | 'pro' | string;
+  has_personal_pin?: boolean;
+  is_pin_activated?: boolean;
+  role?: string;
+}
+
 interface UseStudentParentControlsProps {
   studentId: string;
   studentUser: any;
@@ -77,18 +92,26 @@ export function useStudentParentControls({
 
   const isCurrentlyInInstantLock = instantLockUntil !== null && Date.now() < instantLockUntil;
 
-  // Family Profiles & Sibling Switch
-  const [familyProfiles, setFamilyProfiles] = useState<any[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const saved = localStorage.getItem('campus_family_profiles');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Family Profiles & Sibling Switch (Zero-Trust SSOT from PostgreSQL)
+  const [familyProfiles, setFamilyProfiles] = useState<StudentFamilyProfileDto[]>([]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_student_family_profiles', { p_student_id: studentId });
+        if (isMounted && !error && Array.isArray(data)) {
+          setFamilyProfiles(data as StudentFamilyProfileDto[]);
+        }
+      } catch (err: unknown) {
+        console.warn('[ParentControls] Error fetching family profiles:', err);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [studentId]);
   const [isAddSiblingModalOpen, setIsAddSiblingModalOpen] = useState(false);
-  const [pendingSiblingUnlock, setPendingSiblingUnlock] = useState<any | null>(null);
+  const [pendingSiblingUnlock, setPendingSiblingUnlock] = useState<StudentFamilyProfileDto | null>(null);
 
   // Modal Hub triggers
   const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<string | null>(null);
@@ -453,15 +476,7 @@ export function useStudentParentControls({
   };
 
   const handleRemoveFamilyProfile = (removeStudentId: string) => {
-    setFamilyProfiles(prev => {
-      const updated = prev.filter(p => p.id !== removeStudentId);
-      try {
-        localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Could not save updated family profiles:', e);
-      }
-      return updated;
-    });
+    setFamilyProfiles(prev => prev.filter(p => p.id !== removeStudentId));
   };
 
   const [recentlyChangedDiff, setRecentlyChangedDiff] = useState<any>(null);

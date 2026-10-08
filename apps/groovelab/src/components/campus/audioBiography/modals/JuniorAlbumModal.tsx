@@ -324,7 +324,7 @@ export const JuniorAlbumModal: React.FC<JuniorAlbumModalProps> = ({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)'
+                            boxShadow: 'none'
                           }}
                           className="hover-scale"
                         >

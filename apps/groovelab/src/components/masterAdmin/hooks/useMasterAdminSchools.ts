@@ -311,6 +311,9 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
   }, [schools, fetchSchoolsAndStats, notify]);
 
   const handleProvisionSchool = useCallback(async (data: any) => {
+    if (!data?.name?.trim() || !data?.street?.trim() || !data?.house_number?.trim() || !data?.zip_code?.trim() || !data?.city?.trim() || (!data?.billing_email?.trim() && !data?.email?.trim())) {
+      throw new Error('MANDATORY_FIELD_MISSING: Die Musikschule kann nicht angelegt werden. Name, Straße, Hausnummer, PLZ, Ort und E-Mail sind zwingend erforderlich.');
+    }
     const { data: created, error } = await supabase.from('schools').insert(data).select().single();
     if (error) throw error;
 

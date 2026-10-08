@@ -125,7 +125,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             color: '#34a853',
-            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
+            boxShadow: 'none'
           }}>
             <Music size={20} />
           </div>
@@ -293,7 +293,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.4)',
+              boxShadow: 'none',
               transition: 'all 0.2s ease',
               touchAction: 'manipulation',
               opacity: isSubmitting ? 0.75 : 1

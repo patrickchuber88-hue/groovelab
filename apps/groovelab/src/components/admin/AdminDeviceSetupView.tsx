@@ -682,7 +682,7 @@ export function AdminDeviceSetupView({
           borderRadius: isMobile ? '16px' : '20px',
           boxSizing: 'border-box',
           width: '100%',
-          boxShadow: '0 4px 16px rgba(234, 179, 8, 0.15)'
+          boxShadow: 'none'
         }}>
           <span style={{ fontSize: '0.82rem', color: '#854d0e', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertTriangle size={16} strokeWidth={2.4} color="#854d0e" aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -701,7 +701,7 @@ export function AdminDeviceSetupView({
               fontWeight: 900,
               fontSize: '0.84rem',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.35)',
+              boxShadow: 'none',
               transition: 'all 0.2s',
               opacity: isSaving ? 0.7 : 1
             }}
@@ -752,7 +752,7 @@ export function AdminDeviceSetupView({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+            boxShadow: 'none',
             transition: 'all 0.15s'
           }}
           className="hover-scale"
@@ -811,7 +811,7 @@ export function AdminDeviceSetupView({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                  boxShadow: 'none'
                 }}>
                   {activeGrooveSettingsModal === 'hours' && <Clock size={22} color="#ffffff" />}
                   {activeGrooveSettingsModal === 'security' && <ShieldCheck size={22} color="#ffffff" />}
@@ -1180,7 +1180,7 @@ export function AdminDeviceSetupView({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 4px 10px rgba(234,179,8,0.2)',
+                          boxShadow: 'none',
                           transition: 'all 0.15s'
                         }}
                         className="hover-scale"
@@ -1247,7 +1247,7 @@ export function AdminDeviceSetupView({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 4px 10px rgba(234,179,8,0.2)',
+                            boxShadow: 'none',
                             transition: 'all 0.15s'
                           }}
                           className="hover-scale"
@@ -1371,7 +1371,7 @@ export function AdminDeviceSetupView({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: '0 4px 12px rgba(234,179,8,0.25)',
+                        boxShadow: 'none',
                         marginTop: '6px'
                       }}
                       className="hover-scale"

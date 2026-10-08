@@ -1,27 +1,21 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { 
-  Search, Plus, QrCode, Trash2, Edit2, Link as LinkIcon, 
-  Check, X, ChevronRight, Sliders, ExternalLink, RefreshCw,
-  DoorOpen, School, Sparkles, ShieldCheck
+  Search, Plus, X, Layers, Package, Sparkles, 
+  DoorOpen, ShieldCheck, Info, CheckCircle2, ChevronRight
 } from 'lucide-react';
-import QRCode from 'react-qr-code';
+import { supabase } from '../../lib/supabase';
+import { 
+  EquipmentInstance, 
+  EquipmentGroup, 
+  SecretaryEquipmentCard, 
+  getInstrumentVisualMeta 
+} from './equipment/SecretaryEquipmentCard';
+import { SecretaryEquipmentRoomCanvas } from './equipment/SecretaryEquipmentRoomCanvas';
+import { SecretaryEquipmentEditModal } from './equipment/SecretaryEquipmentEditModal';
 
-export interface EquipmentInstance {
-  id: string;
-  fullName: string;
-  baseName: string;
-  model: string;
-  linkUrl: string;
-  roomId: string | null;
-  roomName: string | null;
-  roomInstIdx: number;
-}
-
-export interface EquipmentGroup {
-  baseName: string;
-  model: string;
-  instances: EquipmentInstance[];
-}
+// Re-export core types for backwards compatibility with tabs & hooks
+export type { EquipmentInstance, EquipmentGroup };
+export { getInstrumentVisualMeta };
 
 export interface SecretaryEquipmentViewProps {
   schoolId: string;
@@ -102,6 +96,11 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
   equipmentQtyInputRef,
   parseRoomName,
 }) => {
+  const [localRefreshTick, setLocalRefreshTick] = useState(0);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<'all' | 'free' | 'assigned'>('all');
+  const [showBotenstatusInfo, setShowBotenstatusInfo] = useState(false);
+
   const selectedRoom = useMemo(() => {
     return rooms.find(r => r.id === selectedEquipmentRoomId);
   }, [rooms, selectedEquipmentRoomId]);
@@ -149,6 +148,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
           linkUrl = localLinkMap[eq.name];
         }
       } catch {}
+
       const baseName = eq.name.replace(/\s+#\d+$/, '');
 
       list.push({
@@ -163,7 +163,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
       });
     });
 
-    // Gather any room instruments that were added directly in the room editor modal and are not in schoolEquipment
+    // Room instruments that were added directly
     rooms.forEach(rm => {
       if (Array.isArray(rm.room_instruments)) {
         rm.room_instruments.forEach((inst: any, idx: number) => {
@@ -186,7 +186,64 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
     });
 
     return list;
-  }, [schoolEquipment, rooms, schoolId]);
+  }, [schoolEquipment, rooms, schoolId, localRefreshTick]);
+
+  // Executive Top-Level KPI Calculations
+  const kpis = useMemo(() => {
+    const total = allInstances.length;
+    const free = allInstances.filter(i => !i.roomId).length;
+    const assigned = allInstances.filter(i => !!i.roomId).length;
+    const equippedRooms = rooms.filter(r => Array.isArray(r.room_instruments) && r.room_instruments.length > 0).length;
+    const coverage = rooms.length > 0 ? Math.round((equippedRooms / rooms.length) * 100) : 0;
+    return {
+      total,
+      free,
+      assigned,
+      equippedRooms,
+      totalRooms: rooms.length,
+      coverage
+    };
+  }, [allInstances, rooms]);
+
+  // Reversible unassignment / return to pool handler
+  const handleReturnToPool = useCallback(async (instrumentFullName: string) => {
+    const targetRoom = rooms.find(rm => 
+      Array.isArray(rm.room_instruments) && 
+      rm.room_instruments.some((inst: any) => inst.name === instrumentFullName)
+    );
+    if (!targetRoom || !Array.isArray(targetRoom.room_instruments)) return;
+
+    const idxToRemove = targetRoom.room_instruments.findIndex((inst: any) => inst.name === instrumentFullName);
+    if (idxToRemove === -1) return;
+
+    const updatedInsts = targetRoom.room_instruments.filter((_: any, idx: number) => idx !== idxToRemove);
+
+    // 1. LocalStorage cache update
+    try {
+      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+      map[targetRoom.id] = updatedInsts;
+      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+    } catch (err) {
+      console.error(err);
+    }
+
+    // 2. Immediate in-memory mutation for zero-latency UI reaction
+    targetRoom.room_instruments = updatedInsts;
+    setLocalRefreshTick(t => t + 1);
+
+    // 3. Supabase persistence
+    try {
+      await supabase.from('rooms').update({ room_instruments: updatedInsts }).eq('id', targetRoom.id);
+    } catch (err) {
+      console.error('Error returning instrument to pool:', err);
+    }
+  }, [rooms, schoolId]);
+
+  // Direct assignment to room helper
+  const handleAssignToRoom = useCallback(async (instrumentFullName: string, targetRoomId: string) => {
+    await handleDropInstrumentOnRoom(instrumentFullName, targetRoomId);
+    setLocalRefreshTick(t => t + 1);
+  }, [handleDropInstrumentOnRoom]);
 
   // 2. Group by baseName + model
   const groups = useMemo(() => {
@@ -205,7 +262,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
 
     let filteredGroups = Object.values(groupsMap);
 
-    // Apply search filter
+    // Search filter
     if (equipmentSearchQuery.trim()) {
       const query = equipmentSearchQuery.toLowerCase();
       filteredGroups = filteredGroups.filter(g => 
@@ -214,17 +271,24 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
       );
     }
 
-    // Apply filter: only free
-    if (equipmentSortFreeFirst) {
+    // Quick filter
+    if (quickFilter === 'free' || equipmentSortFreeFirst) {
       filteredGroups = filteredGroups
         .map(g => ({
           ...g,
           instances: g.instances.filter(inst => !inst.roomId)
         }))
         .filter(g => g.instances.length > 0);
+    } else if (quickFilter === 'assigned') {
+      filteredGroups = filteredGroups
+        .map(g => ({
+          ...g,
+          instances: g.instances.filter(inst => !!inst.roomId)
+        }))
+        .filter(g => g.instances.length > 0);
     }
 
-    // 3. Filter groups based on selected room
+    // Filter by selected room
     if (selectedRoom) {
       filteredGroups = filteredGroups
         .map(g => ({
@@ -235,102 +299,492 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
     }
 
     return filteredGroups;
-  }, [allInstances, equipmentSearchQuery, equipmentSortFreeFirst, selectedRoom]);
-
-  // Sorted rooms list
-  const sortedRooms = useMemo(() => {
-    return [...rooms].sort((a, b) => {
-      const parsedA = parseRoomName(a.name || '');
-      const parsedB = parseRoomName(b.name || '');
-      const prefixCompare = parsedA.prefix.localeCompare(parsedB.prefix, 'de', { sensitivity: 'base' });
-      if (prefixCompare !== 0) return prefixCompare;
-      
-      const numA = parsedA.number !== null ? parsedA.number : -1;
-      const numB = parsedB.number !== null ? parsedB.number : -1;
-      return numA - numB;
-    });
-  }, [rooms, parseRoomName]);
+  }, [allInstances, equipmentSearchQuery, equipmentSortFreeFirst, quickFilter, selectedRoom]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 300px', gap: '24px', fontFamily: 'Inter, sans-serif', alignItems: 'start' }}>
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 340px', 
+      gap: '24px', 
+      fontFamily: "'Plus Jakarta Sans', sans-serif", 
+      alignItems: 'start' 
+    }}>
       
-      {/* LEFT COLUMN: WIDGET */}
+      {/* LEFT COLUMN: MAIN COCKPIT & INSTRUMENTS */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* Selected Room Header or Title */}
-        <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
-          <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <School size={20} color="#ea4335" />
-            {selectedRoom ? `Instrumente in „${selectedRoom.name}“` : 'Alle Instrumente & Ausstattungen'}
-          </h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
-            {selectedRoom 
-              ? `Es werden nur Instrumente angezeigt, die dem Raum „${selectedRoom.name}“ zugeordnet sind. Klicke auf ein Instrument, um es zu bearbeiten.`
-              : 'Hier werden alle Instrumente der Musikschule aufgelistet. Ziehe freie Instrumente auf die Räume rechts, um sie zuzuweisen.'
-            }
-          </p>
+        {/* EXECUTIVE HEADER & TOP-LEVEL METRICS */}
+        <div style={{ 
+          background: '#ffffff', 
+          borderRadius: '24px', 
+          padding: '24px', 
+          border: '1px solid rgba(15, 23, 42, 0.06)', 
+          boxShadow: '0 4px 20px rgba(15, 23, 42, 0.03)' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #ea4335 0%, #b71904 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(216, 30, 5, 0.25)'
+                }}>
+                  <Layers size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    {selectedRoom ? `Instrumente in „${selectedRoom.name}“` : 'Alle Instrumente & Ausstattungen'}
+                  </h3>
+                </div>
+                {selectedRoom && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEquipmentRoomId(null)}
+                    style={{ 
+                      background: '#f1f5f9', 
+                      border: 'none', 
+                      padding: '4px 10px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.70rem', 
+                      fontWeight: 700, 
+                      color: '#475569', 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Raum-Filter aufheben <X size={12} />
+                  </button>
+                )}
+              </div>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 550, maxWidth: '640px' }}>
+                {selectedRoom 
+                  ? `Anzeige beschränkt auf den Raum „${selectedRoom.name}“. Ziehe Instrumente auf den freien Pool, um sie zu entkoppeln.`
+                  : 'Didaktische Raum- und Ausstattungsplanung vor Ort. Freie Einheiten lassen sich per Drag & Drop oder Klick Räumen zuweisen.'
+                }
+              </p>
+            </div>
 
-          {/* Ambient Botenstatus & ERP-Subsidiaritäts-Banner */}
-          <div style={{ 
-            marginTop: '14px', 
-            padding: '10px 14px', 
-            borderRadius: '14px', 
-            background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95))', 
-            border: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
+            {/* Ambient ERP Trust Badge (BGB § 130 Botenstatus) */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShowBotenstatusInfo(prev => !prev)}
+                style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(248, 250, 252, 0.95)',
+                  border: '1px solid #e2e8f0',
+                  padding: '7px 12px',
+                  borderRadius: '12px',
+                  fontSize: '0.70rem',
+                  fontWeight: 700,
+                  color: '#334155',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(8px)',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <ShieldCheck size={14} color="#059669" />
+                <span>Rechtssicherer Botenstatus</span>
+                <Info size={12} color="#94a3b8" />
+              </button>
+
+              {showBotenstatusInfo && (
+                <div style={{ 
+                  position: 'absolute', 
+                  right: 0, 
+                  top: '115%', 
+                  width: '320px', 
+                  background: '#ffffff', 
+                  borderRadius: '18px', 
+                  padding: '16px', 
+                  boxShadow: '0 16px 36px rgba(15, 23, 42, 0.12)', 
+                  border: '1px solid #e2e8f0', 
+                  zIndex: 20 
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>Rechtlicher ERP-Botenstatus</span>
+                    <button 
+                      type="button"
+                      onClick={() => setShowBotenstatusInfo(false)} 
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.70rem', color: '#64748b', lineHeight: 1.5 }}>
+                    Diese Übersicht dient der internen Raum- und Stundenplanung vor Ort. Die rechtsverbindliche Vermögens-, Inventur- und Leihverwaltung verbleibt zu 100 % im Primär-ERP der Musikschule (WinMusik, MBS etc.). Kein Verleih, keine Vermietung, kein Verkauf.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 4 Apple Squircle KPI Cards (Makellose visuelle Symmetrie) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginTop: '22px' }}>
+            
+            {/* KPI 1: Gesamtbestand */}
             <div style={{ 
-              width: '26px', 
-              height: '26px', 
-              borderRadius: '8px', 
-              background: '#f1f5f9', 
-              border: '1px solid #cbd5e1', 
+              background: '#ffffff', 
+              borderRadius: '18px', 
+              padding: '16px', 
+              border: '1px solid rgba(15, 23, 42, 0.06)', 
+              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.02)',
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'center', 
-              flexShrink: 0 
+              gap: '12px' 
             }}>
-              <ShieldCheck size={14} color="#64748b" />
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '12px', 
+                background: '#fef2f2', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                flexShrink: 0 
+              }}>
+                <Package size={18} color="#ea4335" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Gesamtbestand
+                </span>
+                <div style={{ fontSize: '1.30rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }}>
+                  {kpis.total} <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b' }}>Stück</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
+                  in {groups.length} Typen
+                </span>
+              </div>
             </div>
-            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45, fontWeight: 500 }}>
-              <strong style={{ color: '#334155', fontWeight: 700 }}>Didaktisches Raum-Inventar (Didaktischer Botenstatus):</strong> Diese Übersicht dient der internen Raum- und Stundenplanung vor Ort. Die rechtsverbindliche Vermögens-, Inventur- und Leihverwaltung verbleibt zu 100 % im Primär-ERP der Musikschule (WinMusik, MBS etc.). Kein Verleih, keine Vermietung, kein Verkauf.
-            </p>
+
+            {/* KPI 2: Sofort frei */}
+            <div style={{ 
+              background: '#ffffff', 
+              borderRadius: '18px', 
+              padding: '16px', 
+              border: '1px solid rgba(15, 23, 42, 0.06)', 
+              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px' 
+            }}>
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '12px', 
+                background: '#ecfdf5', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                flexShrink: 0 
+              }}>
+                <Sparkles size={18} color="#059669" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Sofort frei
+                </span>
+                <div style={{ fontSize: '1.30rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {kpis.free}
+                  {kpis.free > 0 && (
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                  )}
+                </div>
+                <span style={{ fontSize: '0.68rem', color: kpis.free > 0 ? '#15803d' : '#94a3b8', fontWeight: 600 }}>
+                  {kpis.free > 0 ? 'Bereit zur Zuweisung' : 'Alle Einheiten belegt'}
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 3: In Räumen aktiv */}
+            <div style={{ 
+              background: '#ffffff', 
+              borderRadius: '18px', 
+              padding: '16px', 
+              border: '1px solid rgba(15, 23, 42, 0.06)', 
+              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px' 
+            }}>
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '12px', 
+                background: '#eff6ff', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                flexShrink: 0 
+              }}>
+                <Layers size={18} color="#2563eb" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  In Räumen
+                </span>
+                <div style={{ fontSize: '1.30rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }}>
+                  {kpis.assigned} <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b' }}>aktiv</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
+                  {kpis.total > 0 ? `${Math.round((kpis.assigned / kpis.total) * 100)}% der Flotte` : '0%'}
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 4: Raumabdeckung */}
+            <div style={{ 
+              background: '#ffffff', 
+              borderRadius: '18px', 
+              padding: '16px', 
+              border: '1px solid rgba(15, 23, 42, 0.06)', 
+              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px' 
+            }}>
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '12px', 
+                background: '#f1f5f9', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                flexShrink: 0 
+              }}>
+                <DoorOpen size={18} color="#475569" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Raumabdeckung
+                </span>
+                <div style={{ fontSize: '1.30rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }}>
+                  {kpis.equippedRooms} <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b' }}>/ {kpis.totalRooms}</span>
+                </div>
+                <div style={{ marginTop: '5px', width: '100%', height: '5px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
+                  <div style={{ width: `${kpis.coverage}%`, height: '100%', background: '#475569', borderRadius: '9999px' }} />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        {/* Unified Instruments List Widget */}
-        <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* COMMAND BAR: SEARCH, SEGMENTED CONTROLS & PRIMARY ACTION */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           
-          {/* Unified Search, Filter & Creation Row Widget */}
-          <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1.5px solid #cbd5e1', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Left: Search & Segmented Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
             
-            {/* Creation Form inline (Left) */}
-            <form 
-              onSubmit={(e) => {
+            {/* Search Input */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              background: '#ffffff', 
+              padding: '0 14px', 
+              borderRadius: '14px', 
+              border: '1px solid #e2e8f0', 
+              height: '44px', 
+              boxSizing: 'border-box',
+              minWidth: '220px',
+              maxWidth: '340px',
+              flex: 1,
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.02)'
+            }}>
+              <Search size={16} color="#94a3b8" />
+              <input
+                value={equipmentSearchQuery}
+                onChange={e => setEquipmentSearchQuery(e.target.value)}
+                placeholder="Instrumente oder Modelle filtern..."
+                style={{ border: 'none', outline: 'none', fontSize: '0.82rem', fontWeight: 650, width: '100%', color: '#0f172a', background: 'transparent' }}
+              />
+              {equipmentSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setEquipmentSearchQuery('')}
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: 0 }}
+                >
+                  <X size={14} />
+                </button>
+              ) : (
+                <kbd style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '1px 5px', fontSize: '0.64rem', color: '#64748b', fontWeight: 700 }}>
+                  /
+                </kbd>
+              )}
+            </div>
+
+            {/* Apple-Grade Segmented Control */}
+            <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', gap: '2px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickFilter('all');
+                  setEquipmentSortFreeFirst(false);
+                }}
+                style={{
+                  border: 'none',
+                  background: quickFilter === 'all' && !equipmentSortFreeFirst ? '#ffffff' : 'transparent',
+                  color: quickFilter === 'all' && !equipmentSortFreeFirst ? '#0f172a' : '#64748b',
+                  fontWeight: 800,
+                  fontSize: '0.74rem',
+                  padding: '7px 14px',
+                  borderRadius: '9px',
+                  cursor: 'pointer',
+                  boxShadow: quickFilter === 'all' && !equipmentSortFreeFirst ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+              >
+                Alle ({allInstances.length})
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickFilter('free');
+                  setEquipmentSortFreeFirst(true);
+                }}
+                style={{
+                  border: 'none',
+                  background: quickFilter === 'free' || equipmentSortFreeFirst ? '#ffffff' : 'transparent',
+                  color: quickFilter === 'free' || equipmentSortFreeFirst ? '#15803d' : '#64748b',
+                  fontWeight: 800,
+                  fontSize: '0.74rem',
+                  padding: '7px 14px',
+                  borderRadius: '9px',
+                  cursor: 'pointer',
+                  boxShadow: quickFilter === 'free' || equipmentSortFreeFirst ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <Sparkles size={13} color={quickFilter === 'free' || equipmentSortFreeFirst ? '#16a34a' : '#94a3b8'} />
+                Frei ({kpis.free})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickFilter('assigned');
+                  setEquipmentSortFreeFirst(false);
+                }}
+                style={{
+                  border: 'none',
+                  background: quickFilter === 'assigned' ? '#ffffff' : 'transparent',
+                  color: quickFilter === 'assigned' ? '#0f172a' : '#64748b',
+                  fontWeight: 800,
+                  fontSize: '0.74rem',
+                  padding: '7px 14px',
+                  borderRadius: '9px',
+                  cursor: 'pointer',
+                  boxShadow: quickFilter === 'assigned' ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+              >
+                Im Raum ({kpis.assigned})
+              </button>
+            </div>
+          </div>
+
+          {/* Right: + Instrument anlegen CTA */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsQuickAddOpen(prev => !prev);
+              setTimeout(() => equipmentNameInputRef?.current?.focus(), 80);
+            }}
+            style={{
+              height: '44px',
+              padding: '0 20px',
+              background: isQuickAddOpen ? '#334155' : '#d81e05',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '12px',
+              fontWeight: 800,
+              fontSize: '0.80rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              boxShadow: isQuickAddOpen ? 'none' : '0 4px 14px rgba(216, 30, 5, 0.22)',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {isQuickAddOpen ? (
+              <>
+                <X size={16} /> Schließen
+              </>
+            ) : (
+              <>
+                <Plus size={16} /> Instrument anlegen
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* EXPANDABLE QUICK-ADD DRAWER */}
+        {isQuickAddOpen && (
+          <div style={{ 
+            background: '#ffffff', 
+            borderRadius: '20px', 
+            padding: '20px', 
+            border: '1.5px solid #cbd5e1', 
+            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} color="#d81e05" /> Neues Instrument / Ausstattung registrieren
+              </span>
+              <span style={{ fontSize: '0.70rem', color: '#64748b' }}>Wird dem freien Pool hinzugefügt</span>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
                 e.preventDefault();
-                handleSaveEquipment();
+                await handleSaveEquipment();
+                setIsQuickAddOpen(false);
+                setLocalRefreshTick(t => t + 1);
               }}
-              style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: 0, flex: 2, minWidth: '320px' }}
+              style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}
             >
               <input
                 ref={equipmentNameInputRef}
                 value={equipmentFormName}
                 onChange={e => setEquipmentFormName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && equipmentFormName.trim()) {
-                    e.preventDefault();
-                    equipmentQtyInputRef?.current?.focus();
-                    equipmentQtyInputRef?.current?.select();
-                  }
+                placeholder="Bezeichnung (z.B. Roland FP-30X, Yamaha U1, Cajon)..."
+                style={{ 
+                  flex: 2, 
+                  minWidth: '260px', 
+                  height: '42px', 
+                  padding: '0 14px', 
+                  borderRadius: '10px', 
+                  border: '1.5px solid #cbd5e1', 
+                  fontSize: '0.82rem', 
+                  fontWeight: 700, 
+                  outline: 'none', 
+                  background: '#ffffff' 
                 }}
-                placeholder='Neues Instrument anlegen...'
-                style={{ width: '280px', height: '38px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, outline: 'none', background: 'white' }}
               />
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'white', padding: '0 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box', flexShrink: 0 }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '0 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '42px', boxSizing: 'border-box' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
                 <input
                   ref={equipmentQtyInputRef}
                   type="number"
@@ -338,7 +792,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   max="50"
                   value={equipmentFormQty}
                   onChange={e => setEquipmentFormQty(Math.max(1, parseInt(e.target.value) || 1))}
-                  style={{ width: '30px', border: 'none', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center', outline: 'none', background: 'transparent' }}
+                  style={{ width: '38px', border: 'none', fontSize: '0.88rem', fontWeight: 900, textAlign: 'center', outline: 'none', background: 'transparent', color: '#0f172a' }}
                 />
               </div>
 
@@ -346,446 +800,147 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                 type="submit"
                 disabled={equipmentSaving || !equipmentFormName.trim()}
                 style={{
-                  height: '38px',
-                  padding: '0 16px',
-                  background: 'linear-gradient(135deg, #ea4335 0%, #d63031 100%)',
-                  color: 'white',
+                  height: '42px',
+                  padding: '0 22px',
+                  background: '#d81e05',
+                  color: '#ffffff',
                   border: 'none',
                   borderRadius: '10px',
                   fontWeight: 800,
-                  fontSize: '0.74rem',
+                  fontSize: '0.80rem',
                   cursor: 'pointer',
                   opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1,
-                  boxShadow: '0 2px 6px rgba(234,67,53,0.15)',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0
+                  boxShadow: '0 2px 8px rgba(216,30,5,0.2)'
                 }}
               >
-                {equipmentSaving ? 'Wird angelegt...' : 'Anlegen'}
+                {equipmentSaving ? 'Wird registriert...' : 'Im Pool anlegen'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsQuickAddOpen(false)}
+                style={{
+                  height: '42px',
+                  padding: '0 14px',
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.80rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
               </button>
             </form>
-
-            {/* Vertical separator */}
-            <div style={{ width: '1.5px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
-
-            {/* Search & Filter (Right) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '180px', background: 'white', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box', flexShrink: 0 }}>
-              <Search size={16} color="#94a3b8" />
-              <input
-                value={equipmentSearchQuery}
-                onChange={e => setEquipmentSearchQuery(e.target.value)}
-                placeholder="Instrumente durchsuchen..."
-                style={{ border: 'none', outline: 'none', fontSize: '0.78rem', fontWeight: 700, width: '100%', color: '#0f172a', background: 'transparent' }}
-              />
-            </div>
-            
-            <button
-              type="button"
-              onClick={() => setEquipmentSortFreeFirst(prev => !prev)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: equipmentSortFreeFirst ? '#fce8e6' : 'white',
-                border: equipmentSortFreeFirst ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
-                color: equipmentSortFreeFirst ? '#ea4335' : '#475569',
-                padding: '0 14px',
-                borderRadius: '10px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                fontFamily: 'Urbanist',
-                height: '38px',
-                boxSizing: 'border-box',
-                flexShrink: 0
-              }}
-            >
-              <span>Freie Instrumente</span>
-            </button>
           </div>
+        )}
 
-          {/* Unified List items list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {groups.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.78rem', fontWeight: 700, padding: '24px 0', margin: 0 }}>
-                {selectedRoom ? 'Keine Instrumente in diesem Raum' : 'Keine Instrumente im Pool'}
+        {/* INSTRUMENT GROUPS LIST */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {groups.length === 0 ? (
+            <div style={{ 
+              background: '#ffffff', 
+              borderRadius: '24px', 
+              padding: '48px 24px', 
+              textAlign: 'center', 
+              border: '1px solid rgba(15, 23, 42, 0.06)', 
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.02)' 
+            }}>
+              <Package size={40} color="#cbd5e1" style={{ margin: '0 auto 12px auto' }} />
+              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                {selectedRoom ? 'Keine Instrumente in diesem Raum' : 'Keine Instrumente gefunden'}
+              </h4>
+              <p style={{ margin: '6px 0 16px 0', fontSize: '0.78rem', color: '#64748b' }}>
+                {selectedRoom 
+                  ? `Ziehe freie Instrumente aus dem Pool auf „${selectedRoom.name}“, um sie zuzuweisen.`
+                  : 'Passe die Suchfilter an oder registriere ein neues Instrument.'}
               </p>
-            ) : (
-              groups.map((group) => {
-                // Find first free instance in this group for dragging
-                const firstFreeInstance = group.instances.find(inst => !inst.roomId);
-                const hasFree = !!firstFreeInstance;
-
-                return (
-                  <div 
-                    key={`${group.baseName}:::${group.model}`}
-                    draggable={hasFree && !selectedRoom}
-                    onDragStart={(e) => {
-                      if (!firstFreeInstance) return;
-                      e.dataTransfer.setData("text/plain", firstFreeInstance.fullName);
-                      e.dataTransfer.effectAllowed = "copyMove";
-                    }}
-                    onClick={() => {
-                      setEditingEquipmentGroup(group);
-                      setEditGroupName(group.baseName);
-                      setEditGroupModel(group.model);
-                      setEditGroupLink(group.instances[0]?.linkUrl || '');
-                      setEditGroupCoupled(true);
-                      setEditGroupQty(group.instances.length);
-                      setEditGroupInstancesData(group.instances.map(inst => ({ ...inst })));
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      background: 'white',
-                      border: '1px solid #f1f5f9',
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                      gap: '16px'
-                    }}
-                    className="hover-scale-mini"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                      
-                      {/* Horizontal wrapper for name/model and locations */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {group.baseName}
-                            {group.instances[0]?.linkUrl && (group.instances[0].linkUrl.startsWith('http://') || group.instances[0].linkUrl.startsWith('https://')) && (
-                              <a 
-                                href={group.instances[0].linkUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ color: '#ea4335', display: 'inline-flex' }}
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-                            )}
-                          </span>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
-                            Modell: {group.model}
-                          </span>
-                        </div>
-
-                        {/* Location Pills Row */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', flex: 1 }}>
-                          {group.instances.map((inst, iIdx) => (
-                            <span 
-                              key={iIdx} 
-                              style={{ 
-                                fontSize: '0.64rem', 
-                                fontWeight: 800, 
-                                padding: '2px 8px', 
-                                borderRadius: '6px',
-                                background: inst.roomId ? '#e2e8f0' : '#ecfdf5',
-                                color: inst.roomId ? '#475569' : '#059669',
-                                border: inst.roomId ? '1px solid #cbd5e1' : '1px solid #10b981'
-                              }}
-                            >
-                              {inst.roomName ? inst.roomName : 'Frei'}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0f172a', background: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        Menge: {group.instances.length}
-                      </span>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                        <Edit2 size={13} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-      </div>
-
-      {/* RIGHT COLUMN: ROOMS / LOCATIONS PANEL */}
-      <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-          <div>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-              Räume & Zuweisung
-            </h4>
-            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
-              Ziehe freie Instrumente hierher
-            </span>
-          </div>
-          {selectedEquipmentRoomId && (
-            <button
-              onClick={() => setSelectedEquipmentRoomId(null)}
-              style={{ background: '#f1f5f9', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', cursor: 'pointer' }}
-            >
-              Filter lösen ✕
-            </button>
+              {!selectedRoom && (
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAddOpen(true)}
+                  style={{ 
+                    background: '#d81e05', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    padding: '9px 18px', 
+                    borderRadius: '10px', 
+                    fontSize: '0.78rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(216,30,5,0.2)'
+                  }}
+                >
+                  + Erstes Instrument anlegen
+                </button>
+              )}
+            </div>
+          ) : (
+            groups.map((group) => (
+              <SecretaryEquipmentCard
+                key={`${group.baseName}:::${group.model}`}
+                group={group}
+                selectedRoom={selectedRoom}
+                rooms={rooms}
+                onEdit={(grp) => {
+                  setEditingEquipmentGroup(grp);
+                  setEditGroupName(grp.baseName);
+                  setEditGroupModel(grp.model);
+                  setEditGroupLink(grp.instances[0]?.linkUrl || '');
+                  setEditGroupCoupled(true);
+                  setEditGroupQty(grp.instances.length);
+                  setEditGroupInstancesData(grp.instances.map(inst => ({ ...inst })));
+                }}
+                onReturnToPool={handleReturnToPool}
+                onAssignToRoom={handleAssignToRoom}
+              />
+            ))
           )}
         </div>
 
-        {/* All Rooms Filter Button */}
-        <div
-          onClick={() => setSelectedEquipmentRoomId(null)}
-          style={{
-            padding: '10px 14px',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            background: !selectedEquipmentRoomId ? '#fce8e6' : '#f8fafc',
-            border: !selectedEquipmentRoomId ? '1.5px solid #ea4335' : '1px solid #f1f5f9',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            transition: 'all 0.2s'
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 800, color: !selectedEquipmentRoomId ? '#ea4335' : '#1e293b' }}>
-            <School size={14} color={!selectedEquipmentRoomId ? '#ea4335' : '#64748b'} /> Alle Räume
-          </span>
-          <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b' }}>
-            {allInstances.length}
-          </span>
-        </div>
-
-        {/* Rooms List */}
-        {sortedRooms.map(rm => {
-          const isSelected = selectedEquipmentRoomId === rm.id;
-          const isDragOver = dragOverRoomId === rm.id;
-          
-          return (
-            <div 
-              key={rm.id}
-              onClick={() => setSelectedEquipmentRoomId(rm.id)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOverRoomId(rm.id);
-              }}
-              onDragLeave={() => setDragOverRoomId(null)}
-              onDrop={async (e) => {
-                e.preventDefault();
-                const instName = e.dataTransfer.getData("text/plain");
-                setDragOverRoomId(null);
-                if (instName) {
-                  await handleDropInstrumentOnRoom(instName, rm.id);
-                }
-              }}
-              style={{ 
-                padding: '12px 14px', 
-                borderRadius: '12px', 
-                cursor: 'pointer', 
-                background: isSelected ? '#fce8e6' : isDragOver ? '#e6f4ea' : '#f8fafc',
-                border: isSelected ? '1.5px solid #ea4335' : isDragOver ? '2px dashed #34a853' : '1px solid #f1f5f9',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                transition: 'all 0.2s'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 800, color: isSelected ? '#ea4335' : '#1e293b' }}>
-                  <DoorOpen size={14} color={isSelected ? '#ea4335' : '#64748b'} /> {rm.name}
-                </span>
-                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#86868b', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>
-                  {rm.floor || 'Allgemein'}
-                </span>
-              </div>
-              
-              {/* Short summary of configured instruments */}
-              {rm.room_instruments && rm.room_instruments.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
-                  {rm.room_instruments.map((inst: any, idx: number) => (
-                    <span key={idx} style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 650, background: 'white', padding: '1px 4px', borderRadius: '3px', border: '1px solid #e2e8f0' }}>
-                      {inst.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
       </div>
+
+      {/* RIGHT COLUMN: SPATIAL ROOMS CANVAS & DROP HUBS */}
+      <SecretaryEquipmentRoomCanvas
+        rooms={rooms}
+        selectedEquipmentRoomId={selectedEquipmentRoomId}
+        setSelectedEquipmentRoomId={setSelectedEquipmentRoomId}
+        dragOverRoomId={dragOverRoomId}
+        setDragOverRoomId={setDragOverRoomId}
+        handleDropInstrumentOnRoom={async (instName, roomId) => {
+          await handleDropInstrumentOnRoom(instName, roomId);
+          setLocalRefreshTick(t => t + 1);
+        }}
+        handleReturnToPool={handleReturnToPool}
+        allInstances={allInstances}
+        freeCount={kpis.free}
+        parseRoomName={parseRoomName}
+      />
 
       {/* EDIT MODAL FOR EQUIPMENT GROUP */}
       {editingEquipmentGroup && (
-        <div 
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="equipment-group-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setEditingEquipmentGroup(null);
+        <SecretaryEquipmentEditModal
+          editingEquipmentGroup={editingEquipmentGroup}
+          setEditingEquipmentGroup={setEditingEquipmentGroup}
+          editGroupName={editGroupName}
+          setEditGroupName={setEditGroupName}
+          editGroupModel={editGroupModel}
+          setEditGroupModel={setEditGroupModel}
+          editGroupLink={editGroupLink}
+          setEditGroupLink={setEditGroupLink}
+          editGroupQty={editGroupQty}
+          setEditGroupQty={setEditGroupQty}
+          editGroupInstancesData={editGroupInstancesData}
+          setEditGroupInstancesData={setEditGroupInstancesData}
+          rooms={rooms}
+          handleSaveGroupEdit={async () => {
+            await handleSaveGroupEdit();
+            setLocalRefreshTick(t => t + 1);
           }}
-          style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.45)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '24px',
-            width: '100%',
-            maxWidth: '560px',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            overflow: 'hidden'
-          }}>
-            {/* Modal Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h4 id="equipment-group-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                  Instrument bearbeiten
-                </h4>
-                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                  {editingEquipmentGroup.baseName} ({editingEquipmentGroup.instances.length} Stück)
-                </span>
-              </div>
-              <button
-                onClick={() => setEditingEquipmentGroup(null)}
-                style={{ border: 'none', background: '#f1f5f9', color: '#64748b', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              {/* Name & Model */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>Name / Bezeichnung</label>
-                  <input
-                    value={editGroupName}
-                    onChange={e => setEditGroupName(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.80rem', fontWeight: 700, outline: 'none' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>Modell</label>
-                  <input
-                    value={editGroupModel}
-                    onChange={e => setEditGroupModel(e.target.value)}
-                    placeholder="z.B. Yamaha U1, Roland FP-30X"
-                    style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.80rem', fontWeight: 700, outline: 'none' }}
-                  />
-                </div>
-              </div>
-
-              {/* Link / URL */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>Handbuch / Hersteller-Link</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '0 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1' }}>
-                  <LinkIcon size={14} color="#94a3b8" />
-                  <input
-                    value={editGroupLink}
-                    onChange={e => setEditGroupLink(e.target.value)}
-                    placeholder="https://..."
-                    style={{ border: 'none', background: 'transparent', outline: 'none', padding: '8px 0', fontSize: '0.80rem', fontWeight: 600, width: '100%', color: '#0f172a' }}
-                  />
-                </div>
-              </div>
-
-              {/* Quantity */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <div>
-                  <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#1e293b', display: 'block' }}>Bestand / Menge</span>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Erhöhen oder reduzieren</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditGroupQty(Math.max(1, editGroupQty - 1))}
-                    style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 900 }}
-                  >-</button>
-                  <span style={{ fontSize: '0.90rem', fontWeight: 900, minWidth: '24px', textAlign: 'center' }}>{editGroupQty}</span>
-                  <button
-                    type="button"
-                    onClick={() => setEditGroupQty(editGroupQty + 1)}
-                    style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 900 }}
-                  >+</button>
-                </div>
-              </div>
-
-              {/* Individual Instances List with Room Selectors */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569' }}>Exemplare & Raumzuweisung</span>
-                {editGroupInstancesData.map((inst, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                      #{idx + 1} {inst.fullName}
-                    </span>
-                    <select
-                      value={inst.roomId || ''}
-                      onChange={(e) => {
-                        const newRoomId = e.target.value || null;
-                        const next = [...editGroupInstancesData];
-                        next[idx].roomId = newRoomId;
-                        next[idx].roomName = rooms.find(r => r.id === newRoomId)?.name || null;
-                        setEditGroupInstancesData(next);
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, outline: 'none', background: 'white' }}
-                    >
-                      <option value="">Freier Pool (Kein Raum)</option>
-                      {rooms.map(rm => (
-                        <option key={rm.id} value={rm.id}>{rm.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', background: '#f8fafc' }}>
-              <button
-                type="button"
-                onClick={handleDeleteEquipmentGroup}
-                style={{ background: '#fee2e2', border: 'none', color: '#ef4444', padding: '8px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <Trash2 size={13} /> Löschen
-              </button>
-              
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setEditingEquipmentGroup(null)}
-                  style={{ background: 'white', border: '1px solid #cbd5e1', color: '#64748b', padding: '8px 16px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                >
-                  Abbrechen
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveGroupEdit}
-                  style={{ background: '#ea4335', border: 'none', color: 'white', padding: '8px 20px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 2px 8px rgba(234,67,53,0.25)' }}
-                >
-                  Speichern
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          handleDeleteEquipmentGroup={handleDeleteEquipmentGroup}
+        />
       )}
 
     </div>

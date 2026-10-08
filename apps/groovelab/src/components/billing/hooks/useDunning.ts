@@ -15,7 +15,7 @@ export function useDunning(showActionToast: (msg: string) => void) {
     const schoolName = inv.schoolName || 'Musikschule';
     const recipientEmail = inv.billingEmail || '';
     const formattedAmount = Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
-    const dueDate = invoice.date || 'vor 14 Tagen';
+    const dueDate = invoice.date || 'vor 30 Tagen';
 
     let subject = '';
     let body = '';

@@ -502,7 +502,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale"

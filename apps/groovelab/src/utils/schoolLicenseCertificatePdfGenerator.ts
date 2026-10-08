@@ -16,6 +16,8 @@
  * - Mathematical 1-Page Layout Clamping: doc.getNumberOfPages() === 1 strictly guaranteed.
  */
 
+import { computeCanonicalPayloadHash } from './pdfTypographyEngine';
+
 export interface SchoolLicenseCertificateParams {
   studentName: string;
   studentId: string;
@@ -46,21 +48,16 @@ export const createSchoolLicenseCertificateDocument = async (
 
   const refCode = `LIZENZ-${(params.studentId || 'SCHUELER').slice(0, 8).toUpperCase()}-${startYear}`;
 
-  // Calculate cryptographic SHA-256 seal for certificate authenticity
-  let sha256Seal = refCode;
-  try {
-    if (typeof window !== 'undefined' && window.crypto?.subtle) {
-      const raw = `SCHOOL_CERT:${refCode}:${params.studentId}:${params.schoolName}:${schoolYearStr}:${validUntilStr}`;
-      const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
-      sha256Seal = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    } else if (typeof global !== 'undefined' && (global as any).crypto?.subtle) {
-      const raw = `SCHOOL_CERT:${refCode}:${params.studentId}:${params.schoolName}:${schoolYearStr}:${validUntilStr}`;
-      const buf = await (global as any).crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
-      sha256Seal = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (e) {
-    // Graceful fallback
-  }
+  // Calculate cryptographic SHA-256 seal for certificate authenticity (RFC 8785 canonical)
+  const canonicalPayload = {
+    docType: 'SCHOOL_CERT',
+    refCode,
+    studentId: params.studentId,
+    schoolName: params.schoolName,
+    schoolYear: schoolYearStr,
+    validUntil: validUntilStr
+  };
+  const sha256Seal = await computeCanonicalPayloadHash(canonicalPayload);
 
   // Page background
   doc.setFillColor(248, 250, 252); // Slate 50
@@ -228,10 +225,10 @@ export const createSchoolLicenseCertificateDocument = async (
   doc.text(butLines, 28, curY + 11.5);
 
   // 7. Footer: Siegel & Bestätigungsklausel (Fixed bottom margin >= 266mm)
-  doc.setFontSize(6.8);
+  doc.setFontSize(6.2);
   doc.setFont('courier', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(`Revisionssicheres Schullizenz-Prüfsiegel: SHA256-${sha256Seal.slice(0, 36)}...`, 22, 266);
+  doc.text(`Revisionssicheres Schullizenz-Prüfsiegel: SHA256:${sha256Seal}`, 22, 266);
 
   doc.setFontSize(7.0);
   doc.setFont('helvetica', 'normal');

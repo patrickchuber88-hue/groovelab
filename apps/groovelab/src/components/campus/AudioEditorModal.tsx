@@ -1055,7 +1055,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       borderRadius: '6px',
                       background: '#16a34a',
                       border: 'none',
-                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.45)',
+                      boxShadow: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1082,7 +1082,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       borderRadius: '6px',
                       background: '#16a34a',
                       border: 'none',
-                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.45)',
+                      boxShadow: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1493,7 +1493,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale"

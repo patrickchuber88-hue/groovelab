@@ -2274,7 +2274,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 bottom: 0,
                 width: '2px',
                 background: '#2563eb',
-                boxShadow: '0 0 8px rgba(37, 99, 235, 0.85)',
+                boxShadow: 'none',
                 pointerEvents: 'none',
                 zIndex: 10
               }}
@@ -2470,7 +2470,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       bottom: 0,
                       width: '2px',
                       background: '#2563eb',
-                      boxShadow: '0 0 8px rgba(37, 99, 235, 0.85)',
+                      boxShadow: 'none',
                       pointerEvents: 'none',
                       zIndex: 10
                     }}
@@ -2657,7 +2657,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         fontWeight: 950,
                         border: 'none',
                         cursor: isLoadingTeacher ? 'wait' : 'pointer',
-                        boxShadow: '0 6px 18px rgba(220, 38, 38, 0.35)',
+                        boxShadow: 'none',
                         transition: 'all 0.18s ease',
                         width: isMobile ? '100%' : 'auto'
                       }}
@@ -2683,7 +2683,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      boxShadow: '0 4px 16px rgba(139, 92, 246, 0.22)',
+                      boxShadow: 'none',
                       boxSizing: 'border-box',
                       width: '100%',
                       maxWidth: '440px',
@@ -2703,7 +2703,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           justifyContent: 'center',
                           fontWeight: 950,
                           fontSize: '1.35rem',
-                          boxShadow: '0 2px 8px rgba(124, 58, 237, 0.35)',
+                          boxShadow: 'none',
                           animation: 'pulse 1s infinite'
                         }}
                       >
@@ -2898,7 +2898,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           bottom: 0,
                           width: '2px',
                           background: '#2563eb',
-                          boxShadow: '0 0 8px rgba(37, 99, 235, 0.85)',
+                          boxShadow: 'none',
                           pointerEvents: 'none',
                           zIndex: 10
                         }}
@@ -2949,7 +2949,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
-                boxShadow: '0 4px 16px rgba(124, 58, 237, 0.08)'
+                boxShadow: 'none'
               }}
             >
               {/* Header: Track Badges & Volume Dual Faders */}
@@ -3094,7 +3094,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       fontWeight: 900,
                       border: 'none',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+                      boxShadow: 'none'
                     }}
                     className="hover-scale"
                   >
@@ -3114,7 +3114,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    boxShadow: '0 4px 16px rgba(139, 92, 246, 0.22)',
+                    boxShadow: 'none',
                     boxSizing: 'border-box',
                     width: '100%',
                     maxWidth: '440px',
@@ -3134,7 +3134,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         justifyContent: 'center',
                         fontWeight: 950,
                         fontSize: '1.35rem',
-                        boxShadow: '0 2px 8px rgba(124, 58, 237, 0.35)',
+                        boxShadow: 'none',
                         animation: 'pulse 1s infinite'
                       }}
                     >
@@ -3347,7 +3347,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         bottom: 0,
                         width: '2px',
                         background: '#2563eb',
-                        boxShadow: '0 0 8px rgba(37, 99, 235, 0.85)',
+                        boxShadow: 'none',
                         pointerEvents: 'none',
                         zIndex: 10
                       }}
@@ -3560,7 +3560,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     fontWeight: 950,
                     border: 'none',
                     cursor: (isSaving || isSyncingBuffer) ? 'wait' : ((hasSavedTake && !saveSuccess) ? 'default' : 'pointer'),
-                    boxShadow: '0 4px 12px rgba(21, 128, 61, 0.28)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   className={(hasSavedTake && !saveSuccess) ? '' : 'hover-scale'}

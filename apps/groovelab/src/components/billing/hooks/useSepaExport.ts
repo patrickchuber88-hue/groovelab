@@ -31,15 +31,17 @@ export function useSepaExport(showActionToast: (msg: string) => void) {
           const invId = `RE-${numId}-${yy}${mm}-01`;
           const paid = getPaidInvoices(inv.schoolId).includes(invId);
 
-          if (!paid) {
+          const effectiveIban = inv.sepaIban || inv.billingIban;
+          if (!paid && effectiveIban) {
             sepaTxs.push({
               instructionId: `SEPA-INST-${numId}-${Date.now().toString().slice(-4)}`,
               endToEndId: invId,
               amount: inv.total,
-              debtorName: inv.schoolName,
-              debtorIban: 'DE' + (inv.schoolId.replace(/[^0-9]/g, '') + '000000000000000000').substring(0, 20),
-              mandateId: `MANDAT-MS-${numId}`,
-              mandateSignatureDate: '2026-01-01',
+              debtorName: inv.sepaAccountHolder || inv.schoolName,
+              debtorIban: effectiveIban.replace(/\s+/g, '').toUpperCase(),
+              debtorBic: inv.sepaBic || undefined,
+              mandateId: inv.sepaMandateId || `MANDAT-MS-${numId}`,
+              mandateSignatureDate: inv.sepaMandateDate || '2026-01-01',
               remittanceInfo: `Campus-Groovelab Cloud-Hosting ${invId}`
             });
           }

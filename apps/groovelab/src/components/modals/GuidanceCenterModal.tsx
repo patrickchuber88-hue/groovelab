@@ -75,7 +75,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
           maxHeight: '92vh',
           background: '#ffffff',
           borderRadius: '24px',
-          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(226, 232, 240, 0.9)',
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.3)', border: '1px solid #e2e8f0',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
@@ -101,7 +101,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
+              boxShadow: 'none'
             }}>
               <BookOpen size={22} />
             </div>

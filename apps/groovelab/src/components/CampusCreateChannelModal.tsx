@@ -695,7 +695,7 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
               fontSize: '0.86rem',
               fontWeight: 900,
               cursor: isSubmitting || !channelName.trim() ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
+              boxShadow: 'none',
               transition: 'background 0.2s ease'
             }}
           >

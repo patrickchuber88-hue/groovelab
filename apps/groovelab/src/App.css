@@ -53,7 +53,8 @@
   height: 8px;
   border-radius: 50%;
   background: var(--status-success);
-  box-shadow: 0 0 8px var(--status-success);
+  border: 1px solid #ffffff;
+  box-shadow: none;
 }
 
 .main-content {
@@ -253,13 +254,14 @@ div:hover > .photo-overlay {
 }
 
 .exercise-card.band-ready {
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2), 0 4px 12px rgba(0,0,0,0.05);
+  border: 1.5px solid #f59e0b;
+  box-shadow: none;
   animation: glowGold 3s infinite alternate;
 }
 
 @keyframes glowGold {
-  from { box-shadow: 0 0 10px rgba(245, 158, 11, 0.1), 0 4px 12px rgba(0,0,0,0.05); }
-  to { box-shadow: 0 0 25px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0,0,0,0.05); }
+  from { border-color: rgba(245, 158, 11, 0.4); }
+  to { border-color: rgba(245, 158, 11, 1); }
 }
 
 .repertoire-card-container {
@@ -271,7 +273,7 @@ div:hover > .photo-overlay {
 }
 
 .repertoire-card-container .glass-panel {
-  box-shadow: 0 10px 25px -5px rgba(52, 168, 83, 0.1), 0 8px 10px -6px rgba(52, 168, 83, 0.1);
+  box-shadow: none;
 }
 
 .slider-container {
@@ -386,8 +388,8 @@ div:hover > .photo-overlay {
 
 .band-slot.filled {
   background: white;
-  border-color: rgba(234, 179, 8, 0.3);
-  box-shadow: 0 2px 8px rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.4);
+  box-shadow: none;
 }
 
 .slot-icon-circle {
@@ -405,7 +407,7 @@ div:hover > .photo-overlay {
 .band-slot.filled .slot-icon-circle {
   background: var(--primary-color);
   color: white;
-  box-shadow: 0 0 12px rgba(234, 179, 8, 0.4);
+  box-shadow: none;
 }
 
 .slot-count-badge {
@@ -439,19 +441,20 @@ div:hover > .photo-overlay {
   border-radius: 50%;
   background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 25px rgba(225, 29, 72, 0.3);
+  box-shadow: none;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   animation: pulseGlow 2.5s infinite;
 }
 
 .fab-button:hover {
-  transform: scale(1.08) translateY(-2px);
-  box-shadow: 0 14px 30px rgba(225, 29, 72, 0.4);
+  transform: scale(1.06) translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: none;
 }
 
 .fab-button:active {
@@ -1043,9 +1046,9 @@ div:hover > .photo-overlay {
   }
 }
 @keyframes pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); }
-  70% { box-shadow: 0 0 0 15px rgba(225, 29, 72, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
 }
 
 @media (min-width: 1025px) {
@@ -1072,7 +1075,7 @@ div:hover > .photo-overlay {
   .fab-button {
     width: 48px !important;
     height: 48px !important;
-    box-shadow: 0 8px 20px rgba(225, 29, 72, 0.25) !important;
+    box-shadow: none !important;
   }
 }
 
@@ -1091,15 +1094,12 @@ div:hover > .photo-overlay {
 @keyframes pulseGlow {
   0% {
     transform: scale(1);
-    box-shadow: 0 8px 24px rgba(225, 29, 72, 0.35);
   }
   50% {
     transform: scale(1.04);
-    box-shadow: 0 12px 30px rgba(225, 29, 72, 0.55);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 8px 24px rgba(225, 29, 72, 0.35);
   }
 }
 

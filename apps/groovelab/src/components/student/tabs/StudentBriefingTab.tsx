@@ -339,20 +339,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
   const { isCellular, formatBytes, badgeText } = useNetworkProfile();
 
   // 🌟 1% Goldstandard: Real-Time Live XP Deposit Animation & Triumphant Audio Feedback
-  const [displayXp, setDisplayXp] = useState<number>(() => {
-    if (typeof currentXp === 'number' && currentXp > 0) return currentXp;
-    if (typeof window !== 'undefined') {
-      const effectiveId = props.studentId || studentUser?.id;
-      if (effectiveId) {
-        const cached = localStorage.getItem(`campus_bonus_xp_${effectiveId}`);
-        if (cached !== null) {
-          const parsed = parseInt(cached, 10);
-          if (!isNaN(parsed) && parsed > 0) return parsed;
-        }
-      }
-    }
-    return currentXp || 0;
-  });
+  const [displayXp, setDisplayXp] = useState<number>(() => currentXp || 0);
   const [isXpPulsing, setIsXpPulsing] = useState<boolean>(false);
   const [floatingDepositAmount, setFloatingDepositAmount] = useState<number | null>(null);
   const pendingDepositRef = useRef<{ amount: number; oldVal: number } | null>(null);
@@ -422,14 +409,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
         const timer = setTimeout(() => {
           triggerDepositAnimation(amount, oldVal, target);
         }, 300);
-        return () => clearTimeout(timer);
-      } else if (currentXp > displayXp && displayXp > 0 && !isXpPulsing) {
-        const diff = currentXp - displayXp;
-        const oldVal = displayXp;
-        const timer = setTimeout(() => {
-          triggerDepositAnimation(diff, oldVal, currentXp);
-        }, 300);
-        return () => clearTimeout(timer);
       } else if (currentXp !== displayXp && !isXpPulsing) {
         setDisplayXp(currentXp || 0);
       }
@@ -759,7 +738,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: current === 'super' ? '0 2px 8px rgba(22, 163, 74, 0.35)' : 'none',
+            boxShadow: 'none',
             transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           className="hover-scale-mini"
@@ -799,7 +778,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: current === 'wackelig' ? '0 2px 8px rgba(217, 119, 6, 0.35)' : 'none',
+            boxShadow: 'none',
             transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           className="hover-scale-mini"
@@ -839,7 +818,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: current === 'hilfe' ? '0 2px 8px rgba(220, 38, 38, 0.35)' : 'none',
+            boxShadow: 'none',
             transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           className="hover-scale-mini"
@@ -1385,7 +1364,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       border: '1.5px solid #bfdbfe',
                       borderRadius: '20px',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 14px -2px rgba(59, 130, 246, 0.12)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s ease',
                     }}
                     className="hover-scale"
@@ -1401,7 +1380,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         justifyContent: 'center',
                         color: 'white',
                         flexShrink: 0,
-                        boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
+                        boxShadow: 'none'
                       }}>
                         <Bell size={22} />
                       </div>
@@ -1422,7 +1401,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       fontSize: '0.84rem',
                       fontWeight: 800,
                       whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
+                      boxShadow: 'none'
                     }}>
                       Aktivieren
                     </div>
@@ -1510,7 +1489,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '28px',
-                        boxShadow: '0 14px 30px -6px rgba(239, 68, 68, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '100px',
                         padding: '20px 24px',
@@ -1711,7 +1690,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   fontWeight: 850, 
                                   border: '1.5px solid #fde047',
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.18s ease'
                                 }}
                                 className="hover-scale"
@@ -2233,7 +2212,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         >
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', width: '100%', flexWrap: 'nowrap' }}>
-                              <div style={{ background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)', color: '#34a853', width: isMusicStandMode ? '52px' : '42px', height: isMusicStandMode ? '52px' : '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.16)', flexShrink: 0 }}>
+                              <div style={{ background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)', color: '#34a853', width: isMusicStandMode ? '52px' : '42px', height: isMusicStandMode ? '52px' : '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none', flexShrink: 0 }}>
                                 <BookOpen size={isMusicStandMode ? 26 : 22} />
                               </div>
 
@@ -2387,7 +2366,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 background: '#ffffff',
                                 borderRadius: '32px',
                                 padding: isMusicStandMode ? '32px' : '28px',
-                                boxShadow: isGoalAchieved ? '0 12px 32px rgba(99, 102, 241, 0.12)' : '0 12px 30px rgba(99, 102, 241, 0.06)',
+                                boxShadow: 'none',
                                 border: isGoalAchieved ? '2px solid rgba(129, 140, 248, 0.45)' : '2px solid rgba(99, 102, 241, 0.25)',
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -2410,7 +2389,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: isGoalAchieved ? '0 6px 16px rgba(124, 58, 237, 0.25)' : '0 6px 16px rgba(99, 102, 241, 0.2)',
+                                    boxShadow: 'none',
                                     flexShrink: 0
                                   }}>
                                     {isGoalAchieved ? (
@@ -2622,7 +2601,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   justifyContent: 'center',
                                   gap: '8px',
                                   whiteSpace: 'nowrap',
-                                  boxShadow: '0 8px 20px rgba(99, 102, 241, 0.32)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.2s ease'
                                 }}
                                 className="hover-scale"
@@ -2703,7 +2682,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: '#d97706', width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(245, 158, 11, 0.18)' }}>
+                                  <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: '#d97706', width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
                                     <Trophy size={isMusicStandMode ? 32 : 28} color="#d97706" />
                                   </div>
 
@@ -2746,7 +2725,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   background: 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)',
                                   borderRadius: '18px',
                                   border: '1.5px solid #fde68a',
-                                  boxShadow: '0 3px 10px rgba(245, 158, 11, 0.08)'
+                                  boxShadow: 'none'
                                 }}>
                                   <div style={{
                                     width: isMusicStandMode ? '52px' : '44px',
@@ -2825,7 +2804,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   justifyContent: 'center',
                                   gap: '10px',
                                   whiteSpace: 'nowrap',
-                                  boxShadow: '0 8px 20px rgba(217, 119, 6, 0.28)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.2s ease'
                                 }}
                                 className="hover-scale"
@@ -2939,7 +2918,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                boxShadow: 'none',
                                 flexShrink: 0
                               }}>
                                 <BookOpen size={22} strokeWidth={2.4} />
@@ -3178,7 +3157,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             color: '#e11d48',
-                                            boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
+                                            boxShadow: 'none',
                                             flexShrink: 0
                                           }}>
                                             <BookOpen size={13} strokeWidth={2.4} />
@@ -3424,7 +3403,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         border: '1px solid #fef08a',
                                         borderRadius: '12px',
                                         padding: '9px 12px',
-                                        boxShadow: '0 2px 6px rgba(234, 179, 8, 0.05)',
+                                        boxShadow: 'none',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: '4px'
@@ -3526,7 +3505,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
-                                boxShadow: '0 6px 20px rgba(34, 197, 94, 0.25)',
+                                boxShadow: 'none',
                                 transition: 'all 0.15s ease',
                                 touchAction: 'manipulation'
                               }}
@@ -3765,7 +3744,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '12px',
-                                boxShadow: '0 12px 25px rgba(99, 102, 241, 0.4)'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale"
                             >
@@ -3794,7 +3773,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: '10px',
-                                  boxShadow: '0 10px 25px rgba(5, 150, 105, 0.35)'
+                                  boxShadow: 'none'
                                 }}
                                 className="hover-scale"
                               >
@@ -3994,7 +3973,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: '0 0 0 16px rgba(239, 68, 68, 0.2)',
+                              boxShadow: 'none',
                               animation: 'pulse 1.5s infinite'
                             }}>
                               <Mic size={54} color="#ef4444" />
@@ -4041,7 +4020,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '12px',
-                                boxShadow: '0 12px 25px rgba(239, 68, 68, 0.4)'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale"
                             >
@@ -4065,7 +4044,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 8px 20px rgba(34, 197, 94, 0.2)'
+                                boxShadow: 'none'
                               }}>
                                 <Sparkles size={34} />
                               </div>
@@ -4102,7 +4081,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   cursor: 'pointer',
-                                  boxShadow: '0 6px 14px rgba(34, 197, 94, 0.35)',
+                                  boxShadow: 'none',
                                   flexShrink: 0,
                                   transition: 'transform 0.15s ease'
                                 }}
@@ -4200,11 +4179,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   }}
                                   onFocus={(e) => {
                                     e.currentTarget.style.borderColor = '#22c55e';
-                                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.15)';
+                                    e.currentTarget.style.boxShadow = 'none';
                                   }}
                                   onBlur={(e) => {
                                     e.currentTarget.style.borderColor = '#cbd5e1';
-                                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.03)';
+                                    e.currentTarget.style.boxShadow = 'none';
                                   }}
                                 />
                                 <div style={{
@@ -4365,7 +4344,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: '8px',
-                                  boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)'
+                                  boxShadow: 'none'
                                 }}
                                 className="hover-scale"
                               >
@@ -4458,7 +4437,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 6px 16px rgba(124, 58, 237, 0.15)'
+                            boxShadow: 'none'
                           }}>
                             <Headphones size={30} />
                           </div>
@@ -4508,7 +4487,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         cursor: 'pointer',
-                                        boxShadow: isPlaying ? '0 6px 16px rgba(124, 58, 237, 0.35)' : '0 6px 16px rgba(22, 163, 74, 0.3)',
+                                        boxShadow: 'none',
                                         flexShrink: 0
                                       }}
                                       className="hover-scale"
@@ -4693,7 +4672,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
                       color: 'white',
                       borderRadius: '20px',
-                      boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                       minHeight: '70px',
                       padding: '16px',
@@ -4744,7 +4723,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
                       color: '#0f172a',
                       borderRadius: '20px',
-                      boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                       minHeight: '70px',
                       padding: '16px',
@@ -4822,7 +4801,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '20px',
-                        boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
@@ -4987,7 +4966,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 fontWeight: 950,
                                 padding: '2px 7px',
                                 borderRadius: '100px',
-                                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
+                                boxShadow: 'none',
                                 letterSpacing: '-0.01em'
                               }}>
                                 {sidebarTotalAlertsCount}
@@ -5077,7 +5056,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   fontWeight: 800,
                                   border: 'none',
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.18s ease'
                                 }}
                                 className="hover-scale"
@@ -5516,7 +5495,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '16px',
-                          boxShadow: '0 8px 24px -4px rgba(234, 179, 8, 0.12), 0 2px 6px rgba(234, 179, 8, 0.06)'
+                          boxShadow: 'none'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1 }}>
                             <div style={{
@@ -5528,7 +5507,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               alignItems: 'center',
                               justifyContent: 'center',
                               border: '2px solid #eab308',
-                              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+                              boxShadow: 'none',
                               flexShrink: 0
                             }}>
                               <Disc size={22} color="#854d0e" />
@@ -5574,7 +5553,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               display: 'flex',
                               alignItems: 'center',
                               gap: '6px',
-                              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+                              boxShadow: 'none',
                               flexShrink: 0
                             }}
                             className="hover-scale"
@@ -5802,7 +5781,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 padding: '3px 10px', 
                                 borderRadius: '100px',
                                 border: streak === 0 ? '1px solid #fde68a' : '1px solid rgba(255, 255, 255, 0.3)',
-                                boxShadow: streak === 0 ? 'none' : '0 3px 10px rgba(220, 38, 38, 0.22)',
+                                boxShadow: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px'
@@ -5880,7 +5859,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         borderRadius: '6px',
                                         background: isConsumed ? '#f1f5f9' : '#ffffff',
                                         border: isConsumed ? '1px solid #cbd5e1' : '1px solid #8b5cf6',
-                                        boxShadow: isShieldActive ? '0 1px 4px rgba(124, 58, 237, 0.12)' : 'none',
+                                        boxShadow: 'none',
                                         fontSize: '0.66rem',
                                         fontWeight: 900,
                                         color: isConsumed ? '#64748b' : '#6d28d9',
@@ -6174,7 +6153,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
                       color: 'white',
                       borderRadius: '20px',
-                      boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                       minHeight: '70px',
                       padding: '16px',
@@ -6226,7 +6205,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
                         color: '#0f172a',
                         borderRadius: '20px',
-                        boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
@@ -6305,7 +6284,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '20px',
-                        boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
@@ -6560,7 +6539,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 fontWeight: 950,
                                 padding: '2px 7px',
                                 borderRadius: '100px',
-                                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
+                                boxShadow: 'none',
                                 letterSpacing: '-0.01em'
                               }}>
                                 {sidebarTotalAlertsCount}
@@ -7349,7 +7328,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         borderRadius: '10px',
                                         background: isConsumed ? '#f1f5f9' : '#ffffff',
                                         border: isConsumed ? '1px solid #cbd5e1' : '1.5px solid #10b981',
-                                        boxShadow: isShieldActive ? '0 1px 4px rgba(16, 185, 129, 0.12)' : 'none',
+                                        boxShadow: 'none',
                                         transition: 'all 0.2s ease'
                                       }}>
                                         <Shield size={14} color={isConsumed ? '#64748b' : '#059669'} fill={isConsumed ? '#cbd5e1' : '#10b981'} />

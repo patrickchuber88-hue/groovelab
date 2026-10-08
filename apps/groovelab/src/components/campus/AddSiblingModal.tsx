@@ -320,27 +320,50 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
     }
   };
 
-  // Profil final hinzufügen
-  const finalizeLinking = () => {
+  // Profil final hinzufügen mit Server-RPC link_student_sibling
+  const finalizeLinking = async () => {
     if (!scannedUser) return;
-    setIsVerifying(false);
-    setStep('success');
+    setIsVerifying(true);
+    setPinError('');
 
-    const newProfile = {
-      id: scannedUser.id,
-      first_name: scannedUser.first_name,
-      last_name: scannedUser.last_name || '',
-      instrument: scannedUser.instrument || 'Gitarre',
-      photo_url: scannedUser.photo_url || null,
-      campus_ui_level: scannedUser.campus_ui_level || 'junior',
-      has_personal_pin: Boolean(scannedUser.has_personal_pin || scannedUser.is_pin_activated),
-      role: 'student'
-    };
+    try {
+      const pinStr = pinDigits.join('') || null;
+      const { data: linkRes, error: linkErr } = await supabase.rpc('link_student_sibling', {
+        p_current_student_id: currentStudentId,
+        p_target_credential: scannedUser.id,
+        p_target_pin: pinStr
+      });
 
-    setTimeout(() => {
-      onProfileAdded(newProfile);
-      handleModalClose();
-    }, 1200);
+      if (linkErr || !linkRes?.success) {
+        const errorMsg = linkRes?.error || linkErr?.message || 'Verknüpfung fehlgeschlagen.';
+        setPinError(errorMsg);
+        setScanError(errorMsg);
+        setIsVerifying(false);
+        return;
+      }
+
+      setIsVerifying(false);
+      setStep('success');
+
+      const newProfile = {
+        id: scannedUser.id,
+        first_name: scannedUser.first_name,
+        last_name: scannedUser.last_name || '',
+        instrument: scannedUser.instrument || '',
+        photo_url: scannedUser.photo_url || null,
+        campus_ui_level: scannedUser.campus_ui_level || 'junior',
+        has_personal_pin: Boolean(scannedUser.has_personal_pin || scannedUser.is_pin_activated),
+        role: 'student'
+      };
+
+      setTimeout(() => {
+        onProfileAdded(newProfile);
+        handleModalClose();
+      }, 1200);
+    } catch (err: any) {
+      setPinError(err?.message || 'Fehler beim Verknüpfen.');
+      setIsVerifying(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -742,7 +765,7 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
                   borderRadius: '22px',
                   objectFit: 'cover',
                   border: '3px solid #ffffff',
-                  boxShadow: '0 8px 20px -4px rgba(22, 163, 74, 0.3)'
+                  boxShadow: 'none'
                 }}
                 onError={(e) => { e.currentTarget.src = getFallbackAvatar(scannedUser.instrument); }}
               />
@@ -798,7 +821,7 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)'
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
               >

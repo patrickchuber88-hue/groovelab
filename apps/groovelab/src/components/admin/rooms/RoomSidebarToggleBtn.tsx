@@ -87,7 +87,7 @@ export const RoomSidebarToggleBtn: React.FC<RoomSidebarToggleBtnProps> = ({
           gap: '7px',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           whiteSpace: 'nowrap',
-          boxShadow: isOpen ? 'none' : '0 2px 10px rgba(52, 168, 83, 0.32)'
+          boxShadow: 'none'
         }}
         onMouseEnter={(e) => {
           if (isOpen) {

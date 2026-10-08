@@ -221,6 +221,7 @@ async function mixMicWithDirectBackingBeat(
       snare: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'snare', 'medium', 0),
       hatClosed: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'hatClosed', 'medium', 0),
       hatOpen: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'hatOpen', 'medium', 0),
+      hatPedal: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'hatPedal', 'medium', 0),
       click: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'rim', 'medium', 0),
       rim: renderRimBuffer(offlineCtx),
       ride: renderRideBuffer(offlineCtx),
@@ -229,6 +230,7 @@ async function mixMicWithDirectBackingBeat(
     };
 
     let lastOpenHatGainNode: GainNode | null = null;
+    let lastRideGainNode: GainNode | null = null;
 
     const playOfflineSample = (buffer: AudioBuffer, volMul = 1.0, time: number, filterNode?: BiquadFilterNode): GainNode | null => {
       if (!buffer || time >= duration) return null;
@@ -257,17 +259,25 @@ async function mixMicWithDirectBackingBeat(
     // 🌟 Hi-Hat Choking Engine (8ms physical pedal clamp)
     const playOfflineHat = (isOpen = false, volMul = 1.0, time: number) => {
       if (isOpen) {
-        lastOpenHatGainNode = playOfflineSample(kitBuffers.hatOpen, volMul * 0.38, time);
+        lastOpenHatGainNode = playOfflineSample(kitBuffers.hatOpen, volMul * 0.28, time);
       } else {
         if (lastOpenHatGainNode) {
           try {
-            lastOpenHatGainNode.gain.setValueAtTime(volMul * 0.38 * 0.85, time);
+            lastOpenHatGainNode.gain.setValueAtTime(volMul * 0.28 * 0.85, time);
             lastOpenHatGainNode.gain.exponentialRampToValueAtTime(0.0001, time + 0.008);
           } catch {}
           lastOpenHatGainNode = null;
         }
-        playOfflineSample(kitBuffers.hatClosed, volMul * 0.45, time);
+        playOfflineSample(kitBuffers.hatClosed, volMul * 0.32, time);
       }
+    };
+
+    const playOfflineHatPedal = (volMul = 1.0, time: number) => {
+      if (lastOpenHatGainNode) {
+        try { lastOpenHatGainNode.gain.setValueAtTime(0.0001, time + 0.008); } catch {}
+        lastOpenHatGainNode = null;
+      }
+      return playOfflineSample(kitBuffers.hatPedal, volMul * 0.32, time);
     };
 
     // 🌟 Multi-Velocity Snare (Dynamic Ghost-Note Layer at volMul <= 0.35)
@@ -282,7 +292,16 @@ async function mixMicWithDirectBackingBeat(
       return playOfflineSample(kitBuffers.snare, volMul * 0.84, time);
     };
 
-    const playOfflineRide = (volMul = 1.0, time: number) => playOfflineSample(kitBuffers.ride, volMul * 0.33, time);
+    const playOfflineRide = (volMul = 1.0, time: number) => {
+      if (lastRideGainNode) {
+        try {
+          lastRideGainNode.gain.setValueAtTime(lastRideGainNode.gain.value, time);
+          lastRideGainNode.gain.exponentialRampToValueAtTime(0.0001, time + 0.070);
+        } catch {}
+        lastRideGainNode = null;
+      }
+      return (lastRideGainNode = playOfflineSample(kitBuffers.ride, volMul * 0.28, time));
+    };
     const playOfflineShaker = (forward = true, volMul = 1.0, time: number) => playOfflineSample(forward ? kitBuffers.shakerFwd : kitBuffers.shakerBack, volMul * 0.26, time);
 
     const isSwing = style === 'swing';
@@ -374,135 +393,142 @@ async function mixMicWithDirectBackingBeat(
       } else if (style === 'singersongwriter') {
         if (variation === 'A') {
           if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineKick(0.70, hitTime);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.85, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.65 : 0.35, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.32, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.65, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.50 : 0.30, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.28, hitTime);
         } else if (variation === 'B') {
           if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineKick(0.75, hitTime);
           if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.48, hitTime);
           else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSnare(0.16, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.70 : 0.40, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.38, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.55 : 0.35, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.30, hitTime);
         } else {
           if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineKick(0.80, hitTime);
           if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.55, hitTime);
-          else if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineRim(0.70, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 10, currentStepInBar === 10 ? 0.70 : 0.45, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.40, hitTime);
+          else if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineSnare(0.22, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 10, currentStepInBar === 10 ? 0.60 : 0.38, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.32, hitTime);
         }
       } else if (style === 'swing') {
         if (variation === 'A') {
-          // 🌟 10/10 Goldstandard: 20" Ride Cymbal & Hi-Hat Foot Chick
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineKick(0.20, hitTime);
-          if (currentStepInBar === 2) playOfflineRim(0.35, hitTime);
-          else if (currentStepInBar === 8) playOfflineSnare(0.30, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineRide(0.75, hitTime);
-          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineRide(0.38, hitTime);
-          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineHat(false, 0.65, hitTime);
+          // 🌟 Authentic 20" Flat Ride "spang-a-lang" & Warm Snare Backbeat on 2 & 4
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.15, hitTime);
+          if (currentStepInBar === 8) playOfflineSnare(0.20, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineRide(0.55, hitTime);
+          else if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineRide(0.42, hitTime);
+          else if (currentStepInBar === 5 || currentStepInBar === 11) playOfflineRide(0.28, hitTime);
+          if (currentStepInBar === 3) { playOfflineSnare(0.35, hitTime); playOfflineHatPedal(0.45, hitTime); }
+          else if (currentStepInBar === 9) { playOfflineSnare(0.38, hitTime); playOfflineHatPedal(0.45, hitTime); }
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.22, hitTime);
-          if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 11) playOfflineSnare(0.38, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineRide(0.80, hitTime);
-          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineRide(0.42, hitTime);
-          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineHat(false, 0.70, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.18, hitTime);
+          if (currentStepInBar === 5 || currentStepInBar === 11) playOfflineSnare(0.25, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineRide(0.58, hitTime);
+          else if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineRide(0.45, hitTime);
+          else if (currentStepInBar === 5 || currentStepInBar === 11) playOfflineRide(0.30, hitTime);
+          if (currentStepInBar === 3) { playOfflineSnare(0.38, hitTime); playOfflineHatPedal(0.48, hitTime); }
+          else if (currentStepInBar === 9) { playOfflineSnare(0.42, hitTime); playOfflineHatPedal(0.48, hitTime); }
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.28, hitTime);
-          if (currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.55, hitTime);
-          else if (currentStepInBar === 2 || currentStepInBar === 5) playOfflineSnare(0.26, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineRide(0.75, hitTime);
-          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8) playOfflineRide(0.40, hitTime);
-          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineHat(false, 0.68, hitTime);
+          if (currentStepInBar === 0) playOfflineKick(0.22, hitTime);
+          else if (currentStepInBar === 8) playOfflineKick(0.18, hitTime);
+          if (currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.35, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 5) playOfflineSnare(0.20, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineRide(0.55, hitTime);
+          else if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineRide(0.42, hitTime);
+          else if (currentStepInBar === 5 || currentStepInBar === 11) playOfflineRide(0.28, hitTime);
+          if (currentStepInBar === 3) { playOfflineSnare(0.35, hitTime); playOfflineHatPedal(0.45, hitTime); }
+          else if (currentStepInBar === 9) { playOfflineSnare(0.38, hitTime); playOfflineHatPedal(0.45, hitTime); }
         }
       } else if (style === 'latin') {
         if (variation === 'A') {
           if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineKick(0.90, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 12) playOfflineRim(0.95, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.70 : 0.40, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.35, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.55, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.45 : 0.28, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.28, hitTime);
         } else if (variation === 'B') {
           if (currentStepInBar % 2 === 0) playOfflineKick(currentStepInBar % 4 === 2 ? 1.05 : 0.55, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineRim(0.90, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.65, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.40, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.55, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.45, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.30, hitTime);
         } else {
           if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineKick(0.95, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 2 || currentStepInBar === 3 || currentStepInBar === 5 || currentStepInBar === 6 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11 || currentStepInBar === 13 || currentStepInBar === 14) {
-            playOfflineRim(0.80, hitTime);
-          }
-          if (currentStepInBar % 4 === 2) playOfflineHat(true, 0.65, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.42, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.55, hitTime);
+          if (currentStepInBar % 4 === 2) playOfflineHat(true, 0.45, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.30, hitTime);
         }
       } else if (style === 'funk') {
         if (variation === 'A') {
           if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineKick(1.15, hitTime);
           if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.1, hitTime);
-          else if (currentStepInBar === 7 || currentStepInBar === 13 || currentStepInBar === 15) playOfflineSnare(0.28, hitTime); // Ghost note
-          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 6 || currentStepInBar === 14, (currentStepInBar === 6 || currentStepInBar === 14) ? 1.0 : (currentStepInBar % 4 === 0 ? 0.95 : 0.55), hitTime);
-          else if (currentStepInBar === 3 || currentStepInBar === 11) playOfflineHat(false, 0.35, hitTime);
+          else if (currentStepInBar === 7 || currentStepInBar === 13 || currentStepInBar === 15) playOfflineSnare(0.28, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 6 || currentStepInBar === 14, (currentStepInBar === 6 || currentStepInBar === 14) ? 0.68 : (currentStepInBar % 4 === 0 ? 0.60 : 0.38), hitTime);
+          else if (currentStepInBar === 3 || currentStepInBar === 11) playOfflineHat(false, 0.28, hitTime);
         } else if (variation === 'B') {
           if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineKick(1.2, hitTime);
           else if (currentStepInBar === 4 || currentStepInBar === 12 || currentStepInBar === 14) playOfflineSnare(1.15, hitTime);
-          else if (currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 15) playOfflineHat(false, 0.85, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 15) playOfflineHat(false, 0.55, hitTime);
         } else {
           if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 11) playOfflineKick(1.2, hitTime);
           if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.1, hitTime);
           else if (currentStepInBar === 13 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSnare(0.9, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.52, hitTime);
         }
       } else if (style === 'reggae') {
         if (variation === 'A') {
-          if (currentStepInBar === 8) { playOfflineKick(1.2, hitTime); playOfflineSnare(1.05, hitTime); }
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.9, hitTime);
-          if (currentStepInBar === 0) playOfflineRim(0.22, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.0 : 0.58, hitTime);
+          // 🌟 Warm Snare Backbeat on 2 & 4 + One-Drop on Beat 3
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.75, hitTime);
+          if (currentStepInBar === 8) { playOfflineKick(1.2, hitTime); playOfflineSnare(1.10, hitTime); }
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 0.52 : 0.25, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineKick(1.15, hitTime);
-          if (currentStepInBar === 8) playOfflineSnare(1.05, hitTime);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.85, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.88, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineKick(1.05, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.85, hitTime);
+          if (currentStepInBar === 8) playOfflineSnare(1.10, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 0.52 : 0.28, hitTime);
         } else {
-          if (currentStepInBar === 8) playOfflineKick(1.2, hitTime);
-          if (currentStepInBar === 8 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSnare(1.0, hitTime);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.9, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.80, hitTime);
+          if (currentStepInBar === 8) playOfflineKick(1.15, hitTime);
+          if (currentStepInBar === 8) playOfflineSnare(1.10, hitTime);
+          else if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineSnare(0.35, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 0.50 : 0.25, hitTime);
         }
       } else if (style === 'walzer') {
         if (variation === 'A') {
-          if (currentStepInBar === 0) playOfflineKick(1.0, hitTime);
-          if (currentStepInBar === 4 || currentStepInBar === 8) { playOfflineRim(0.85, hitTime); playOfflineSnare(0.22, hitTime); }
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar === 0 ? 0.95 : (currentStepInBar === 4 || currentStepInBar === 8 ? 0.72 : 0.45), hitTime);
+          if (currentStepInBar === 0) { playOfflineKick(0.85, hitTime); playOfflineRide(0.25, hitTime); }
+          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSnare(0.42, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.9, hitTime);
-          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSnare(0.75, hitTime);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 4 || currentStepInBar === 7 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineHat(false, 0.8, hitTime);
+          if (currentStepInBar === 0) playOfflineKick(0.70, hitTime);
+          else if (currentStepInBar === 6) playOfflineKick(0.30, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSnare(0.35, hitTime);
+          if (currentStepInBar === 0) playOfflineRide(0.48, hitTime);
+          else if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineRide(0.40, hitTime);
+          else if (currentStepInBar === 10) playOfflineRide(0.28, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineHatPedal(0.32, hitTime);
         } else {
-          if (currentStepInBar === 0) playOfflineKick(1.0, hitTime);
-          if (currentStepInBar === 4) playOfflineSnare(0.7, hitTime);
-          if (currentStepInBar === 8 || currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.8, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
+          if (currentStepInBar === 0) { playOfflineKick(0.90, hitTime); playOfflineRide(0.28, hitTime); }
+          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSnare(0.45, hitTime);
+          else if (currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.25, hitTime);
         }
       } else if (style === 'ballad68') {
         if (variation === 'A') {
           if (currentStepInBar === 0) playOfflineKick(1.2, hitTime);
           else if (currentStepInBar === 5) playOfflineKick(0.6, hitTime);
           if (currentStepInBar === 6) playOfflineSnare(1.1, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 0 || currentStepInBar === 6) ? 1.0 : 0.6, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 0 || currentStepInBar === 6) ? 0.55 : 0.35, hitTime);
         } else if (variation === 'B') {
           if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 5) playOfflineKick(1.1, hitTime);
           if (currentStepInBar === 6) playOfflineSnare(1.15, hitTime);
-          else if (currentStepInBar === 11) playOfflineRim(0.5, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.82, hitTime);
+          else if (currentStepInBar === 11) playOfflineSnare(0.20, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.45, hitTime);
         } else {
           if (currentStepInBar === 0 || currentStepInBar === 5) playOfflineKick(1.2, hitTime);
           if (currentStepInBar === 6) playOfflineSnare(1.1, hitTime);
           else if (currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.85, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.45, hitTime);
         }
       } else if (style === 'disco') {
         if (variation === 'A') {
           if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineKick(1.15, hitTime);
           if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.0, hitTime);
-          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.05 : 0.5, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 0.72 : 0.38, hitTime);
         } else if (variation === 'B') {
           // 🌟 V2: 10/10 Goldstandard Disco Groove+ (Studio 54 / Chic / Daft Punk Energy)
           if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 12) {
@@ -510,31 +536,29 @@ async function mixMicWithDirectBackingBeat(
           }
           if (currentStepInBar === 4 || currentStepInBar === 12) {
             playOfflineSnare(1.15, hitTime);
-            playOfflineRim(0.70, hitTime);
           } else if (currentStepInBar === 15) {
             playOfflineSnare(0.32, hitTime);
           }
           if (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) {
-            playOfflineHat(true, 1.15, hitTime);
+            playOfflineHat(true, 0.68, hitTime);
           } else if (currentStepInBar === 3 || currentStepInBar === 7 || currentStepInBar === 11 || currentStepInBar === 15) {
-            playOfflineHat(false, 0.55, hitTime);
-          } else if (currentStepInBar % 4 === 0) {
-            playOfflineHat(false, 0.85, hitTime);
-          } else {
             playOfflineHat(false, 0.38, hitTime);
+          } else if (currentStepInBar % 4 === 0) {
+            playOfflineHat(false, 0.55, hitTime);
+          } else {
+            playOfflineHat(false, 0.28, hitTime);
           }
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.38, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.32, hitTime);
         } else {
           // 🌟 V3: Complex (Full Disco fill with rolling snares & crash transition)
           if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineKick(1.15, hitTime);
           if (currentStepInBar === 4) {
             playOfflineSnare(1.15, hitTime);
-            playOfflineRim(0.70, hitTime);
           } else if (currentStepInBar === 12 || currentStepInBar === 13 || currentStepInBar === 14 || currentStepInBar === 15) {
             playOfflineSnare(currentStepInBar === 12 ? 1.15 : (currentStepInBar === 13 ? 0.70 : (currentStepInBar === 14 ? 0.85 : 1.05)), hitTime);
           }
-          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 2 || currentStepInBar === 6, (currentStepInBar === 2 || currentStepInBar === 6) ? 1.1 : 0.65, hitTime);
-          playOfflineShaker(currentStepInBar % 2 === 0, 0.40, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 2 || currentStepInBar === 6, (currentStepInBar === 2 || currentStepInBar === 6) ? 0.70 : 0.42, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.35, hitTime);
         }
       } else {
         // Steady 4/4 groove fallback
@@ -1186,6 +1210,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const isPlayingRef = useRef(isPlaying);
   const sampleBufferCacheRef = useRef<Record<string, Record<string, AudioBuffer>>>({});
   const activeOpenHatGainsRef = useRef<GainNode[]>([]);
+  const activeRideGainsRef = useRef<GainNode[]>([]);
 
   const getOrCreateGenreSampleBuffers = (ctx: AudioContext, genre: string): Record<string, AudioBuffer> => {
     if (sampleBufferCacheRef.current[genre]) {
@@ -1193,18 +1218,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     }
 
     // High-Resolution 0,1% Studio Stereo Acoustic Drum Samples
-    const kickBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'kick', 'medium', 0);
-    const snareBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'snare', 'medium', 0);
-    const hatClosedBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatClosed', 'medium', 0);
-    const hatOpenBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatOpen', 'medium', 0);
-    const clickBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'rim', 'medium', 0);
-
     const kitBuffers: Record<string, AudioBuffer> = {
-      kick: kickBuf,
-      snare: snareBuf,
-      hatClosed: hatClosedBuf,
-      hatOpen: hatOpenBuf,
-      click: clickBuf,
+      kick: StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'kick', 'medium', 0),
+      snare: StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'snare', 'medium', 0),
+      hatClosed: StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatClosed', 'medium', 0),
+      hatOpen: StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatOpen', 'medium', 0),
+      hatPedal: StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatPedal', 'medium', 0),
+      click: StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'rim', 'medium', 0),
       rim: renderRimBuffer(ctx),
       ride: renderRideBuffer(ctx),
       shakerFwd: renderShakerBuffer(ctx, true),
@@ -1256,6 +1276,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     setIsPlaying(false);
     setRecordSeconds(0);
     activeOpenHatGainsRef.current = [];
+    activeRideGainsRef.current = [];
 
     if (isRecordingRef.current) {
       setIsRecording(false);
@@ -1741,28 +1762,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     compressor.attack.setValueAtTime(0.015, audioCtx.currentTime);
     compressor.release.setValueAtTime(0.12, audioCtx.currentTime);
 
-    // 🌟 3D Studio Room Ambience bus (-22 dB diffuse wooden studio reflection)
-    const roomGain = audioCtx.createGain();
-    roomGain.gain.setValueAtTime(0.08, audioCtx.currentTime); // subtle -22 dB
-    const roomDelayL = audioCtx.createDelay();
-    roomDelayL.delayTime.setValueAtTime(0.019, audioCtx.currentTime);
-    const roomDelayR = audioCtx.createDelay();
-    roomDelayR.delayTime.setValueAtTime(0.027, audioCtx.currentTime);
-    const roomFilter = audioCtx.createBiquadFilter();
-    roomFilter.type = 'lowpass';
-    roomFilter.frequency.setValueAtTime(4200, audioCtx.currentTime);
-
-    const roomMerger = audioCtx.createChannelMerger(2);
-    roomDelayL.connect(roomMerger, 0, 0);
-    roomDelayR.connect(roomMerger, 0, 1);
-    roomMerger.connect(roomFilter);
-    roomFilter.connect(roomGain);
-    roomGain.connect(compressor);
-
-    // Direct Dry Signal + Parallel Acoustic Room Glue
+    // 🌟 100% Pure Direct Studio Dry Path (Zero Comb-Filtering, Zero Room Echo)
     masterGain.connect(compressor);
-    masterGain.connect(roomDelayL);
-    masterGain.connect(roomDelayR);
     compressor.connect(audioCtx.destination);
     masterGainRef.current = masterGain;
 
@@ -2099,33 +2100,31 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     const microSwingOffset = (isHipHopOrFunk && step % 2 === 1) ? ((60.0 / bpmRef.current) / 4) * 0.12 : 0;
     const noteTime = time + microSwingOffset;
 
-    // 🌟 Hi-Hat Choking Engine (8ms physical pedal clamp)
-    const chokeOpenHats = (atTime: number) => {
-      const gains = activeOpenHatGainsRef.current;
-      activeOpenHatGainsRef.current = [];
+    // 🌟 Voice Choking Engine (Hi-Hat 8ms pedal clamp, Ride 70ms natural acoustic damping)
+    const chokeVoiceGains = (ref: React.MutableRefObject<GainNode[]>, atTime: number, rampSec: number) => {
+      const gains = ref.current;
+      ref.current = [];
       for (const g of gains) {
         try {
           g.gain.cancelScheduledValues(atTime);
           g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), atTime);
-          g.gain.exponentialRampToValueAtTime(0.0001, atTime + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.0001, atTime + rampSec);
         } catch {}
       }
     };
+    const chokeOpenHats = (atTime: number) => chokeVoiceGains(activeOpenHatGainsRef, atTime, 0.008);
+    const chokeRides = (atTime: number) => chokeVoiceGains(activeRideGainsRef, atTime, 0.070);
 
     // High-End Sample Playback with Micro-Ramp (Zero Clicking & Phase-Locked Metronome Alignment)
     const playSample = (buffer: AudioBuffer, vol: number, volMultiplier = 1.0, pitchJitter = 0.0, filterNode?: BiquadFilterNode): GainNode | null => {
       if (vol <= 0.001 || !buffer) return null;
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      if (pitchJitter > 0) {
-        source.playbackRate.value = 1 + (Math.random() * 2 - 1) * pitchJitter;
-      }
+      if (pitchJitter > 0) source.playbackRate.value = 1 + (Math.random() * 2 - 1) * pitchJitter;
       const gain = ctx.createGain();
       const targetGain = vol * volMultiplier * 0.85;
-      // Micro 0.8ms linear ramp prevents DC zero-crossing clicks & pops
       gain.gain.setValueAtTime(0.0001, noteTime);
       gain.gain.linearRampToValueAtTime(targetGain, noteTime + 0.0008);
-      
       if (filterNode) {
         source.connect(filterNode);
         filterNode.connect(gain);
@@ -2137,7 +2136,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       return gain;
     };
 
-    // 🎚️ Tonmeister Studio Mix Calibration:
     const playKick = (volMul = 1.0) => playSample(kitBuffers.kick, kVol, volMul * 1.0, 0.008);
 
     // 🌟 Multi-Velocity Snare (Dynamic Ghost-Note Layer at volMul <= 0.35)
@@ -2154,20 +2152,30 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
     const playRimClick = (volMul = 1.0) => playSample(kitBuffers.rim, sVol, volMul * 0.63, 0.010);
 
-    // 🌟 Hi-Hat with automatic Choking on pedal closing
+    // 🌟 Hi-Hat with automatic Choking on pedal closing (Warm & Balanced Studio Leveling)
     const playHat = (isOpen = false, volMul = 1.0) => {
       if (isOpen) {
-        const g = playSample(kitBuffers.hatOpen, hVol, volMul * 0.38, 0.018);
+        const g = playSample(kitBuffers.hatOpen, hVol, volMul * 0.28, 0.012);
         if (g) activeOpenHatGainsRef.current.push(g);
         return g;
       } else {
         chokeOpenHats(noteTime);
-        return playSample(kitBuffers.hatClosed, hVol, volMul * 0.45, 0.018);
+        return playSample(kitBuffers.hatClosed, hVol, volMul * 0.32, 0.012);
       }
     };
 
-    // 🌟 Supplementary Studio Instruments (Warm Ride & Organic Shaker)
-    const playRide = (volMul = 1.0) => playSample(kitBuffers.ride, hVol, volMul * 0.33, 0.012);
+    const playHatPedal = (volMul = 1.0) => {
+      chokeOpenHats(noteTime);
+      return playSample(kitBuffers.hatPedal, hVol, volMul * 0.32, 0.010);
+    };
+
+    // 🌟 Supplementary Studio Instruments (Warm Damped Ride & Organic Shaker)
+    const playRide = (volMul = 1.0) => {
+      chokeRides(noteTime);
+      const g = playSample(kitBuffers.ride, hVol, volMul * 0.28, 0.010);
+      if (g) activeRideGainsRef.current.push(g);
+      return g;
+    };
     const playShaker = (forward = true, volMul = 1.0) => playSample(forward ? kitBuffers.shakerFwd : kitBuffers.shakerBack, hVol, volMul * 0.26, 0.025);
     const playClick = (isAccent = false) => playKlopfgeistClick(ctx, noteTime, isAccent, selectedStyleRef.current === 'metronome' ? mVol : mVol * 0.75, masterGain, clickPresenceRef.current);
 
@@ -2271,7 +2279,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         else if (step === 3 || step === 10) playKick(0.9);
         if (step === 4 || step === 12) playSnare(1.1);
         else if (step === 7 || step === 15) playSnare(0.22); // Multi-velocity ghost
-        if (step % 2 === 0) playHat(step === 14, step % 4 === 0 ? 0.9 : 0.55);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.9 : 0.55);
       } else if (variant === 'B') {
         // V2: Groove+ (Boom-Bap double kick)
         if (step === 0 || step === 2 || step === 8 || step === 10) playKick(1.2);
@@ -2292,118 +2300,107 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (isSwing) {
       if (variant === 'A') {
-        // 🌟 V1: Classic jazz swing - Authentic 20" Ride cymbal with feathered kick & hi-hat foot chick
-        if (step === 0 || step === 3 || step === 6 || step === 9) playKick(0.20);
-        if (step === 2) playRimClick(0.35);
-        else if (step === 8) playSnare(0.30);
-        if (step === 0 || step === 3 || step === 6 || step === 9) playRide(0.75);
-        else if (step === 2 || step === 5 || step === 8 || step === 11) playRide(0.38);
-        if (step === 3 || step === 9) playHat(false, 0.65); // Hi-Hat foot chick on 2 & 4
+        // 🌟 Authentic 20" Flat Ride "spang-a-lang" & Warm Snare Backbeat on 2 & 4
+        if (step === 0 || step === 6) playKick(0.15);
+        if (step === 8) playSnare(0.20);
+        if (step === 0 || step === 6) playRide(0.55);
+        else if (step === 3 || step === 9) playRide(0.42);
+        else if (step === 5 || step === 11) playRide(0.28);
+        if (step === 3) { playSnare(0.35); playHatPedal(0.45); }
+        else if (step === 9) { playSnare(0.38); playHatPedal(0.45); }
       } else if (variant === 'B') {
-        // 🌟 V2: Groove+ (Comping snare hits & Ride)
-        if (step === 0 || step === 6) playKick(0.22);
-        if (step === 2 || step === 5 || step === 11) playSnare(0.38);
-        if (step === 0 || step === 3 || step === 6 || step === 9) playRide(0.80);
-        else if (step === 2 || step === 5 || step === 8 || step === 11) playRide(0.42);
-        if (step === 3 || step === 9) playHat(false, 0.70);
+        if (step === 0 || step === 6) playKick(0.18);
+        if (step === 5 || step === 11) playSnare(0.25);
+        if (step === 0 || step === 6) playRide(0.58);
+        else if (step === 3 || step === 9) playRide(0.45);
+        else if (step === 5 || step === 11) playRide(0.30);
+        if (step === 3) { playSnare(0.38); playHatPedal(0.48); }
+        else if (step === 9) { playSnare(0.42); playHatPedal(0.48); }
       } else {
-        // 🌟 V3: Complex (Swing triplets fill & Ride wash)
-        if (step === 0 || step === 6) playKick(0.28);
-        if (step === 9 || step === 10 || step === 11) {
-          playSnare(0.55); // crescendo snare fill
-        } else if (step === 2 || step === 5) {
-          playSnare(0.26);
-        }
-        if (step === 0 || step === 3 || step === 6 || step === 9) playRide(0.75);
-        else if (step === 2 || step === 5 || step === 8) playRide(0.40);
-        if (step === 3 || step === 9) playHat(false, 0.68);
+        if (step === 0) playKick(0.22);
+        else if (step === 8) playKick(0.18);
+        if (step === 10 || step === 11) playSnare(0.35);
+        else if (step === 2 || step === 5) playSnare(0.20);
+        if (step === 0 || step === 6) playRide(0.55);
+        else if (step === 3 || step === 9) playRide(0.42);
+        else if (step === 5 || step === 11) playRide(0.28);
+        if (step === 3) { playSnare(0.35); playHatPedal(0.45); }
+        else if (step === 9) { playSnare(0.38); playHatPedal(0.45); }
       }
       if (step % 3 === 0) triggerVisualBeat(Math.floor(step / 3));
     } else if (selectedStyleRef.current === 'latin') {
       if (variant === 'A') {
-        // V1: Classic Bossa double kick & rim clave with subtle studio shaker
         if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.90);
-        if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick(0.95);
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.70 : 0.40);
-        playShaker(step % 2 === 0, 0.35);
+        if (step === 4 || step === 12) playSnare(0.55);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.45 : 0.28);
+        playShaker(step % 2 === 0, 0.28);
       } else if (variant === 'B') {
-        // V2: Groove+ (High-energy Samba surdo sweep with subtle shaker)
         if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 14) {
-          playKick(step % 4 === 2 ? 1.05 : 0.55); // typical surdo groove
+          playKick(step % 4 === 2 ? 1.05 : 0.55);
         }
-        if (step === 0 || step === 4 || step === 8 || step === 12) playRimClick(0.90);
-        if (step % 2 === 0) playHat(false, 0.65);
-        playShaker(step % 2 === 0, 0.40);
+        if (step === 4 || step === 12) playSnare(0.55);
+        if (step % 2 === 0) playHat(false, 0.45);
+        playShaker(step % 2 === 0, 0.30);
       } else {
-        // V3: Complex (Cascara clave & open hats)
         if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.95);
-        // Cascara rimshot pattern
-        if (step === 0 || step === 2 || step === 3 || step === 5 || step === 6 || step === 8 || step === 10 || step === 11 || step === 13 || step === 14) {
-          playRimClick(0.80);
-        }
-        if (step % 4 === 2) playHat(true, 0.65); // open hat barks with choke
-        playShaker(step % 2 === 0, 0.42);
+        if (step === 4 || step === 12) playSnare(0.55);
+        if (step % 4 === 2) playHat(true, 0.45);
+        playShaker(step % 2 === 0, 0.30);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'funk') {
       if (variant === 'A') {
-        // V1: Funky Breakbeat with ghost snares
         if (step === 0 || step === 6 || step === 10 || step === 11) playKick(1.15);
         if (step === 4 || step === 12) playSnare(1.1);
-        else if (step === 7 || step === 13 || step === 15) playSnare(0.28); // Multi-velocity ghost
-        if (step % 2 === 0) playHat(step === 6 || step === 14, (step === 6 || step === 14) ? 1.0 : (step % 4 === 0 ? 0.95 : 0.55));
-        else if (step === 3 || step === 11) playHat(false, 0.35);
+        else if (step === 7 || step === 13 || step === 15) playSnare(0.28);
+        if (step % 2 === 0) playHat(step === 6 || step === 14, (step === 6 || step === 14) ? 0.68 : (step % 4 === 0 ? 0.60 : 0.38));
+        else if (step === 3 || step === 11) playHat(false, 0.28);
       } else if (variant === 'B') {
-        // V2: Groove+ (Linear Funk - tight groove, no simultaneous strikes)
         if (step === 0 || step === 6 || step === 10) playKick(1.2);
         else if (step === 4 || step === 12 || step === 14) playSnare(1.15);
-        else if (step === 2 || step === 8 || step === 15) playHat(false, 0.85);
+        else if (step === 2 || step === 8 || step === 15) playHat(false, 0.55);
       } else {
-        // V3: Complex (Funk drum fill)
         if (step === 0 || step === 6 || step === 11) playKick(1.2);
         if (step === 4 || step === 12) playSnare(1.1);
-        else if (step === 13 || step === 14 || step === 15) playSnare(0.9); // rapid fill
-        if (step % 2 === 0) playHat(false, 0.8);
+        else if (step === 13 || step === 14 || step === 15) playSnare(0.9);
+        if (step % 2 === 0) playHat(false, 0.52);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'reggae') {
       if (variant === 'A') {
-        // V1: Classic One-Drop with guide click
-        if (step === 8) { playKick(1.2); playSnare(1.05); }
-        if (step === 4 || step === 12) playRimClick(0.9);
-        if (step === 0) playRimClick(0.22); // pedagogical guide
-        if (step % 2 === 0) playHat(false, (step === 2 || step === 6 || step === 10 || step === 14) ? 1.0 : 0.58);
+        // 🌟 Warm Snare Backbeat on 2 & 4 + One-Drop on Beat 3
+        if (step === 4 || step === 12) playSnare(0.75);
+        if (step === 8) { playKick(1.2); playSnare(1.10); }
+        if (step % 2 === 0) playHat(false, (step === 2 || step === 6 || step === 10 || step === 14) ? 0.52 : 0.25);
       } else if (variant === 'B') {
-        // V2: Groove+ (Steppers style - four on the floor kick)
-        if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
-        if (step === 8) playSnare(1.05);
-        if (step === 4 || step === 12) playRimClick(0.85);
-        if (step % 2 === 0) playHat(false, 0.88);
+        if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.05);
+        if (step === 4 || step === 12) playSnare(0.85);
+        if (step === 8) playSnare(1.10);
+        if (step % 2 === 0) playHat(false, (step === 2 || step === 6 || step === 10 || step === 14) ? 0.52 : 0.28);
       } else {
-        // V3: Complex (Rocksteady with rimshot fill)
-        if (step === 8) playKick(1.2);
-        if (step === 8 || step === 14 || step === 15) playSnare(1.0);
-        if (step === 4 || step === 12) playRimClick(0.9);
-        if (step % 2 === 0) playHat(false, 0.8);
+        if (step === 4 || step === 12) playSnare(0.80);
+        if (step === 8) playKick(1.15);
+        if (step === 8) playSnare(1.10);
+        else if (step === 14 || step === 15) playSnare(0.35);
+        if (step % 2 === 0) playHat(false, (step === 2 || step === 6 || step === 10 || step === 14) ? 0.50 : 0.25);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'walzer') {
       if (variant === 'A') {
-        // V1: Classic Waltz boom-chick-chick
-        if (step === 0) playKick(1.0);
-        if (step === 4 || step === 8) { playRimClick(0.85); playSnare(0.22); }
-        if (step % 2 === 0) playHat(false, step === 0 ? 0.95 : (step === 4 || step === 8 ? 0.72 : 0.45));
+        if (step === 0) { playKick(0.85); playRide(0.25); }
+        if (step === 4 || step === 8) playSnare(0.42);
       } else if (variant === 'B') {
-        // V2: Groove+ (Syncopated Jazz Waltz)
-        if (step === 0 || step === 6) playKick(0.9);
-        if (step === 4 || step === 8) playSnare(0.75);
-        if (step === 0 || step === 3 || step === 4 || step === 7 || step === 8 || step === 11) playHat(false, 0.8);
+        if (step === 0) playKick(0.70);
+        else if (step === 6) playKick(0.30);
+        if (step === 4 || step === 8) playSnare(0.35);
+        if (step === 0) playRide(0.48);
+        else if (step === 4 || step === 8) playRide(0.40);
+        else if (step === 10) playRide(0.28);
+        if (step === 4 || step === 8) playHatPedal(0.32);
       } else {
-        // V3: Complex (Waltz snare fill)
-        if (step === 0) playKick(1.0);
-        if (step === 4) playSnare(0.7);
-        if (step === 8 || step === 9 || step === 10 || step === 11) playSnare(0.8); // 3rd beat roll
-        if (step % 2 === 0) playHat(false, 0.8);
+        if (step === 0) { playKick(0.90); playRide(0.28); }
+        if (step === 4 || step === 8) playSnare(0.45);
+        else if (step === 10 || step === 11) playSnare(0.25);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'ballad68') {
@@ -2412,19 +2409,19 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         if (step === 0) playKick(1.2);
         else if (step === 5) playKick(0.6);
         if (step === 6) playSnare(1.1);
-        if (step % 2 === 0) playHat(false, (step === 0 || step === 6) ? 1.0 : 0.6);
+        if (step % 2 === 0) playHat(false, (step === 0 || step === 6) ? 0.55 : 0.35);
       } else if (variant === 'B') {
         // V2: Groove+ (Heartbeat Ballad)
         if (step === 0 || step === 4 || step === 5) playKick(1.1);
         if (step === 6) playSnare(1.15);
-        else if (step === 11) playRimClick(0.5);
-        if (step % 2 === 0) playHat(false, 0.82);
+        else if (step === 11) playSnare(0.20);
+        if (step % 2 === 0) playHat(false, 0.45);
       } else {
         // V3: Complex (Ballad fill on 10/11)
         if (step === 0 || step === 5) playKick(1.2);
         if (step === 6) playSnare(1.1);
-        else if (step === 10 || step === 11) playSnare(0.85); // roll
-        if (step % 2 === 0) playHat(false, 0.8);
+        else if (step === 10 || step === 11) playSnare(0.85);
+        if (step % 2 === 0) playHat(false, 0.45);
       }
       if (step % 2 === 0) triggerVisualBeat(Math.floor(step / 2));
     } else if (selectedStyleRef.current === 'disco') {
@@ -2432,66 +2429,60 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         // V1: Classic Four-on-the-Floor
         if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
         if (step === 4 || step === 12) playSnare(1.0);
-        if (step % 2 === 0) playHat(step === 2 || step === 6 || step === 10 || step === 14, (step === 2 || step === 6 || step === 10 || step === 14) ? 1.05 : 0.5);
+        if (step % 2 === 0) playHat(step === 2 || step === 6 || step === 10 || step === 14, (step === 2 || step === 6 || step === 10 || step === 14) ? 0.72 : 0.38);
       } else if (variant === 'B') {
         // 🌟 V2: 10/10 Goldstandard Disco Groove+ (Studio 54 / Chic / Daft Punk Energy)
-        // 1. Four-on-the-floor with infectious "3 und" bounce kick
         if (step === 0 || step === 4 || step === 8 || step === 10 || step === 12) {
           playKick(step === 10 ? 0.95 : 1.20);
         }
-        // 2. Layered Snare & Rimshot backbeat + 16th prep ghost note
         if (step === 4 || step === 12) {
           playSnare(1.15);
-          playRimClick(0.70);
         } else if (step === 15) {
-          playSnare(0.32); // subtle 16th ghost pickup
+          playSnare(0.32);
         }
-        // 3. Relentless 16th-note pumping Hi-Hat with open offbeat barks & pedal chokes
         if (step === 2 || step === 6 || step === 10 || step === 14) {
-          playHat(true, 1.15); // open hat sizzle on offbeats
+          playHat(true, 0.68);
         } else if (step === 3 || step === 7 || step === 11 || step === 15) {
-          playHat(false, 0.55); // instant physical pedal choke
+          playHat(false, 0.38);
         } else if (step % 4 === 0) {
-          playHat(false, 0.85); // crisp quarter tap
+          playHat(false, 0.55);
         } else {
-          playHat(false, 0.38); // driving 16th ghost tick
+          playHat(false, 0.28);
         }
-        // 4. Shimmering Studio Shaker Teppich for air & forward momentum
-        playShaker(step % 2 === 0, 0.38);
+        playShaker(step % 2 === 0, 0.32);
       } else {
         // 🌟 V3: Complex (Full Disco fill with rolling snares & crash transition)
         if (step === 0 || step === 4 || step === 8 || step === 10 || step === 11) playKick(1.15);
         if (step === 4) {
           playSnare(1.15);
-          playRimClick(0.70);
         } else if (step === 12 || step === 13 || step === 14 || step === 15) {
-          playSnare(step === 12 ? 1.15 : (step === 13 ? 0.70 : (step === 14 ? 0.85 : 1.05))); // crescendo fill
+          playSnare(step === 12 ? 1.15 : (step === 13 ? 0.70 : (step === 14 ? 0.85 : 1.05)));
         }
-        if (step % 2 === 0) playHat(step === 2 || step === 6, (step === 2 || step === 6) ? 1.1 : 0.65);
-        playShaker(step % 2 === 0, 0.40);
+        if (step % 2 === 0) playHat(step === 2 || step === 6, (step === 2 || step === 6) ? 0.70 : 0.42);
+        playShaker(step % 2 === 0, 0.35);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'singersongwriter') {
       if (variant === 'A') {
-        // V1: Soft Acoustic Folk Pocket (Feathered Kick & Rimshot + Studio Shaker)
+        // V1: Soft Acoustic Folk Pocket (Feathered Kick & Warm Snare + Studio Shaker)
         if (step === 0 || step === 10) playKick(0.70);
-        if (step === 4 || step === 12) playRimClick(0.85);
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.65 : 0.35);
-        playShaker(step % 2 === 0, 0.32);
+        if (step === 4 || step === 12) playSnare(0.65);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.50 : 0.30);
+        playShaker(step % 2 === 0, 0.28);
       } else if (variant === 'B') {
         // V2: Groove+ (Shaker & Soft Brush Snare)
         if (step === 0 || step === 10) playKick(0.75);
-        if (step === 4 || step === 12) playSnare(0.48); // soft brush snare
-        else if (step === 7 || step === 15) playSnare(0.16); // subtle brush scrape
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.70 : 0.40);
-        playShaker(step % 2 === 0, 0.38);
+        if (step === 4 || step === 12) playSnare(0.48);
+        else if (step === 7 || step === 15) playSnare(0.16);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.55 : 0.35);
+        playShaker(step % 2 === 0, 0.30);
       } else {
         // V3: Complex (Singer-Songwriter Acoustic Fill & Open Hat Sizzle + Shaker)
         if (step === 0 || step === 6 || step === 10) playKick(0.80);
         if (step === 4 || step === 12) playSnare(0.55);
-        else if (step === 14 || step === 15) playRimClick(0.70); // acoustic wooden fill
-        if (step % 2 === 0) playHat(step === 10, step === 10 ? 0.70 : 0.45);
-        playShaker(step % 2 === 0, 0.40);
+        else if (step === 14 || step === 15) playSnare(0.22);
+        if (step % 2 === 0) playHat(step === 10, step === 10 ? 0.60 : 0.38);
+        playShaker(step % 2 === 0, 0.32);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     }
@@ -2553,7 +2544,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           inset: 0,
           borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
           border: '4px solid #facc15',
-          boxShadow: 'inset 0 0 30px rgba(250, 204, 21, 0.45)',
+          boxShadow: 'none',
           pointerEvents: 'none',
           zIndex: 50,
           animation: 'pulse 0.12s ease-out'
@@ -3452,7 +3443,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 10px rgba(234, 179, 8, 0.40)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   touchAction: 'manipulation'
                 }}
@@ -3758,7 +3749,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           padding: '2px 4px',
                           lineHeight: 1,
                           outline: 'none',
-                          boxShadow: '0 0 0 3px rgba(234, 179, 8, 0.25)'
+                          boxShadow: 'none'
                         }}
                       />
                       <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 900 }}>
@@ -4148,7 +4139,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               gap: '6px',
               fontSize: '0.74rem',
               fontWeight: 900,
-              boxShadow: '0 0 16px rgba(99, 102, 241, 0.4)',
+              boxShadow: 'none',
               animation: 'pulse 1.2s infinite'
             }}>
               <span>🧠 Zähle im Kopf weiter... (Stummtakt)</span>
@@ -4369,7 +4360,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               height: '100%',
               width: `${barProgress}%`,
               background: 'linear-gradient(90deg, #facc15 0%, #eab308 100%)',
-              boxShadow: '0 0 8px rgba(234, 179, 8, 0.5)',
+              boxShadow: 'none',
               borderRadius: '10px',
               transition: isPlaying ? 'none' : 'width 0.1s ease-out'
             }} />
@@ -4388,7 +4379,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              boxShadow: '0 2px 6px rgba(234, 179, 8, 0.1)'
+              boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Music size={15} style={{ color: '#ca8a04' }} />
@@ -4496,7 +4487,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 </>
               ) : (
                 <>
-                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)' }} />
+                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ef4444', boxShadow: 'none' }} />
                   <span>Aufnahme</span>
                 </>
               )}
@@ -4513,7 +4504,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               border: '1.5px solid #fde68a',
               borderRadius: '16px',
               padding: '14px 16px',
-              boxShadow: '0 8px 24px -4px rgba(245, 158, 11, 0.18), 0 2px 6px rgba(0,0,0,0.04)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
@@ -4531,7 +4522,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#ffffff',
-                    boxShadow: '0 3px 8px rgba(245, 158, 11, 0.35)',
+                    boxShadow: 'none',
                     flexShrink: 0
                   }}>
                     <Headphones size={16} />
@@ -4594,7 +4585,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+                    boxShadow: 'none',
                     flexShrink: 0
                   }}
                 >
@@ -4674,7 +4665,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '5px',
-                    boxShadow: '0 3px 10px rgba(234, 179, 8, 0.35)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -4697,7 +4688,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               alignItems: 'center',
               justifyContent: 'space-between',
               animation: 'scaleIn 0.2s ease-out',
-              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.15)',
+              boxShadow: 'none',
               boxSizing: 'border-box'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4977,7 +4968,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                      boxShadow: 'none'
                     }}
                   >
                     <BookOpen size={14} />

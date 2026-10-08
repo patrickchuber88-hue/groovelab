@@ -2480,7 +2480,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 3px 10px rgba(239, 68, 68, 0.2)',
+                    boxShadow: 'none',
                     flexShrink: 0
                   }}>
                     <Mic size={20} strokeWidth={2.4} />
@@ -2613,7 +2613,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px',
-                          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)',
+                          boxShadow: 'none',
                           transition: 'all 0.15s ease'
                         }}
                         className="hover-scale"
@@ -3502,7 +3502,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
               borderRadius: '20px',
               padding: '16px 20px',
               border: '1.5px solid #e0e7ff',
-              boxShadow: '0 4px 18px rgba(99, 102, 241, 0.05)'
+              boxShadow: 'none'
             }}>
               <div style={{
                 fontSize: '0.78rem',
@@ -3680,7 +3680,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     borderRadius: '24px',
                     padding: isMobileOrSim ? '16px 14px' : '24px',
                     border: '1.5px solid #ede9fe',
-                    boxShadow: '0 4px 20px rgba(109, 40, 217, 0.04)',
+                    boxShadow: 'none',
                     position: 'relative'
                   }}
                 >
@@ -3702,7 +3702,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 2px 6px rgba(124, 58, 237, 0.12)'
+                        boxShadow: 'none'
                       }}>
                         <Star size={18} strokeWidth={2.4} />
                       </div>
@@ -3778,7 +3778,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             fontSize: '0.78rem',
                             fontWeight: 850,
                             cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)'
+                            boxShadow: 'none'
                           }}
                           className="hover-scale-mini"
                         >
@@ -3813,7 +3813,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     borderRadius: '24px',
                     padding: isMobileOrSim ? '16px 14px' : '24px',
                     border: '1.5px solid #10b981',
-                    boxShadow: '0 4px 20px rgba(16, 185, 129, 0.08)',
+                    boxShadow: 'none',
                     position: 'relative'
                   }}
                 >
@@ -3835,7 +3835,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.28)'
+                        boxShadow: 'none'
                       }}>
                         <Mic size={18} strokeWidth={2.4} />
                       </div>
@@ -3911,7 +3911,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             fontSize: '0.78rem',
                             fontWeight: 850,
                             cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(21, 128, 61, 0.25)'
+                            boxShadow: 'none'
                           }}
                           className="hover-scale-mini"
                         >

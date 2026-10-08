@@ -5453,20 +5453,6 @@ export function ScheduleCalendarView({
       });
     } catch {}
 
-    // 5. Tier-1 Enterprise+ Fallback for Peter Pan / Default teaching room:
-    // If teacher is explicitly Peter Pan, ensure 'Raum 4' from the rooms catalog is included
-    const targetTeacher = teachers?.find((t: any) => t.id === userId);
-    const isPeter = targetTeacher 
-      ? (targetTeacher.first_name || '').toLowerCase().includes('peter') || (targetTeacher.name || '').toLowerCase().includes('peter')
-      : false;
-
-    if (isPeter) {
-      const raum4 = (rooms || []).find((r: any) => (r.name || '').trim().toLowerCase() === 'raum 4' || (r.name || '').toLowerCase().includes('raum 4'));
-      if (raum4) {
-        ids.add(raum4.id);
-      }
-    }
-
     return Array.from(ids);
   }, [occurrences, cachedWeekSchedules, userId, boards, rooms, schoolId, teachers]);
 
@@ -5688,9 +5674,9 @@ export function ScheduleCalendarView({
     <div className="fluid-board-scroll-container cg-full-height-board" style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       <style>{`
         @keyframes pulse-yellow {
-          0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
-          70% { transform: scale(1.2); opacity: 0.8; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
-          100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+          0% { transform: scale(1); opacity: 1; box-shadow: none; }
+          70% { transform: scale(1.2); opacity: 0.8; box-shadow: none; }
+          100% { transform: scale(1); opacity: 1; box-shadow: none; }
         }
         .pulse-yellow-indicator {
           animation: pulse-yellow 2s infinite;
@@ -5855,7 +5841,7 @@ export function ScheduleCalendarView({
                   color: '#0f172a',
                   fontSize: '0.78rem',
                   fontWeight: 800,
-                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.12)',
+                  boxShadow: 'none',
                   cursor: 'pointer',
                   flexShrink: 0
                 }}
@@ -6322,7 +6308,7 @@ export function ScheduleCalendarView({
                   background: '#2563eb',
                   color: '#ffffff',
                   fontWeight: 700,
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+                  boxShadow: 'none',
                   borderRadius: '8px'
                 }}
               >
@@ -6338,7 +6324,7 @@ export function ScheduleCalendarView({
                   background: brandColor,
                   color: '#ffffff',
                   fontWeight: 700,
-                  boxShadow: `0 2px 8px ${brandColor}33`,
+                  boxShadow: 'none',
                   borderRadius: '8px'
                 }}
               >
@@ -6406,7 +6392,7 @@ export function ScheduleCalendarView({
                     alignItems: 'center',
                     gap: '4px',
                     transition: 'all 0.2s',
-                    boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
+                    boxShadow: 'none'
                   }}
                   onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.05)'}
                   onMouseLeave={e => e.currentTarget.style.filter = 'none'}
@@ -6434,7 +6420,7 @@ export function ScheduleCalendarView({
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
-              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.03)',
+              boxShadow: 'none',
               flexWrap: 'wrap'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -6463,7 +6449,7 @@ export function ScheduleCalendarView({
                     alignItems: 'center',
                     gap: '4px',
                     transition: 'all 0.2s',
-                    boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)'
+                    boxShadow: 'none'
                   }}
                   onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.05)'}
                   onMouseLeave={e => e.currentTarget.style.filter = 'none'}
@@ -6628,7 +6614,7 @@ export function ScheduleCalendarView({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            boxShadow: '0 4px 14px rgba(59, 130, 246, 0.08)',
+            boxShadow: 'none',
             marginBottom: '8px',
           }}>
             <div style={{ fontSize: '1.25rem' }}>ℹ️</div>
@@ -7136,7 +7122,7 @@ export function ScheduleCalendarView({
                           border: '1.5px dashed rgba(34, 197, 94, 0.75)',
                           borderRadius: '8px',
                           zIndex: 10,
-                          boxShadow: '0 2px 8px rgba(34, 197, 94, 0.10)',
+                          boxShadow: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -7154,7 +7140,7 @@ export function ScheduleCalendarView({
                           padding: '2px 8px',
                           borderRadius: '6px',
                           border: '1px solid rgba(34, 197, 94, 0.4)',
-                          boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)',
+                          boxShadow: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
@@ -7183,7 +7169,7 @@ export function ScheduleCalendarView({
                         border: '1.5px dashed rgba(239, 68, 68, 0.7)',
                         borderRadius: '8px',
                         zIndex: 10,
-                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.10)',
+                        boxShadow: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -7201,7 +7187,7 @@ export function ScheduleCalendarView({
                         padding: '2px 8px',
                         borderRadius: '6px',
                         border: '1px solid rgba(239, 68, 68, 0.4)',
-                        boxShadow: '0 2px 6px rgba(239, 68, 68, 0.12)',
+                        boxShadow: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
@@ -7289,7 +7275,7 @@ export function ScheduleCalendarView({
                         pointerEvents: 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.7)'
+                        boxShadow: 'none'
                       }}
                     >
                       <div
@@ -7299,7 +7285,7 @@ export function ScheduleCalendarView({
                           borderRadius: '50%',
                           background: '#ef4444',
                           marginLeft: '-4px',
-                          boxShadow: '0 0 6px #ef4444'
+                          boxShadow: 'none'
                         }}
                       />
                     </div>
@@ -8352,7 +8338,7 @@ export function ScheduleCalendarView({
                                           background: '#fef08a',
                                           color: '#854d0e',
                                           border: '1px solid #fde047',
-                                          boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                          boxShadow: 'none',
                                           cursor: 'pointer',
                                           flexShrink: 0,
                                           transition: 'transform 0.15s ease'
@@ -8449,7 +8435,7 @@ export function ScheduleCalendarView({
                                         background: '#fef08a',
                                         color: '#854d0e',
                                         border: '1px solid #fde047',
-                                        boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                        boxShadow: 'none',
                                         cursor: 'pointer',
                                         marginTop: '2px',
                                         flexShrink: 0,
@@ -8563,7 +8549,7 @@ export function ScheduleCalendarView({
                                           background: '#fef08a',
                                           color: '#854d0e',
                                           border: '1px solid #fde047',
-                                          boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                          boxShadow: 'none',
                                           cursor: 'pointer',
                                           flexShrink: 0,
                                           transition: 'transform 0.15s ease'
@@ -8777,7 +8763,7 @@ return (
                                         background: '#fef08a',
                                         color: '#854d0e',
                                         border: '1px solid #fde047',
-                                        boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                        boxShadow: 'none',
                                         cursor: 'pointer',
                                         flexShrink: 0,
                                         transition: 'transform 0.15s ease'
@@ -9012,7 +8998,7 @@ return (
                     fontSize: '0.9rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
+                    boxShadow: 'none',
                     transition: 'all 0.2s'
                   }}
                   onMouseOver={e => e.currentTarget.style.background = '#34a853'}
@@ -9958,7 +9944,7 @@ return (
                         justifyContent: 'space-between',
                         gap: '12px',
                         marginBottom: '16px',
-                        boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)'
+                        boxShadow: 'none'
                       }}>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -10098,7 +10084,7 @@ return (
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   marginBottom: '10px',
-                                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)'
+                                  boxShadow: 'none'
                                 }}>
                                   <CalendarIcon size={22} />
                                 </div>
@@ -10709,7 +10695,7 @@ return (
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    boxShadow: '0 2px 6px rgba(234, 179, 8, 0.3)'
+                    boxShadow: 'none'
                   }}>
                     <ArrowLeftRight size={12} strokeWidth={2.6} />
                   </div>
@@ -10903,7 +10889,7 @@ return (
                   fontSize: '0.80rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)',
+                  boxShadow: 'none',
                   transition: 'all 0.18s ease',
                   display: 'flex',
                   alignItems: 'center',
@@ -11518,7 +11504,7 @@ return (
                     background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
                     borderRadius: '9999px',
                     transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: '0 1px 3px rgba(220, 38, 38, 0.4)'
+                    boxShadow: 'none'
                   }}
                 />
               </div>
@@ -11663,7 +11649,7 @@ return (
                   fontWeight: 800,
                   color: '#ffffff',
                   cursor: isExecutingReset ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   minWidth: '80px',
                   textAlign: 'center',

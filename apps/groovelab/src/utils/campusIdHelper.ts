@@ -115,23 +115,22 @@ const deriveStableSequenceFromUuid = (uuid: string, roleCode: CampusRoleCode, us
   const lowerUuid = uuid.toLowerCase().trim();
   const lowerName = (userName || '').toLowerCase().trim();
 
-  // 🌟 Flagship Seed-Identitäten (Musäk Bad Säckingen)
+  // 🌟 Flagship Seed-Identitäten (Kanonische Test- & Gründer-UUIDs)
   // Linus K. (Schüler #1)
-  if (lowerUuid === '15102f5e-c504-4c33-93ab-436285197c8c' || lowerName.includes('linus')) {
+  if (lowerUuid === '15102f5e-c504-4c33-93ab-436285197c8c') {
     return 1;
   }
   // Patrick Huber (Lehrkraft / Dozent #1)
   if (lowerUuid === '55555555-5555-5555-5555-555555555555' || 
-      lowerUuid === '11079eae-664a-49a4-8692-771d83a3193c' || 
-      lowerName.includes('patrick')) {
+      lowerUuid === '11079eae-664a-49a4-8692-771d83a3193c') {
     return 1;
   }
   // Manuel Wagner (Schulleitung / Verwaltung #1)
-  if (lowerUuid === 'f8d28267-0552-48b5-b1cd-0e415409ecd4' || lowerName.includes('manuel')) {
+  if (lowerUuid === 'f8d28267-0552-48b5-b1cd-0e415409ecd4') {
     return 1;
   }
   // Mateo Jansen (Lehrkraft #2)
-  if (lowerUuid === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || lowerName.includes('mateo')) {
+  if (lowerUuid === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0') {
     return 2;
   }
 

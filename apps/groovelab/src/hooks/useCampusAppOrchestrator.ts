@@ -507,8 +507,9 @@ export function useCampusAppOrchestrator(): CampusAppOrchestratorResult {
   useEffect(() => {
     if (activeStudentTab === 'messages' && user?.role?.toLowerCase() === 'student') {
       fetchStudentMessages();
+      fetchCampusMessages();
     }
-  }, [activeStudentTab, userBands, user?.id]);
+  }, [activeStudentTab, userBands, user?.id, fetchStudentMessages, fetchCampusMessages]);
 
   // 19. Auth Session Actions
   const {

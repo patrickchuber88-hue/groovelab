@@ -568,7 +568,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -1120,7 +1120,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -1409,7 +1409,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                     fontSize: '0.84rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                    boxShadow: 'none'
                   }}
                 >
                   Alle {matchedResults.length} gematchten Schüler jetzt freischalten

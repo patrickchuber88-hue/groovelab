@@ -309,7 +309,7 @@ export const StudioWaveformTimelineStage: React.FC<StudioWaveformTimelineStagePr
                       padding: '3px 8px',
                       borderRadius: '6px',
                       whiteSpace: 'nowrap',
-                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5)',
+                      boxShadow: 'none',
                       letterSpacing: '0.02em'
                     }}
                   >
@@ -324,7 +324,7 @@ export const StudioWaveformTimelineStage: React.FC<StudioWaveformTimelineStagePr
                     flex: 1,
                     background: rainbowColor.bg,
                     opacity: 0.85,
-                    boxShadow: `0 0 6px ${rainbowColor.bg}`
+                    boxShadow: 'none'
                   }}
                 />
               </div>
@@ -345,7 +345,7 @@ export const StudioWaveformTimelineStage: React.FC<StudioWaveformTimelineStagePr
                 borderRight: '2px solid #ef4444',
                 pointerEvents: 'none',
                 zIndex: 25,
-                boxShadow: '0 0 16px rgba(239, 68, 68, 0.25)'
+                boxShadow: 'none'
               }}
             />
           )}
@@ -360,7 +360,7 @@ export const StudioWaveformTimelineStage: React.FC<StudioWaveformTimelineStagePr
               transform: 'translateX(-50%)',
               width: '2px',
               background: '#ef4444',
-              boxShadow: '0 0 10px rgba(239, 68, 68, 0.85)',
+              boxShadow: 'none',
               pointerEvents: 'none',
               zIndex: 40,
               transition: isPlaying ? 'none' : 'left 0.1s ease-out'
@@ -378,7 +378,7 @@ export const StudioWaveformTimelineStage: React.FC<StudioWaveformTimelineStagePr
                 background: '#ef4444',
                 borderRadius: '50%',
                 border: '1.5px solid #ffffff',
-                boxShadow: '0 0 8px #ef4444'
+                boxShadow: 'none'
               }}
             />
           </div>

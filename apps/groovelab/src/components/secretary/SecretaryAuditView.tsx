@@ -281,7 +281,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
         }
         .search-input-wrapper:focus-within {
           border-color: #ea4335 !important;
-          box-shadow: 0 0 0 2px rgba(234, 67, 53, 0.15) !important;
+          box-shadow: none !important;
         }
         .google-btn-secondary:hover {
           border-color: #ea4335 !important;
@@ -745,7 +745,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              boxShadow: '0 2px 6px rgba(234, 67, 53, 0.25)'
+                              boxShadow: 'none'
                             }}
                             className="hover-scale"
                           >

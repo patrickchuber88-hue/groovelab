@@ -237,7 +237,7 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
                 padding: '2px 7px',
                 borderRadius: '100px',
                 letterSpacing: '0.02em',
-                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
+                boxShadow: 'none'
               }}>
                 {unreadMsgCount}
               </span>

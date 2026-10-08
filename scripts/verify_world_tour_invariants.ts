@@ -7,6 +7,7 @@
 // ==============================================================================
 
 import { WORLD_TOUR_COUNTRIES } from '../apps/groovelab/src/domain/worldTourCatalog';
+import { projectScoreForInstrument } from '../apps/groovelab/src/domain/worldTourTransposer';
 
 interface InvariantViolation {
   countryCode: string;
@@ -209,6 +210,26 @@ WORLD_TOUR_COUNTRIES.forEach((country) => {
       description: 'Komponist bzw. Ursprung ist nicht angegeben.'
     });
   }
+
+  // ----------------------------------------------------------------------------
+  // Axiom 7: Tabulatur-Pausen-Invariante (Zero-Fret-on-Rest / 0,1% Goldstandard)
+  // ----------------------------------------------------------------------------
+  const testInstruments = ['Gitarre', 'E-Bass', 'Ukulele', 'Violine', 'Cello'];
+  testInstruments.forEach((inst) => {
+    const proj = projectScoreForInstrument(score, inst, true);
+    proj.notes.forEach((n, idx) => {
+      if (n.pitch === 'REST') {
+        if (n.displayFret !== undefined || n.displayString !== undefined) {
+          violations.push({
+            countryCode: code,
+            countryName: name,
+            axiom: 'Axiom 7: Zero-Fret-on-Rest',
+            description: `Pause (#${idx + 1}) bei Instrument "${inst}" besitzt fälschlicherweise displayFret=${n.displayFret} / displayString=${n.displayString}.`
+          });
+        }
+      }
+    });
+  });
 });
 
 // ==============================================================================

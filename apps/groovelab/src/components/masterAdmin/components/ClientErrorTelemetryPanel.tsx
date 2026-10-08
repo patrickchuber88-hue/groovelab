@@ -111,7 +111,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '16px',
-          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.06)'
+          boxShadow: 'none'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
@@ -123,7 +123,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
+              boxShadow: 'none'
             }}>
               <CheckCircle2 size={24} />
             </div>
@@ -157,7 +157,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)'
+              boxShadow: 'none'
             }}
             className="hover-scale-mini"
           >

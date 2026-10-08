@@ -707,7 +707,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
               justifyContent: 'center',
               gap: '8px',
               minHeight: '44px',
-              boxShadow: '0 4px 14px rgba(250, 204, 21, 0.3)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease-in-out',
               userSelect: 'none',
               WebkitTapHighlightColor: 'transparent',

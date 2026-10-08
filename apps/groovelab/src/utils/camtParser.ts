@@ -147,9 +147,9 @@ function parseCsvOrTextStatement(textStr: string): BankStatementParseResult {
   let totalDebit = 0;
 
   lines.forEach((line, idx) => {
-    // Regex für Verwendungszwecke im Text suchen
-    const b2bMatch = line.match(/RE-([0-9A-Z]+)-(\d{4})-\d{2}/i) || line.match(/RE-(\d{4}-\d{2})/i);
-    const b2cMatch = line.match(/CG-([A-Z0-9]{4,12})-(\d{4})/i);
+    // Regex für Verwendungszwecke im Text suchen (RE-, INF-, AKT-, GS-, ST-)
+    const b2bMatch = line.match(/(?:RE|INF|AKT|GS|ST)-([0-9A-Z]+)-(\d{4})-(\d{2})/i) || line.match(/(?:RE|INF|AKT|GS|ST)-(\d{4}-\d{2})/i);
+    const b2cMatch = line.match(/CG-([A-Z0-9]{4,16})-(\d{4})/i);
 
     // Betrags-Erkennung (z.B. "14,90", "0,49", "19.90")
     const amountMatch = line.match(/(\d+[.,]\d{2})\s*(EUR|€)?/i);
@@ -198,8 +198,9 @@ function parseCsvOrTextStatement(textStr: string): BankStatementParseResult {
 function classifyTransaction(tx: ParsedBankTransaction): void {
   const rem = tx.remittanceInfo.toUpperCase();
 
-  // 1. Prüfe B2B Musikschul-Rechnung: RE-[SCHUL_ID]-[YYMM]-01
-  const b2bRegex = /RE-([0-9A-Z]+)-(\d{4})-(\d{2})/i;
+  // 1. Prüfe B2B Musikschul-Rechnung: (RE|INF|AKT|GS|ST)-[SCHUL_ID]-[YYMM]-01 oder (RE|INF|AKT|GS|ST)-[YYYY-MM]
+  const b2bRegex = /(?:RE|INF|AKT|GS|ST)-([0-9A-Z]+)-(\d{4})-(\d{2})/i;
+  const b2bShortRegex = /(?:RE|INF|AKT|GS|ST)-(\d{4}-\d{2})/i;
   const b2bMatch = rem.match(b2bRegex);
   if (b2bMatch) {
     tx.matchedType = 'b2b_school';
@@ -207,9 +208,15 @@ function classifyTransaction(tx: ParsedBankTransaction): void {
     tx.matchedSchoolId = b2bMatch[1];
     return;
   }
+  const b2bShortMatch = rem.match(b2bShortRegex);
+  if (b2bShortMatch) {
+    tx.matchedType = 'b2b_school';
+    tx.matchedId = b2bShortMatch[0];
+    return;
+  }
 
-  // 2. Prüfe B2C Schüler-Aktivierung: CG-[HASH8]-[YYMM]
-  const b2cRegex = /CG-([A-Z0-9]{4,12})-(\d{4})/i;
+  // 2. Prüfe B2C Schüler-Aktivierung: CG-[HASH]-[YYMM]
+  const b2cRegex = /CG-([A-Z0-9]{4,16})-(\d{4})/i;
   const b2cMatch = rem.match(b2cRegex);
   if (b2cMatch) {
     tx.matchedType = 'b2c_student';

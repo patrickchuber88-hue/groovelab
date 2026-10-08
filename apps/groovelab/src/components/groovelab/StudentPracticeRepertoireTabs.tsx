@@ -537,7 +537,7 @@ export function StudentPracticeRepertoireTabs({
                       fontWeight: 900,
                       fontSize: '0.9rem',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s',
                       minHeight: '44px',
                       touchAction: 'manipulation'

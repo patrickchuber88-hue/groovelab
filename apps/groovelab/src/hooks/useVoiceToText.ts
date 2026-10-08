@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { requestMicrophonePermissionOnce } from '../services/audioPermissionService';
+import { requestMicrophonePermissionOnce, isMicrophonePermissionCached } from '../services/audioPermissionService';
 
 export interface UseVoiceToTextOptions {
   lang?: string;
@@ -191,18 +191,22 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
     }
 
     // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
-    const hasPermission = await requestMicrophonePermissionOnce();
-    if (!hasPermission) {
-      setError('Mikrofon-Freigabe wurde nicht erteilt.');
-      if (onError) onError('Microphone permission denied');
-      return;
+    // Fast-path: If permission is already cached, bypass async permission pre-flight to preserve
+    // the synchronous transient user activation token required by WebKit/Blink for recognition.start()!
+    if (!isMicrophonePermissionCached()) {
+      const hasPermission = await requestMicrophonePermissionOnce();
+      if (!hasPermission) {
+        setError('Mikrofon-Freigabe wurde nicht erteilt.');
+        if (onError) onError('Microphone permission denied');
+        return;
+      }
     }
 
-    // 📱 Screen WakeLock (Prevent tablet sleep during dictation)
+    // 📱 Screen WakeLock (Triggered non-blocking in background so it never consumes the transient gesture token)
     if ('wakeLock' in navigator && !wakeLockRef.current) {
-      try {
-        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-      } catch (e) {}
+      (navigator as any).wakeLock.request('screen').then((lock: any) => {
+        wakeLockRef.current = lock;
+      }).catch(() => {});
     }
 
     try {
@@ -297,8 +301,16 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       recognition.onerror = (event: any) => {
         console.warn('[useVoiceToText] Recognition error:', event.error);
         if (event.error === 'not-allowed') {
-          localStorage.removeItem('campus_microphone_permission_granted');
-          setError('Mikrofon-Zugriff wurde verweigert. Bitte in den Browser-Einstellungen erlauben.');
+          const isIosStandalone = typeof window !== 'undefined' && 
+            ((navigator as any).standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) &&
+            /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+          if (isIosStandalone) {
+            setError('Im iOS-Homescreen-Modus schränkt Apple die Spracherkennung ein. Bitte nutze die Tastatur oder öffne Campus im Safari-Browser.');
+          } else {
+            localStorage.removeItem('campus_microphone_permission_granted');
+            setError('Mikrofon-Zugriff wurde verweigert. Bitte in den Browser-Einstellungen erlauben.');
+          }
         } else if (event.error !== 'no-speech') {
           setError(`Spracherkennungs-Hinweis: ${event.error}`);
           if (onError) onError(event.error);

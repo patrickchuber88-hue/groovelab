@@ -97,7 +97,7 @@ export const SecretaryRoomCollisionAlertCard: React.FC<SecretaryRoomCollisionAle
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '12px',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.10)',
+            boxShadow: 'none',
             animation: 'fadeIn 0.2s ease-out'
           }}
         >
@@ -112,7 +112,7 @@ export const SecretaryRoomCollisionAlertCard: React.FC<SecretaryRoomCollisionAle
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.25)',
+                boxShadow: 'none',
                 flexShrink: 0
               }}
             >

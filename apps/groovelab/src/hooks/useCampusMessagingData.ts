@@ -64,6 +64,85 @@ export const getLocalReadMsgIds = (uid: string): Set<string> => {
   return set;
 };
 
+// 🛡️ 0.1% Goldstandard SWR Groups & Messages Instant-Seed (Zero-Flicker / Single-Frame Hydration)
+export const getLocalGroupsCache = (uid: string): any[] => {
+  if (typeof window === 'undefined' || !uid) return [];
+  try {
+    const raw = localStorage.getItem(`cgl_groups_cache_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+};
+
+export const setLocalGroupsCache = (uid: string, groups: any[]): void => {
+  if (typeof window === 'undefined' || !uid || !Array.isArray(groups)) return;
+  try {
+    localStorage.setItem(`cgl_groups_cache_${uid}`, JSON.stringify(groups));
+  } catch (e) {}
+};
+
+export const getLocalMessagesCache = (uid: string): any[] => {
+  if (typeof window === 'undefined' || !uid) return [];
+  try {
+    const raw = localStorage.getItem(`cgl_messages_cache_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+};
+
+export const setLocalMessagesCache = (uid: string, msgs: any[]): void => {
+  if (typeof window === 'undefined' || !uid || !Array.isArray(msgs)) return;
+  try {
+    const lean = msgs.slice(-300);
+    localStorage.setItem(`cgl_messages_cache_${uid}`, JSON.stringify(lean));
+  } catch (e) {}
+};
+
+export const getLocalChannelsCache = (groupId: string): any[] => {
+  if (typeof window === 'undefined' || !groupId) return [];
+  try {
+    const raw = localStorage.getItem(`cgl_channels_cache_${groupId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+};
+
+export const setLocalChannelsCache = (groupId: string, channels: any[]): void => {
+  if (typeof window === 'undefined' || !groupId || !Array.isArray(channels)) return;
+  try {
+    localStorage.setItem(`cgl_channels_cache_${groupId}`, JSON.stringify(channels));
+  } catch (e) {}
+};
+
+// 🛡️ 0.1% Goldstandard: SWR Teachers Instant-Seed (Zero-Flicker / Frame-0 Single-Flight Hydration)
+export const getLocalTeachersCache = (studentId: string): any[] => {
+  if (typeof window === 'undefined' || !studentId) return [];
+  try {
+    const raw = localStorage.getItem(`cgl_teachers_cache_${studentId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+};
+
+export const setLocalTeachersCache = (studentId: string, teachers: any[]): void => {
+  if (typeof window === 'undefined' || !studentId || !Array.isArray(teachers)) return;
+  try {
+    localStorage.setItem(`cgl_teachers_cache_${studentId}`, JSON.stringify(teachers));
+  } catch (e) {}
+};
+
 export interface UseCampusMessagingDataParams {
   user: any;
   loggedInUserId: string | null;
@@ -422,99 +501,106 @@ export function useCampusMessagingData({
     if (!uid) return;
     setCampusMessagesLoading(true);
     try {
-      let groupFilter = '';
       const groupLastReadMap = getLocalGroupReads(uid);
       const channelLastReadMap = getLocalChannelReads(uid);
       const groupDefaultChannelMap = new Map<string, string>();
-
       const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id);
 
-      try {
-        let channelsQuery = supabase
-          .from('campus_chat_channels')
-          .select('id, group_id, is_default');
-        if (effectiveSchoolId) {
-          channelsQuery = channelsQuery.eq('school_id', effectiveSchoolId);
-        }
+      // 🛡️ 0.1% Enterprise Goldstandard: Pre-seed group filter from SWR local cache to fire parallel query
+      const cachedGroups = getLocalGroupsCache(uid);
+      const preseededGroupIds = new Set<string>(cachedGroups.map((g: any) => g.id).filter(Boolean));
+      const initialGroupFilter = preseededGroupIds.size > 0 ? `,group_id.in.(${Array.from(preseededGroupIds).join(',')})` : '';
 
-        const [memberGroupsRes, createdGroupsRes, channelReadsRes, channelsRes] = await Promise.all([
-          supabase
-            .from('campus_chat_group_members')
-            .select('group_id, last_read_at')
-            .eq('user_id', uid),
-          supabase
-            .from('campus_chat_groups')
-            .select('id')
-            .eq('creator_id', uid)
-            .eq('is_archived', false),
-          supabase
-            .from('campus_chat_channel_reads')
-            .select('channel_id, last_read_at')
-            .eq('user_id', uid),
-          channelsQuery
-        ]);
-
-        const allGIds = new Set<string>();
-
-        if (channelsRes.data && channelsRes.data.length > 0) {
-          channelsRes.data.forEach((ch: any) => {
-            if (ch.group_id && ch.is_default) {
-              groupDefaultChannelMap.set(ch.group_id, ch.id);
-            }
-          });
-        }
-
-        if (memberGroupsRes.data && memberGroupsRes.data.length > 0) {
-          memberGroupsRes.data.forEach((gm: any) => {
-            if (gm.group_id) {
-              allGIds.add(gm.group_id);
-              if (gm.last_read_at) {
-                const dbTime = new Date(gm.last_read_at).getTime();
-                const existing = groupLastReadMap.get(gm.group_id) || 0;
-                groupLastReadMap.set(gm.group_id, Math.max(dbTime, existing));
-              }
-            }
-          });
-        }
-
-        if (createdGroupsRes.data && createdGroupsRes.data.length > 0) {
-          createdGroupsRes.data.forEach((cg: any) => {
-            if (cg.id) {
-              allGIds.add(cg.id);
-            }
-          });
-        }
-
-        if (allGIds.size > 0) {
-          groupFilter = `,group_id.in.(${Array.from(allGIds).join(',')})`;
-        }
-
-        if (channelReadsRes.data && channelReadsRes.data.length > 0) {
-          channelReadsRes.data.forEach((cr: any) => {
-            if (cr.channel_id && cr.last_read_at) {
-              const dbTime = new Date(cr.last_read_at).getTime();
-              const existing = channelLastReadMap.get(cr.channel_id) || 0;
-              channelLastReadMap.set(cr.channel_id, Math.max(dbTime, existing));
-            }
-          });
-        }
-      } catch (grpErr) {
-        // fail-safe fallback if table not yet migrated
+      let channelsQuery = supabase
+        .from('campus_chat_channels')
+        .select('id, group_id, is_default');
+      if (effectiveSchoolId) {
+        channelsQuery = channelsQuery.eq('school_id', effectiveSchoolId);
       }
 
-      const { data, error } = await supabase
-        .from('campus_direct_messages')
-        .select('*')
-        .or(`sender_id.eq.${uid},recipient_id.eq.${uid}${groupFilter}`)
-        .order('created_at', { ascending: false })
-        .limit(300);
-      if (error) throw error;
-      if (data) {
+      // 🛡️ Zero-Waterfall: Run group metadata AND messages queries simultaneously in a single Promise.all
+      const [memberGroupsRes, createdGroupsRes, channelReadsRes, channelsRes, initialMessagesRes] = await Promise.all([
+        supabase.from('campus_chat_group_members').select('group_id, last_read_at').eq('user_id', uid),
+        supabase.from('campus_chat_groups').select('id').eq('creator_id', uid).eq('is_archived', false),
+        supabase.from('campus_chat_channel_reads').select('channel_id, last_read_at').eq('user_id', uid),
+        channelsQuery,
+        supabase
+          .from('campus_direct_messages')
+          .select('*')
+          .or(`sender_id.eq.${uid},recipient_id.eq.${uid}${initialGroupFilter}`)
+          .order('created_at', { ascending: false })
+          .limit(300)
+      ]);
+
+      const allGIds = new Set<string>();
+
+      if (channelsRes.data && channelsRes.data.length > 0) {
+        channelsRes.data.forEach((ch: any) => {
+          if (ch.group_id && ch.is_default) {
+            groupDefaultChannelMap.set(ch.group_id, ch.id);
+          }
+        });
+      }
+
+      if (memberGroupsRes.data && memberGroupsRes.data.length > 0) {
+        memberGroupsRes.data.forEach((gm: any) => {
+          if (gm.group_id) {
+            allGIds.add(gm.group_id);
+            if (gm.last_read_at) {
+              const dbTime = new Date(gm.last_read_at).getTime();
+              const existing = groupLastReadMap.get(gm.group_id) || 0;
+              groupLastReadMap.set(gm.group_id, Math.max(dbTime, existing));
+            }
+          }
+        });
+      }
+
+      if (createdGroupsRes.data && createdGroupsRes.data.length > 0) {
+        createdGroupsRes.data.forEach((cg: any) => {
+          if (cg.id) {
+            allGIds.add(cg.id);
+          }
+        });
+      }
+
+      if (channelReadsRes.data && channelReadsRes.data.length > 0) {
+        channelReadsRes.data.forEach((cr: any) => {
+          if (cr.channel_id && cr.last_read_at) {
+            const dbTime = new Date(cr.last_read_at).getTime();
+            const existing = channelLastReadMap.get(cr.channel_id) || 0;
+            channelLastReadMap.set(cr.channel_id, Math.max(dbTime, existing));
+          }
+        });
+      }
+
+      let rawData: any[] = initialMessagesRes.data || [];
+
+      // If server discovered additional groups that weren't in the preseeded cache, fetch their delta messages
+      const missingGroupIds = Array.from(allGIds).filter(id => !preseededGroupIds.has(id));
+      if (missingGroupIds.length > 0) {
+        try {
+          const { data: deltaData } = await supabase
+            .from('campus_direct_messages')
+            .select('*')
+            .in('group_id', missingGroupIds)
+            .order('created_at', { ascending: false })
+            .limit(100);
+          if (deltaData && deltaData.length > 0) {
+            const existingMap = new Set(rawData.map((m: any) => m.id));
+            deltaData.forEach((m: any) => {
+              if (!existingMap.has(m.id)) rawData.push(m);
+            });
+            rawData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          }
+        } catch (deltaErr) {}
+      }
+
+      if (rawData.length > 0) {
         const directLastReadMap = getLocalDirectReads(uid);
         const readMsgIds = getLocalReadMsgIds(uid);
 
         // Reverse to maintain chronological order (oldest to newest) for downstream rendering
-        const chronologicalData = data.slice().reverse();
+        const chronologicalData = rawData.slice().reverse();
 
         // 🛡️ Sanitize incoming messages with local persistence (Offline-First / Zero-Bounce)
         const sanitizedData = chronologicalData.map((m: any) => {
@@ -532,10 +618,11 @@ export function useCampusMessagingData({
         });
 
         // 🛡️ SEC-24: Authoritative 1% Cryptographic Message Vault Decryption (L1 Fast-Path Cache)
-        const resolvedSchoolId = effectiveSchoolId || data[0]?.school_id;
+        const resolvedSchoolId = effectiveSchoolId || rawData[0]?.school_id;
         const decryptedData = await decryptMessagesBatch(sanitizedData, resolvedSchoolId);
 
         setCampusMessages(decryptedData);
+        setLocalMessagesCache(uid, decryptedData);
         
         // 1. Unread direct (1:1) messages
         const directUnread = sanitizedData.filter((m: any) => !m.group_id && m.recipient_id === uid && !m.is_read).length;

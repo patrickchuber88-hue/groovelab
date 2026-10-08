@@ -5,6 +5,7 @@ import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream } from '..
 import { processPureRawBlob } from '../../../utils/audioMasteringEngine';
 import { fixWebmDuration } from '../../../utils/webmDurationPatcher';
 import { saveOfflineAudioRecord } from '../../../utils/offlineAudioVault';
+import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
 import { formatTagesKompassStudentName } from './types';
 import { MicroScoreStudioModal } from '../../student/meisterwerk/microscore/MicroScoreStudioModal';
 import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
@@ -180,8 +181,8 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
             });
             await onSaveAudio(`offline://${offlineRec.id}`, recordSeconds || 1);
           } else {
-            const { data: publicUrlData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
-            await onSaveAudio(publicUrlData.publicUrl, recordSeconds || 1);
+            const secureAudioUrl = await getSecureAudioUrl(filePath, 'campus-assets', 1800);
+            await onSaveAudio(secureAudioUrl, recordSeconds || 1);
           }
         } catch (err) {
           console.error('[SmartInput] Error uploading voice memo:', err);
@@ -255,7 +256,7 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
                 height: '10px',
                 borderRadius: '50%',
                 background: '#dc2626',
-                boxShadow: '0 0 8px rgba(220, 38, 38, 0.8)',
+                boxShadow: 'none',
                 animation: 'pulse 1s infinite'
               }}
             />

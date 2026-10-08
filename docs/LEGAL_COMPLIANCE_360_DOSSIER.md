@@ -26,7 +26,7 @@
 * **Säule 10: Veranstaltungsrecht, Konzerte & GEMA (UrhG § 15, BGB § 823 Enthaftung):** Strikte Veranstalter-Enthaftung für Schulkonzerte (GEMA-Meldepflicht & Versammlungsstättenrecht obliegen allein der Schule), UrhG § 53 Notenkopierverbot via Guard `LEG-22` und 100% Zero-Photo-Sphärentrennung.
 * **Säule 11: Privates Unterrichtsvertragsrecht, Kooperationen & Verbandsstatistik (BGB §§ 611, 614 / SGB II § 28 / bdfm):** Zivilrechtliche Entgeltabrechnung und Fälligkeit, private Ganztags-Randzeiten und Nachmittags-AGs an Partnerschulen, BuT-Bildungsgutschein-Abrechnung mit absolutem Stigmatisierungsschutz und anonymisierter bdfm-/Verbands-Statistikexport.
 * **Säule 12: Gesundheits-, Ergonomie- & Lärmschutz-Enthaftung (BGB § 823 / ArbSchG / BFSG):** Ausschluss messtechnischer Schallschutz- und Lärmüberwachungspflichten (bleiben vor Ort bei Schulleitung/Lehrkräften), rein didaktische Raum-Metadaten ohne DIN 18041 Garantien, Quiet Hours und reflexionsarmer Bühnenmodus ($\ge 44 \times 44\,\text{px}$).
-* **Säule 13: Digitale Barrierefreiheit (BFSG 2025, BITV 2.0, DIN EN 301 549, WCAG 2.2 AA):** Vollständige Tastaturbedienbarkeit aller Eltern- und Buchungsprozesse, WAI-ARIA Modal-Contract (`role="dialog"`, `aria-modal="true"`), Mindestkontraste 4,5:1 und rechtssichere Erklärung mit Status „teilweise vereinbar“.
+* **Säule 13: Digitale Barrierefreiheit (BFSG 2025, BITV 2.0, DIN EN 301 549, WCAG 2.2 AA):** Vollständige Tastaturbedienbarkeit aller Eltern- und Buchungsprozesse, WAI-ARIA Modal-Contract (`role="dialog"`, `aria-modal="true"`), Mindestkontraste 4,5:1 und rechtssichere Erklärung mit Status „teilweise vereinbar“ unter Berufung auf die gesetzliche Ausnahme für Kleinstunternehmen gem. § 3 Abs. 2 BFSG bei freiwilliger Einhaltung der WCAG 2.2 AA Standards.
 * **Säule 14: NIS-2, Cyber Resilience Act & IT-Sicherheit (ISO 27001, ASVS Level 3):** WORM Append-Only Manipulationsschutz für Audit-Trails auf Kernel-Ebene, 24h-Vorfallsmeldewege gem. Art. 33 DSGVO, FIDO2 WebAuthn Passkeys, PBKDF2-HMAC-SHA-512 PIN-Hashing und 100% deutsches Hetzner-Hosting.
 * **Säule 15: Künstliche Intelligenz & Signalverarbeitung (EU AI Act - VO (EU) 2024/1689):** Ausschluss von Hochrisiko-Bildungs-KI. Stimmgerät, Metronom und Loopstation basieren auf reiner deterministischer Fast-Fourier-Transformation (FFT) und Autokorrelation ohne neuronale Netze.
 * **Säule 16: Finanzaufsicht & Zahlungsdiensterecht (ZAG / PSD2 / PSD3):** Zero Money Transit Doktrin: Verzicht auf Sammelinkasso oder Treuhandkonten zur vollständigen Freizeichnung von BaFin-Erlaubnispflichten gem. § 2 Abs. 1 Nr. 7 ZAG.
@@ -106,7 +106,7 @@
 * **062 (BSG B 12 R 3/20 R):** Autonomes Nachhol- und Token-System (Makeup Tokens) direkt zwischen Schüler und Lehrkraft bei Unterrichtsausfällen.
 * **063 (BSG B 12 R 3/20 R / § 2 EntgFG):** Ausschluss von Durchbezahlungs- und bezahlten Ferienvergütungsklauseln für freie Honorarkräfte im System.
 * **064 (§ 7 SGB IV / Art. 12 GG):** Nebentätigkeits- und Multi-Schul-Freiheit: Dozenten dürfen uneingeschränkt an mehreren Musikschulen oder privat unterrichten.
-* **065 (§ 266a StGB / § 7a SGB IV):** Schlüsselfertiger forensischer Statusnachweis für Betriebsprüfungen der Deutschen Rentenversicherung (`CourtProofExportModal.tsx`).
+* **065 (§ 266a StGB / § 7a SGB IV / § 3 RDG):** Pädagogisches Dispositions- & Metadaten-Protokoll für Betriebsprüfungen der Deutschen Rentenversicherung mit explizitem § 3 RDG Disclaimer (`CourtProofExportModal.tsx`).
 
 ### BEREICH D: MITBESTIMMUNG, ARBEITNEHMERSCHUTZ & ARBEITSZEIT (066 – 075)
 * **066 (BetrVG § 87 Abs. 1 Nr. 6):** Ausschluss jeglicher automatisierter Leistungs- und Verhaltenskontrolle von Lehrkräften.
@@ -159,21 +159,21 @@
 * **107 (BGB § 312j Abs. 3):** Gesetzliche B2C-Button-Lösung: Eindeutige Zahlungsbeschriftung („Kostenpflichtig buchen“, `LEG-07`) im Eltern-Checkout.
 * **108 (BGB § 312k):** Zweistufiger elektronischer Kündigungsbutton mit sofortigem digitalem Fristbeleg-PDF (`LEG-09`).
 * **109 (BGB § 309 Nr. 9):** Ausschluss automatischer Vertragsverlängerungen (reine befristete Schuljahres-Beiträge; keine Abofalle).
-* **110 (BGB § 356 Abs. 5):** Gesetzeskonforme Widerrufsbelehrung mit Erlöschen bei Sofortnutzung digitaler Inhalte mit ausdrücklicher Eltern-Zustimmung.
-* **111 (BGB § 305 ff.):** Wirksame AGB-Einbeziehung im B2B- und B2C-Checkout mit dauerhafter Download- und Speichermöglichkeit (PDF).
+* **110 (BGB §§ 312f, 356 Abs. 5):** Gesetzeskonforme Widerrufsbelehrung mit dauerhafter In-App-Bereitstellung auf dauerhaftem Datenträger (PDF-Download im Elternbereich gem. § 312f BGB) und Erlöschen bei Sofortnutzung digitaler Inhalte mit ausdrücklicher Eltern-Zustimmung.
+* **111 (BGB § 305 ff. / § 312f BGB):** Wirksame AGB-Einbeziehung im B2B- und B2C-Checkout mit dauerhafter Download- und Speichermöglichkeit (PDF) im In-App-Dokumentensafe.
 * **112 (BGB § 307):** BGH-konforme Haftungshöchstgrenze auf typischerweise vorhersehbare Schäden und Mindestversicherungssumme.
 * **113 (BGB § 254):** Mitverschuldensklausel: Pflicht der Schule zur regelmäßigen lokalen Sicherung über die 1-Klick-Export-Schaltfläche.
 * **114 (BGB § 130):** Botenstatus-Doktrin: Chat-Nachrichten und Terminabsagen sind unverbindliche Mitteilungen; formelle Kündigungen des Hauptunterrichtsvertrags sind über die Plattform ausgeschlossen.
 * **115 (BGB § 823):** Ausschluss von CAFM- & Verkehrssicherungspflichten (bleiben vollumfänglich bei der Musikschule vor Ort).
 * **116 (BGB § 314):** Vorbehalt der außerordentlichen Kündigung aus wichtigem Grund in den B2B- und B2C-AGBs.
-* **117 (BGB § 328):** Strikte Drittwirkungssperre im B2B-SLA: Verfügbarkeitszusagen (99,5 %) gelten rein gegenüber der Musikschule, nicht gegenüber Schülern oder Eltern.
+* **117 (BGB § 328 / § 5 Abs. 6 B2B-AGB):** Strikte Drittwirkungssperre im B2B-SLA: Der Infrastrukturvertrag entfaltet keinerlei drittschützende Wirkung zugunsten von Schülern, Eltern oder Lehrkräften; Hold-Harmless-Freistellung des Betreibers durch die Schule bei schulorganisatorischen Pflichtverletzungen oder Lehrkräfte-Fehlverhalten.
 * **118 (BGB § 242):** Vorgerichtliche B2B-Mediationsklausel (IHK-Schlichtung) vor Anrufung der ordentlichen Zivilgerichte.
 * **119 (BGB § 675):** Ausschluss von Zahlungsdiensteverträgen: Plattform schuldet keine treuhänderische Zahlungsabwicklung (reiner Zero-Money-Transit).
 * **120 (BGB § 145 ff.):** 2-Faktor-Freischaltung für neue Schulen zur Vermeidung unbefugter Fake-Anmeldungen.
 
 ### BEREICH H: PREISANGABEN, STEUER- & ABRECHNUNGSRECHT (121 – 135)
 * **121 (PAngV § 1 Abs. 1, 2 / BGB § 13):** Bruttopreis-Axiom & lückenlose Endpreistransparenz für private Schüler und Eltern (B2C); Ausweis des tatsächlichen Endpreises inklusive sämtlicher eventueller Nebengebühren ohne versteckte Zuschläge.
-* **122 (UStG § 3a Abs. 5 / § 13b / § 535 BGB):** Duale Steuertaxonomie: Rechtssichere Trennung zwischen steuerbarer B2B-SaaS-Hostingmiete (19 % USt in DE bzw. § 13b Reverse Charge in AT/CH) und digitaler B2C-Schüler-Bereitstellung (Bruttoendpreis 5,39 € inkl. MwSt. des Plattformbetriebs gem. PAngV); Ausschluss fremder Schulgeldabrechnung.
+* **122 (UStG § 3a Abs. 5 / § 19 UStG):** Entkoppelte Steuertaxonomie: B2C-Schüler-Gutschein (5,39 €) ist strikt an den Betreiberstatus (`OPERATOR_BANKING_CONFIG.isVatStandardTaxed`) gebunden und von der Bildungsbefreiung (§ 4 Nr. 21 UStG) der Musikschule entkoppelt.
 * **123 (UStG § 19 / PAngV):** Dynamische Kleinunternehmer-Klausel (`LEG-08`): Automatischer Ausweis des gesetzlichen Hinweises *„Gemäß § 19 UStG wird keine Umsatzsteuer berechnet“* bei kleineren Musikschulen und Solo-Musikpädagogen unterhalb der Umsatzschwelle.
 * **124 (DIN EN 16931-1 / UStG § 14 Abs. 2 n.F.):** Asymmetrische E-Rechnungs-Architektur: ZUGFeRD 2.2 & XRechnung XML mit Leitweg-ID ausschließlich für institutionelle Kooperationen (B2G Ganztags- und Schulkooperationen); verbraucherfreundliche PDF-Textform für private Familien (B2C).
 * **125 (GoBD §§ 146, 147 AO):** Revisionssichere Immutabilität: Festgeschriebene Rechnungsbelege und Transaktions-Logs sind datenbankseitig gegen nachträgliche Manipulation (`UPDATE`/`DELETE`) gesperrt; Korrekturen erfolgen ausschließlich durch formelle Stornobelege mit Audit-Trail.

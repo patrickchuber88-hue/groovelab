@@ -188,7 +188,7 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
+                boxShadow: 'none',
               }}
             >
               <Clock size={32} />
@@ -236,7 +236,7 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
                   fontSize: '1rem',
                   fontWeight: 850,
                   cursor: 'pointer',
-                  boxShadow: '0 8px 20px rgba(52,168,83,0.3)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',

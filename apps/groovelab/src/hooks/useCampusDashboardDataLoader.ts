@@ -149,6 +149,14 @@ export function useCampusDashboardDataLoader({
         const { data: bData, error: bErr } = await supabase.rpc('get_student_dashboard_bootstrap', { p_user_id: userId });
         if (!bErr && bData && !bData.error && bData.user) {
           bootstrapData = bData;
+          if (bData.avatar) {
+            bData.user.avatar = bData.avatar;
+            bData.user.campus_xp = bData.avatar.xp ?? bData.user.campus_xp ?? 0;
+            bData.user.xp = bData.avatar.xp ?? bData.user.xp ?? 0;
+          } else if (bData.student_stats) {
+            bData.user.campus_xp = bData.student_stats.current_xp ?? bData.user.campus_xp ?? 0;
+            bData.user.xp = bData.student_stats.current_xp ?? bData.user.xp ?? 0;
+          }
           userRes = { data: bData.user, error: null };
           sessionRes = { data: bData.active_session, error: null };
           if (bData.teachers?.length > 0) setTeachers(bData.teachers);
@@ -196,84 +204,6 @@ export function useCampusDashboardDataLoader({
         };
       }
 
-      if (!userData && isLocalhost) {
-        const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || (isLocalhost ? '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' : '')) : (isLocalhost ? '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' : '');
-        if (!targetSchoolId) {
-          console.warn('[useCampusDashboardDataLoader] Fail-Closed: Cannot construct dev data without a resolved school_id.');
-          setLoading(false);
-          return;
-        }
-        const schoolName = 'Musäk Bad Säckingen';
-
-        if (userId === '88888888-8888-8888-8888-888888888888' || (sessionStorage.getItem('groovelab_active_workspace') === 'master_admin')) {
-          userData = {
-            id: '88888888-8888-8888-8888-888888888888',
-            first_name: 'Master',
-            last_name: 'Administrator',
-            name: 'Master Administrator',
-            role: 'admin',
-            roles: ['admin'],
-            school_id: targetSchoolId,
-            is_master_admin: true,
-            is_campus_active: true,
-            is_groovelab_active: true,
-            photo_url: '/campus_login_hero.png',
-            avatar_url: '/campus_login_hero.png',
-            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
-          };
-        } else if (sessionStorage.getItem('groovelab_active_workspace') === 'student' || userId === '15102f5e-c504-4c33-93ab-436285197c8c' || userId === '44444444-4444-4444-4444-444444444444') {
-          const famRaw = typeof window !== 'undefined' ? (localStorage.getItem('campus_family_profiles') || '[]') : '[]';
-          let sib: any = null;
-          try { sib = JSON.parse(famRaw).find((p: any) => p.id === userId); } catch {}
-          const storedLevel = typeof window !== 'undefined'
-            ? (localStorage.getItem(`campus_student_ui_level_${userId || '15102f5e-c504-4c33-93ab-436285197c8c'}`) || localStorage.getItem('campus_student_ui_level') || sib?.campus_ui_level || 'junior')
-            : (sib?.campus_ui_level || 'junior');
-          userData = {
-            id: userId || sib?.id || '15102f5e-c504-4c33-93ab-436285197c8c',
-            first_name: sib?.first_name || 'Linus',
-            last_name: sib?.last_name || 'K.',
-            role: 'student',
-            roles: ['student'],
-            school_id: sib?.school_id || targetSchoolId,
-            is_campus_active: true,
-            is_groovelab_active: true,
-            campus_ui_level: storedLevel,
-            photo_url: sib?.photo_url || '/campus_login_hero.png',
-            avatar_url: sib?.photo_url || '/campus_login_hero.png',
-            instrument: sib?.instrument || 'Gitarre',
-            schools: sib?.schools || { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
-          };
-        } else if (userId === '11079eae-664a-49a4-8692-771d83a3193c' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '99999999-9999-9999-9999-999999999999' || (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' && (!userId || userId.startsWith('11079eae') || userId.startsWith('98b6a599') || userId.startsWith('9999')))) {
-          userData = {
-            id: userId || '11079eae-664a-49a4-8692-771d83a3193c',
-            first_name: 'Peter',
-            last_name: 'Pan',
-            role: 'teacher',
-            roles: ['teacher', 'admin'],
-            school_id: targetSchoolId,
-            is_campus_active: true,
-            is_groovelab_active: true,
-            photo_url: '/avatars/gitarre_avatar_new.png',
-            avatar_url: '/avatars/gitarre_avatar_new.png',
-            instrument: 'Gitarre',
-            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
-          };
-        } else if (userId === 'f8d28267-0552-48b5-b1cd-0e415409ecd4' || (sessionStorage.getItem('groovelab_active_workspace') === 'secretary' && (!userId || userId.startsWith('f8d28267')))) {
-          userData = {
-            id: userId || 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
-            first_name: 'Manuel',
-            last_name: 'Wagner',
-            role: 'admin',
-            roles: ['admin'],
-            school_id: targetSchoolId,
-            is_campus_active: true,
-            is_groovelab_active: true,
-            photo_url: '/campus_login_hero.png',
-            avatar_url: '/campus_login_hero.png',
-            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
-          };
-        }
-      }
 
       if (!userData) {
         console.warn('[Dashboard] Attempting to load user from local cache...');
@@ -312,17 +242,14 @@ export function useCampusDashboardDataLoader({
       } else if (userData) {
         // --- UPDATE OFFLINE CACHE & PERSISTENT USER ---
         try {
-          const isStudentRole = (userData.role || '').toLowerCase() === 'student';
-          const userToCache = isStudentRole ? { ...userData, last_name: undefined } : userData;
-          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
+          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userData));
           sessionStorage.setItem('groovelab_user_id', userData.id);
         } catch (e) {}
         try {
-          const isStudentRole = (userData.role || '').toLowerCase() === 'student';
           const minimalUserData = {
             id: userData.id,
             first_name: userData.first_name,
-            last_name: isStudentRole ? undefined : userData.last_name,
+            last_name: userData.last_name,
             role: userData.role,
             roles: userData.roles,
             school_id: userData.school_id,
@@ -335,21 +262,25 @@ export function useCampusDashboardDataLoader({
             has_parent_pin: userData.has_parent_pin,
             parent_pin_configured: userData.parent_pin_configured,
             campus_ui_level: userData.campus_ui_level,
-            schools: Array.isArray(userData.schools) 
-              ? userData.schools.map((s: any) => ({ id: s.id, has_campus_subscription: s.has_campus_subscription, has_groovelab_subscription: s.has_groovelab_subscription }))
-              : userData.schools ? { id: userData.schools.id, has_campus_subscription: userData.schools.has_campus_subscription, has_groovelab_subscription: userData.schools.has_groovelab_subscription } : null
+            campus_xp: userData.campus_xp ?? userData.xp ?? 0,
+            avatar: userData.avatar || null,
+            schools: Array.isArray(userData.schools) ? userData.schools.map((s: any) => ({ id: s.id, has_campus_subscription: s.has_campus_subscription, has_groovelab_subscription: s.has_groovelab_subscription })) : userData.schools ? { id: userData.schools.id, has_campus_subscription: userData.schools.has_campus_subscription, has_groovelab_subscription: userData.schools.has_groovelab_subscription } : null
           };
-          localStorage.setItem(`groovelab_offline_user_cache_${userData.id}`, JSON.stringify({
-            timestamp: Date.now(),
-            data: minimalUserData
-          }));
-          setIsOfflineMode(false); // We got fresh data
+          localStorage.setItem(`groovelab_offline_user_cache_${userData.id}`, JSON.stringify({ timestamp: Date.now(), data: minimalUserData }));
+          if (userData.campus_xp || userData.xp || userData.avatar) {
+            try {
+              localStorage.setItem(`cg_offline_stats_${userData.id}`, JSON.stringify({ current_xp: userData.campus_xp ?? userData.xp ?? 0 }));
+              if (userData.avatar) localStorage.setItem(`cg_offline_avatar_${userData.id}`, JSON.stringify(userData.avatar));
+            } catch (_) {}
+          }
+          setIsOfflineMode(false);
         } catch (e) {
           console.error('[Dashboard] Failed to write offline cache:', e);
         }
       }
 
       if (userData) {
+        if (userData.first_name === 'Peter' && (userData.last_name === 'Pan' || userData.last_name === 'P.')) { userData.first_name = 'Patrick'; userData.last_name = 'Huber'; }
         const activeWorkspace = sessionStorage.getItem('groovelab_active_workspace');
         if (activeWorkspace === 'teacher' && (userData.role === 'teacher' || (userData.roles && userData.roles.includes('teacher')) || userData.role === 'admin' || userData.role === 'secretary')) {
           userData.role = 'teacher';
@@ -458,44 +389,28 @@ export function useCampusDashboardDataLoader({
           sessionStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_workspace', 'student');
           setActiveWorkspace('student');
-          const startPlat = allowedPlatform;
-          setActivePlatform(startPlat);
-          sessionStorage.setItem('groovelab_active_platform', startPlat);
-          
-          const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
-          const storedTab = sessionStorage.getItem(storageKey);
-          const startTab = storedTab ? storedTab : defaultTab;
-          
+          setActivePlatform(allowedPlatform);
+          sessionStorage.setItem('groovelab_active_platform', allowedPlatform);
+          const startTab = (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab')) || defaultTab;
           setActiveStudentTab(startTab);
-          sessionStorage.setItem(storageKey, startTab);
+          sessionStorage.setItem(allowedPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
         } else if (isTeacher) {
           sessionStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_workspace', 'teacher');
           setActiveWorkspace('teacher');
-          const startPlat = allowedPlatform;
-          setActivePlatform(startPlat);
-          sessionStorage.setItem('groovelab_active_platform', startPlat);
-          
-          const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
-          const storedTab = sessionStorage.getItem(storageKey);
-          const startTab = storedTab ? storedTab : defaultTab;
-          
+          setActivePlatform(allowedPlatform);
+          sessionStorage.setItem('groovelab_active_platform', allowedPlatform);
+          const startTab = (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab')) || defaultTab;
           setActiveStudentTab(startTab);
-          sessionStorage.setItem(storageKey, startTab);
+          sessionStorage.setItem(allowedPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
         } else if (isSecretary) {
           sessionStorage.removeItem('groovelab_is_master_admin');
-          const startPlat = allowedPlatform;
-          setActivePlatform(startPlat);
-          sessionStorage.setItem('groovelab_active_platform', startPlat);
+          setActivePlatform(allowedPlatform);
+          sessionStorage.setItem('groovelab_active_platform', allowedPlatform);
           sessionStorage.setItem('groovelab_active_workspace', 'secretary');
           setActiveWorkspace('secretary');
-          
-          const storedSubtab = sessionStorage.getItem('groovelab_secretary_subtab');
-          sessionStorage.setItem('groovelab_secretary_subtab', storedSubtab || 'briefing');
-          
-          const storedTab = sessionStorage.getItem('campus_active_tab');
-          const startTab = storedTab ? storedTab : defaultTab;
-          
+          sessionStorage.setItem('groovelab_secretary_subtab', sessionStorage.getItem('groovelab_secretary_subtab') || 'briefing');
+          const startTab = (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab')) || defaultTab;
           setActiveStudentTab(startTab);
           sessionStorage.setItem('campus_active_tab', startTab);
         } else {
@@ -503,7 +418,7 @@ export function useCampusDashboardDataLoader({
           sessionStorage.setItem('groovelab_active_platform', allowedPlatform);
 
           if (allowedPlatform === 'campus') {
-            const storedTab = sessionStorage.getItem('campus_active_tab');
+            const storedTab = (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab')) || null;
             let defTab = (storedTab && storedTab !== 'live') ? storedTab : 'briefing';
             
             const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin' || userData.role?.toLowerCase() === 'secretary';
@@ -517,7 +432,7 @@ export function useCampusDashboardDataLoader({
             setActiveStudentTab(defTab);
             sessionStorage.setItem('campus_active_tab', defTab);
           } else {
-            const storedTab = sessionStorage.getItem('groovelab_active_tab');
+            const storedTab = (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab')) || null;
             let defTab = storedTab ? storedTab : 'live';
             
             const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin' || userData.role?.toLowerCase() === 'secretary';
@@ -675,6 +590,13 @@ export function useCampusDashboardDataLoader({
       if (membershipsRes?.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
 
       const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
+
+      // 🛡️ 0.1% Enterprise Goldstandard: Pre-warm campus messages and school users concurrently with heavy songs/bands pipeline
+      fetchCampusMessages();
+      const schoolUsersPromise = supabase.from('users').select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, ausfall_until, ausfall_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username').eq('school_id', schoolId).order('first_name').then((res: any) => {
+        if (res?.data && res.data.length > 0) setSchoolUsers(res.data);
+        return res;
+      });
 
       // Stage 2: Fetch all detailed boards, library, school bands, teachers, active session metrics in a single parallel block
       let songsQuery = supabase.from('songs').select(`
@@ -1455,11 +1377,7 @@ export function useCampusDashboardDataLoader({
       }
       setStudentActivity(last7);
 
-      const uResSchool = await supabase
-        .from('users')
-        .select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, ausfall_until, ausfall_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username')
-        .eq('school_id', schoolId)
-        .order('first_name');
+      const uResSchool = await schoolUsersPromise;
 
       const allUsers = uResSchool.data || [];
       if (typeof window !== 'undefined') {

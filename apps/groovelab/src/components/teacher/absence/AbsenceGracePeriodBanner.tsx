@@ -81,7 +81,7 @@ export const AbsenceGracePeriodBanner: React.FC<AbsenceGracePeriodBannerProps> =
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.12)',
+        boxShadow: 'none',
         animation: 'fadeIn 0.2s ease-out'
       }}
     >
@@ -97,7 +97,7 @@ export const AbsenceGracePeriodBanner: React.FC<AbsenceGracePeriodBannerProps> =
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+              boxShadow: 'none',
               flexShrink: 0
             }}
           >
@@ -173,7 +173,7 @@ export const AbsenceGracePeriodBanner: React.FC<AbsenceGracePeriodBannerProps> =
               display: 'flex',
               alignItems: 'center',
               gap: '5px',
-              boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
           >

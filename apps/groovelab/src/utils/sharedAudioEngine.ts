@@ -12,14 +12,15 @@ export class SharedAudioEngine {
   private static instance: AudioContext | null = null;
   private static isUnlocked = false;
   private static isVisibilityListenerAttached = false;
-  private static silentAudioElement: HTMLAudioElement | null = null;
+  private static silentOscillator: OscillatorNode | null = null;
+  private static silentGain: GainNode | null = null;
   private static activePracticeSessionCount = 0;
   private static registeredWorklets: Set<string> = new Set();
 
   /**
-   * 📱 iOS Safari Silent Audio Loop for Hardware Mute Switch Bypass.
-   * Forces Apple WebKit to route WebAudio to the 'Playback' category
-   * instead of 'Ambient' (which is muted by the physical silence switch).
+   * 📱 0,1% Goldstandard: iOS Safari Sub-Oscillator for Hardware Mute Switch Bypass.
+   * Routes WebAudio cleanly through the cooperative 'PlayAndRecord' category.
+   * Completely eliminates WebKit AudioSession deadlocks where HTML5 <audio> blocks getUserMedia!
    * 
    * STRICT ENTERPRISE LEITPLANKE:
    * - Only active while a practice session, metronome or timer is running!
@@ -29,24 +30,32 @@ export class SharedAudioEngine {
     if (typeof window === 'undefined') return;
     this.activePracticeSessionCount++;
 
-    if (this.silentAudioElement) return;
+    if (this.silentOscillator) return;
 
     try {
-      const audio = document.createElement('audio');
-      // Tiny valid 1-frame silent MP3 data URI
-      audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAACcQCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-      audio.loop = true;
-      audio.volume = 0.001;
-      audio.setAttribute('playsinline', 'true');
-      audio.setAttribute('webkit-playsinline', 'true');
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {});
+      const ctx = this.getContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
-      this.silentAudioElement = audio;
+
+      // Unhörbarer 40Hz Sub-Bass Oszillator mit Amplitude 0.00001 (-100 dB)
+      // Signalisiert dem WebKit Audio-Server eine aktive Audio-Wiedergabe,
+      // ohne die Audio-Session in den exklusiven Playback-Modus zu sperren!
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(40, ctx.currentTime);
+      gain.gain.setValueAtTime(0.00001, ctx.currentTime);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+
+      this.silentOscillator = osc;
+      this.silentGain = gain;
     } catch (e) {
-      console.warn('[SharedAudioEngine] Could not start session audio bypass:', e);
+      console.warn('[SharedAudioEngine] Could not start WebAudio session audio bypass:', e);
     }
   }
 
@@ -58,13 +67,14 @@ export class SharedAudioEngine {
       this.activePracticeSessionCount--;
     }
 
-    if (this.activePracticeSessionCount <= 0 && this.silentAudioElement) {
+    if (this.activePracticeSessionCount <= 0 && this.silentOscillator) {
       try {
-        this.silentAudioElement.pause();
-        this.silentAudioElement.removeAttribute('src');
-        this.silentAudioElement.load();
+        this.silentOscillator.stop();
+        this.silentOscillator.disconnect();
+        this.silentGain?.disconnect();
       } catch (e) {}
-      this.silentAudioElement = null;
+      this.silentOscillator = null;
+      this.silentGain = null;
       this.activePracticeSessionCount = 0;
     }
   }

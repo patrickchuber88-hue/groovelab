@@ -261,7 +261,7 @@ export function StudentPinResetModal({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               transition: 'transform 0.1s'
             }}
             onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}

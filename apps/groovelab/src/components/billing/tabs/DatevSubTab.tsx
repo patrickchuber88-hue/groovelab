@@ -121,7 +121,7 @@ export const DatevSubTab: React.FC<DatevSubTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(234, 67, 53, 0.25)'
+              boxShadow: 'none'
             }}
             className="hover-scale-mini"
           >

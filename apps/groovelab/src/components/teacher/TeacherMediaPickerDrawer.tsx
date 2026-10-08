@@ -190,7 +190,7 @@ export const TeacherMediaPickerDrawer: React.FC<TeacherMediaPickerDrawerProps> =
               alignItems: 'center',
               justifyContent: 'center',
               color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+              boxShadow: 'none'
             }}>
               <Layers size={22} />
             </div>

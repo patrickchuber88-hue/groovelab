@@ -320,7 +320,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
             borderRadius: '50%',
             border: '3px solid #facc15',
             background: '#ffffff',
-            boxShadow: '0 8px 20px rgba(250, 204, 21, 0.25)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -657,7 +657,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
                     alignItems: 'center',
                     gap: '6px',
                     touchAction: 'manipulation',
-                    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.05)'
+                    boxShadow: 'none'
                   }}
                 >
                   <LogOut size={14} />

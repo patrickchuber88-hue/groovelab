@@ -1222,7 +1222,7 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
           border: '1.5px solid #10b981',
           borderRadius: '16px',
           padding: '8px 12px',
-          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)'
+          boxShadow: 'none'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button

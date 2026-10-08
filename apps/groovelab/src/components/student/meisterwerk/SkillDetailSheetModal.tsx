@@ -337,7 +337,7 @@ export const SkillDetailSheetModal: React.FC<SkillDetailSheetModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                boxShadow: '0 4px 10px rgba(245, 158, 11, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <Target size={20} />

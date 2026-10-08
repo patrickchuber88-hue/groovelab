@@ -185,7 +185,7 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
    - Fällt der 30. Tag auf ein Wochenende (Samstag/Sonntag) oder einen gesetzlichen Feiertag, verschiebt sich die Fälligkeit gemäß § 193 BGB automatisch auf den nächsten Werktag (Montag).
 7. **EPC-GiroCode (Europäischer QR-Standard):**
    - Jede Rechnung enthält den offiziellen EPC-QR-Code (European Payments Council) zur beleglosen 1-Scan-Zahlung in Banking-Apps.
-   - Bankverbindung des Plattformbetriebs: *Campus-Groovelab Plattformbetrieb*, IBAN `DE89 3704 0044 0532 9482 11`, BIC `GENODEFFXXX`.
+   - Bankverbindung des Plattformbetriebs: *Campus-Groovelab Plattformbetrieb*, IBAN `DE89 3704 0044 0532 9482 11`, BIC `COBADEFFXXX` (Commerzbank AG).
 8. **Didaktische Immunität & Schonfristen (§ 242 BGB):**
    - Musikschulen erhalten nach Fälligkeit eine reale **Schonfrist von weiteren 30 Tagen (Stufe 1 & 2 als Ambient-Hinweise)** und in den Sommermonaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
    - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität).

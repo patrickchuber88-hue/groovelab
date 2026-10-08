@@ -158,7 +158,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 letterSpacing: '-0.01em',
                 fontFamily: "'Plus Jakarta Sans', sans-serif"
               }}>
-                {school?.name || 'Musäk Bad Säckingen'}
+                {school?.name || 'Musikschule'}
               </span>
             </div>
           )}
@@ -216,7 +216,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               cursor: 'pointer',
               transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
-              boxShadow: '0 1px 3px rgba(239, 68, 68, 0.08)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >
@@ -248,7 +248,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.2)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
             title="Details zur Probezeit"
@@ -387,7 +387,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)'
+                  boxShadow: 'none'
                 }}>
                   <GraduationCap size={24} color="#34a853" />
                 </div>
@@ -408,7 +408,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(234, 179, 8, 0.1)'
+                  boxShadow: 'none'
                 }}>
                   <CampusRibbonNoteIcon size={24} color="#eab308" />
                 </div>

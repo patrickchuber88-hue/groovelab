@@ -67,7 +67,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         borderRadius: '24px',
         padding: '24px',
         border: '1.5px solid #10b981',
-        boxShadow: '0 8px 24px -4px rgba(16, 185, 129, 0.16)',
+        boxShadow: 'none',
         textAlign: 'left',
         position: 'relative',
         overflow: 'hidden'
@@ -82,7 +82,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ffffff',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+            boxShadow: 'none',
             flexShrink: 0
           }}>
             <ShieldCheck size={32} strokeWidth={2.4} />
@@ -101,7 +101,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 borderRadius: '999px',
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
-                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                boxShadow: 'none'
               }}>
                 100% BIOMETRIEFREI
               </span>
@@ -253,7 +253,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+            boxShadow: 'none'
           }}>
             <Check size={18} color="#ffffff" strokeWidth={2.5} />
             <span>{audioPurgeSuccess}</span>
@@ -290,7 +290,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+            boxShadow: 'none'
           }}>
             <Check size={18} color="#ffffff" strokeWidth={2.5} />
             <span>✓ Dein Löschantrag wurde erfasst und wird vom Sekretariat fristgerecht bearbeitet.</span>
@@ -560,7 +560,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                  boxShadow: 'none'
                 }}
               >
                 <Trash2 size={15} />
@@ -677,7 +677,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                   fontWeight: 850,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                  boxShadow: 'none'
                 }}
               >
                 Antrag verbindlich absenden

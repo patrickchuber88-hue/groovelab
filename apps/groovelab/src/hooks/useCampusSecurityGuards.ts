@@ -98,6 +98,8 @@ export function useCampusSecurityGuards({
     try {
       const userId = user?.id;
       if (!userId) return;
+      const initialRole = user?.role || (newRole === 'teacher' ? 'admin' : 'teacher');
+      const initialWorkspace = (initialRole === 'admin' || initialRole === 'secretary') ? 'secretary' : (initialRole === 'teacher' ? 'teacher' : 'student');
 
       if (newRole === 'master_admin') {
         if (!isLocalDevEnvironment()) {
@@ -220,25 +222,19 @@ export function useCampusSecurityGuards({
 
         if (rpcErr) {
           console.error('[Role Switch] switch_user_active_role error:', rpcErr.message);
-          if (!isLocalhost) {
-            alert('Rollenwechsel fehlgeschlagen: ' + rpcErr.message);
-            // Revert state if failed in production
-            const previousRole = newRole === 'teacher' ? 'admin' : 'teacher';
-            const previousWorkspace = previousRole === 'teacher' ? 'teacher' : 'secretary';
-            sessionStorage.setItem('groovelab_active_workspace', previousWorkspace);
-            setActiveWorkspace(previousWorkspace);
-            setUser((prevUser: any) => prevUser ? { ...prevUser, role: previousRole } : prevUser);
-            return;
-          } else {
-            console.warn('[Role Switch] Localhost resilience: allowing client role transition despite backend RPC notice:', rpcErr.message);
-          }
+          alert('Rollenwechsel fehlgeschlagen: ' + rpcErr.message);
+          // Revert state if failed
+          const previousRole = initialRole;
+          const previousWorkspace = initialWorkspace;
+          sessionStorage.setItem('groovelab_active_workspace', previousWorkspace);
+          setActiveWorkspace(previousWorkspace);
+          setUser((prevUser: any) => prevUser ? { ...prevUser, role: previousRole } : prevUser);
+          return;
         }
       } catch (err: any) {
         console.error('[Role Switch] Error:', err);
-        if (!isLocalhost) {
-          alert('Rollenwechsel fehlgeschlagen: ' + (err?.message || 'Verbindungsfehler'));
-          return;
-        }
+        alert('Rollenwechsel fehlgeschlagen: ' + (err?.message || 'Verbindungsfehler'));
+        return;
       }
     } catch (err: any) {
       console.warn('Fehler beim Rollenwechsel:', err);

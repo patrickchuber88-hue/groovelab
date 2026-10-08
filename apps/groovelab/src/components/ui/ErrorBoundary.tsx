@@ -152,7 +152,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               fontWeight: 800, 
               fontSize: '1rem',
               cursor: 'pointer',
-              boxShadow: '0 10px 20px rgba(245, 158, 11, 0.2)',
+              boxShadow: 'none',
               transition: 'transform 0.2s'
             }}
             onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}

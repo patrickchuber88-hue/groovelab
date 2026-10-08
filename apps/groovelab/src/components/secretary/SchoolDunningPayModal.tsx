@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { generateEpcGiroCodePayload, formatIbanWithSpaces } from '../../utils/epcGiroCode';
 import { SchoolDunningStatus, getDunningVisualConfig } from '../../domain/schoolDunningEngine';
+import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../../config/operatorBanking';
 
 export interface SchoolDunningPayModalProps {
   isOpen: boolean;
@@ -24,9 +25,9 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
   onClose,
   dunningStatus,
   schoolName,
-  operatorCompany = 'Campus-Groovelab Plattformbetrieb',
-  operatorIban = 'DE89 3704 0044 0532 9482 11',
-  operatorBic = 'GENODEFFXXX',
+  operatorCompany = OPERATOR_BANKING_CONFIG.companyName,
+  operatorIban = formatOperatorIban(),
+  operatorBic = OPERATOR_BANKING_CONFIG.bic,
   onGoToLicenses,
   onActivateTrustExtension
 }) => {
@@ -367,7 +368,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
               >

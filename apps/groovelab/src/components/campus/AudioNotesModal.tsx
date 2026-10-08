@@ -1201,7 +1201,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#dc2626',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.18)'
+                boxShadow: 'none'
               }}
             >
               <Bookmark size={20} strokeWidth={2.4} fill="#ef4444" />

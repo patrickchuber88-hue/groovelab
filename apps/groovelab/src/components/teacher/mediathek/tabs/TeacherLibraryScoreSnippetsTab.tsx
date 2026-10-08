@@ -398,7 +398,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 14px rgba(79, 70, 229, 0.25)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease'
           }}
         >
@@ -620,7 +620,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: '12px',
-                boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
+                boxShadow: 'none'
               }}>
                 <Sparkles size={28} />
               </div>

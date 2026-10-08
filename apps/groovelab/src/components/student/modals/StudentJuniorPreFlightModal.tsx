@@ -200,7 +200,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                         padding: '3px 8px',
                         borderRadius: '7px',
                         border: 'none',
-                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                        boxShadow: 'none'
                       }}>
                         S. {pNum}
                       </span>
@@ -304,7 +304,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                    boxShadow: 'none'
                   }}>
                     <Headphones size={17} />
                   </div>
@@ -374,13 +374,13 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
             padding: '4px 4px 0 4px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 750, color: '#475569' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)' }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: 'none' }}>
                 <Check size={13} strokeWidth={3} />
               </div>
               <span>Noten aufgeschlagen &amp; Notenständer bereit</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 750, color: '#475569' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)' }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: 'none' }}>
                 <Check size={13} strokeWidth={3} />
               </div>
               <span>Instrument zur Hand &amp; startklar</span>
@@ -403,7 +403,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
               fontWeight: 950,
               fontSize: '1.15rem',
               cursor: 'pointer',
-              boxShadow: '0 10px 28px rgba(99, 102, 241, 0.4)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

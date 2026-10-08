@@ -473,7 +473,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 fontSize: '14px',
                 padding: '10px 20px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
+                boxShadow: 'none',
                 transition: 'all 0.2s'
               }}
               onMouseOver={(e) => {
@@ -684,7 +684,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               fontSize: '16px',
               padding: '16px 32px',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
+              boxShadow: 'none',
               transition: 'all 0.2s',
               display: 'flex',
               alignItems: 'center',
@@ -1428,7 +1428,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.05)'
+                boxShadow: 'none'
               }}>
                 <span>🌟 HÖCHSTE SICHERHEITS-STUFE: POSTGRESQL RLS</span>
               </div>
@@ -1540,7 +1540,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               borderRadius: '32px',
               padding: '40px 32px',
               textAlign: 'center',
-              boxShadow: '0 12px 30px rgba(52, 168, 83, 0.04)'
+              boxShadow: 'none'
             }}>
               <span style={{
                 background: '#34a853',
@@ -1746,7 +1746,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   textAlign: 'left',
                   display: 'flex',
                   flexDirection: 'column',
-                  boxShadow: '0 10px 30px rgba(52, 168, 83, 0.06)',
+                  boxShadow: 'none',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
@@ -1790,7 +1790,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 borderRadius: '20px',
                 background: '#ecfdf5',
                 border: '1.5px solid #10b981',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)',
+                boxShadow: 'none',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '16px',
@@ -1808,7 +1808,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   fontWeight: 900,
                   fontSize: '20px',
                   flexShrink: 0,
-                  boxShadow: '0 2px 8px rgba(22, 165, 74, 0.3)'
+                  boxShadow: 'none'
                 }}>
                   <ShieldCheck size={22} color="#ffffff" />
                 </div>
@@ -1888,7 +1888,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}
-                    <div style={{ marginTop: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', boxShadow: '0 2px 8px rgba(52, 168, 83, 0.05)' }}>
+                    <div style={{ marginTop: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', boxShadow: 'none' }}>
                       <div style={{ fontSize: '13px', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         <span>💚 Geschwister-Vorteil &amp; 20:1 Solidaritätsversprechen</span>
                       </div>
@@ -1939,7 +1939,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   fontWeight: 800,
                   fontSize: '16px',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
+                  boxShadow: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -2575,7 +2575,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   fontSize: '0.85rem',
                   padding: '10px 24px',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)',
+                  boxShadow: 'none',
                   outline: 'none'
                 }}
               >

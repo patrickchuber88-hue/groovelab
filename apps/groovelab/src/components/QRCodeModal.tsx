@@ -493,7 +493,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       gap: '6px',
-                      boxShadow: '0 4px 14px rgba(15,23,42,0.15)',
+                      boxShadow: 'none',
                       touchAction: 'manipulation'
                     }}
                     className="hover-scale"
@@ -517,7 +517,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(15,23,42,0.15)',
+                      boxShadow: 'none',
                       touchAction: 'manipulation'
                     }}
                     className="hover-scale"
@@ -742,7 +742,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               justifyContent: 'center',
               gap: '12px',
               marginTop: '16px',
-              boxShadow: '0 15px 35px rgba(225, 29, 72, 0.05)',
+              boxShadow: 'none',
               transition: 'all 0.2s'
             }}
           >

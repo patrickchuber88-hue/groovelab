@@ -749,7 +749,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
   // Generiere Intervall-Frage (inkl. Prüfungs-Mix Auflösung)
   const generateNewIntervalQuestion = useCallback(() => {
     const randomInterval = availableIntervals[Math.floor(Math.random() * availableIntervals.length)];
-    const rootMidi = 48 + Math.floor(Math.random() * 14); // C3 bis D4
+    const rootMidi = 60 + Math.floor(Math.random() * 12); // C4 bis B4 (Eingestrichene Oktave)
     const effectiveMode: 'ascending' | 'descending' | 'harmonic' = intervalPlayMode === 'vdm_mix'
       ? (['ascending', 'descending', 'harmonic'] as const)[Math.floor(Math.random() * 3)]
       : intervalPlayMode;
@@ -769,11 +769,11 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
     const isInversion = (vdmLevel === 'd2' || vdmLevel === 'd3') && chordCategory === 'inversions';
     if (isInversion) {
       const randomInv = CHORD_INVERSIONS[Math.floor(Math.random() * CHORD_INVERSIONS.length)];
-      const rootMidi = 48 + Math.floor(Math.random() * 8); // C3 bis G3
+      const rootMidi = 60 + Math.floor(Math.random() * 8); // C4 bis G4 (Akkord-Umkehrungen)
       setCurrentChordQuestion({ rootMidi, chord: randomInv, isInversion: true });
     } else {
       const randomChord = availableChords[Math.floor(Math.random() * availableChords.length)];
-      const rootMidi = 48 + Math.floor(Math.random() * 12);
+      const rootMidi = 60 + Math.floor(Math.random() * 8); // C4 bis G4 (Dreiklänge)
       setCurrentChordQuestion({ rootMidi, chord: randomChord, isInversion: false });
     }
     setSelectedChordAnswer(null);
@@ -1205,7 +1205,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px -2px rgba(139, 92, 246, 0.45)'
+            boxShadow: 'none'
           }}>
             <Headphones size={20} strokeWidth={2.4} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
           </div>
@@ -1294,7 +1294,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.35)'
+              boxShadow: 'none'
             }}
           >
             <Headphones size={15} strokeWidth={2.4} />
@@ -2518,7 +2518,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         fontSize: '0.80rem',
                         fontWeight: 900,
                         cursor: 'pointer',
-                        boxShadow: '0 3px 12px rgba(139, 92, 246, 0.40)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale"
                     >
@@ -3055,7 +3055,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         fontSize: '0.80rem',
                         fontWeight: 900,
                         cursor: 'pointer',
-                        boxShadow: '0 3px 12px rgba(139, 92, 246, 0.40)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale"
                     >
@@ -3167,7 +3167,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        boxShadow: '0 6px 18px rgba(139, 92, 246, 0.40)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
@@ -3322,7 +3322,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                                 borderRadius: '99px',
                                 fontSize: '0.78rem',
                                 fontWeight: 900,
-                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                                boxShadow: 'none'
                               }}>
                                 <Check size={14} strokeWidth={3} />
                                 <span>{uiLevel === 'junior' ? 'Super getroffen! Halte den Ton...' : 'Perfekt getroffen! Ton halten...'}</span>
@@ -3397,7 +3397,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                                   width: `${pitchMatchLockCountdown}%`,
                                   height: '100%',
                                   background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                                  boxShadow: '0 0 10px rgba(16, 185, 129, 0.6)',
+                                  boxShadow: 'none',
                                   transition: 'width 0.08s linear'
                                 }} />
                               </div>

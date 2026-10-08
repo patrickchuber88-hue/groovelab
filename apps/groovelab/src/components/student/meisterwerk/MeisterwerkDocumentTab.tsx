@@ -626,6 +626,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [localNewSongTitle, setLocalNewSongTitle] = useState('');
   const [localNewSongArtist, setLocalNewSongArtist] = useState('');
 
+  // 🎙️ 0.1% Goldstandard: Revisionssichere Dismissal-Liste für übertragene Aufnahmen (ohne Mutation historischer Snapshots)
+  const currentWeekDismissKey = useMemo(() => student?.id ? `campus_dismissed_audios_${student.id}_${viewingWeekOffset}` : null, [student?.id, viewingWeekOffset]);
+  const [dismissedAudioUrls, setDismissedAudioUrls] = useState<string[]>(() => {
+    try { return (typeof window !== 'undefined' && student?.id) ? JSON.parse(localStorage.getItem(`campus_dismissed_audios_${student.id}_${viewingWeekOffset}`) || '[]') : []; } catch { return []; }
+  });
+  useEffect(() => {
+    if (currentWeekDismissKey) {
+      try { setDismissedAudioUrls(JSON.parse(localStorage.getItem(currentWeekDismissKey) || '[]')); } catch { setDismissedAudioUrls([]); }
+    }
+    const handleAudioDismissed = (e: any) => {
+      const u = (e?.detail?.url || '').replace(/^["']|["']$/g, '').trim();
+      if (u) setDismissedAudioUrls(prev => (prev.includes(u) ? prev : [...prev, u]));
+    };
+    window.addEventListener('campus-audio-dismissed', handleAudioDismissed);
+    return () => window.removeEventListener('campus-audio-dismissed', handleAudioDismissed);
+  }, [currentWeekDismissKey]);
+
   // 🎵 0.1% Goldstandard 2027 Song Sections Architecture (Zero-Dummy-Data Doktrin)
   const [songSections, setSongSections] = useState<SongSection[]>(() => []);
   const [activeSectionId, setActiveSectionId] = useState<string>('');
@@ -962,7 +979,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
       playAlongAudioEngine.suspend();
     };
   }, [isPlayingAlong, songBpm, songTimeSignature, songSections, activeSectionId, isLoopingActiveSection, isSpeedTrainerActive, selectedActiveSongId, student?.id]);
-
 
   // 📚 Lehrwerke Selection & Creation State (Self-Contained 1% Goldstandard)
   const [localShowAssignDropdown, setLocalShowAssignDropdown] = useState(false);
@@ -1324,10 +1340,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     }
   }, [toggleStudentFocusPage, setAssignedLehrwerke, props.setAssignedLehrwerke, student?.id]);
 
-
-
-
-
   // 🎛️ STUDIO MODULES CUSTOM DRAG & DROP + JIGGLE MODE STATE
   // 🛡️ Goldstandard Separation: UI-Layout-Personalisierung ist entkoppelt vom didaktischen readOnly-Inhaltsschutz
   const canCustomizeLayout = true;
@@ -1680,24 +1692,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     }
   }, [activeViewingStudentNotes]);
 
-  // 📱 Long-Press Handlers for iPads / Tablets (500ms)
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const handleTouchStartTile = useCallback(() => {
-    if (!canCustomizeLayout) return;
-    longPressTimerRef.current = setTimeout(() => {
-      setIsModuleEditMode(true);
-      if (typeof navigator !== 'undefined' && (navigator as any).vibrate) {
-        (navigator as any).vibrate(50);
-      }
-    }, 500);
-  }, [canCustomizeLayout]);
-
-  const handleTouchCancelTile = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  }, []);
+  // 🎛️ Auto-Exit Timeout for Module Edit Mode (Jiggle) after 25s inactivity
+  useEffect(() => {
+    if (!isModuleEditMode) return;
+    const timer = setTimeout(() => {
+      setIsModuleEditMode(false);
+    }, 25000);
+    return () => clearTimeout(timer);
+  }, [isModuleEditMode]);
 
   const handleHideModule = useCallback(async (key: StudioModuleKey) => {
     const nextHidden = customModuleLayout.hidden.includes(key) 
@@ -2080,8 +2082,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     selectTextbookPage(activeLehrwerkId, safeTotal);
                   }
                 };
-
-
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
@@ -2730,7 +2730,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         background: '#9333ea',
                                         color: '#ffffff',
                                         border: '1.5px solid #ffffff',
-                                        boxShadow: '0 1px 3px rgba(147, 51, 234, 0.4)',
+                                        boxShadow: 'none',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -3348,7 +3348,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 background: 'linear-gradient(90deg, #16a34a, #4ade80)',
                                 borderRadius: '99px',
                                 transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
-                                boxShadow: '0 0 10px rgba(74, 222, 128, 0.4)'
+                                boxShadow: 'none'
                               }} />
                             </div>
                           </div>
@@ -3368,7 +3368,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 background: 'linear-gradient(90deg, #eab308, #fde047)',
                                 borderRadius: '99px',
                                 transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
-                                boxShadow: '0 0 10px rgba(250, 204, 21, 0.4)'
+                                boxShadow: 'none'
                               }} />
                             </div>
                           </div>
@@ -3691,7 +3691,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 fontWeight: 'bold',
                                 fontSize: '0.82rem',
                                 cursor: 'pointer',
-                                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
+                                boxShadow: 'none',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -3793,7 +3793,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Üben',
                           icon: <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(234, 179, 8, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('practice'),
                           showInView: isModActive('practice') || !readOnly,
                           onClick: () => {
@@ -3806,7 +3806,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Aufnahmen',
                           icon: <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('recordings'),
                           showInView: isModActive('recordings') || !readOnly,
                           onClick: () => {
@@ -3819,7 +3819,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Groove-Trainer',
                           icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('groovetrainer'),
                           showInView: isModActive('groovetrainer') || !readOnly,
                           borderOverride: isModActive('groovetrainer') ? undefined : '1.5px dashed #cbd5e1',
@@ -3833,7 +3833,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Stimmgerät',
                           icon: <TuningForkIcon size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('tuner'),
                           showInView: isModActive('tuner') || !readOnly,
                           borderOverride: isModActive('tuner') ? undefined : '1.5px dashed #cbd5e1',
@@ -3863,7 +3863,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
                           icon: <Headphones size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(139, 92, 246, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('earlab'),
                           showInView: isModActive('earlab') || !readOnly,
                           borderOverride: isModActive('earlab') ? undefined : '1.5px dashed #cbd5e1',
@@ -3901,7 +3901,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               : 'Repertoire & Noten',
                           icon: <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('protocol'),
                           showInView: isModActive('protocol') || !readOnly,
                           onClick: () => {
@@ -3930,7 +3930,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           title: 'Musik-Weltreise',
                           icon: <Compass size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
                           gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(2, 132, 199, 0.40)',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('worldtour'),
                           showInView: isModActive('worldtour') || !readOnly,
                           borderOverride: isModActive('worldtour') ? undefined : '1.5px dashed #cbd5e1',
@@ -4117,9 +4117,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     e.preventDefault();
                                     handleDropOnModule(moduleKey);
                                   }}
-                                  onTouchStart={handleTouchStartTile}
-                                  onTouchEnd={handleTouchCancelTile}
-                                  onTouchMove={handleTouchCancelTile}
                                   onClick={() => {
                                     if (isModuleEditMode) return;
                                     mod.onClick();
@@ -4167,7 +4164,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         cursor: 'pointer',
-                                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
+                                        boxShadow: 'none',
                                         zIndex: 40
                                       }}
                                       className="hover-scale"
@@ -4226,10 +4223,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 tabIndex={0}
                                 onClick={handleOpenModuleUnlock}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    handleOpenModuleUnlock();
-                                  }
+                                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenModuleUnlock(); }
                                 }}
                                 style={{
                                   background: '#f8fafc',
@@ -4288,10 +4282,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     archiveMod.onClick();
                                   }}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      if (!isModuleEditMode) archiveMod.onClick();
-                                    }
+                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!isModuleEditMode) archiveMod.onClick(); }
                                   }}
                                   style={{
                                     background: isArchiveGhosted ? '#f8fafc' : '#ffffff',
@@ -4334,7 +4325,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         cursor: 'pointer',
-                                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
+                                        boxShadow: 'none',
                                         zIndex: 40
                                       }}
                                       className="hover-scale"
@@ -4574,7 +4565,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '6px',
-                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
+                              boxShadow: 'none'
                             }}
                             className="hover-scale-mini"
                           >
@@ -4692,10 +4683,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         tabIndex={0}
                         aria-label="Lehrwerk hinzufügen"
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            toggleAssignDropdown();
-                          }
+                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAssignDropdown(); }
                         }}
                         style={{
                           flex: '0 0 auto',
@@ -4765,10 +4753,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           tabIndex={0}
                           aria-label={`Lehrwerk ${book.title}, ${total} Seiten, ${worked} gemeistert`}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              selectTextbookPage(itemBookId, activePageNumber || 1);
-                            }
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTextbookPage(itemBookId, activePageNumber || 1); }
                           }}
                           style={{
                             flex: '0 0 auto',
@@ -4975,16 +4960,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         const canCreate = true;
                         return (
                           <div
-                            onClick={() => {
-                              if (canCreate) setLocalShowCreateSongModal(true);
-                            }}
+                            onClick={() => { if (canCreate) setLocalShowCreateSongModal(true); }}
                             role={canCreate ? 'button' : undefined}
                             tabIndex={canCreate ? 0 : undefined}
                             onKeyDown={canCreate ? (e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setLocalShowCreateSongModal(true);
-                              }
+                              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLocalShowCreateSongModal(true); }
                             } : undefined}
                             aria-label={canCreate ? "Ersten Song aus Mediathek wählen oder anlegen" : "Noch kein aktives Song-Projekt"}
                             style={{
@@ -5052,10 +5032,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 tabIndex={0}
                                 aria-label={`Song ${songTitle} von ${songArtist}, ${progress}% Fortschritt`}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    selectActiveSong(skill);
-                                  }
+                                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectActiveSong(skill); }
                                 }}
                                 style={{
                                   background: isSelected ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#ffffff',
@@ -5559,7 +5536,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   fontSize: '0.8rem',
                                   fontWeight: 900,
                                   cursor: 'pointer',
-                                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                                  boxShadow: 'none'
                                 }}
                               >
                                 ✨ Song erstellen & zuweisen
@@ -5606,7 +5583,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
                       letterSpacing: '-0.01em',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(99, 102, 241, 0.20)',
+                      boxShadow: 'none',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       display: 'flex',
                       alignItems: 'center',
@@ -5639,7 +5616,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
                       letterSpacing: '-0.01em',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(217, 119, 6, 0.20)',
+                      boxShadow: 'none',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       display: 'flex',
                       alignItems: 'center',
@@ -5672,7 +5649,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
                       letterSpacing: '-0.01em',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.20)',
+                      boxShadow: 'none',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       display: 'flex',
                       alignItems: 'center',
@@ -5836,7 +5813,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               border: '1.5px solid #c4b5fd',
                               padding: '2px 8px',
                               borderRadius: '999px',
-                              boxShadow: '0 1px 3px rgba(109, 40, 217, 0.1)'
+                              boxShadow: 'none'
                             }}>
                               <CheckCircle size={12} strokeWidth={2.4} style={{ color: '#7c3aed', flexShrink: 0 }} />
                               <span>{readOnly ? '✓ Zuhause geübt' : '💜 Vom Schüler geübt'}</span>
@@ -5924,7 +5901,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     background: 'linear-gradient(90deg, #fef9c3 0%, #fef08a 100%)',
                     border: '1.5px solid #eab308',
                     borderRadius: '14px',
-                    boxShadow: '0 2px 8px rgba(234, 179, 8, 0.2)',
+                    boxShadow: 'none',
                     animation: 'pulse 2s infinite'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', fontWeight: 800, color: '#854d0e' }}>
@@ -6516,7 +6493,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 fontSize: '0.74rem',
                                 fontWeight: 900,
                                 border: '1px solid rgba(251, 191, 36, 0.3)',
-                                boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.2)',
+                                boxShadow: '0 3px 8px rgba(0,0,0,0.03)',
                                 alignSelf: 'flex-start'
                               }}>
                                 <FileText size={11} strokeWidth={2} style={{ color: '#64748b' }} />
@@ -6891,13 +6868,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </div>
                       )}
 
-
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
                         <button
                           type="button"
-                          onClick={() => {
-                            handleBackToHub();
-                          }}
+                          onClick={() => handleBackToHub()}
                           style={{
                             flex: 1,
                             padding: '14px 20px',
@@ -6908,7 +6882,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             fontWeight: 800,
                             fontSize: '0.88rem',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                            boxShadow: 'none',
                             transition: 'all 0.2s ease',
                             display: 'flex',
                             alignItems: 'center',
@@ -6960,7 +6934,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+                      boxShadow: 'none',
                       flexShrink: 0
                     }}>
                       <Sliders size={18} color="#ffffff" strokeWidth={2.4} />
@@ -6999,7 +6973,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       justifyContent: 'center',
                       color: '#ffffff',
                       flexShrink: 0,
-                      boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+                      boxShadow: 'none'
                     }}>
                       <Sliders size={16} />
                     </div>
@@ -7086,7 +7060,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       justifyContent: 'center',
                       color: '#ffffff',
                       flexShrink: 0,
-                      boxShadow: '0 2px 8px rgba(99, 102, 241, 0.25)'
+                      boxShadow: 'none'
                     }}>
                       <Mic size={16} />
                     </div>
@@ -7146,7 +7120,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       justifyContent: 'center',
                       color: '#ffffff',
                       flexShrink: 0,
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                      boxShadow: 'none'
                     }}>
                       <BookOpen size={16} />
                     </div>
@@ -7173,7 +7147,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                            boxShadow: 'none',
                             transition: 'transform 0.15s ease'
                           }}
                           className="hover-scale-mini"
@@ -7211,7 +7185,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
@@ -8052,6 +8026,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 })()
                               : [])) || [];
 
+                        audioNotes = audioNotes.filter(a => {
+                          const u = (a.url || '').replace(/^["']|["']$/g, '').trim();
+                          if (!u || dismissedAudioUrls.includes(u) || dismissedAudioUrls.includes(a.url)) return false;
+                          try { return localStorage.getItem(`campus_dismissed_audio_${u}`) !== '1'; } catch { return true; }
+                        });
+                        if (audioNotes.length === 0) isAudioCarriedOver = false;
+
                         const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0 || effectiveWorldTourMasteries.length > 0;
                         
                         const currentHour = getSimulatedNow().getHours();
@@ -8363,8 +8344,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 )}
                               </div>
 
-
-
                               {/* 🍏 Right: Compact Action Hub (32px Slim Icons) */}
                               <div 
                                 ref={shareMenuRef}
@@ -8419,7 +8398,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         fontSize: '0.75rem',
                                         fontWeight: 850,
                                         cursor: 'pointer',
-                                        boxShadow: '0 2px 8px rgba(250, 204, 21, 0.35)',
+                                        boxShadow: 'none',
                                         transition: 'all 0.15s ease',
                                         touchAction: 'manipulation',
                                         WebkitTapHighlightColor: 'transparent',
@@ -8484,7 +8463,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         fontWeight: 800,
                                         whiteSpace: 'nowrap',
                                         cursor: 'pointer',
-                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.25)',
+                                        boxShadow: 'none',
                                         transition: 'all 0.15s ease',
                                         touchAction: 'manipulation',
                                         WebkitTapHighlightColor: 'transparent',
@@ -8742,8 +8721,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               </div>
                             </div>
 
-
-
                             {/* 2. Silent Mode Banner (falls aktiv) */}
                             {isSilentTime && (
                               <div style={{
@@ -8809,6 +8786,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 maxHeight: 'none',
                                 overflowY: 'auto',
                                 overflowX: 'hidden',
+                                scrollbarGutter: 'stable',
                                 WebkitOverflowScrolling: 'touch',
                                 background: !hasActiveItems ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
                                 border: !hasActiveItems ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
@@ -8848,11 +8826,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         alignItems: 'center',
                                         gap: '4px'
                                       }}
-                                      title="Live-Schülersicht aktiv"
-                                      aria-label="Live-Schülersicht aktiv"
+                                      title={isCampusActive ? "Live-Schülersicht aktiv" : "Basis-Vorschau aktiv"}
+                                      aria-label={isCampusActive ? "Live-Schülersicht aktiv" : "Basis-Vorschau aktiv"}
                                     >
-                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }} />
-                                      <span>Live-Schülersicht</span>
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: isCampusActive ? '#16a34a' : '#0284c7' }} />
+                                      <span>{isCampusActive ? 'Live-Schülersicht' : 'Basis-Vorschau (Live-Woche)'}</span>
                                     </span>
                                   ) : (
                                     <span style={{ fontSize: isJunior ? '1.02rem' : '0.98rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
@@ -8932,7 +8910,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   border: '1.5px solid rgba(250, 204, 21, 0.40)',
                                   borderRadius: '20px',
                                   padding: '18px 20px',
-                                  boxShadow: '0 8px 24px rgba(250, 204, 21, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04)',
+                                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   gap: '14px'
@@ -8950,7 +8928,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        boxShadow: '0 2px 8px rgba(250, 204, 21, 0.20)',
+                                        boxShadow: 'none',
                                         flexShrink: 0
                                       }}>
                                         <HelpCircle size={20} />
@@ -9227,7 +9205,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 <div style={{
                                   background: '#fffdf0', border: '1.5px solid #fde047',
                                   borderRadius: '12px', padding: isMobileView ? '8px 12px' : '9px 14px',
-                                  boxShadow: '0 2px 8px rgba(250, 204, 21, 0.12)',
+                                  boxShadow: 'none',
                                   display: 'flex', flexDirection: 'column', gap: '5px'
                                 }}>
                                   {/* Header: Gelber Marken-Badge, Lehrkraft, Vormerkungs-Hinweis & Action Targets */}
@@ -9239,7 +9217,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         fontSize: '0.68rem', fontWeight: 850,
                                         textTransform: 'uppercase', letterSpacing: '0.03em',
                                         padding: '2px 7px', borderRadius: '100px',
-                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.35)',
+                                        boxShadow: 'none',
                                         flexShrink: 0
                                       }}>
                                         <HelpCircle size={11} color="#0f172a" strokeWidth={2.5} />
@@ -9307,7 +9285,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             onClick={async () => { setIsConfirmingResolveQuestion(false); await handleResolveStudentQuestion(); }}
                                             onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsConfirmingResolveQuestion(false); await handleResolveStudentQuestion(); } }}
                                             title="Löschen bestätigen" aria-label="Löschen bestätigen"
-                                            style={{ border: 'none', background: '#dc2626', color: '#ffffff', borderRadius: '8px', height: '32px', padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, boxShadow: '0 1px 4px rgba(220, 38, 38, 0.3)', touchAction: 'manipulation' }}
+                                            style={{ border: 'none', background: '#dc2626', color: '#ffffff', borderRadius: '8px', height: '32px', padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, boxShadow: 'none', touchAction: 'manipulation' }}
                                             className="hover-scale-mini"
                                           >
                                             <Check size={12} strokeWidth={3} />
@@ -9375,7 +9353,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       setIsQuestionEditorOpen(true);
                                     }
                                   }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 13px', background: '#fffdf0', border: '1px dashed #fde047', borderRadius: '12px', color: '#854d0e', fontSize: '0.78rem', fontWeight: 750, cursor: 'pointer', width: '100%', boxSizing: 'border-box', textAlign: 'left', boxShadow: '0 1px 3px rgba(250, 204, 21, 0.08)', transition: 'all 0.15s ease' }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 13px', background: '#fffdf0', border: '1px dashed #fde047', borderRadius: '12px', color: '#854d0e', fontSize: '0.78rem', fontWeight: 750, cursor: 'pointer', width: '100%', boxSizing: 'border-box', textAlign: 'left', boxShadow: 'none', transition: 'all 0.15s ease' }}
                                   className="hover-scale-mini"
                                 >
                                   <HelpCircle size={14} color="#ca8a04" style={{ flexShrink: 0 }} />
@@ -9390,7 +9368,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   border: '1.5px solid #fcd34d',
                                   borderRadius: '16px',
                                   padding: '12px 16px',
-                                  boxShadow: '0 3px 10px rgba(217, 119, 6, 0.08)',
+                                  boxShadow: 'none',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
@@ -9479,7 +9457,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '5px',
-                                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
+                                        boxShadow: 'none'
                                       }}
                                       className="hover-scale-mini"
                                       title="Als im Unterricht besprochen markieren"
@@ -9530,7 +9508,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)'
+                                    boxShadow: 'none'
                                   }}>
                                     <Music size={22} color="#15803d" strokeWidth={2.4} />
                                   </div>
@@ -9865,11 +9843,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     padding: '2px 4px',
                                                     borderRadius: '4px',
                                                     display: 'flex',
-                                                    alignItems: 'center',
-                                                    transition: 'transform 0.15s ease'
+                                                    alignItems: 'center'
                                                   }}
-                                                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                                  className="hover-scale-mini"
                                                   title="Notiz vorlesen"
                                                 >
                                                   <Volume2 size={13} strokeWidth={2.4} />
@@ -10128,11 +10104,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                       borderRadius: '4px',
                                                       display: 'flex',
                                                       alignItems: 'center',
-                                                      flexShrink: 0,
-                                                      transition: 'transform 0.15s ease'
+                                                      flexShrink: 0
                                                     }}
-                                                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                                    className="hover-scale-mini"
                                                     title="Fahrplan vorlesen"
                                                   >
                                                     <Volume2 size={13} strokeWidth={2.4} />
@@ -10152,8 +10126,24 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     <div style={{ paddingTop: '2px' }}>
                                       <AudioTrackCarousel
                                         tracks={audioNotes}
-                                        onDelete={!readOnly && !isAudioCarriedOver ? handleDeleteNote : undefined}
-                                        readOnly={readOnly || isAudioCarriedOver}
+                                        onDelete={!readOnly ? async (trackIdx?: number, trackUrl?: string) => {
+                                          const target = (trackIdx !== undefined && audioNotes[trackIdx]) ? audioNotes[trackIdx] : audioNotes.find(a => a.url === trackUrl);
+                                          const url = target?.url || trackUrl;
+                                          if ((target?.isCarriedOver || isAudioCarriedOver) && url) {
+                                            const cleanUrl = (url || '').replace(/^["']|["']$/g, '').trim();
+                                            try { localStorage.setItem(`campus_dismissed_audio_${cleanUrl}`, '1'); } catch {}
+                                            window.dispatchEvent(new CustomEvent('campus-audio-dismissed', { detail: { url: cleanUrl } }));
+                                            setDismissedAudioUrls(prev => {
+                                              const next = prev.includes(cleanUrl) ? prev : [...prev, cleanUrl];
+                                              if (currentWeekDismissKey) { try { localStorage.setItem(currentWeekDismissKey, JSON.stringify(next)); } catch {} }
+                                              return next;
+                                            });
+                                            setHasChanges(true);
+                                          } else if (handleDeleteNote) {
+                                            await Promise.resolve(handleDeleteNote(target?.originalIdx ?? target?.idx ?? trackIdx));
+                                          }
+                                        } : undefined}
+                                        readOnly={readOnly}
                                         isFutureWeek={isFutureWeek}
                                         isTeacher={!readOnly}
                                         activeTopicContext={topicName}
@@ -10470,11 +10460,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   padding: '2px 4px',
                                                   borderRadius: '4px',
                                                   display: 'flex',
-                                                  alignItems: 'center',
-                                                  transition: 'transform 0.15s ease'
+                                                  alignItems: 'center'
                                                 }}
-                                                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                                className="hover-scale-mini"
                                                 title="Diesen Baustein vorlesen"
                                               >
                                                 <Volume2 size={12} strokeWidth={2.4} />
@@ -10740,7 +10728,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    boxShadow: "0 2px 6px rgba(37, 99, 235, 0.12)"
+                    boxShadow: "none"
                   }}>
                     <Sliders size={20} color="#2563eb" strokeWidth={2.4} />
                   </div>
@@ -10941,7 +10929,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   display: "flex",
                                   alignItems: "center",
                                   gap: "5px",
-                                  boxShadow: "0 2px 6px rgba(34, 197, 94, 0.25)"
+                                  boxShadow: "none"
                                 }}
                                 className="hover-scale"
                                 aria-label={`${labelMap[hiddenKey] || hiddenKey} wieder einblenden`}
@@ -11190,7 +11178,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     height: "7px",
                     borderRadius: "50%",
                     background: "#22c55e",
-                    boxShadow: "0 0 6px rgba(34, 197, 94, 0.6)"
+                    boxShadow: "none"
                   }} />
                   <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b" }}>
                     Live synchronisiert

@@ -113,7 +113,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)'
+                boxShadow: 'none'
               }}
             >
               <Sparkles size={18} color="#b45309" />
@@ -201,7 +201,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                 completedCount === milestones.length
                   ? 'linear-gradient(90deg, #f59e0b 0%, #eab308 50%, #fde047 100%)'
                   : 'linear-gradient(90deg, #10b981 0%, #059669 60%, #f59e0b 100%)',
-              boxShadow: '0 0 10px rgba(16, 185, 129, 0.4)',
+              boxShadow: 'none',
               transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           />
@@ -526,7 +526,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                 border: '1px solid #f59e0b',
                                 padding: '2px 8px',
                                 borderRadius: '100px',
-                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.25)'
+                                boxShadow: 'none'
                               }}
                             >
                               <CheckCircle2 size={11} color="#d97706" />
@@ -738,7 +738,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+                                  boxShadow: 'none'
                                 }}
                                 className="hover-scale"
                               >
@@ -795,7 +795,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                               justifyContent: 'center',
                               gap: '10px',
                               cursor: 'pointer',
-                              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.38)',
+                              boxShadow: 'none',
                               transition: 'all 0.15s ease'
                             }}
                             className="hover-scale"

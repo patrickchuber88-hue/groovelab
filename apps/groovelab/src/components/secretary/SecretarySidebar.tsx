@@ -110,7 +110,7 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
   setShowOwnQrModal,
   onLogout,
   handleSecretaryLogout,
-  schoolName = 'Musäk Bad Säckingen',
+  schoolName = 'Schulverwaltung',
   isCurrentUserTeacher = false,
   onRoleSwitched,
   isCollapsed = false,
@@ -279,7 +279,7 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             cursor: 'pointer',
             transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
-            boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)'
+            boxShadow: 'none'
           }}
           className="hover-scale"
         >
@@ -306,7 +306,7 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
           fontSize: '0.68rem',
           textTransform: 'uppercase',
           letterSpacing: '0.03em',
-          boxShadow: '0 2px 6px rgba(245, 158, 11, 0.2)'
+          boxShadow: 'none'
         }}>
           <AlertCircle size={11} color="white" />
           <span>{trialDaysRemaining > 0 ? `Probezeit: ${trialDaysRemaining} ${trialDaysRemaining === 1 ? 'Tag' : 'Tage'}` : 'Probezeit abgelaufen'}</span>
@@ -537,7 +537,7 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
           { id: 'rooms', label: 'Räume', icon: DoorOpen },
           hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
           { id: 'employees', label: 'Mitarbeiter', icon: Users },
-          { id: 'licenses', label: 'Abrechnung & Lizenzen', icon: Award },
+          { id: 'licenses', label: 'Abrechnung & Infrastruktur', icon: Award },
           { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
           { id: 'setup', label: 'Einstellungen', icon: Settings }
         ] as any[]).filter(Boolean).map((item: any) => {

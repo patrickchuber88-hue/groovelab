@@ -105,7 +105,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               justifyContent: 'center',
               color: '#ffffff',
               fontSize: '1.3rem',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+              boxShadow: 'none',
               flexShrink: 0
             }}>
               🎁
@@ -272,7 +272,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >

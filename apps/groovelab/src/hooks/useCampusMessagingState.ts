@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getLocalMessagesCache, setLocalMessagesCache } from './useCampusMessagingData';
 
 export interface UseCampusMessagingStateParams {
   userId?: string | null;
@@ -34,11 +35,19 @@ export const useCampusMessagingState = ({
   const [studentMessagesFilter, setStudentMessagesFilter] = useState<'all' | 'school' | 'band'>('all');
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
 
-  // Campus 1-on-1 Direct Messaging states
-  const [campusMessages, setCampusMessages] = useState<any[]>([]);
+  // Campus 1-on-1 Direct Messaging states (0.1% Goldstandard SWR Instant Hydration)
+  const effectiveUid = userId || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id')) : null) || '';
+  const [campusMessages, setCampusMessages] = useState<any[]>(() => getLocalMessagesCache(effectiveUid));
   const [campusMessagesLoading, setCampusMessagesLoading] = useState(false);
   const [campusUnreadCount, setCampusUnreadCount] = useState(0);
   const [selectedCampusRecipient, setSelectedCampusRecipient] = useState<any>(null);
+
+  // Sync campusMessages with localStorage SWR cache per user
+  useEffect(() => {
+    if (effectiveUid && campusMessages.length > 0) {
+      setLocalMessagesCache(effectiveUid, campusMessages);
+    }
+  }, [effectiveUid, campusMessages]);
 
   // Sync deletedMessageIds with localStorage per user
   useEffect(() => {

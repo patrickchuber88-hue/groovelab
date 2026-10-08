@@ -84,7 +84,7 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            boxShadow: '0 2px 8px rgba(52, 168, 83, 0.3)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease',
             touchAction: 'manipulation'
           }}

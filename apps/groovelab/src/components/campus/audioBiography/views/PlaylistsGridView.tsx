@@ -287,7 +287,7 @@ export const PlaylistsGridView: React.FC<PlaylistsGridViewProps> = ({
                 color: '#ffffff',
                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 border: 'none',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                boxShadow: 'none',
                 padding: '3px 10px',
                 borderRadius: '100px',
                 display: 'inline-flex',
@@ -397,7 +397,7 @@ export const PlaylistsGridView: React.FC<PlaylistsGridViewProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)'
+                boxShadow: 'none'
               }}
               className="hover-scale"
             >
@@ -604,7 +604,7 @@ export const PlaylistsGridView: React.FC<PlaylistsGridViewProps> = ({
                 fontSize: '0.88rem',
                 fontWeight: 900,
                 cursor: 'pointer',
-                boxShadow: '0 4px 18px rgba(16, 185, 129, 0.45)',
+                boxShadow: 'none',
                 marginTop: '6px'
               }}
               className="hover-scale"

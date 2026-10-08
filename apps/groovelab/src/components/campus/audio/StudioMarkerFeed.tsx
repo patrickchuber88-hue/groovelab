@@ -147,7 +147,7 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            boxShadow: '0 10px 30px -5px rgba(239, 68, 68, 0.15)',
+            boxShadow: 'none',
             animation: 'fadeIn 0.18s ease-out'
           }}
         >
@@ -339,7 +339,7 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                  boxShadow: 'none'
                 }}
               >
                 <Check size={15} strokeWidth={2.6} />
@@ -396,7 +396,7 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+              boxShadow: 'none'
             }}
           >
             <Sparkles size={24} color="#ef4444" />

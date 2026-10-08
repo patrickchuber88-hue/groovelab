@@ -82,7 +82,7 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
             borderRadius: '12px',
             background: '#ffffff',
             border: '1px solid rgba(16, 185, 129, 0.25)',
-            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.06)'
+            boxShadow: 'none'
           }}>
             <span style={{
               width: '8px',

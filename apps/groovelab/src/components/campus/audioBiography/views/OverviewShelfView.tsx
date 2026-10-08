@@ -151,7 +151,7 @@ export const OverviewShelfView: React.FC<OverviewShelfViewProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <Plus size={22} strokeWidth={2.8} />

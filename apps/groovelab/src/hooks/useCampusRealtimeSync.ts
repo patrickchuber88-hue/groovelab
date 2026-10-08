@@ -368,7 +368,8 @@ export function useCampusRealtimeSync({
         });
       }, 3500);
       
-      const needsInitialLoading = !user;
+      const hasLease = typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem('gl_active_session_lease_id'));
+      const needsInitialLoading = !user || !hasLease;
       fetchDashboardData(loggedInUserId, needsInitialLoading).finally(() => clearTimeout(safetyTimer));
     }
   }, [loggedInUserId]);

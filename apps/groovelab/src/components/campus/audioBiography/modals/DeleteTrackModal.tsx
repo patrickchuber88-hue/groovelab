@@ -128,7 +128,7 @@ export const DeleteTrackModal: React.FC<DeleteTrackModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              boxShadow: '0 4px 16px rgba(239, 68, 68, 0.4)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >

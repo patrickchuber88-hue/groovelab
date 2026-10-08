@@ -271,7 +271,7 @@ export const BankingSubTab: React.FC<BankingSubTabProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(234, 67, 53, 0.22)'
+              boxShadow: 'none'
             }}
             className="hover-scale-mini"
           >
@@ -287,7 +287,7 @@ export const BankingSubTab: React.FC<BankingSubTabProps> = ({
           borderRadius: '24px',
           padding: '24px 28px',
           border: '1.5px solid #0284c7',
-          boxShadow: '0 8px 24px rgba(2, 132, 199, 0.08)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           gap: '16px'

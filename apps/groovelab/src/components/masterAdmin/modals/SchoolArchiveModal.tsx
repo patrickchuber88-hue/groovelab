@@ -135,7 +135,7 @@ export const SchoolArchiveModal: React.FC<SchoolArchiveModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"

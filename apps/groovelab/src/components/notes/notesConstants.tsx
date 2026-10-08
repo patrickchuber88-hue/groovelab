@@ -156,7 +156,7 @@ export const resolveCleanInstrument = (s: any, teacherInst?: string | null): str
   if (teacherInst && teacherInst.toLowerCase() !== 'musiker' && teacherInst.toLowerCase() !== 'allgemein') {
     return teacherInst.trim();
   }
-  return 'Gitarre';
+  return '';
 };
 
 // Date calculation helpers for quick Due Date presets

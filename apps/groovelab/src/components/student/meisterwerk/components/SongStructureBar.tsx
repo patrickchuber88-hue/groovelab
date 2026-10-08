@@ -389,7 +389,7 @@ export const SongStructureBar: React.FC<SongStructureBarProps> = ({
             fontWeight: 850,
             cursor: 'pointer',
             transition: 'all 0.15s ease',
-            boxShadow: '0 2px 6px rgba(99, 102, 241, 0.15)',
+            boxShadow: 'none',
             flexShrink: 0
           }}
           className="hover-scale"

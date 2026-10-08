@@ -8,7 +8,7 @@ import { ZenPlayAlongDock } from "../../campus/ZenPlayAlongDock";
 import { formatTeacherFullName } from "../../../utils/nameHelper";
 import { getSimulatedNow, toLocalYYYYMMDD } from "../studentDateUtils";
 import { AuthoritativeHomeworkWidget } from "../homework/AuthoritativeHomeworkWidget";
-import { PracticeExerciseStageView } from "../practice/PracticeExerciseStageView";
+import { PracticeHomeworkCard } from "../practice/PracticeHomeworkCard";
 import { useModalA11y } from "../../../hooks/useModalA11y";
 
 const Confetti = lazy(() => import("react-confetti"));
@@ -68,6 +68,8 @@ export interface StudentPracticeTabProps {
   juniorLaunchStage: "launching" | "summary";
   expandedMonths: Record<string, boolean>;
   setExpandedMonths: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  currentXp?: number;
+  currentStreak?: number;
 }
 
 export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
@@ -78,6 +80,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   studentId,
   studentUser,
   avatar,
+  currentXp,
+  currentStreak,
   effectivePracticeMinutes,
   secondsElapsedRef,
   isJuniorMissionPausedRef,
@@ -131,7 +135,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   const practiceSettingsModalRef = useModalA11y(showJuniorPracticeSettingsModal, () => setShowJuniorPracticeSettingsModal(false));
 
   useEffect(() => {
-    const handleAbort = (e: any) => { setAbortedNotice(e?.detail?.message || 'Fokus-Session abgebrochen: Du hast die App oder den Tab verlassen. 🛑'); };
+    const handleAbort = (e: any) => { setAbortedNotice(e?.detail?.message || 'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt der Fokus-Timer geöffnet! 🛑'); };
     window.addEventListener('campus_focus_session_aborted', handleAbort);
     return () => window.removeEventListener('campus_focus_session_aborted', handleAbort);
   }, []);
@@ -164,9 +168,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
       className="animation-slide-up practice-board-wrapper"
     >
       {abortedNotice && (
-        <div style={{ background: '#fef2f2', border: '1.5px solid #f87171', borderRadius: '16px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.12)' }}>
+        <div role="alert" aria-live="assertive" style={{ background: '#fef2f2', border: '1.5px solid #f87171', borderRadius: '16px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', boxShadow: 'none' }}>
           <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#991b1b' }}>{abortedNotice}</span>
-          <button type="button" onClick={() => setAbortedNotice(null)} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '8px', padding: '4px 8px', fontSize: '0.78rem', fontWeight: 850, cursor: 'pointer' }}>OK</button>
+          <button type="button" onClick={() => setAbortedNotice(null)} aria-label="Hinweis schließen" style={{ border: 'none', background: '#fee2e2', color: '#991b1b', borderRadius: '8px', padding: '6px 12px', minHeight: '36px', minWidth: '44px', fontSize: '0.78rem', fontWeight: 850, cursor: 'pointer' }}>OK</button>
         </div>
       )}
       {activeTab === 'practice_board' && (
@@ -190,19 +194,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
             {/* 🌟 JUNIOR GOLDSTANDARD: KINDGERECHTER ÜBE-PFAD (7-10 JAHRE)              */}
             {/* ========================================================================= */}
             {studentUiLevel === 'junior' && juniorMissionPhase === 'idle' && (() => {
-              const streak = avatar?.streak_flame || 0;
-              const targetMins = getTargetMinutes(streak);
               const weekMetrics = getDeterministicWeekMetrics();
               const { weekDays, weekPracticedCount, availableShields } = weekMetrics;
+              const streak = currentStreak ?? Math.max(avatar?.streak_flame || 0, weekMetrics?.calculatedStreak || 0);
+              const targetMins = getTargetMinutes(streak);
 
-              // XP Calculation
-              let xpVal = avatar?.xp || 0;
-              try {
-                const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
-                if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
-                const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
-                if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
-              } catch (e) {}
+              // XP Calculation (Authoritative 100% Parity)
+              const xpVal = currentXp ?? avatar?.xp ?? 0;
 
               // Next Sticker Calculation (Harmonized 1:1 with effectivePracticeMinutes)
               const effMins = effectivePracticeMinutes;
@@ -266,9 +264,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       to { transform: rotate(360deg) translateX(97px) rotate(-360deg); }
                     }
                     @keyframes pulseRadarBeacon {
-                      0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
-                      70% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
-                      100% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+                      0% { transform: scale(0.96); box-shadow: none; }
+                      70% { transform: scale(1.03); box-shadow: none; }
+                      100% { transform: scale(0.96); box-shadow: none; }
                     }
                     @keyframes goldCoinShine {
                       0%, 100% { filter: brightness(1) drop-shadow(0 2px 4px rgba(234, 179, 8, 0.25)); }
@@ -276,27 +274,27 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     }
                     @keyframes amberStreakGlow {
                       0%, 100% {
-                        box-shadow: 0 4px 0 #b45309, 0 6px 14px rgba(245, 158, 11, 0.30);
+                        box-shadow: none;
                         filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.35));
                       }
                       50% {
-                        box-shadow: 0 4px 0 #b45309, 0 10px 22px rgba(245, 158, 11, 0.55);
+                        box-shadow: none;
                         filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.75));
                       }
                     }
                     .junior-3d-button {
                       background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
-                      box-shadow: 0 8px 0 #312e81, 0 16px 25px rgba(49, 46, 129, 0.45), 0 0 18px rgba(245, 158, 11, 0.22);
+                      box-shadow: none;
                       transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
                       transform: translateY(0);
                     }
                     .junior-3d-button:hover {
                       transform: translateY(-2px);
-                      box-shadow: 0 10px 0 #312e81, 0 20px 32px rgba(49, 46, 129, 0.55), 0 0 35px rgba(245, 158, 11, 0.50);
+                      box-shadow: none;
                     }
                     .junior-3d-button:active {
                       transform: translateY(6px);
-                      box-shadow: 0 2px 0 #312e81, 0 6px 12px rgba(49, 46, 129, 0.3);
+                      box-shadow: none;
                     }
                     .junior-day-coin {
                       transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -336,7 +334,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#4f46e5',
-                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.22)',
+                        boxShadow: 'none',
                         flexShrink: 0
                       }}>
                         <Rocket size={isMusicStandMode ? 28 : 22} color="#4f46e5" />
@@ -368,7 +366,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         transition: 'all 0.3s ease'
                       }}>
                         <Star size={16} fill={streak > 0 ? '#f59e0b' : '#94a3b8'} color={streak > 0 ? '#d97706' : '#94a3b8'} style={{ filter: streak > 0 ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))' : 'none' }} />
-                        <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Serie</span>
+                        <span>{streak === 0 ? 'Startklar Tag 1' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} Serie`}</span>
                       </div>
 
                       {/* XP Pill */}
@@ -383,7 +381,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         borderRadius: '100px',
                         fontWeight: 900,
                         fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)',
-                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.1)'
+                        boxShadow: 'none'
                       }}>
                         <Star size={15} fill="#4f46e5" />
                         <span>{xpVal} XP</span>
@@ -399,7 +397,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       borderRadius: '24px',
                       border: '2px solid rgba(168, 85, 247, 0.35)',
                       padding: isMusicStandMode ? '32px 24px' : '26px 20px',
-                      boxShadow: '0 20px 50px -10px rgba(46, 16, 101, 0.5), 0 0 35px rgba(168, 85, 247, 0.15) inset',
+                      boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.5)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -497,7 +495,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         letterSpacing: '0.04em',
                         textTransform: 'uppercase',
                         marginBottom: '16px',
-                        boxShadow: '0 0 15px rgba(99, 102, 241, 0.25)',
+                        boxShadow: 'none',
                         zIndex: 1
                       }}>
                         <Target size={15} color="#c7d2fe" />
@@ -544,7 +542,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             height: '22px',
                             borderRadius: '50%',
                             background: 'linear-gradient(135deg, #e0e7ff 0%, #c084fc 100%)',
-                            boxShadow: '0 0 12px #c084fc, 0 0 24px rgba(168, 85, 247, 0.8)',
+                            boxShadow: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
@@ -692,7 +690,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         flex: 1
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: isMusicStandMode ? '56px' : '42px', height: isMusicStandMode ? '56px' : '42px', minWidth: isMusicStandMode ? '56px' : '42px', borderRadius: '14px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.22)' }}>
+                          <div style={{ width: isMusicStandMode ? '56px' : '42px', height: isMusicStandMode ? '56px' : '42px', minWidth: isMusicStandMode ? '56px' : '42px', borderRadius: '14px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: 'none' }}>
                             <Sparkles size={isMusicStandMode ? 28 : 22} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -881,7 +879,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: isMusicStandMode ? '56px' : '42px', height: isMusicStandMode ? '56px' : '42px', borderRadius: '14px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.22)' }}>
+                            <div style={{ width: isMusicStandMode ? '56px' : '42px', height: isMusicStandMode ? '56px' : '42px', borderRadius: '14px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: 'none' }}>
                               <Award size={isMusicStandMode ? 28 : 22} />
                             </div>
                             <div>
@@ -940,7 +938,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             borderRadius: '14px',
                             background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 100%)',
                             border: '2px solid #818cf8',
-                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25), 0 2px 0 #4f46e5',
+                            boxShadow: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -992,7 +990,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 height: '100%',
                                 background: 'linear-gradient(90deg, #818cf8 0%, #a855f7 50%, #c084fc 100%)',
                                 borderRadius: '100px',
-                                boxShadow: '0 0 10px rgba(168, 85, 247, 0.5)',
+                                boxShadow: 'none',
                                 transition: 'width 0.4s ease'
                               }} />
                             </div>
@@ -1018,7 +1016,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '12px',
-                      boxShadow: '0 4px 15px rgba(52, 168, 83, 0.06)'
+                      boxShadow: 'none'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1440,7 +1438,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 0 45px rgba(245, 158, 11, 0.45)',
+                            boxShadow: 'none',
                             animation: 'countInPulse 0.5s ease-out'
                           }}>
                             <span style={{
@@ -1548,7 +1546,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       gap: '8px',
-                                      boxShadow: '0 0 20px rgba(245, 158, 11, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35)',
+                                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
                                       touchAction: 'manipulation',
                                       WebkitTapHighlightColor: 'transparent',
                                       userSelect: 'none',
@@ -1563,23 +1561,24 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   </button>
                                 ) : (
                                   <>
-                                    {/* ⏸️ Pause (Apple Music Frosted Glass Capsule) */}
+                                    {/* ⏸️ Pause / Weiter (Apple Music Frosted Glass Capsule) */}
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setIsJuniorMissionPaused(true);
-                                        isJuniorMissionPausedRef.current = true;
+                                        const next = !isJuniorMissionPaused;
+                                        setIsJuniorMissionPaused(next);
+                                        isJuniorMissionPausedRef.current = next;
                                       }}
                                       style={{
-                                        background: 'rgba(255, 255, 255, 0.12)',
-                                        border: '1.5px solid rgba(255, 255, 255, 0.22)',
+                                        background: isJuniorMissionPaused ? 'rgba(245, 158, 11, 0.22)' : 'rgba(255, 255, 255, 0.12)',
+                                        border: isJuniorMissionPaused ? '1.5px solid #fbbf24' : '1.5px solid rgba(255, 255, 255, 0.22)',
                                         backdropFilter: 'blur(20px)',
                                         WebkitBackdropFilter: 'blur(20px)',
                                         borderRadius: '100px',
                                         minHeight: '44px',
                                         height: '44px',
                                         padding: '0 16px',
-                                        color: '#f8fafc',
+                                        color: isJuniorMissionPaused ? '#fbbf24' : '#f8fafc',
                                         fontSize: '0.88rem',
                                         fontWeight: 900,
                                         cursor: 'pointer',
@@ -1587,18 +1586,18 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: '7px',
-                                        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+                                        boxShadow: isJuniorMissionPaused ? '0 0 16px rgba(245, 158, 11, 0.35)' : '0 4px 14px rgba(0, 0, 0, 0.25)',
                                         touchAction: 'manipulation',
                                         WebkitTapHighlightColor: 'transparent',
                                         userSelect: 'none',
                                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                       }}
                                       className="hover-scale"
-                                      title="Übung kurz pausieren"
-                                      aria-label="Übung pausieren"
+                                      title={isJuniorMissionPaused ? 'Übung fortsetzen' : 'Übung kurz pausieren'}
+                                      aria-label={isJuniorMissionPaused ? 'Übung fortsetzen' : 'Übung pausieren'}
                                     >
-                                      <Pause size={14} fill="#f8fafc" color="#f8fafc" />
-                                      <span>Pause</span>
+                                      {isJuniorMissionPaused ? <Play size={14} fill="#fbbf24" color="#fbbf24" /> : <Pause size={14} fill="#f8fafc" color="#f8fafc" />}
+                                      <span>{isJuniorMissionPaused ? 'Weiter' : 'Pause'}</span>
                                     </button>
 
                                     {/* ⏹️ Beenden (Apple Music Vibrant Crimson Capsule - Sofort sichtbar & Mobile First) */}
@@ -1622,7 +1621,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: '8px',
-                                        boxShadow: '0 4px 18px rgba(239, 68, 68, 0.55), 0 0 12px rgba(239, 68, 68, 0.35)',
+                                        boxShadow: 'none',
                                         touchAction: 'manipulation',
                                         WebkitTapHighlightColor: 'transparent',
                                         userSelect: 'none',
@@ -2043,7 +2042,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     padding: isMusicStandMode ? '5px 14px' : '3px 12px',
                                     borderRadius: '100px',
                                     backdropFilter: 'blur(12px)',
-                                    boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
+                                    boxShadow: 'none',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '6px',
@@ -2411,7 +2410,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               padding: isMusicStandMode ? '36px 32px' : '28px 24px',
                               maxWidth: '460px',
                               width: '100%',
-                              boxShadow: '0 25px 60px rgba(0,0,0,0.4), 0 0 35px rgba(168, 85, 247, 0.25)',
+                              boxShadow: '0 25px 60px rgba(0,0,0,0.4)',
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'center',
@@ -2486,7 +2485,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
+                                    boxShadow: 'none'
                                   }}>
                                     <Star size={15} fill="#f59e0b" color="#b45309" style={{ filter: 'drop-shadow(0 0 5px rgba(245, 158, 11, 0.7))' }} />
                                     <span>Wochen-Stern entzündet</span>
@@ -2509,7 +2508,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   fontWeight: 950,
                                   cursor: 'pointer',
                                   marginTop: '8px',
-                                  boxShadow: '0 8px 24px rgba(79, 70, 229, 0.35)',
+                                  boxShadow: 'none',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -2564,7 +2563,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 8px 20px rgba(79, 70, 229, 0.2)'
+                          boxShadow: 'none'
                         }}>
                           <Pause size={30} fill="currentColor" />
                         </div>
@@ -2628,7 +2627,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               fontWeight: 950,
                               fontSize: '1.05rem',
                               cursor: 'pointer',
-                              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)',
+                              boxShadow: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -2729,7 +2728,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           fontSize: '1rem',
                           fontWeight: 900,
                           cursor: 'pointer',
-                          boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)'
+                          boxShadow: 'none'
                         }}
                         className="hover-scale"
                       >
@@ -2748,24 +2747,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
             {/* ⚡ TEEN FLOW: THE ACOUSTIC LOUNGE (11–15 JAHRE) - 1:1 JUNIOR PARITÄT     */}
             {/* ========================================================================= */}
             {studentUiLevel === 'teen' && (() => {
-              const streak = avatar?.streak_flame || 0;
-              const targetMins = getTargetMinutes(streak);
-              const targetSeconds = targetMins * 60;
               const weekMetrics = getDeterministicWeekMetrics();
               const { weekDays, weekPracticedCount, availableShields } = weekMetrics;
+              const streak = currentStreak ?? Math.max(avatar?.streak_flame || 0, weekMetrics?.calculatedStreak || 0);
+              const targetMins = getTargetMinutes(streak);
+              const targetSeconds = targetMins * 60;
               const elapsedSecs = secondsElapsedRef.current || secondsElapsed;
               const isGoalReached = elapsedSecs >= targetSeconds;
               const currentMins = Math.floor(elapsedSecs / 60);
               const currentSecs = elapsedSecs % 60;
               const effMins = effectivePracticeMinutes;
 
-              let xpVal = avatar?.xp || 0;
-              try {
-                const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
-                if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
-                const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
-                if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
-              } catch (e) {}
+              // XP Calculation (Authoritative 100% Parity)
+              const xpVal = currentXp ?? avatar?.xp ?? 0;
               let nextStickerName = 'Fleiß-Pionier';
               let targetMin = 20;
               let prevMin = 0;
@@ -2843,7 +2837,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 0 50px rgba(245, 158, 11, 0.45)',
+                          boxShadow: 'none',
                           animation: 'countInPulse 0.5s ease-out'
                         }}>
                           <span style={{ fontSize: '5.5rem', fontWeight: 950, color: '#fbbf24', lineHeight: 1 }}>
@@ -2915,7 +2909,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               fontWeight: 850,
                               color: '#fbbf24'
                             }}>
-                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 8px #f59e0b' }} />
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f59e0b', boxShadow: 'none' }} />
                               <Headphones size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
                               <span>Übe-Studio</span>
                             </div>
@@ -2945,7 +2939,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     gap: '8px',
-                                    boxShadow: '0 0 20px rgba(245, 158, 11, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35)',
+                                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
                                     touchAction: 'manipulation',
                                     WebkitTapHighlightColor: 'transparent',
                                     userSelect: 'none',
@@ -3027,7 +3021,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       gap: '8px',
-                                      boxShadow: '0 4px 18px rgba(239, 68, 68, 0.55), 0 0 12px rgba(239, 68, 68, 0.35)',
+                                      boxShadow: 'none',
                                       touchAction: 'manipulation',
                                       WebkitTapHighlightColor: 'transparent',
                                       userSelect: 'none',
@@ -3080,7 +3074,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             borderRadius: '50%',
                             background: 'radial-gradient(circle, #0f172a 0%, #090d16 100%)',
                             border: '3px solid rgba(245, 158, 11, 0.35)',
-                            boxShadow: '0 0 60px rgba(245, 158, 11, 0.28), 0 0 100px rgba(245, 158, 11, 0.12), inset 0 0 35px rgba(0,0,0,0.8)'
+                            boxShadow: 'inset 0 0 35px rgba(0,0,0,0.8)'
                           }}>
                             {/* SVG Vinyl Grooves & Progress Arc */}
                             <svg
@@ -3151,7 +3145,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   padding: isMusicStandMode ? '6px 16px' : '4px 14px',
                                   borderRadius: '100px',
                                   backdropFilter: 'blur(12px)',
-                                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
+                                  boxShadow: 'none',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
@@ -3269,7 +3263,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#fbbf24',
-                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
+                        boxShadow: 'none',
                         flexShrink: 0
                       }}>
                         <Music size={isMusicStandMode ? 28 : 20} color="#fbbf24" />
@@ -3296,7 +3290,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         fontSize: isMusicStandMode ? '0.88rem' : '0.82rem'
                       }}>
                         <Flame size={16} fill="#f59e0b" color="#f59e0b" />
-                        <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Flow</span>
+                        <span>{streak === 0 ? 'Startklar Tag 1' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} Flow`}</span>
                       </div>
 
                       {/* XP Pill */}
@@ -3326,7 +3320,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       borderRadius: '24px',
                       border: '1.5px solid rgba(245, 158, 11, 0.28)',
                       padding: isMusicStandMode ? '32px 24px' : '26px 20px',
-                      boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.6), 0 0 35px rgba(245, 158, 11, 0.06) inset',
+                      boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.6)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -3365,7 +3359,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         letterSpacing: '0.04em',
                         textTransform: 'uppercase',
                         marginBottom: '18px',
-                        boxShadow: '0 2px 14px rgba(245, 158, 11, 0.15)',
+                        boxShadow: 'none',
                         zIndex: 1
                       }}>
                         <Target size={14} color="#fbbf24" />
@@ -3383,7 +3377,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         borderRadius: '50%',
                         background: 'radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.96) 65%, #050811 100%)',
                         border: '3px solid rgba(245, 158, 11, 0.45)',
-                        boxShadow: '0 0 35px rgba(245, 158, 11, 0.18), inset 0 0 25px rgba(0,0,0,0.8)',
+                        boxShadow: 'inset 0 0 25px rgba(0,0,0,0.8)',
                         marginBottom: '20px',
                         zIndex: 1,
                         flexShrink: 0
@@ -3453,7 +3447,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             justifyContent: 'center',
                             gap: '10px',
                             padding: isMusicStandMode ? '16px 36px' : '14px 28px',
-                            boxShadow: '0 12px 30px -4px rgba(245, 158, 11, 0.45), inset 0 1px 1px rgba(255,255,255,0.6)',
+                            boxShadow: 'none',
                             letterSpacing: '-0.015em',
                             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                             touchAction: 'manipulation'
@@ -3534,7 +3528,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              boxShadow: '0 2px 8px rgba(99, 102, 241, 0.20)'
+                              boxShadow: 'none'
                             }}>
                               <Shield size={12} fill="#818cf8" color="#818cf8" />
                               <span>{availableShields} von 3 Schilden aktiv</span>
@@ -3731,7 +3725,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             borderRadius: '14px',
                             background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%)',
                             border: '2px solid rgba(245, 158, 11, 0.45)',
-                            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+                            boxShadow: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -3792,24 +3786,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
             {/* 🎓 PRO STUDIO: HELLES APPLE HIG DESIGN (16+ J.) - 1:1 JUNIOR PARITÄT */}
             {studentUiLevel === 'pro' && (() => {
-              const streak = avatar?.streak_flame || 0;
-              const targetMins = getTargetMinutes(streak);
-              const targetSeconds = targetMins * 60;
               const weekMetrics = getDeterministicWeekMetrics();
               const { weekDays, weekPracticedCount, availableShields } = weekMetrics;
+              const streak = currentStreak ?? Math.max(avatar?.streak_flame || 0, weekMetrics?.calculatedStreak || 0);
+              const targetMins = getTargetMinutes(streak);
+              const targetSeconds = targetMins * 60;
               const todayProgress = Math.min(1, (weekDays.find((d: any) => d.isToday)?.totalDaySecs || 0) / targetSeconds);
               const elapsedSecs = secondsElapsedRef.current || secondsElapsed;
               const isGoalReached = elapsedSecs >= targetSeconds;
               const currentMins = Math.floor(elapsedSecs / 60);
               const currentSecs = elapsedSecs % 60;
 
-              let xpVal = avatar?.xp || 0;
-              try {
-                const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
-                if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
-                const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
-                if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
-              } catch (e) {}
+              // XP Calculation (Authoritative 100% Parity)
+              const xpVal = currentXp ?? avatar?.xp ?? 0;
 
               const missionInfo = getJuniorMissionDetails();
               const rawInst = (studentUser?.instrument || '').trim();
@@ -3907,7 +3896,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 0 45px rgba(22, 163, 74, 0.25)',
+                          boxShadow: 'none',
                           animation: 'countInPulse 0.5s ease-out'
                         }}>
                           <span style={{ fontSize: '5.5rem', fontWeight: 950, color: '#16a34a', lineHeight: 1 }}>
@@ -3980,7 +3969,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               fontSize: '0.82rem',
                               fontWeight: 850,
                               color: '#ffffff',
-                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                              boxShadow: 'none'
                             }}>
                               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', boxShadow: '0 0 6px #ffffff' }} />
                               <span>Studio-Fokus</span>
@@ -4012,7 +4001,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     gap: '8px',
-                                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)',
+                                    boxShadow: 'none',
                                     touchAction: 'manipulation',
                                     WebkitTapHighlightColor: 'transparent',
                                     userSelect: 'none',
@@ -4089,7 +4078,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       gap: '8px',
-                                      boxShadow: '0 4px 18px rgba(239, 68, 68, 0.45), 0 0 10px rgba(239, 68, 68, 0.25)',
+                                      boxShadow: 'none',
                                       touchAction: 'manipulation',
                                       WebkitTapHighlightColor: 'transparent',
                                       userSelect: 'none',
@@ -4141,7 +4130,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             justifyContent: 'center',
                             borderRadius: '50%',
                             background: '#ffffff',
-                            boxShadow: '0 12px 35px rgba(22, 163, 74, 0.08), 0 2px 10px rgba(0,0,0,0.03)'
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
                           }}>
                             <svg
                               width={isMusicStandMode ? '260' : '230'}
@@ -4211,7 +4200,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  boxShadow: '0 2px 10px rgba(245, 158, 11, 0.2)',
+                                  boxShadow: 'none',
                                   animation: 'flatReminderPulse 2s ease-in-out infinite'
                                 }}>
                                   <Smartphone size={14} strokeWidth={2.4} color="#92400e" style={{ flexShrink: 0 }} />
@@ -4229,7 +4218,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                                  boxShadow: 'none'
                                 }}>
                                   {!isGoalReached ? (
                                     <>
@@ -4329,7 +4318,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#ffffff',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
+                        boxShadow: 'none',
                         flexShrink: 0
                       }}>
                         <Music size={isMusicStandMode ? 28 : 22} color="#ffffff" />
@@ -4356,7 +4345,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)'
                       }}>
                         <Flame size={16} fill="#f59e0b" color="#f59e0b" />
-                        <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Streak</span>
+                        <span>{streak === 0 ? 'Startklar Tag 1' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} Streak`}</span>
                       </div>
 
                       {/* XP Pill */}
@@ -4371,30 +4360,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         borderRadius: '100px',
                         fontWeight: 900,
                         fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                        boxShadow: 'none'
                       }}>
                         <Star size={15} fill="#ffffff" color="#ffffff" />
                         <span>{xpVal} XP</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* 🏛️ 0,1% Practice Exercise Focus Stage & Context Shelf (65:35 Asymmetric Bento) */}
-                  <PracticeExerciseStageView
-                    studentId={studentId || studentUser?.id}
-                    studentUser={studentUser}
-                    studentUiLevel={studentUiLevel}
-                    isMusicStandMode={isMusicStandMode}
-                    lehrwerke={lehrwerke}
-                    progressItems={progressItems}
-                    activeSongSkills={activeSongSkills}
-                    assignedCampusSongs={assignedCampusSongs}
-                    streak={streak}
-                    availableShields={availableShields}
-                    weekDays={weekDays}
-                    onStartFocusSession={handleStartPracticeSession}
-                    onOpenHomeworkBook={handleOpenHomeworkBookWithView}
-                  />
 
                   {/* 2. Studio 2-Column Cockpit Grid (Hero links, Partner-Karten rechts) */}
                   <div className="practice-studio-cockpit-grid">
@@ -4404,7 +4376,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       borderRadius: '24px',
                       border: '2px solid #e2e8f0',
                       padding: isMusicStandMode ? '32px 24px' : '26px 20px',
-                      boxShadow: '0 16px 40px -10px rgba(0, 0, 0, 0.05), 0 0 35px rgba(22, 163, 74, 0.03) inset',
+                      boxShadow: '0 16px 40px -10px rgba(0, 0, 0, 0.05)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -4430,7 +4402,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         letterSpacing: '0.04em',
                         textTransform: 'uppercase',
                         marginBottom: '18px',
-                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                        boxShadow: 'none',
                         zIndex: 1
                       }}>
                         <Target size={14} color="#ffffff" />
@@ -4533,7 +4505,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             border: 'none',
                             padding: '3px 12px',
                             borderRadius: '100px',
-                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                            boxShadow: 'none'
                           }}>
                             Fokuszeit
                           </span>
@@ -4560,7 +4532,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '10px',
-                            boxShadow: '0 8px 24px rgba(22, 163, 74, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+                            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.22)',
                             transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
                             touchAction: 'manipulation'
                           }}
@@ -4588,7 +4560,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '14px',
-                      justifyContent: 'space-between',
+                      justifyContent: 'flex-start',
                       height: '100%'
                     }}>
                       {/* Karte C: Wochen-Konsistenz & Fokus (7-Tage-Grid mit 3 Schutzschilden) */}
@@ -4632,7 +4604,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              boxShadow: '0 2px 6px rgba(99, 102, 241, 0.10)'
+                              boxShadow: 'none'
                             }}>
                               <ShieldCheck size={12} color="#6366f1" />
                               <span>{availableShields} von 3 Schilden aktiv</span>
@@ -4745,66 +4717,18 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         </div>
                       </div>
 
-                      {/* Karte B: Meisterwerk & Repertoire Quick-Access */}
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '24px',
-                        border: '2px solid #e2e8f0',
-                        padding: isMusicStandMode ? '20px 24px' : '16px 20px',
-                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        boxSizing: 'border-box'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: isMusicStandMode ? '46px' : '42px',
-                            height: isMusicStandMode ? '46px' : '42px',
-                            borderRadius: '13px',
-                            background: 'rgba(245, 158, 11, 0.10)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#d97706',
-                            flexShrink: 0
-                          }}>
-                            <Trophy size={isMusicStandMode ? 24 : 20} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.20rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Meisterwerk &amp; Repertoire
-                            </h4>
-                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
-                              {activeSongsList.length > 0 ? `${activeSongsList.length} Stücke in Arbeit` : 'Alle Song-Projekte gemeistert'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                          style={{
-                            background: '#f8fafc',
-                            border: '1.5px solid #e2e8f0',
-                            borderRadius: '100px',
-                            padding: '6px 14px',
-                            color: '#334155',
-                            fontSize: '0.80rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}
-                          className="hover-scale"
-                          aria-label="Protokoll öffnen"
-                        >
-                          <FileText size={14} color="#64748b" />
-                          <span>Protokoll öffnen →</span>
-                        </button>
-                      </div>
+                      {/* Karte B: Didaktische Wochen-Aufgabe & Repertoire (0,1% Goldstandard) */}
+                      <PracticeHomeworkCard
+                        studentId={studentId || studentUser?.id}
+                        studentUser={studentUser}
+                        isMusicStandMode={isMusicStandMode}
+                        activeSongsList={activeSongsList}
+                        onOpenHomeworkBook={handleOpenHomeworkBookWithView}
+                        lehrwerke={lehrwerke}
+                        progressItems={progressItems}
+                        activeSongSkills={activeSongSkills}
+                        assignedCampusSongs={assignedCampusSongs}
+                      />
                     </div>
                   </div>
                 </div>
@@ -4884,6 +4808,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               dayState?: string;
               isShielded?: boolean;
               shieldNumber?: number;
+              xp_earned?: number;
             }> = {};
 
             // 1. SSOT: Reale Fokus-Logs genau einmal direkt aggregieren (Zero Double-Counting)
@@ -5017,6 +4942,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               key: string;
               entries: typeof allMeaningfulLogs;
               totalMins: number;
+              totalSecs: number;
               activePracticeDays: number;
               shieldedDays: number;
             }
@@ -5028,6 +4954,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               key: currentMonthKey,
               entries: [],
               totalMins: 0,
+              totalSecs: 0,
               activePracticeDays: 0,
               shieldedDays: 0
             };
@@ -5045,6 +4972,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                   key,
                   entries: [],
                   totalMins: 0,
+                  totalSecs: 0,
                   activePracticeDays: 0,
                   shieldedDays: 0
                 };
@@ -5056,6 +4984,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               const isShielded = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
 
               if (totalSecs > 0) {
+                monthsMap[key].totalSecs += totalSecs;
                 monthsMap[key].totalMins += Math.floor(totalSecs / 60);
                 monthsMap[key].activePracticeDays += 1;
               }
@@ -5123,6 +5052,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                   <span style={{ fontSize: '0.74rem', color: countPillColor, fontWeight: 750, background: countPillBg, border: countPillBorder, padding: '4px 12px', borderRadius: '100px' }}>
                     {totalActivePracticeDays} dokumentierte {totalActivePracticeDays === 1 ? 'Übetag' : 'Übetage'}
                     {totalShieldedDaysCount > 0 ? (isTeen ? ` • ${totalShieldedDaysCount} geschützt` : ` • ${totalShieldedDaysCount} ${totalShieldedDaysCount === 1 ? 'Schutzschild' : 'Schutzschilde'}`) : ''}
+                    {` • ${effectivePracticeMinutes} Min. Gesamtzeit`}
                   </span>
                 </div>
 
@@ -5185,7 +5115,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               {month.shieldedDays > 0 ? (
                                 isTeen ? ` • ${month.shieldedDays} geschützt` : ` • ${month.shieldedDays} ${month.shieldedDays === 1 ? 'Schutzschild' : 'Schutzschilde'}`
                               ) : ''}
-                              {` • ${month.totalMins} Min.`}
+                              {` • ${month.totalMins > 0 ? `${month.totalMins} Min.` : (month.totalSecs > 0 ? `${month.totalSecs} Sek.` : '0 Min.')}`}
                             </span>
                           </div>
                         </div>
@@ -5217,7 +5147,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 const eSecs = entry.extraSeconds || 0;
                                 const totalSecs = fSecs + eSecs;
                                 const totalMins = Math.floor(totalSecs / 60);
-                                const xp = Math.max(1, totalMins);
+                                const earnedXp = entry.xp_earned ?? (entry.hasMasteredSession ? 3 : totalMins);
 
                                 if (isShielded) {
                                   return (
@@ -5424,20 +5354,24 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                             <Clock size={11} color={isTeen ? (entry.hasMasteredSession ? '#34d399' : '#94a3b8') : (entry.hasMasteredSession ? '#16a34a' : '#64748b')} style={{ flexShrink: 0 }} />
                                             {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
                                           </span>
-                                          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>•</span>
-                                          <span style={{ 
-                                            fontSize: '0.72rem', 
-                                            fontWeight: 850, 
-                                            color: isTeen 
-                                              ? (entry.hasMasteredSession ? '#38bdf8' : '#94a3b8') 
-                                              : (entry.hasMasteredSession ? '#15803d' : '#64748b'), 
-                                            display: 'inline-flex', 
-                                            alignItems: 'center', 
-                                            gap: '3px' 
-                                          }}>
-                                            <Zap size={11} color={isTeen ? (entry.hasMasteredSession ? '#38bdf8' : '#94a3b8') : (entry.hasMasteredSession ? '#16a34a' : '#64748b')} style={{ flexShrink: 0 }} />
-                                            <span>+{xp} XP</span>
-                                          </span>
+                                          {earnedXp > 0 && (
+                                            <>
+                                              <span style={{ fontSize: '0.65rem', color: '#64748b' }}>•</span>
+                                              <span style={{ 
+                                                fontSize: '0.72rem', 
+                                                fontWeight: 850, 
+                                                color: isTeen 
+                                                  ? (entry.hasMasteredSession ? '#38bdf8' : '#94a3b8') 
+                                                  : (entry.hasMasteredSession ? '#15803d' : '#64748b'), 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '3px' 
+                                              }}>
+                                                <Zap size={11} color={isTeen ? (entry.hasMasteredSession ? '#38bdf8' : '#94a3b8') : (entry.hasMasteredSession ? '#16a34a' : '#64748b')} style={{ flexShrink: 0 }} />
+                                                <span>+{earnedXp} XP</span>
+                                              </span>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
                                     </div>

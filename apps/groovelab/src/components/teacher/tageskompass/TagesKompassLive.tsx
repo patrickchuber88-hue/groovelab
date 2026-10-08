@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   Clock, 
   Play, 
@@ -137,7 +137,39 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
       })
       .filter(Boolean) as MicroScoreSnippet[];
   }, [prevNotes]);
-  const prevAudioTracks = useMemo(() => parseHomeworkAudioNotes(prevNotes), [prevNotes]);
+  // 🎙️ 0.1% Goldstandard: Revisionssichere Dismissal-Liste für Vorwochenaufnahmen
+  const prevDismissKey = useMemo(() => prep?.studentId ? `campus_dismissed_audios_${prep.studentId}_prev` : null, [prep?.studentId]);
+  const [dismissedPrevAudioUrls, setDismissedPrevAudioUrls] = useState<string[]>(() => {
+    try {
+      return (typeof window !== 'undefined' && prep?.studentId)
+        ? JSON.parse(localStorage.getItem(`campus_dismissed_audios_${prep.studentId}_prev`) || '[]')
+        : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    if (!prevDismissKey) return;
+    try {
+      setDismissedPrevAudioUrls(JSON.parse(localStorage.getItem(prevDismissKey) || '[]'));
+    } catch { setDismissedPrevAudioUrls([]); }
+  }, [prevDismissKey]);
+
+  const prevAudioTracks = useMemo(() => {
+    const raw = parseHomeworkAudioNotes(prevNotes);
+    if (dismissedPrevAudioUrls.length === 0) return raw;
+    return raw.filter(t => !dismissedPrevAudioUrls.includes(t.url));
+  }, [prevNotes, dismissedPrevAudioUrls]);
+
+  const handleDeletePrevAudio = useCallback((index: number, url?: string) => {
+    const targetUrl = url || prevAudioTracks[index]?.url;
+    if (!targetUrl) return;
+    setDismissedPrevAudioUrls(prev => {
+      const next = prev.includes(targetUrl) ? prev : [...prev, targetUrl];
+      if (prevDismissKey) {
+        try { localStorage.setItem(prevDismissKey, JSON.stringify(next)); } catch {}
+      }
+      return next;
+    });
+  }, [prevAudioTracks, prevDismissKey]);
   const prevLehrwerke = useMemo(() => parseHomeworkLehrwerke(prevNotes), [prevNotes]);
   const activePrevTags = useMemo(() => extractActiveDidacticTags(prevTextNote), [prevTextNote]);
   const hasPrevHomework = Boolean(prevTextNote || prevMicroScores.length > 0 || prevAudioTracks.length > 0 || prevLehrwerke.length > 0 || (prep?.prevWeekItems && prep.prevWeekItems.length > 0));
@@ -616,7 +648,8 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
               <div style={{ marginTop: '2px' }}>
                 <WochenFahrplanAudioPlayer
                   tracks={prevAudioTracks}
-                  readOnly={true}
+                  readOnly={false}
+                  onDelete={handleDeletePrevAudio}
                   topicName="Vorwoche"
                 />
               </div>

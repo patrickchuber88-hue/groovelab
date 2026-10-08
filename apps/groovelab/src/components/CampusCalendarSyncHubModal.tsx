@@ -340,7 +340,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.14)',
+            boxShadow: 'none',
             marginTop: '4px'
           }}>
             <CalendarDays size={26} strokeWidth={2.2} />

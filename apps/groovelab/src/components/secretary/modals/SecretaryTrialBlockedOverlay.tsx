@@ -85,7 +85,7 @@ export const SecretaryTrialBlockedOverlay: React.FC<SecretaryTrialBlockedOverlay
             fontWeight: 900,
             fontSize: '1rem',
             cursor: 'pointer',
-            boxShadow: '0 10px 20px rgba(52, 168, 83, 0.18)',
+            boxShadow: 'none',
             transition: 'all 0.2s',
             outline: 'none'
           }}

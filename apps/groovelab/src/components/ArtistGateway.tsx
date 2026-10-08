@@ -256,7 +256,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
             background: 'rgba(234, 179, 8, 0.12)',
             border: '1px solid rgba(234, 179, 8, 0.35)',
             color: '#facc15',
-            boxShadow: '0 0 25px rgba(234, 179, 8, 0.2)'
+            boxShadow: 'none'
           }}
         >
           <Sparkles size={14} /> ARTIST GATEWAY ✨
@@ -305,7 +305,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                 color: '#facc15',
                 fontSize: '0.85rem',
                 fontWeight: 900,
-                boxShadow: '0 4px 20px rgba(234, 179, 8, 0.15)'
+                boxShadow: 'none'
               }}
             >
               <Clock size={16} /> Mögliche Bandprobe: {suggestion.day} {suggestion.start} – {suggestion.end} Uhr
@@ -391,7 +391,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                           inset: 0, 
                           border: '4px solid #facc15', 
                           borderRadius: '44px', 
-                          boxShadow: 'inset 0 0 24px rgba(250, 204, 21, 0.6), 0 0 30px rgba(234, 179, 8, 0.5)' 
+                          boxShadow: 'none' 
                         }} 
                       />
                       <div 
@@ -410,7 +410,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                           justifyContent: 'center',
                           fontWeight: 950,
                           fontSize: '13px',
-                          boxShadow: '0 4px 14px rgba(234, 179, 8, 0.45)',
+                          boxShadow: 'none',
                           border: 'none',
                           zIndex: 10
                         }}
@@ -464,7 +464,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
               fontWeight: 950, 
               color: '#0f172a', 
               cursor: 'pointer', 
-              boxShadow: '0 12px 35px rgba(234, 179, 8, 0.45), 0 4px 12px rgba(0,0,0,0.2)',
+              boxShadow: 'none',
               transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
               letterSpacing: '0.04em',
               minHeight: '48px',
@@ -472,11 +472,11 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
             }}
             onMouseEnter={e => {
               e.currentTarget.style.transform = 'translateY(-3px) scale(1.03)';
-              e.currentTarget.style.boxShadow = '0 18px 45px rgba(234, 179, 8, 0.6), 0 6px 16px rgba(0,0,0,0.3)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.boxShadow = '0 12px 35px rgba(234, 179, 8, 0.45), 0 4px 12px rgba(0,0,0,0.2)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             BÜHNE FREI – ZUM DASHBOARD 🚀

@@ -95,7 +95,7 @@ export const LinerNotesModal: React.FC<LinerNotesModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+              boxShadow: 'none'
             }}>
               <BookOpen size={20} color="#ffffff" />
             </div>
@@ -361,7 +361,7 @@ export const LinerNotesModal: React.FC<LinerNotesModalProps> = ({
               fontSize: '0.84rem',
               fontWeight: 900,
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >

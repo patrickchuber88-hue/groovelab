@@ -82,21 +82,20 @@ export function useCampusNavigationAndWorkspaces({
 
   // 2. Tab-Steuerung
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const urlTab = new URLSearchParams(window.location.search).get('tab');
+      if (urlTab) return urlTab;
+    }
     const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
     if (platform === 'campus') {
-      const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
-      return tab === 'live' ? 'briefing' : (tab === 'mediathek' ? 'songs' : tab);
+      // 🏛️ 0,1% Goldstandard: Kanonischer Kaltstart-Anker ist immer 'briefing'
+      return 'briefing';
     }
     if (platform === 'ensembles') {
       return (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
     }
     // GrooveLab: Startseite ist autoritativ das Live Lab ('live')
-    const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
-    const validStudentGrooveTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages', 'profile'];
-    if (user?.role?.toLowerCase() === 'student' && !validStudentGrooveTabs.includes(tab)) {
-      return 'live';
-    }
-    return tab;
+    return 'live';
   });
 
   const setActivePlatform = useCallback((val: any, _forceUnlock = false) => {

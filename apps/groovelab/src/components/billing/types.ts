@@ -59,6 +59,12 @@ export interface Invoice {
   leitweg_id?: string;
   contractStartDate?: string | null;
   createdAt?: string | null;
+  sepaIban?: string;
+  sepaBic?: string;
+  sepaAccountHolder?: string;
+  sepaMandateId?: string;
+  sepaMandateDate?: string;
+  billingIban?: string;
 }
 
 export interface PlatformSummary {

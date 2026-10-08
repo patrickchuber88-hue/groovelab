@@ -29,7 +29,7 @@ export interface ParentSponsorPatronageCardProps {
 
 export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProps> = ({ schoolId }) => {
   const [sponsors, setSponsors] = useState<SchoolSponsorItem[]>([]);
-  const [schoolName, setSchoolName] = useState<string>('Musäk Bad Säckingen');
+  const [schoolName, setSchoolName] = useState<string>('Musikschule');
 
   useEffect(() => {
     try {
@@ -129,7 +129,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
               justifyContent: 'center',
               color: '#15803d',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(22, 163, 74, 0.12)'
+              boxShadow: 'none'
             }}>
               <GraduationCap size={20} strokeWidth={2.3} />
             </div>
@@ -346,7 +346,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
             justifyContent: 'center',
             color: '#b45309',
             flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.12)'
+            boxShadow: 'none'
           }}>
             <Award size={20} strokeWidth={2.3} />
           </div>

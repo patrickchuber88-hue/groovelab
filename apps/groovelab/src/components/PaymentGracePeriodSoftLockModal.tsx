@@ -10,6 +10,7 @@ import {
   generateStudentGoBdCode,
   calculateSchoolYearDirectBilling
 } from '../utils/epcGiroCode';
+import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../config/operatorBanking';
 
 export interface PaymentGracePeriodSoftLockModalProps {
   student: {
@@ -39,9 +40,9 @@ export interface PaymentGracePeriodSoftLockModalProps {
 export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLockModalProps> = ({
   student,
   schoolData,
-  masterBillingIban = 'DE89 3704 0044 0532 9482 11',
-  masterBillingBic = 'GENODEFFXXX',
-  masterBillingCompany = 'Campus-Groovelab Plattformbetrieb',
+  masterBillingIban = formatOperatorIban(),
+  masterBillingBic = OPERATOR_BANKING_CONFIG.bic,
+  masterBillingCompany = OPERATOR_BANKING_CONFIG.companyName,
   onClose,
   onOpenActivationModal
 }) => {
@@ -153,7 +154,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(217, 119, 6, 0.2)'
+              boxShadow: 'none'
             }}>
               <Music size={22} color="#d97706" />
             </div>
@@ -441,7 +442,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
+                  boxShadow: 'none'
                 }}
               >
                 <span>Vollständige Zahlungsanweisung & PDF-Beleg öffnen</span>

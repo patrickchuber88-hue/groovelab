@@ -413,7 +413,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
                   fontWeight: 900,
                   fontSize: '0.84rem',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)',
+                  boxShadow: 'none',
                   touchAction: 'manipulation',
                   minHeight: '44px'
                 }}
@@ -565,7 +565,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
                       fontWeight: 850,
                       fontSize: '0.80rem',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
+                      boxShadow: 'none',
                       touchAction: 'manipulation',
                       minHeight: '44px'
                     }}
@@ -663,7 +663,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
                   fontWeight: 900,
                   fontSize: '0.82rem',
                   cursor: isRequestingMic ? 'wait' : 'pointer',
-                  boxShadow: '0 2px 10px rgba(2, 132, 199, 0.3)',
+                  boxShadow: 'none',
                   touchAction: 'manipulation',
                   minHeight: '44px',
                   opacity: isRequestingMic ? 0.8 : 1
@@ -1008,7 +1008,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
           borderRadius: '16px',
           background: challengeResult.stars >= 2 ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)' : '#fffbeb',
           border: `2px solid ${challengeResult.stars >= 2 ? '#22c55e' : challengeResult.stars === 1 ? '#f59e0b' : '#cbd5e1'}`,
-          boxShadow: '0 4px 14px -2px rgba(34, 197, 94, 0.20)',
+          boxShadow: 'none',
           animation: 'fade-in 0.3s ease'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

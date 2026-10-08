@@ -173,7 +173,7 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         border: '1.5px solid #10b981',
-        boxShadow: '0 16px 36px rgba(16, 185, 129, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -193,7 +193,7 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.15)',
+          boxShadow: 'none',
           flexShrink: 0
         }}>
           <Fingerprint size={22} strokeWidth={2.3} />
@@ -240,7 +240,7 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             onMouseOver={(e) => e.currentTarget.style.background = '#166534'}

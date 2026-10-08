@@ -483,7 +483,7 @@ export function CampusSetupScreen({
             fontWeight: 800,
             fontSize: isMobileDevice ? '0.78rem' : '0.84rem',
             cursor: isSettingsDirty ? 'pointer' : 'default',
-            boxShadow: isSettingsDirty ? `0 4px 12px ${brandColor}40` : 'none',
+            boxShadow: 'none',
             transition: 'all 0.2s',
             opacity: isSaving ? 0.7 : 1,
             flexShrink: 0,
@@ -535,7 +535,7 @@ export function CampusSetupScreen({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+            boxShadow: 'none',
             transition: 'all 0.15s'
           }}
           className="hover-scale"
@@ -760,7 +760,7 @@ export function CampusSetupScreen({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '12px',
-                    boxShadow: '0 4px 12px rgba(4, 120, 87, 0.15)'
+                    boxShadow: 'none'
                   }}>
                     <div>
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a7f3d0' }}>
@@ -898,7 +898,7 @@ export function CampusSetupScreen({
                           fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(52, 168, 83, 0.3)',
+                          boxShadow: 'none',
                           transition: 'transform 0.15s',
                           whiteSpace: 'nowrap'
                         }}
@@ -940,7 +940,7 @@ export function CampusSetupScreen({
                           fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(234, 179, 8, 0.2)',
+                          boxShadow: 'none',
                           transition: 'transform 0.15s'
                         }}
                         className="hover-scale"
@@ -988,7 +988,7 @@ export function CampusSetupScreen({
                           fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(30, 41, 59, 0.2)',
+                          boxShadow: 'none',
                           transition: 'transform 0.15s',
                           whiteSpace: 'nowrap',
                           display: 'inline-flex',
@@ -1398,7 +1398,7 @@ export function CampusSetupScreen({
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '8px',
-                            boxShadow: newPinInput.trim().length === 4 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : 'none',
+                            boxShadow: 'none',
                             transition: 'all 0.15s ease',
                             touchAction: 'manipulation'
                           }}
@@ -1604,7 +1604,7 @@ export function CampusSetupScreen({
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     cursor: isSettingsDirty ? 'pointer' : 'default',
-                    boxShadow: isSettingsDirty ? `0 4px 12px ${brandColor}40` : 'none'
+                    boxShadow: 'none'
                   }}
                   className={isSettingsDirty ? "hover-scale" : ""}
                 >

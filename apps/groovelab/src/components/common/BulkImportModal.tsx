@@ -1007,7 +1007,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                     fontWeight: 900,
                     fontSize: '0.88rem',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)'
+                    boxShadow: 'none'
                   }}
                 >
                   Fertigstellen &amp; Übersicht aktualisieren

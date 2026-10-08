@@ -83,9 +83,9 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
       doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.8);
+      doc.setFontSize(6.4);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256-${sha256Digest.slice(0, 24)}... • Amtliches Konformitätsattest`, margin, pageHeight - 8);
+      doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256:${sha256Digest} • Amtliches Konformitätsattest`, margin, pageHeight - 8);
       doc.text(`Seite ${pageNum} von 2`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     };
 
@@ -304,10 +304,10 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.text('Patrick Huber', margin + 6, curY + 41);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.2);
+    doc.setFontSize(6.8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text('Campus-Groovelab SaaS Operator • Sicherheits- & Betriebsleitung', margin + 6, curY + 45);
-    doc.text(`Rheinfelden (Baden) • Gültig ab Schuljahr 2026/2027 • Prüfsumme: SHA256-${sha256Digest.slice(0, 32)}...`, margin + 6, curY + 49);
+    doc.text(`Rheinfelden (Baden) • Gültig ab Schuljahr 2026/2027 • Prüfsumme: SHA256:${sha256Digest}`, margin + 6, curY + 49);
 
     // Section 6: Audit Proofs & Invariants for Staff Council (harmonizes page 2 whitespace)
     curY += 57;

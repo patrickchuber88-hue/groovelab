@@ -229,7 +229,7 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+              boxShadow: 'none',
               flexShrink: 0
             }}
           >
@@ -479,7 +479,7 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
               fontWeight: 800,
               cursor: loading || (!scheduleChanges && !homework && !streakAndNews) ? 'not-allowed' : 'pointer',
               opacity: loading || (!scheduleChanges && !homework && !streakAndNews) ? 0.6 : 1,
-              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
+              boxShadow: 'none',
               transition: 'transform 0.1s ease',
               display: 'flex',
               alignItems: 'center',

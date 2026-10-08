@@ -120,9 +120,15 @@ function parseSnapshotPayload(
       }
     }
     if (entry.includes('AUDIO:')) {
-      const match = entry.match(/AUDIO:\s*([^\s|\]}]+)/);
-      if (match && match[1] && !audio.some(a => a.url === match[1])) {
-        audio.push({ url: match[1], label: 'Aufnahme deiner Lehrkraft' });
+      const cleanStr = entry.startsWith('[') ? entry.replace(/[\[\]"]/g, '') : entry;
+      const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+      const url = (parts[0] || '').replace(/^["']|["']$/g, '').trim();
+      const dur = parseInt(parts[1] || '0', 10);
+      const date = parts[2]?.trim();
+      const label = parts[3]?.trim() || 'Aufnahme deiner Lehrkraft';
+      const author = parts[4]?.trim() || 'teacher';
+      if (url && !audio.some(a => a.url === url)) {
+        audio.push({ url, label, duration: dur, date, author });
       }
     }
     const cleanN = cleanHomeworkNote(entry);
@@ -262,11 +268,29 @@ export function useAuthoritativeHomeworkPlan(
           }
         } catch {}
       }
-      if (typeof raw === 'string' && raw.includes('AUDIO:')) {
-        const match = raw.match(/AUDIO:\s*([^\s|\]}]+)/);
-        if (match && match[1] && !audioTracks.some(a => a.url === match[1])) {
-          audioTracks.push({ url: match[1], label: item.topic_name ? `Aufnahme: ${item.topic_name}` : 'Aufnahme deiner Lehrkraft' });
+      if (raw) {
+        let entries: any[] = [];
+        try {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          entries = Array.isArray(parsed) ? parsed : [raw];
+        } catch {
+          entries = [raw];
         }
+        entries.forEach((ent: any) => {
+          if (typeof ent === 'string' && ent.includes('AUDIO:')) {
+            const cleanStr = ent.startsWith('[') ? ent.replace(/[\[\]"]/g, '') : ent;
+            const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+            const url = (parts[0] || '').replace(/^["']|["']$/g, '').trim();
+            const dur = parseInt(parts[1] || '0', 10);
+            const date = parts[2]?.trim();
+            const defaultLabel = item.topic_name ? `Aufnahme: ${item.topic_name}` : 'Aufnahme deiner Lehrkraft';
+            const label = parts[3]?.trim() || defaultLabel;
+            const author = parts[4]?.trim() || 'teacher';
+            if (url && !audioTracks.some(a => a.url === url)) {
+              audioTracks.push({ url, label, duration: dur, date, author });
+            }
+          }
+        });
       }
       const cleaned = cleanHomeworkNote(raw);
       if (cleaned && !isWeeklySnapshotContainer(item.topic_name) && !item.topic_name?.startsWith('Hausaufgabe KW ') && !generalNotes.includes(cleaned)) {

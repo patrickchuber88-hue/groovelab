@@ -320,7 +320,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '4px',
-                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.06)',
+                boxShadow: 'none',
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               className="hover-scale"
@@ -447,7 +447,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                             color: '#ffffff',
                             border: 'none',
-                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                            boxShadow: 'none'
                           }}>
                             🟢 Dieses Gerät (Aktiv)
                           </span>
@@ -592,7 +592,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+            boxShadow: 'none'
           }}>
             <CheckCircle2 size={15} color="#ffffff" aria-hidden="true" />
             <span>{scrubSuccessMessage}</span>

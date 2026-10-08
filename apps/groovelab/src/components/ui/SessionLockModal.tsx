@@ -617,7 +617,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                 justifyContent: 'center',
                 gap: '8px',
                 marginBottom: '10px',
-                boxShadow: '0 6px 16px -2px rgba(2, 132, 199, 0.35)'
+                boxShadow: 'none'
               }}
             >
               {loading ? <Loader2 size={18} className="animate-spin" /> : <Key size={18} />}

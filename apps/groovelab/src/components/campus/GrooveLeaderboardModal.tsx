@@ -105,7 +105,7 @@ export const GrooveLeaderboardModal: React.FC<GrooveLeaderboardModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)'
+                boxShadow: 'none'
               }}
             >
               <Trophy size={20} strokeWidth={2.4} />

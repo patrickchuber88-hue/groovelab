@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1791438755322';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1791438755322';
+const CACHE_NAME = 'groovelab-static-v1791501848810';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1791501848810';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -50,11 +50,8 @@ self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(function() {
-      return self.skipWaiting();
     }).catch(function(err) {
       console.warn('Pre-caching failed during install:', err);
-      return self.skipWaiting();
     })
   );
 });
@@ -235,14 +232,23 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
+  // 🛡️ 0,1% Goldstandard: Bypass Service Worker cache completely for version metadata, health checks & explicit bypass requests
+  if (
+    url.pathname === '/version.json' ||
+    url.pathname === '/healthz' ||
+    url.searchParams.has('cg_sw_bypass')
+  ) {
+    return;
+  }
+
   // Navigate mode (HTML documents) -> Network First with Snappy Cache Fallback (prevents PWA stale cache poisoning & cold launch freeze)
   if (event.request.mode === 'navigate') {
     event.respondWith(
       new Promise(function(resolve) {
         let hasResolved = false;
-        // 📱 Snappy 1200ms Apple-Level Mobile Network Timeout:
-        // If network takes longer than 1.2s, immediately fall back to cached shell to prevent blank freeze
-        const networkTimeout = setTimeout(function() {
+        const isExplicitUpdate = url.searchParams.has('v');
+        // 📱 Snappy 1200ms Apple-Level Mobile Network Timeout (active on standard cold launch, disabled on explicit cache-busting update reloads):
+        const networkTimeout = isExplicitUpdate ? null : setTimeout(function() {
           caches.match('/index.html').then(function(cached) {
             if (cached && !hasResolved) {
               hasResolved = true;
@@ -253,7 +259,7 @@ self.addEventListener('fetch', function(event) {
 
         fetch(event.request)
           .then(function(networkResponse) {
-            clearTimeout(networkTimeout);
+            if (networkTimeout) clearTimeout(networkTimeout);
             if (networkResponse && networkResponse.status === 200) {
               const cloneForIndex = networkResponse.clone();
               const cloneForRoot = networkResponse.clone();
@@ -268,7 +274,7 @@ self.addEventListener('fetch', function(event) {
             }
           })
           .catch(function() {
-            clearTimeout(networkTimeout);
+            if (networkTimeout) clearTimeout(networkTimeout);
             if (!hasResolved) {
               hasResolved = true;
               caches.match('/index.html').then(function(cachedResponse) {

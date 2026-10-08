@@ -140,7 +140,7 @@ export const SiblingPinUnlockModal: React.FC<SiblingPinUnlockModalProps> = ({
           borderRadius: '32px',
           width: '100%',
           maxWidth: '380px',
-          boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+          boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -188,7 +188,7 @@ export const SiblingPinUnlockModal: React.FC<SiblingPinUnlockModalProps> = ({
               objectFit: 'cover',
               background: '#f8fafc',
               border: '3px solid #e0f2fe',
-              boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.25)'
+              boxShadow: 'none'
             }}
           />
           <div
@@ -204,7 +204,7 @@ export const SiblingPinUnlockModal: React.FC<SiblingPinUnlockModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.4)',
+              boxShadow: 'none',
               border: 'none'
             }}
           >

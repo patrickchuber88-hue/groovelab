@@ -113,7 +113,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
         border: '1.5px solid #10b981',
         borderRadius: '22px',
         padding: '22px',
-        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)',
+        boxShadow: 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
@@ -130,7 +130,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
+              boxShadow: 'none',
               flexShrink: 0
             }}>
               <BookOpen size={24} strokeWidth={2.2} />
@@ -243,7 +243,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
+                boxShadow: 'none',
                 minHeight: '40px',
                 touchAction: 'manipulation'
               }}
@@ -266,7 +266,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
         flexDirection: 'column',
         gap: '16px',
         textAlign: 'left',
-        boxShadow: '0 4px 16px -4px rgba(234, 179, 8, 0.18)'
+        boxShadow: 'none'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -279,7 +279,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.28)',
+              boxShadow: 'none',
               flexShrink: 0
             }}>
               <Zap size={24} strokeWidth={2.2} />

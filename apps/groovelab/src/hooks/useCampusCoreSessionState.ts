@@ -156,7 +156,7 @@ export function useCampusCoreSessionState({
   const [loading, setLoading] = useState(() => Boolean(
     typeof window !== 'undefined' && 
     sessionStorage.getItem('groovelab_user_id') && 
-    !sessionStorage.getItem('groovelab_cached_user')
+    (!sessionStorage.getItem('groovelab_cached_user') || !sessionStorage.getItem('gl_active_session_lease_id'))
   ));
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);

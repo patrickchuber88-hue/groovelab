@@ -275,7 +275,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 900, cursor: 'pointer', boxShadow: `0 8px 20px -6px ${brandColor}40` }}>Band erstellen & Aktivieren</button>
+                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 900, cursor: 'pointer', boxShadow: 'none' }}>Band erstellen & Aktivieren</button>
                 <button type="button" onClick={() => setShowAddBand(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
               </div>
             </form>

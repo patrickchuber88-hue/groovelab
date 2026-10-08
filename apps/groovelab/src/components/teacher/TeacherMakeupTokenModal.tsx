@@ -551,7 +551,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
                     color: '#ffffff',
                     fontWeight: 900,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(11, 87, 208, 0.25)',
+                    boxShadow: 'none',
                     opacity: loading ? 0.7 : 1,
                     display: 'flex',
                     alignItems: 'center',
@@ -798,7 +798,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(11, 87, 208, 0.25)',
+                      boxShadow: 'none',
                       opacity: loading ? 0.7 : 1
                     }}
                   >
@@ -930,7 +930,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px',
-                          boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)',
+                          boxShadow: 'none',
                           opacity: loading ? 0.7 : 1
                         }}
                       >
@@ -1019,7 +1019,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
                     color: '#ffffff',
                     fontWeight: 900,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(220, 38, 38, 0.25)',
+                    boxShadow: 'none',
                     opacity: loading ? 0.7 : 1
                   }}
                 >

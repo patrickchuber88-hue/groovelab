@@ -34,6 +34,8 @@ export interface StudentProfileTabProps {
   isMusicStandMode?: boolean;
   flamesActive?: boolean;
   xpActive?: boolean;
+  currentXp?: number;
+  currentStreak?: number;
 }
 
 export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
@@ -41,6 +43,8 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
   studentUser,
   studentId,
   avatar,
+  currentXp,
+  currentStreak,
   editingProfile,
   setEditingProfile,
   showEditProfile,
@@ -162,7 +166,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
             WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '32px',
-            boxShadow: '0 12px 40px rgba(52, 168, 83, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.15)',
             display: 'flex',
             overflow: 'visible',
             position: 'relative',
@@ -178,7 +182,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
               height: '128px',
               borderRadius: '50%',
               border: '5px solid #ffffff',
-              boxShadow: '0 12px 32px rgba(52, 168, 83, 0.2)',
+              boxShadow: 'none',
               background: '#ffffff',
               flexShrink: 0,
               overflow: 'hidden',
@@ -372,7 +376,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                 <div>
                   <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Erfahrung (XP)</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
-                    {avatar?.xp || 0} XP
+                    {(currentXp ?? avatar?.xp) || 0} XP
                   </div>
                 </div>
               </div>
@@ -387,7 +391,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                 <div>
                   <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Übe-Streak</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
-                    {avatar?.streak_flame || 0} Tage
+                    {(currentStreak ?? avatar?.streak_flame) || 0} Tage
                   </div>
                 </div>
               </div>
@@ -996,7 +1000,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     margin: '0 auto 16px auto',
-                    boxShadow: '0 8px 20px rgba(245, 158, 11, 0.2)'
+                    boxShadow: 'none'
                   }}>
                     <span style={{ fontSize: '2rem' }}>📦</span>
                   </div>
@@ -1053,7 +1057,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                         fontWeight: 850,
                         fontSize: '0.92rem',
                         cursor: 'pointer',
-                        boxShadow: '0 8px 20px rgba(5, 150, 105, 0.25)',
+                        boxShadow: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1143,7 +1147,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     height: '110px',
                     borderRadius: '50%',
                     border: '5px solid #ffffff',
-                    boxShadow: '0 8px 24px rgba(52, 168, 83, 0.12)',
+                    boxShadow: 'none',
                     background: '#ffffff',
                     overflow: 'hidden',
                     display: 'flex',
@@ -1405,7 +1409,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                   <button 
                     type="submit" 
                     disabled={savingProfile}
-                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)' }}
+                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
                   >
                     {savingProfile ? 'Wird gespeichert...' : 'Änderungen speichern'}
                   </button>

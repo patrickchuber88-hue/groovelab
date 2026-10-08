@@ -186,7 +186,7 @@ export function StudentBriefingModalsHub({
               maxWidth: (!studentUiLevel || studentUiLevel === 'junior') ? '470px' : '430px',
               padding: (!studentUiLevel || studentUiLevel === 'junior') ? '24px 22px' : '24px',
               border: '1.5px solid rgba(250, 204, 21, 0.40)',
-              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(250, 204, 21, 0.25)',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               gap: (!studentUiLevel || studentUiLevel === 'junior') ? '16px' : '16px',
@@ -210,7 +210,7 @@ export function StudentBriefingModalsHub({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 2px 8px rgba(250, 204, 21, 0.20)',
+                        boxShadow: 'none',
                         flexShrink: 0
                       }}>
                         <HelpCircle size={isJunior ? 24 : 20} strokeWidth={2.4} />
@@ -647,7 +647,7 @@ export function StudentBriefingModalsHub({
                         fontSize: '0.82rem',
                         fontWeight: 900,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                        boxShadow: 'none'
                       }}
                     >
                       Ja, Stunde absagen
@@ -719,7 +719,7 @@ export function StudentBriefingModalsHub({
                         fontSize: '0.88rem',
                         fontWeight: 900,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale"
                     >
@@ -978,7 +978,7 @@ export function StudentBriefingModalsHub({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"

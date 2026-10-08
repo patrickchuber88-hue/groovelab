@@ -1,75 +1,55 @@
-# 🏛️ 0,1% Goldstandard Implementierungsplan: Sovereign 0% US-Cloud Release & Deployment Hardening
+# 🛡️ Implementierungsplan: 100%ige Beseitigung der 4 Wackel-Vektoren im Aufgabenheft (0,1% Enterprise Goldstandard)
 
-> **Axiom & Oberste Doktrin:** **0 % US-Cloud-Abhängigkeit.** Keine Nutzung von US-Cloud-Diensten (AWS, GCP, Azure, Cloudflare, Vercel, Supabase US-Cloud). 100 % der Daten, Rechenkapazität, Backups und Deployments verbleiben in ISO/IEC 27001 zertifizierten deutschen Rechenzentren (Hetzner Falkenstein / Nürnberg).  
-> **Ziel:** Vollständige Härtung der Pipeline gemäss IT-Forensiker-Standard:
-> 1. Git-Remote auf lokalen Ed25519-SSH-Schlüssel umstellen (Eliminierung interaktiver HTTPS-Prompts ohne US-Vermittlung).
-> 2. Kryptografische CycloneDX SBOM (`sbom.cdx.json`) & SHA-256 Release-Siegelung direkt in `deploy.sh` verankern.
-> 3. Read-Only Migrations-Paritäts-Preflight in `deploy.sh` integrieren (Schutz gegen Split-Brain ohne DDL-Privilegien für `deployuser`).
-> 4. Explizite Verankerung der „0% US Cloud“-Doktrin in den Systemregeln & Deployment-Preflights.
+## 🎯 Zielsetzung
+Vollständige und dauerhafte Beseitigung aller Ursachen für das „Wackeln“, Zittern und Springen im Aufgabenheft (`MeisterwerkDocumentTab`, `MeisterwerkDocumentationModal`, `CampusMainContentRouter`) über alle 4 identifizierten Vektoren unter strikter Wahrung der Monolith-Ceiling-Vorgaben ($\le +15$ Zeilen).
 
 ---
 
-## 🔍 1. Forensische Bestandsaufnahme & Architektur-Audit
+## 🔍 Übersicht der 4 Sanierungs-Säulen
 
-1. **Git Remote Transport:**  
-   - Aktuell steht `origin` auf `https://patrickchuber88-hue@github.com/patrickchuber88-hue/groovelab.git`.  
-   - Der lokale Rechner besitzt bereits einen voll autorisierten Ed25519-Schlüssel (`~/.ssh/id_ed25519`), der bei GitHub als `patrickchuber88-hue` hinterlegt und funktionsfähig ist (`Hi patrickchuber88-hue! You've successfully authenticated`).  
-   - Ein Wechsel auf `git@github.com:patrickchuber88-hue/groovelab.git` beseitigt alle Passwort-Prompts vollständig, ohne Passwörter im RAM oder in temporären Dateien abzulegen.
-
-2. **SBOM & Supply-Chain-Transparenz (ISO/IEC 5230 & NIST SP 800-161):**  
-   - [`scripts/generate_cyclonedx_sbom.mjs`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/scripts/generate_cyclonedx_sbom.mjs) existiert bereits und analysiert alle direkten und transitiven Abhängigkeiten.  
-   - Aktuell wird es jedoch in `deploy.sh` noch nicht automatisch aufgerufen.  
-   - Durch Einbindung in den Pre-Deploy-Shield von `deploy.sh` wird bei jedem Release atomar eine `sbom.cdx.json` und ein kryptografischer SHA-256 Digest erzeugt und im Release-Ordner `/var/www/groovelab/releases/$RELEASE_ID/` abgelegt.
-
-3. **Read-Only Migrations-Paritäts-Wächter (Anti-Split-Brain):**  
-   - Das Frontend setzt auf Tabellen und RPCs auf, die durch Migrationen (z. B. 531, 533, 537) bereitgestellt werden.  
-   - Ein versehentliches Frontend-Deployment auf eine veraltete Datenbank führt zu UI-Laufzeitfehlern.  
-   - Umgekehrt darf `deployuser` niemals DDL-Rechte (`CREATE`, `ALTER`) besitzen.  
-   - Lösung: Ein schneller, rein lesender Preflight-Check in `deploy.sh`, der via SSH prüft, ob die höchste lokale Migrationsnummer in der Datenbank vorliegt, bevor rsync startet.
+| Vektor | Problem | 0,1% Goldstandard Lösung | Betroffene Datei |
+| :--- | :--- | :--- | :--- |
+| **1. Unbeabsichtigter Jiggle-Modus** | Kacheln rotieren unendlich (-1° bis +1°), ausgelöst durch unbewussten 500ms Long-Press auf Tablets oder Klick auf „Anpassen“. | • Long-Press auf Touchscreens entfernen (Modul-Anordnung erfolgt intentional über den „Anpassen“-Button).<br>• Klick außerhalb der Kacheln beendet den Modus automatisch (`setIsModuleEditMode(false)`).<br>• 20s Inaktivitäts-Timeout beendet den Jiggle-Modus selbsttätig. | `MeisterwerkDocumentTab.tsx` |
+| **2. Layout-Thrashing & Doppel-Scrollbar** | Desktop-`<main>` hat `overflowY: 'auto'`, innere Bühne hat `calc(100vh - 120px)`. Bei minimalem Höhenüberhang flackert der Scrollbalken und staucht das 2-Spalten-Layout um 15px. | • Für `['homework', 'homework_book']` erhält `<main>` auf Desktop strikt `overflowY: 'hidden'`.<br>• Das eingebettete Modal nutzt `height: '100%'` (Flexbox) statt starrer `calc(100vh - 120px)`.<br>• Scroll-Container erhalten `scrollbar-gutter: stable` gegen Breiten-Zucken. | `CampusMainContentRouter.tsx`, `MeisterwerkDocumentationModal.tsx`, `MeisterwerkDocumentTab.tsx` |
+| **3. Hover-Scale Kanten-Oszillation & Subpixel-Jitter** | `transform: scale(1.02)` / `scale(1.03)` mit `!important` und inline `scale(1.2)` lassen Kanten bei Mausberührung mit 60 Hz oszillieren; Safari rendert Text dabei unscharf. | • `.hover-scale` auf geschmeidige Vertikal-Verschiebung (`transform: translateY(-1px)`) und subtile Helligkeitsanhebung umstellen (keine Hitbox-Expansion an den Kanten).<br>• Inline-JS `transform = 'scale(1.2)'` tilgen.<br>• GPU-Compositing via `transform: translateZ(0)` gegen Safari-Font-Blur. | `apps/groovelab/src/index.css`, `MeisterwerkDocumentTab.tsx` |
+| **4. Breakpoint-Schwingung & Render-DOM-Queries** | `document.querySelector` im Renderrumpf von `MeisterwerkDocumentationModal.tsx` bremst Rendering; harter 768px Breakpoint springt bei Scrollbar-Erscheinen. | • Imperative DOM-Queries in `useEffect` verlagern.<br>• Entprellung und Stabilisierung des Breakpoint-Wechsels. | `MeisterwerkDocumentationModal.tsx` |
 
 ---
 
-## 🛠️ 2. Geplante Änderungen im Detail
+## 🛠️ Geplante chirurgische Maßnahmen (Schritt für Schritt)
 
-### Schritt 1: Git-Remote auf SSH umstellen
-* **Befehl:** `git remote set-url origin git@github.com:patrickchuber88-hue/groovelab.git`
-* **Verifikation:** `git push origin main` (überträgt die beiden lokalen Commits `2cfd7895` und `2a5ffa28` nahtlos per Ed25519-Signatur).
+### Phase 1: Vektor 2 (Single Scroll SSOT & Layout-Thrashing-Beseitigung)
+1. In `CampusMainContentRouter.tsx`:
+   - In Zeile 290–293: Für `['homework', 'homework_book'].includes(activeStudentTab)` auf Desktop `overflowY: 'hidden'` setzen (nur der innere Notenheft-Bereich scrollt, die Gesamthülle bleibt felsenfest verankert).
+2. In `MeisterwerkDocumentationModal.tsx`:
+   - Zeile 3836: `height: (isMobileOrSim || isMobileView) ? '100%' : 'calc(100vh - 120px)'` ersetzen durch `height: '100%'` mit `minHeight: 0`, sodass die Komponente natürlich und ohne Pixel-Überhang den Flex-Raum ausfüllt.
+3. In `MeisterwerkDocumentTab.tsx`:
+   - Zeile 8794: An der Schülervorschau-Bühne (`KÖRPER 1: DAS NOTENHEFT`) `scrollbarGutter: 'stable'` ergänzen.
 
-### Schritt 2: CycloneDX SBOM Generator veredeln & in `deploy.sh` integrieren
-* **Datei:** [`scripts/generate_cyclonedx_sbom.mjs`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/scripts/generate_cyclonedx_sbom.mjs)
-  * Ausgabe als kanonisches `dist/sbom.cdx.json` sicherstellen.
-  * Erzeugung eines SHA-256 Hash-Siegels `dist/sbom.cdx.json.sha256`.
-* **Datei:** [`deploy.sh`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/deploy.sh)
-  * In Phase 0 (Pre-Deployment Security Shield) den Aufruf `node scripts/generate_cyclonedx_sbom.mjs` verankern.
-  * Die SBOM-Dateien werden automatisch per `rsync` in das neue Release-Verzeichnis übertragen.
+### Phase 2: Vektor 1 (Jiggle-Modus Härtung & Entschärfung)
+1. In `MeisterwerkDocumentTab.tsx`:
+   - Zeile 4130: `onTouchStart={handleTouchStartTile}` entfernen bzw. entschärfen, damit versehentliches Berühren auf Tablets/iPads nicht den Jiggle-Modus startet.
+   - Globalen Click-Outside-Listener und Inaktivitäts-Timer einbauen, der `isModuleEditMode` nach 20 Sekunden ohne Interaktion oder bei Klick außerhalb automatisch auf `false` setzt.
 
-### Schritt 3: Read-Only Migrations-Paritäts-Check in `deploy.sh` integrieren
-* **Datei:** [`deploy.sh`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/deploy.sh)
-  * Vor Phase 1: Ermittlung der höchsten lokalen Migrations-ID in `supabase/migrations/` (z. B. `537`).
-  * Ausführung einer schlanken, nicht-invasiven Read-Only-Prüfung über SSH gegen den Supabase-DB-Container:
-    Prüft, ob die Tabelle `public.teacher_score_snippets` (aus Migration 537) bzw. die entsprechende Migration existiert.
-  * Schlägt die Prüfung fehl, stoppt das Script sofort (Fail-Closed) mit verständlicher Operator-Handlungsanweisung.
+### Phase 3: Vektor 3 (Hover-Scale Kanten-Oszillation & Safari Subpixel-Fix)
+1. In `apps/groovelab/src/index.css`:
+   - Zeilen 1484–1497: `.hover-scale` und `.hover-scale-mini` auf `transform: translateY(-1px)` statt `transform: scale(1.02)` umstellen und `transform: translateZ(0)` zur GPU-Fixierung ergänzen.
+2. In `MeisterwerkDocumentTab.tsx`:
+   - Zeile 9861: Das inline `transform = 'scale(1.2)'` am Vorlese-Button durch CSS-Klasse ohne Kantenverzerrung ersetzen.
 
-### Schritt 4: Verankerung der „0% US-Cloud“-Doktrin
-* **Datei:** [`.agents/AGENTS.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/.agents/AGENTS.md)
-  * Aufnahme des unantastbaren Axioms: *„Absolute 0% US-Cloud-Doktrin: Niemals US-Cloud-Dienste (AWS, GCP, Azure, Cloudflare, Vercel, Supabase US-Cloud) einbinden. Vollständige Daten- und Betriebssouveränität in Deutschland (Hetzner Falkenstein/Nürnberg).“*
-* **Datei:** [`docs/SYSTEM_FEATURE_MATRIX.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/docs/SYSTEM_FEATURE_MATRIX.md)
-  * Aktualisierung der Matrix-Integrität und Exocortex-Eintrag.
+### Phase 4: Vektor 4 (DOM-Query-Entlastung)
+1. In `MeisterwerkDocumentationModal.tsx`:
+   - Zeilen 199–200: `document.querySelector` im Renderrumpf bereinigen und in einen sauberen State/Effect überführen.
 
 ---
 
-## 🔒 3. Invarianten & Sicherheits-Schnittstellen
-
-| Invariante | Zielwert / Status | Schutzmechanismus |
-| :--- | :---: | :--- |
-| **US-Cloud Exposure** | **0,00 %** | Keine US-Server, keine externen CDN-Calls, 100% Hetzner DE |
-| **SSH-Privilegien** | **Least Privilege** | `deployuser` führt weiterhin 0 DDL-Befehle aus |
-| **Rollback-Garantie** | **< 100 ms** | Unverändert atomarer Symlink-Switch |
-| **Audit-Beweiskraft** | **ISO/IEC 27037** | CycloneDX 1.5 SBOM + SHA-256 Siegel pro Release |
+## 🏛️ Monolith Ceiling & Goldstandard Invarianten
+- `MeisterwerkDocumentTab.tsx`: Aktuell 11.230 Zeilen (Baseline: 11.222; Puffer: $\le 11.237$). Alle Änderungen sind Netto-Null oder Netto-Schrumpfung.
+- `MeisterwerkDocumentationModal.tsx`: Aktuell 4.015 Zeilen (Baseline: 4.017).
+- `CampusMainContentRouter.tsx`: 787 Zeilen.
+- Kein Einsatz von `any`, `@ts-ignore` oder Fremdbibliotheken.
 
 ---
 
-## 🛑 Zwingender Stopp-Punkt (Genehmigungsvorbehalt)
-
-Gemäß `.agents/AGENTS.md` (Implementierungsplan-Governance):
-Der Agent stoppt hier zwingend und führt **keine** Dateimodifikationen oder Git-Befehle aus, bis der Benutzer diesen Plan schriftlich genehmigt hat.
+## 🛑 Stopp-Punkt & Freigabe
+Gemäß der strikten **Implementierungsplan-Governance** stoppt die Ausführung hier. Erst nach deiner ausdrücklichen Freigabe wird mit der Implementierung begonnen.

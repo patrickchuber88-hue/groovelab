@@ -167,7 +167,7 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 5px rgba(239, 68, 68, 0.35)',
+                boxShadow: 'none',
                 lineHeight: 1
               }}
             >
@@ -264,7 +264,7 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 5px rgba(37, 99, 235, 0.35)',
+                boxShadow: 'none',
                 lineHeight: 1
               }}
             >

@@ -333,7 +333,7 @@ export const GlobalCommandPaletteModal: React.FC<GlobalCommandPaletteModalProps>
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: '20px',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.30), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.30)', border: '1px solid #e2e8f0',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column'

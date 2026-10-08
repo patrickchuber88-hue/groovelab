@@ -3,6 +3,7 @@ import QRCode from 'react-qr-code';
 import { FileCode, Download } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { downloadXRechnungXML, EInvoiceLineItem } from '../utils/eInvoiceGenerator';
+import { OPERATOR_BANKING_CONFIG } from '../config/operatorBanking';
 
 export interface InvoiceData {
   id: string;
@@ -106,10 +107,21 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const monthIndex = months[parts[1]] || 0;
       const year = parseInt(parts[2]);
       const d = new Date(year, monthIndex, day);
-      d.setDate(d.getDate() + 14);
+      d.setDate(d.getDate() + 30);
+      // § 193 BGB Werktags-Klausel (Samstag/Sonntag -> Montag)
+      if (d.getDay() === 6) {
+        d.setDate(d.getDate() + 2);
+      } else if (d.getDay() === 0) {
+        d.setDate(d.getDate() + 1);
+      }
       return `${d.getDate()}. ${deMonthsList[d.getMonth()]} ${d.getFullYear()}`;
     }
     return dateStr;
+  };
+
+  const formatDisplayIban = (rawIban?: string) => {
+    const clean = (rawIban || OPERATOR_BANKING_CONFIG.iban || '').replace(/\s+/g, '');
+    return clean.replace(/(.{4})/g, '$1 ').trim();
   };
 
   const formatDisplayDate = (dStr?: string) => {
@@ -371,7 +383,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 4px rgba(15, 23, 42, 0.15)'
+                boxShadow: 'none'
               }}
               title="ZUGFeRD 2.2 / XRechnung (EN16931) für ERP & Kämmereien"
             >
@@ -391,7 +403,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 fontSize: '0.72rem',
                 fontWeight: 750,
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(234, 67, 53, 0.15)'
+                boxShadow: 'none'
               }}
             >
               Drucken / PDF
@@ -482,9 +494,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
               <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>{operatorCompany}</strong>
               {operatorContact && operatorContact !== operatorCompany && <span style={{ display: 'block' }}>{operatorContact}</span>}
-              <span style={{ display: 'block' }}>{operatorStreet}</span>
-              <span style={{ display: 'block' }}>{operatorZip} {operatorCity}</span>
-              <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '3px' }}>USt-IdNr.: DE364892110 • Steuernummer: 04123/45678</span>
+              <span style={{ display: 'block' }}>{operatorStreet || OPERATOR_BANKING_CONFIG.street}</span>
+              <span style={{ display: 'block' }}>{operatorZip || OPERATOR_BANKING_CONFIG.zipCode} {operatorCity || OPERATOR_BANKING_CONFIG.city}</span>
+              <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '3px' }}>USt-IdNr.: {OPERATOR_BANKING_CONFIG.ustIdNr}</span>
             </div>
           </div>
 
@@ -504,7 +516,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             </div>
             <div>
               <span style={{ color: '#64748b', display: 'block' }}>Zahlungsart</span>
-              <strong style={{ color: '#0f172a' }}>Rechnung (14 Tage Zahlungsziel)</strong>
+              <strong style={{ color: '#0f172a' }}>Rechnung (30 Tage Zahlungsziel)</strong>
             </div>
           </div>
 
@@ -512,10 +524,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', marginBottom: '16px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
-                <th style={{ padding: '8px 0' }}>Position</th>
-                <th style={{ padding: '8px', textAlign: 'right' }}>Menge</th>
-                <th style={{ padding: '8px', textAlign: 'right' }}>Einzelpreis</th>
-                <th style={{ padding: '8px 0', textAlign: 'right' }}>Gesamtpreis</th>
+                <th style={{ padding: '8px 0', whiteSpace: 'nowrap' }}>Position</th>
+                <th style={{ padding: '8px', textAlign: 'right', whiteSpace: 'nowrap' }}>Menge</th>
+                <th style={{ padding: '8px', textAlign: 'right', whiteSpace: 'nowrap' }}>Einzelpreis</th>
+                <th style={{ padding: '8px 0', textAlign: 'right', whiteSpace: 'nowrap' }}>Gesamtpreis</th>
               </tr>
             </thead>
             <tbody>
@@ -682,9 +694,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                   {isAkt && (
                     <>
+                      {/* Position 1: Software-Bereitstellung (Inklusive) gem. § 1 SaaS-Axiom */}
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Bereitstellung</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 700 }}>Pädagogische Schulplattform &amp; Web-App (Im Cloud-Paket inklusive / 0,00 €)</span>
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>1 Monat</td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>0,00 €</td>
+                        <td style={{ padding: '8px 0', textAlign: 'right', color: '#137333', fontWeight: 700, whiteSpace: 'nowrap' }}>0,00 €</td>
+                      </tr>
+
                       {studentBillingOption === 'option2' || !['option3_2', 'option3_3'].includes(studentBillingOption || '') ? (
                         <>
-                          {/* Position 1: Campus Student Activations */}
+                          {/* Position 2: Campus Student Activations */}
                           {(() => {
                             const campusCnt = invoice.activeCampusCount !== undefined ? invoice.activeCampusCount : (invoice.activationsCount || 0);
                             if (campusCnt <= 0) return null;
@@ -693,16 +716,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                                 <td style={{ padding: '8px 0' }}>
                                   <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
                                   <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                                    {campusCnt} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil). Interaktive App-Nutzung: Übe-Timer, Loopstation, Schüler-Protokoll.{freeLabel}
+                                    {campusCnt} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil). Interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll.{freeLabel}
                                   </span>
                                 </td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>
                                   {campusCnt} {campusCnt === 1 ? 'Schüler' : 'Schüler'}
                                 </td>
-                                <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>
                                   {isFree ? '0,00 €' : `${masterPricing.priceStudent.toFixed(2).replace('.', ',')} €`}
                                 </td>
-                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                   {isFree ? '0,00 €' : `${(campusCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €`}
                                 </td>
                               </tr>
@@ -722,13 +745,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                               {isFree && <strong style={{ color: '#ea4335', marginLeft: '6px' }}>{freeLabel}</strong>}
                             </span>
                           </td>
-                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>
                             {invoice.activationsCount || 0} Schüler
                           </td>
-                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>
                             {isFree ? '0,00 €' : `${(invoice.studentFee || 0.49).toFixed(2).replace('.', ',')} €`}
                           </td>
-                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {isFree ? '0,00 €' : `${invoice.amount.toFixed(2).replace('.', ',')} €`}
                           </td>
                         </tr>
@@ -873,8 +896,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
                     <span>Bitte überweisen Sie den fälligen Betrag bis zum <strong>{finalDueDateStr}</strong> ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
                     <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
-                      <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
-                      <strong>IBAN:</strong> <span>{operatorIban}</span>
+                      <strong>Zahlungsempfänger:</strong> <span>{operatorCompany || OPERATOR_BANKING_CONFIG.companyName}</span>
+                      <strong>IBAN:</strong> <span style={{ fontFamily: 'monospace', letterSpacing: '0.04em' }}>{formatDisplayIban(operatorIban)}</span>
                       {operatorBic && !operatorBic.includes('XXX') ? (
                         <><strong>BIC:</strong> <span>{operatorBic}</span></>
                       ) : (

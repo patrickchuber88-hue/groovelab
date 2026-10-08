@@ -153,7 +153,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                           border: '1.5px solid #10b981',
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
-                          boxShadow: '0 2px 6px rgba(16,185,129,0.08)',
+                          boxShadow: 'none',
                           transition: 'all 0.2s'
                         }}
                       >
@@ -203,7 +203,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                           border: 'none',
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
-                          boxShadow: '0 4px 10px rgba(234,67,53,0.15)',
+                          boxShadow: 'none',
                           transition: 'all 0.2s'
                         }}
                       >

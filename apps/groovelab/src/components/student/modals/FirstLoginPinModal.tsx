@@ -88,7 +88,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
               borderRadius: '22px',
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               border: 'none',
-              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.35)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -140,7 +140,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+                boxShadow: 'none'
               }}>
                 <CheckCircle size={18} color="#ffffff" />
                 <span>PIN erfolgreich gespeichert! 🚀</span>

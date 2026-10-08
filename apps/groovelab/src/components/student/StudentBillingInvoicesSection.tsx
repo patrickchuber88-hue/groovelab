@@ -191,7 +191,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               color: '#ffffff',
               border: 'none',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

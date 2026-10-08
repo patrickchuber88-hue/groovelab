@@ -501,7 +501,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
   const inputFocusStyle = {
     borderColor: '#34a853',
-    boxShadow: '0 0 0 4px rgba(52, 168, 83, 0.15)',
+    boxShadow: 'none',
     background: 'rgba(255, 255, 255, 0.08)'
   };
 
@@ -558,7 +558,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         .signup-input:focus {
           border-color: #34a853 !important;
           background: #ffffff !important;
-          box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.12) !important;
+          box-shadow: none !important;
         }
         .signup-input::placeholder {
           color: #94a3b8 !important;
@@ -569,7 +569,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         }
         .signup-btn-next:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 12px 24px rgba(52, 168, 83, 0.2) !important;
+          box-shadow: none !important;
           filter: brightness(1.03);
         }
         .signup-btn-next:active:not(:disabled) {
@@ -659,7 +659,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                         justifyContent: 'center',
                         gap: '6px',
                         transition: 'all 0.15s ease',
-                        boxShadow: isSelected ? '0 2px 8px rgba(52, 168, 83, 0.15)' : 'none'
+                        boxShadow: 'none'
                       }}
                     >
                       <span style={{ fontSize: '1.05rem' }}>{c.flag}</span>
@@ -910,7 +910,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         {/* STEP 3: REGISTRATION SUCCESS & QR BADGE PREVIEW */}
         {step === 3 && createdUser && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center', position: 'relative' }}>
-            <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803d', marginBottom: '0px', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)' }}>
+            <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803d', marginBottom: '0px', boxShadow: 'none' }}>
               <CheckCircle size={24} />
             </div>
             <div>
@@ -932,7 +932,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 padding: '16px',
                 width: '100%',
                 maxWidth: '280px',
-                boxShadow: '0 16px 32px -4px rgba(52, 168, 83, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.45)',
+                boxShadow: 'none',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -988,7 +988,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
-              boxShadow: '0 4px 10px rgba(251, 191, 36, 0.04)'
+              boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.04em', color: '#b45309' }}>
@@ -1125,7 +1125,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   padding: '12px 16px',
                   fontSize: '0.88rem',
                   boxSizing: 'border-box',
-                  boxShadow: '0 12px 24px rgba(52, 168, 83, 0.22)'
+                  boxShadow: 'none'
                 }}
               >
                 Zum Dashboard fortfahren <ArrowRight size={15} />
@@ -1178,7 +1178,7 @@ const nextButtonStyle: React.CSSProperties = {
   fontWeight: 800,
   fontSize: '0.95rem',
   cursor: 'pointer',
-  boxShadow: '0 10px 20px rgba(52, 168, 83, 0.15)',
+  boxShadow: 'none',
   transition: 'transform 0.2s, box-shadow 0.2s',
   outline: 'none',
   display: 'flex',

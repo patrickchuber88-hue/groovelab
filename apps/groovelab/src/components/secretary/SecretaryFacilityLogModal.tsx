@@ -211,7 +211,7 @@ export const SecretaryFacilityLogModal: React.FC<SecretaryFacilityLogModalProps>
               alignItems: 'center',
               justifyContent: 'center',
               border: '1px solid #fecaca',
-              boxShadow: '0 4px 12px rgba(220, 38, 38, 0.12)'
+              boxShadow: 'none'
             }}>
               <Wrench size={22} />
             </div>
@@ -747,7 +747,7 @@ export const SecretaryFacilityLogModal: React.FC<SecretaryFacilityLogModalProps>
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)',
+                          boxShadow: 'none',
                           opacity: isProcessing ? 0.7 : 1,
                           transition: 'all 0.15s ease'
                         }}

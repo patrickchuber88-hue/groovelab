@@ -197,7 +197,7 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
         <ram:DueDateDateTime>
           <udt:DateTimeString format="102">${dueDateFormatted}</udt:DateTimeString>
         </ram:DueDateDateTime>
-        <ram:Description>Zahlbar innerhalb von 14 Tagen ohne Abzug.</ram:Description>
+        <ram:Description>Zahlbar innerhalb von 30 Tagen ohne Abzug (§ 286 Abs. 3 BGB).</ram:Description>
       </ram:SpecifiedTradePaymentTerms>
 
       <!-- Final Summation -->

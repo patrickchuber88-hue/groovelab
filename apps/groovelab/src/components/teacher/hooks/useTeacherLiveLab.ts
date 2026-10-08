@@ -18,6 +18,13 @@ export interface UseTeacherLiveLabProps {
   setUnreadShouts?: React.Dispatch<React.SetStateAction<any[]>>;
   setHelpRequests?: React.Dispatch<React.SetStateAction<any[]>>;
 }
+ 
+// ⚡ 0,1% Goldstandard: Fail-Closed UUID Sanitizer gegen Layout-Mock-Strings (canonical-*)
+const isValidUuid = (id: string | null | undefined): boolean => {
+  if (!id || typeof id !== 'string') return false;
+  if (id.startsWith('canonical-')) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
 
 export function useTeacherLiveLab({
   userId,
@@ -49,8 +56,8 @@ export function useTeacherLiveLab({
 
   const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
   const isUserCheckedIn = localCheckedIn || 
-    (!!session && !session.check_out_time && !!session.station_id && (session.user_id === userId || isTeacher)) || 
-    (activeSessions && activeSessions.some((s: any) => s && s.user_id === userId && !s.check_out_time && !!s.station_id));
+    (!!session && !session.check_out_time && (isTeacher || !!session.station_id) && (session.user_id === userId || isTeacher)) || 
+    (activeSessions && activeSessions.some((s: any) => s && s.user_id === userId && !s.check_out_time && (isTeacher || !!s.station_id)));
 
   // ⚡ Multi-Device Realtime Remote-Checkout Listener (0,1% Goldstandard)
   useEffect(() => {
@@ -78,11 +85,12 @@ export function useTeacherLiveLab({
       
       const lehrerStation = (stations || []).find(s => 
         s.room_id === selectedRoomId && 
+        isValidUuid(s.id) &&
         ((s.name || '').toLowerCase().includes('lehrer') || (s.name || '').toLowerCase().includes('teacher'))
       );
       let targetStationId = lehrerStation ? lehrerStation.id : null;
 
-      if (!targetStationId && selectedRoomId) {
+      if (!targetStationId && selectedRoomId && isValidUuid(selectedRoomId)) {
         const { data: dbStations } = await supabase
           .from('stations')
           .select('id, name')
@@ -91,16 +99,19 @@ export function useTeacherLiveLab({
         const dbLehrer = (dbStations || []).find(s => 
           (s.name || '').toLowerCase().includes('lehrer') || (s.name || '').toLowerCase().includes('teacher')
         );
-        if (dbLehrer) {
+        if (dbLehrer && isValidUuid(dbLehrer.id)) {
           targetStationId = dbLehrer.id;
         }
       }
+
+      // ⚡ 0,1% Goldstandard: Fallback auf null wenn keine valide UUID – schützt vor SQLSTATE 22P02
+      const safeStationId = isValidUuid(targetStationId) ? targetStationId : null;
 
       const { data: sessData, error: sessErr } = await supabase
         .from('sessions')
         .insert({
           user_id: userId,
-          station_id: targetStationId,
+          station_id: safeStationId,
           gps_verified: true,
           check_in_time: now
         })
@@ -151,6 +162,11 @@ export function useTeacherLiveLab({
   // ⚡ 0,1% Goldstandard: 1-Tap Re-Check-in für fest an Stationen gekoppelte Schul-iPads
   const performCoupledStationCheckin = useCallback(async (stationId: string) => {
     if (!userId) return;
+    if (!isValidUuid(stationId)) {
+      setCheckInErrorMsg('Ungültige Stations-ID. Bitte wähle eine Station vor Ort.');
+      setCheckingInStatus('error');
+      return;
+    }
     setCheckingInStatus('verifying');
     setCheckInErrorMsg('');
     const now = new Date().toISOString();
@@ -227,6 +243,11 @@ export function useTeacherLiveLab({
 
   const handleKioskStationSelect = useCallback(async (station: any) => {
     if (!userId) return;
+    if (!station?.id || !isValidUuid(station.id)) {
+      alert('Ungültige Stations-ID für Kiosk-Check-in.');
+      setCheckingInStatus('error');
+      return;
+    }
     setCheckingInStatus('verifying');
     const now = new Date().toISOString();
 

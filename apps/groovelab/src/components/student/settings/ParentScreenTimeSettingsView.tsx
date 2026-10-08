@@ -40,7 +40,7 @@ export const ParentScreenTimeSettingsView: React.FC<ParentScreenTimeSettingsView
         borderRadius: '20px',
         padding: '20px',
         border: '1.5px solid #bae6fd',
-        boxShadow: '0 4px 16px -2px rgba(2, 132, 199, 0.08)',
+        boxShadow: 'none',
         textAlign: 'left'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

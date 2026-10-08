@@ -185,7 +185,7 @@ export const TeacherUrgentCancellationsModal: React.FC<TeacherUrgentCancellation
           maxHeight: '92vh',
           borderRadius: '32px',
           border: '1.5px solid #fee2e2',
-          boxShadow: '0 25px 50px -12px rgba(239, 68, 68, 0.25), 0 0 0 1px rgba(239, 68, 68, 0.1)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -237,7 +237,7 @@ export const TeacherUrgentCancellationsModal: React.FC<TeacherUrgentCancellation
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                boxShadow: '0 8px 16px rgba(239, 68, 68, 0.3)'
+                boxShadow: 'none'
               }}
             >
               <AlertTriangle size={28} strokeWidth={2.5} />

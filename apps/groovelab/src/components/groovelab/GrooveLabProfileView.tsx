@@ -331,7 +331,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                       background: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'linear-gradient(135deg, #eab308, #ca8a04)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
                       color: 'white', padding: '4px 12px', borderRadius: '8px',
                       fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
-                      boxShadow: '0 4px 10px rgba(234, 179, 8, 0.25)'
+                      boxShadow: 'none'
                     }}>
                       {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'GrooveLab Coach' : 'Pro Artist'}
                     </span>
@@ -348,7 +348,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
 
                     {/* XP badge only for students */}
                     {user.role === 'student' && (
-                      <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                      <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: 'none' }}>
                         <Star size={12} fill="white" /> {studentTotalXP} Punkte
                       </div>
                     )}
@@ -1028,7 +1028,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                               display: 'flex', 
                               alignItems: 'center', 
                               justifyContent: 'center',
-                              boxShadow: '0 4px 12px rgba(236, 72, 153, 0.15)'
+                              boxShadow: 'none'
                             }}>
                               <Users size={24} />
                             </div>
@@ -1056,16 +1056,16 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                 fontSize: '0.82rem',
                                 fontWeight: 900,
                                 cursor: 'pointer',
-                                boxShadow: '0 4px 14px rgba(236, 72, 153, 0.3)',
+                                boxShadow: 'none',
                                 transition: 'all 0.2s ease'
                               }}
                               onMouseOver={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 6px 18px rgba(236, 72, 153, 0.4)';
+                                e.currentTarget.style.boxShadow = 'none';
                               }}
                               onMouseOut={(e) => {
                                 e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.boxShadow = '0 4px 14px rgba(236, 72, 153, 0.3)';
+                                e.currentTarget.style.boxShadow = 'none';
                               }}
                             >
                               <Users size={15} /> Band-Matching öffnen
@@ -1130,7 +1130,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                   {/* Professional GrooveLab Coach Metrics Grid (3 columns) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
                     {/* Metric 1: Betreute Bands */}
-                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(234, 179, 8, 0.04)' }}>
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
                       <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(234, 179, 8, 0.12)', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Users size={22} />
                       </div>
@@ -1160,7 +1160,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                     </div>
 
                     {/* Metric 2: Präsenztage */}
-                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(234, 179, 8, 0.04)' }}>
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
                       <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Calendar size={22} />
                       </div>
@@ -1177,7 +1177,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                     </div>
 
                     {/* Metric 3: GrooveLab-Instrumente */}
-                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(234, 179, 8, 0.04)' }}>
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
                       <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(202, 138, 4, 0.12)', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Music size={22} />
                       </div>
@@ -1193,7 +1193,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                   {/* Teaching Days & Coached Bands Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px' }}>
                     {/* Day Availability Calendar Planner */}
-                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(234, 179, 8, 0.03)' }}>
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: 'none' }}>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Calendar size={20} style={{ color: '#eab308' }} />
                         Anwesenheitszeiten & Startzeiten
@@ -1322,7 +1322,7 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                       const teacherBandsList = Array.from(map.values());
 
                       return (
-                        <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(234, 179, 8, 0.03)' }}>
+                        <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: 'none' }}>
                           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Users size={20} style={{ color: '#eab308' }} />
                             Betreute Band-Projekte ({teacherBandsList.length})

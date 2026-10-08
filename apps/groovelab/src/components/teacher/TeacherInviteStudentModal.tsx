@@ -85,7 +85,7 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
                 Abbrechen
               </button>
               <button type="submit" disabled={inviteSaving}
-                style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139,92,246,0.2)', opacity: inviteSaving ? 0.7 : 1 }}>
+                style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: 'none', opacity: inviteSaving ? 0.7 : 1 }}>
                 {inviteSaving ? 'Erstelle...' : '🔗 Link erstellen'}
               </button>
             </div>
@@ -108,7 +108,7 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button onClick={() => { navigator.clipboard.writeText(inviteLink!).then(() => alert('✓ Einladungslink kopiert!')); }}
-                style={{ padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(139,92,246,0.2)' }}>
+                style={{ padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: 'none' }}>
                 <Copy size={16} /> Link kopieren
               </button>
               <a href={`mailto:?subject=${encodeURIComponent('Einladung zur Campus-Aktivierung')}&body=${encodeURIComponent(`Hallo ${inviteFirstName || 'Familie'},\n\nhier ist der persönliche Einladungslink zur Aktivierung des Schülerprofils (30 Tage gültig):\n${inviteLink!}`)}`}

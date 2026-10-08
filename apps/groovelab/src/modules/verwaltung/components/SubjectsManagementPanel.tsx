@@ -171,7 +171,7 @@ export const SubjectsManagementPanel: React.FC<SubjectsManagementPanelProps> = (
             fontWeight: 700,
             fontSize: '0.85rem',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'

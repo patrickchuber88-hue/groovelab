@@ -256,10 +256,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const targetId = studentId || token || 'demo_student';
   const [schoolName, setSchoolName] = useState<string>(() => {
     const cached = localStorage.getItem('campus_school_name') || localStorage.getItem('groovelab_school_name') || '';
-    if (cached && !cached.toLowerCase().includes('groove academy')) {
-      return cached;
-    }
-    return 'Musäk Bad Säckingen';
+    return cached || 'Musikschule';
   });
   const [studentDisplayName, setStudentDisplayName] = useState<string>('Amelia • Gitarre');
   const [studentInstrument, setStudentInstrument] = useState<string>('Gitarre');
@@ -300,9 +297,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     const loadData = async () => {
       try {
         let resolvedSchoolName = localStorage.getItem('campus_school_name') || localStorage.getItem('groovelab_school_name') || '';
-        if (resolvedSchoolName.toLowerCase().includes('groove academy')) {
-          resolvedSchoolName = '';
-        }
         let resolvedInstrument = 'Gitarre';
         let resolvedFirstName = '';
 
@@ -316,7 +310,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               resolvedInstrument = parsed.instrument;
               setStudentInstrument(parsed.instrument);
             }
-            if (parsed.school_name && !parsed.school_name.toLowerCase().includes('groove academy')) {
+            if (parsed.school_name) {
               resolvedSchoolName = parsed.school_name;
             }
           }
@@ -365,7 +359,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                 .eq('id', targetSchoolId)
                 .maybeSingle();
 
-              if (schoolRecord?.name && !schoolRecord.name.toLowerCase().includes('groove academy')) {
+              if (schoolRecord?.name) {
                 resolvedSchoolName = schoolRecord.name;
               }
             }
@@ -374,18 +368,18 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }
         }
 
-        // 3. If no school resolved from student profile, query the real active music school (excluding test schools)
-        if (!resolvedSchoolName || resolvedSchoolName.toLowerCase().includes('groove academy')) {
+        // 3. If no school resolved from student profile, query the real active music school (excluding demo schools)
+        if (!resolvedSchoolName) {
           try {
             const { data: realSchools } = await supabase
               .from('schools')
               .select('id, name, city')
-              .not('name', 'ilike', '%groove academy%')
+              .eq('is_demo_tenant', false)
               .order('created_at', { ascending: false })
               .limit(5);
 
             if (realSchools && realSchools.length > 0) {
-              const matchedSchool = realSchools.find(s => s.name && !s.name.toLowerCase().includes('groove academy'));
+              const matchedSchool = realSchools.find(s => s.name);
               if (matchedSchool?.name) {
                 resolvedSchoolName = matchedSchool.name;
               }
@@ -395,9 +389,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }
         }
 
-        // 4. Default fallback: 'Musäk Bad Säckingen'
-        if (!resolvedSchoolName || resolvedSchoolName.toLowerCase().includes('groove academy')) {
-          resolvedSchoolName = 'Musäk Bad Säckingen';
+        // 4. Default fallback: 'Musikschule'
+        if (!resolvedSchoolName) {
+          resolvedSchoolName = 'Musikschule';
         }
 
         if (resolvedSchoolName && !isCancelled) {
@@ -942,7 +936,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           border: '1.5px solid rgba(239, 68, 68, 0.4)',
           borderRadius: '32px',
           padding: '36px 30px',
-          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(239, 68, 68, 0.15)',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -960,7 +954,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ef4444',
-            boxShadow: '0 8px 24px rgba(239, 68, 68, 0.25)'
+            boxShadow: 'none'
           }}>
             <ShieldAlert size={34} />
           </div>

@@ -346,7 +346,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           background: #34a853 !important;
           color: #ffffff !important;
           border-color: #34a853 !important;
-          box-shadow: 0 4px 10px rgba(52, 168, 83, 0.15);
+          box-shadow: none;
         }
         
         .school-list-item:hover {
@@ -431,7 +431,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
               fontSize: '0.84rem',
               color: '#ea4335',
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(234, 67, 53, 0.08)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             className="hover-scale-mini"

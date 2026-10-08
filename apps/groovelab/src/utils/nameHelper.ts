@@ -343,8 +343,8 @@ export function isTeacherFullName(name: string | null | undefined): boolean {
  * Lehrkräfte-Namensanzeige (Vorname Nachname Invariante):
  * Lehrkräfte werden auf allen Oberflächen, Dashboards, Landingpages, Chats,
  * Benachrichtigungen und Übersichten für Schüler, Eltern und Verwaltung IMMER
- * einheitlich mit ihrem vollständigen Namen (Vorname + Nachname, z. B. "Severin Landenberger",
- * "Peter Pan") kommuniziert. Lehrkräftenamen dürfen NIEMALS invertiert ("Nachname, Vorname")
+ * einheitlich mit ihrem vollständigen Namen (Vorname + Nachname, z. B. "Patrick Huber",
+ * "Severin Landenberger") kommuniziert. Lehrkräftenamen dürfen NIEMALS invertiert ("Nachname, Vorname")
  * und NIEMALS auf "Vorname + Anfangsbuchstabe" gekürzt werden.
  */
 export function formatTeacherFullName(
@@ -400,19 +400,7 @@ export function formatTeacherFullName(
     }
   }
 
-  if (!first && !last) return 'Lehrkraft';
-
-  // Specific normalization for Severin Landenberger (if stored with initial 'L.' in database)
-  if (first.toLowerCase() === 'severin' && (!last || last === 'L.' || last === 'L' || last.toLowerCase() === 'l.')) {
-    last = 'Landenberger';
-  }
-
-  // Specific normalization for Peter Pan (if stored with initial 'P.' or erroneously 'Petersen' in database)
-  if (first.toLowerCase() === 'peter' && (!last || last === 'P.' || last === 'P' || last.toLowerCase() === 'p.' || last.toLowerCase() === 'petersen')) {
-    last = 'Pan';
-  }
-
-  return `${first} ${last}`.trim();
+  return `${first} ${last}`.trim() || 'Lehrkraft';
 }
 
 /**
@@ -549,19 +537,7 @@ export function formatDisplaySubjectOrInstrument(
     return rawTeacherInst;
   }
 
-  // If teacher is known (e.g. Severin Landenberger) or has a default
-  const teacherName = (
-    teacherObj?.first_name ||
-    teacherObj?.name ||
-    (typeof teacherObj === 'string' ? teacherObj : '')
-  ).toLowerCase();
-
-  if (teacherName.includes('severin')) {
-    return 'Gitarre';
-  }
-
-  // Default music school fallback for assigned lesson slots
-  return 'Gitarre';
+  return '';
 }
 
 /**

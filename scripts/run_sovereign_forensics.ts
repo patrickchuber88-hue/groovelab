@@ -34,13 +34,15 @@ const suites = [
   { name: 'Fuzzing, SQLi & Input Pentest', file: 'apps/groovelab/src/tests/test_fuzzing_injection_defense_simulation.ts' },
   { name: 'Red-Team RLS & BOLA Audit', file: 'apps/groovelab/src/tests/redteam_rls_audit.ts' },
   { name: 'WORM Non-Repudiation Drill', file: 'apps/groovelab/src/tests/test_worm_audit_trail.ts' },
-  { name: 'Legal & Regulatory 360° Forensic', file: 'apps/groovelab/src/tests/test_legal_compliance_360_forensic.ts' }
+  { name: 'Legal & Regulatory 360° Forensic', file: 'apps/groovelab/src/tests/test_legal_compliance_360_forensic.ts' },
+  { name: 'Mutation & Falsification Drill', file: 'apps/groovelab/src/tests/test_forensic_mutation_falsification.ts' },
+  { name: 'WAL & Out-of-Band Storage Guard', file: 'apps/groovelab/src/tests/test_wal_storage_replication_guard.ts' }
 ];
 
 console.log('╔════════════════════════════════════════════════════════════════════╗');
 console.log('║   CAMPUS-GROOVELAB: MASTER-RUNNER 3 — SOVEREIGN ACTIVE DEFENSE     ║');
 console.log('║   Standards: DIN EN ISO/IEC 27037, ISO 27001 A.8.15 & BSI TR-02102 ║');
-console.log('║   7 Specialized Sovereign & Red-Teaming Suites / Top 0.1% Standard ║');
+console.log('║   9 Specialized Sovereign & 0.1% Forensic Suites (Top 0.1% Std)   ║');
 console.log('╚════════════════════════════════════════════════════════════════════╝\n');
 
 const results: SuiteResult[] = [];

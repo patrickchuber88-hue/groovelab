@@ -6,6 +6,7 @@
  * complying with European GDPR data portability & access rights.
  */
 import { supabase } from '../lib/supabase';
+import { computeCanonicalPayloadHash } from './pdfTypographyEngine';
 
 export interface GdprDataDossier {
   exportMetadata: {
@@ -48,40 +49,39 @@ export async function generateStudentGdprDataTakeout(userId: string, schoolId?: 
     .select('id, homework_notes, updated_at')
     .eq('student_id', userId);
 
-  // 4. Compute SHA-256 signature for data tamper protection
-  const rawPayload = JSON.stringify({
-    userId,
-    schoolId,
-    exportedAt: new Date().toISOString(),
-    profile: userProfile,
-    notesCount: studentNotes?.length || 0,
-    progressCount: progressItems?.length || 0
-  });
+  // 4. Assemble complete user data payload
+  const userData = {
+    profile: userProfile || { id: userId, anonymized: true },
+    homeworkNotes: studentNotes || [],
+    progressEntries: progressItems || [],
+    practiceStreaks: [],
+    loopstationRecordingsCount: 0,
+    repertoireMasteries: []
+  };
 
-  let signature = 'SIG_VERIFIED_LOCAL';
-  if (typeof crypto !== 'undefined' && crypto.subtle) {
-    const data = new TextEncoder().encode(rawPayload);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    signature = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+  // 5. Compute atomic SHA-256 signature for complete data tamper protection (RFC 8785 canonical)
+  const exportedAt = new Date().toISOString();
+  const canonicalPayload = {
+    platform: 'Campus-Groovelab',
+    legalStandard: 'DSGVO Art. 15 / Art. 20 (Recht auf Datenübertragbarkeit)',
+    exportedAt,
+    targetUserId: userId,
+    schoolId: schoolId || userProfile?.school_id || null,
+    userData
+  };
+
+  const signature = await computeCanonicalPayloadHash(canonicalPayload);
 
   const dossier: GdprDataDossier = {
     exportMetadata: {
       platform: 'Campus-Groovelab',
       legalStandard: 'DSGVO Art. 15 / Art. 20 (Recht auf Datenübertragbarkeit)',
-      exportedAt: new Date().toISOString(),
+      exportedAt,
       targetUserId: userId,
       schoolId: schoolId || userProfile?.school_id,
       sha256Signature: signature
     },
-    userData: {
-      profile: userProfile || { id: userId, anonymized: true },
-      homeworkNotes: studentNotes || [],
-      progressEntries: progressItems || [],
-      practiceStreaks: [],
-      loopstationRecordingsCount: 0,
-      repertoireMasteries: []
-    }
+    userData
   };
 
   return dossier;

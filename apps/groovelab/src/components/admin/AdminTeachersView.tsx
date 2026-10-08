@@ -217,7 +217,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
             )}
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#0f172a' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Hinzufügen</button>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#0f172a' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: 'none', transition: 'all 0.2s' }}>Hinzufügen</button>
               <button type="button" onClick={() => { setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' }); }} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
@@ -330,7 +330,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#0f172a' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Änderungen speichern</button>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#0f172a' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: 'none', transition: 'all 0.2s' }}>Änderungen speichern</button>
               <button type="button" onClick={() => setEditingTeacher(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>

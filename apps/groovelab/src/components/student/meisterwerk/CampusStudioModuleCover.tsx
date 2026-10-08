@@ -111,7 +111,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Üben',
           gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-          boxShadow: '0 6px 14px -2px rgba(234, 179, 8, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <Clock
               size={dimensions.iconSize}
@@ -130,7 +130,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
               ? 'Songs & Noten'
               : 'Repertoire & Noten',
           gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-          boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <BookOpen
               size={dimensions.iconSize}
@@ -145,7 +145,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Aufnahmen',
           gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-          boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <Mic
               size={dimensions.iconSize}
@@ -160,7 +160,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Groove-Trainer',
           gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-          boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <Radio
               size={dimensions.iconSize}
@@ -175,7 +175,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Stimmgerät',
           gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-          boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <TuningForkIcon
               size={dimensions.iconSize}
@@ -190,7 +190,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
           gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-          boxShadow: '0 6px 14px -2px rgba(139, 92, 246, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <Headphones
               size={dimensions.iconSize}
@@ -205,7 +205,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Loopstation',
           gradient: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
-          boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <Sliders
               size={dimensions.iconSize}
@@ -246,7 +246,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Musik-Weltreise',
           gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-          boxShadow: '0 6px 14px -2px rgba(2, 132, 199, 0.40)',
+          boxShadow: 'none',
           renderIcon: () => (
             <Compass
               size={dimensions.iconSize}
@@ -261,7 +261,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
         return {
           title: 'Aufgabenheft-Verlauf',
           gradient: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
-          boxShadow: '0 4px 10px -2px rgba(71, 85, 105, 0.35)',
+          boxShadow: 'none',
           renderIcon: () => (
             <History
               size={dimensions.iconSize}

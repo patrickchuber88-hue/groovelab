@@ -346,7 +346,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                   gap: '8px',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                   fontFamily: 'Inter, sans-serif',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.28)',
+                  boxShadow: 'none',
                   letterSpacing: '-0.01em',
                   userSelect: 'none'
                 }}

@@ -372,6 +372,8 @@ export function StudentAvatarDashboard({
             studentId={studentId}
             studentUser={profile.studentUser}
             avatar={streaks.avatar}
+            currentXp={streaks.currentXp}
+            currentStreak={streaks.effectiveStreak}
             effectivePracticeMinutes={totalPracticeMinutes}
             secondsElapsedRef={{ current: practice.secondsElapsed }}
             isJuniorMissionPausedRef={isJuniorMissionPausedRef}
@@ -383,7 +385,7 @@ export function StudentAvatarDashboard({
               await practice.requestOrientationPermission?.();
               practice.setSessionActive(true);
             }}
-            finishPracticeSession={practice.finishPracticeSession}
+            finishPracticeSession={(explicitXp) => practice.finishPracticeSession(explicitXp, streaks.avatar?.streak_flame)}
             logParentGuidedPractice={async () => {}}
             handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
             playMilestoneSound={playOrbitLaunchSound}
@@ -566,6 +568,8 @@ export function StudentAvatarDashboard({
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Profil...</div>}>
           <StudentProfileTab
             avatar={streaks.avatar}
+            currentXp={streaks.currentXp}
+            currentStreak={streaks.effectiveStreak}
             activeTab={profile.activeTab}
             studentUser={profile.studentUser}
             studentId={studentId}

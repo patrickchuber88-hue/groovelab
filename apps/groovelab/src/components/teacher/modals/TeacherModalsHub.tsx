@@ -534,7 +534,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                 <div style={{ background: '#f59e0b', color: 'white', padding: '12px', borderRadius: '16px', boxShadow: '0 8px 24px rgba(245, 158, 11, 0.2)' }}>
+                 <div style={{ background: '#f59e0b', color: 'white', padding: '12px', borderRadius: '16px', boxShadow: 'none' }}>
                    <TrendingUp size={28} />
                  </div>
                  <div>
@@ -620,7 +620,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
                    <div style={{ display: 'flex', gap: '12px' }}>
                      <button 
                        onClick={() => handleApproveSubmission(sub.id)}
-                       style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '12px', borderRadius: '16px', fontWeight: 1000, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(52, 168, 83, 0.2)' }}
+                       style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '12px', borderRadius: '16px', fontWeight: 1000, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
                      >
                        BESTÄTIGEN
                      </button>
@@ -731,7 +731,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
             color: '#0f172a',
             borderRadius: '16px',
             padding: '16px 24px',
-            boxShadow: '0 10px 30px rgba(234, 179, 8, 0.4)',
+            boxShadow: 'none',
             zIndex: 99999,
             display: 'flex',
             alignItems: 'center',

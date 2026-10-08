@@ -43,7 +43,7 @@ export const SecretaryDeveloperResetButton: React.FC<SecretaryDeveloperResetButt
         fontSize: '0.8rem',
         fontWeight: 800,
         cursor: 'pointer',
-        boxShadow: '0 10px 25px rgba(124, 58, 237, 0.3)',
+        boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',

@@ -24,9 +24,9 @@ export const DESIGN_TOKENS = {
     cardSoft: '0 4px 15px rgba(0, 0, 0, 0.04)',
     innerSubtle: 'inset 0 1px 2px rgba(0, 0, 0, 0.02)',
     innerLightBorder: 'inset 0 1px 0 rgba(255, 255, 255, 0.45)',
-    campusGlow: '0 0 16px rgba(52, 168, 83, 0.25)',
-    grooveGlow: '0 0 16px rgba(234, 179, 8, 0.25)',
-    adminGlow: '0 0 16px rgba(234, 67, 53, 0.25)'
+    campusGlow: 'none',
+    grooveGlow: 'none',
+    adminGlow: 'none'
   },
 
   // 🌈 Module Primary & Surface Colors

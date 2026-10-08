@@ -381,7 +381,7 @@ export function getSchoolCanonicalBilling(
     billingDiscountType: (school.billing_discount_type as any) || 'monthly',
     exemptStudentCount: stats.exemptActiveStudents,
     parentPaidStudentCount: stats.parentPaidStudents,
-    directBillingMode: isFullDirect ? 'full' : (isPartial ? 'partial' : 'none'),
+    directBillingMode: isFullDirect ? 'full' : 'none',
     rates: {
       priceCampus: effectiveRates.priceCampus,
       priceGroovelab: effectiveRates.priceGroovelab,

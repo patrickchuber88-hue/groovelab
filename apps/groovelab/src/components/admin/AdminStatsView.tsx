@@ -420,7 +420,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                               display: 'flex',
                               flexDirection: 'column',
                               background: '#34a853',
-                              boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                              boxShadow: 'none',
                               borderRadius: '16px',
                               padding: '12px 14px',
                               gap: '8px'
@@ -862,7 +862,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                       {user.first_name} {maskLastName(user.last_name, showRealNames)}
                     </div>
                   </div>
-                  <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.2)' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: 'none' }}>
                     <Star size={12} fill="white" /> {user.xp} XP
                   </div>
                 </div>

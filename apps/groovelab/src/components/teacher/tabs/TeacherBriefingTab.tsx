@@ -296,6 +296,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     briefingData.timeline.forEach((s: any) => {
       if (
         (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
+        !s.isBreak &&
         !s.is_room_booking &&
         !s.isRoomBooking &&
         s.status !== 'canceled_by_student' &&
@@ -441,6 +442,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     briefingData.timeline.forEach((s: any) => {
       if (
         (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
+        !s.isBreak &&
         !s.is_room_booking &&
         !s.isRoomBooking &&
         s.status !== 'canceled_by_student' &&
@@ -542,7 +544,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+          boxShadow: 'none',
           minWidth: 0
         }}>
           <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -567,7 +569,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+          boxShadow: 'none',
           minWidth: 0
         }}>
           <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -588,7 +590,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+          boxShadow: 'none',
           minWidth: 0
         }}>
           <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -613,7 +615,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)',
+          boxShadow: 'none',
           minWidth: 0
         }}>
           <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -623,7 +625,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             {isRestDay ? 'Frei' : cancellationsCount}
           </span>
           <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8 }}>
-            {isRestDay ? 'Erholung' : (cancellationsCount === 0 ? 'Keine' : 'Heute')}
+            {isRestDay ? 'Erholung' : (cancellationsCount === 0 ? 'Planmäßig' : 'Heute')}
           </span>
         </div>
       </div>
@@ -662,7 +664,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             padding: '12px 16px', 
             borderRadius: '22px',
             background: 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
-            boxShadow: '0 4px 16px -2px rgba(239, 68, 68, 0.08)',
+            boxShadow: 'none',
             border: '1.5px solid #fecaca',
             display: 'flex',
             alignItems: 'center',
@@ -737,7 +739,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               alignItems: 'center',
               gap: '6px',
               flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
           >
@@ -756,7 +758,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        boxShadow: '0 4px 20px rgba(239, 68, 68, 0.08)'
+        boxShadow: 'none'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -838,7 +840,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         border: '1.5px solid #fed7aa',
         borderRadius: compact ? '20px' : '28px',
         padding: compact ? '16px' : '22px 24px',
-        boxShadow: '0 8px 30px -4px rgba(234, 88, 12, 0.12)',
+        boxShadow: 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: '14px',
@@ -858,7 +860,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35)',
+              boxShadow: 'none',
               flexShrink: 0
             }}>
               <AlertTriangle size={20} strokeWidth={2.5} />
@@ -1118,7 +1120,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                 <span style={{
                   position: 'absolute', top: '-6px', right: '-6px', width: '10px', height: '10px',
                   borderRadius: '50%', background: '#f59e0b', border: `2px solid ${btnBg}`,
-                  boxShadow: '0 0 8px #f59e0b', animation: 'pulse 1.5s infinite'
+                  boxShadow: 'none', animation: 'pulse 1.5s infinite'
                 }} />
               )}
             </div>
@@ -1192,7 +1194,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    boxShadow: '0 4px 20px rgba(234, 88, 12, 0.06)'
+                    boxShadow: 'none'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1222,7 +1224,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         fontWeight: 700,
                         fontSize: '0.75rem',
                         cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(234, 88, 12, 0.2)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s ease'
                       }}
                     >
@@ -1263,7 +1265,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                 display: 'flex',
                 alignItems: 'center',
                 gap: '16px',
-                boxShadow: '0 8px 30px rgba(52, 168, 83, 0.04)',
+                boxShadow: 'none',
                 position: 'relative',
                 overflow: 'hidden'
               }}>
@@ -1484,7 +1486,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                       position: 'relative', overflow: 'hidden',
                       background: '#4f46e5', color: 'white',
                       borderRadius: '22px', 
-                      boxShadow: '0 12px 28px -6px rgba(79, 70, 229, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1512,7 +1514,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         ) : (
                           totalActiveStudentsToday > activeLessonsCount && (
                             <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px' }}>
-                              ({totalActiveStudentsToday} Schüler)
+                              ({totalActiveStudentsToday} Sch.)
                             </span>
                           )
                         )}
@@ -1524,7 +1526,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                       position: 'relative', overflow: 'hidden',
                       background: '#16a34a', color: 'white',
                       borderRadius: '22px', 
-                      boxShadow: '0 12px 28px -6px rgba(22, 163, 74, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1550,7 +1552,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                       position: 'relative', overflow: 'hidden',
                       background: '#eab308', color: '#0f172a',
                       borderRadius: '22px', 
-                      boxShadow: '0 12px 28px -6px rgba(234, 179, 8, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1568,9 +1570,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         <span style={{ fontSize: '1.75rem', fontWeight: 950, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>
                           {isRestDay ? regularWeeklyPensum : workloadHoursStr}
                         </span>
-                        {isRestDay && (
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.8, marginLeft: '2px', color: '#0f172a' }}>/ Woche</span>
-                        )}
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px', color: '#0f172a' }}>
+                          {isRestDay ? '/ Woche' : 'Heute'}
+                        </span>
                       </div>
                     </div>
 
@@ -1579,7 +1581,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                       position: 'relative', overflow: 'hidden',
                       background: '#dc2626', color: 'white',
                       borderRadius: '22px', 
-                      boxShadow: '0 12px 28px -6px rgba(220, 38, 38, 0.35)',
+                      boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1607,7 +1609,10 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           <>
                             <span style={{ fontSize: '1.75rem', fontWeight: 950, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
                             <span style={{ fontSize: '0.74rem', fontWeight: 800, opacity: 0.9 }}>
-                              {cancellationsCount === 0 ? 'Keine Ausfälle' : 'Heute'}
+                              {cancellationsCount === 1 ? 'Ausfall' : 'Ausfälle'}
+                            </span>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px' }}>
+                              {cancellationsCount === 0 ? 'Planmäßig' : 'Heute'}
                             </span>
                           </>
                         )}

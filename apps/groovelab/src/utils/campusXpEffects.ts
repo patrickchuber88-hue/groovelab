@@ -115,22 +115,22 @@ export const animateXpCountUp = (
 export const CAMPUS_XP_EFFECTS_CSS = `
 @keyframes campusXpGoldPulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7), 0 10px 25px -5px rgba(99, 102, 241, 0.35);
+    box-shadow: none;
     border-color: rgba(250, 204, 21, 0.9);
     transform: scale(1);
   }
   35% {
-    box-shadow: 0 0 35px 8px rgba(250, 204, 21, 0.85), 0 14px 30px -6px rgba(99, 102, 241, 0.45);
+    box-shadow: none;
     border-color: #facc15;
     transform: scale(1.035);
   }
   70% {
-    box-shadow: 0 0 24px 5px rgba(250, 204, 21, 0.65), 0 12px 28px -5px rgba(99, 102, 241, 0.40);
+    box-shadow: none;
     border-color: rgba(250, 204, 21, 0.8);
     transform: scale(1.015);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0), 0 10px 25px -5px rgba(99, 102, 241, 0.35);
+    box-shadow: none;
     border-color: rgba(255, 255, 255, 0.25);
     transform: scale(1);
   }
@@ -172,7 +172,8 @@ export const CAMPUS_XP_EFFECTS_CSS = `
   font-weight: 950;
   padding: 5px 14px;
   border-radius: 9999px;
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.55), 0 0 0 2px #ffffff;
+  border: 1px solid #fde047;
+  box-shadow: none;
   pointer-events: none;
   white-space: nowrap;
   animation: campusXpFloatingBadge 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;

@@ -263,10 +263,10 @@ export function drawDocumentHashFooter(doc: jsPDF, options: DocumentHashFooterOp
 
   // Line 1: Cryptographic verification hash
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.8);
+  doc.setFontSize(6.4);
   doc.setTextColor(textGray[0], textGray[1], textGray[2]);
   const cleanHash = options.sha256Hash.trim();
-  const hashLabel = `Urkunden-Prüfhash (§ 371a ZPO): SHA256-${cleanHash.slice(0, 32)}... • Amtliche Ausfertigung`;
+  const hashLabel = `Urkunden-Prüfhash (§ 371a ZPO): SHA256:${cleanHash} • Amtliche Ausfertigung`;
   doc.text(hashLabel, margin, footY);
 
   // Line 2: Operator imprint & location
@@ -290,17 +290,34 @@ export function drawDocumentHashFooter(doc: jsPDF, options: DocumentHashFooterOp
 }
 
 /**
- * Computes a deterministic SHA-256 hash over a canonical JSON payload.
- * Sorts object keys alphabetically to guarantee reproducible digests.
+ * Serializes data into a deterministic canonical JSON string according to RFC 8785 (JCS).
+ * Keys are sorted recursively, whitespace is stripped, and values are normalized.
  */
-export async function computeCanonicalPayloadHash(payload: Record<string, unknown> | string): Promise<string> {
+export function canonicalizeJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return '[' + value.map(item => canonicalizeJson(item === undefined ? null : item)).join(',') + ']';
+  }
+  const obj = value as Record<string, unknown>;
+  const sortedKeys = Object.keys(obj)
+    .filter(k => obj[k] !== undefined && typeof obj[k] !== 'function')
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const entries: string[] = [];
+  for (const key of sortedKeys) {
+    entries.push(JSON.stringify(key) + ':' + canonicalizeJson(obj[key]));
+  }
+  return '{' + entries.join(',') + '}';
+}
+
+/**
+ * Computes a deterministic SHA-256 hash over a canonical JSON payload according to RFC 8785.
+ * Recursively sorts all keys across nested objects to guarantee reproducible digests.
+ */
+export async function computeCanonicalPayloadHash(payload: unknown): Promise<string> {
   if (typeof payload === 'string') {
     return computeSha256(payload);
   }
-  const sortedKeys = Object.keys(payload).sort();
-  const canonicalObj: Record<string, unknown> = {};
-  for (const key of sortedKeys) {
-    canonicalObj[key] = payload[key];
-  }
-  return computeSha256(JSON.stringify(canonicalObj));
+  return computeSha256(canonicalizeJson(payload));
 }

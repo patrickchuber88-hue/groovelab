@@ -93,7 +93,7 @@ export function MasterAdminSidebar({
             width: '40px',
             height: '40px',
             borderRadius: '12px',
-            boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -196,7 +196,7 @@ export function MasterAdminSidebar({
                     borderRadius: '10px',
                     minWidth: '16px',
                     textAlign: 'center',
-                    boxShadow: '0 2px 5px rgba(239, 68, 68, 0.25)'
+                    boxShadow: 'none'
                   }}>
                     {pendingUsersCount}
                   </span>
@@ -210,7 +210,7 @@ export function MasterAdminSidebar({
                     fontWeight: 850,
                     padding: '2px 6px',
                     borderRadius: '6px',
-                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.25)',
+                    boxShadow: 'none',
                     letterSpacing: '0.02em'
                   }}>
                     AKTIV
@@ -226,7 +226,7 @@ export function MasterAdminSidebar({
                     borderRadius: '10px',
                     minWidth: '16px',
                     textAlign: 'center',
-                    boxShadow: '0 2px 5px rgba(245, 158, 11, 0.35)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '3px'

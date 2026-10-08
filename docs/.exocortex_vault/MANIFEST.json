@@ -4,6 +4,26 @@
   "created_at": "2026-10-06T20:24:44.495Z",
   "snapshots": [
     {
+      "id": "SNAP-0c5cbfd3",
+      "filename": "matrix_2026-10-08T23-21-30-249Z_0c5cbfd3.md",
+      "created_at": "2026-10-08T23:21:30.249Z",
+      "sha256": "0c5cbfd3d18107f55d482c283bfcb5105f3be161e4f747a97dff54e63c59b547",
+      "byte_size": 675626,
+      "line_count": 431,
+      "feature_count": 341,
+      "reason": "auto"
+    },
+    {
+      "id": "SNAP-18110954",
+      "filename": "matrix_2026-10-08T20-46-03-138Z_18110954.md",
+      "created_at": "2026-10-08T20:46:03.138Z",
+      "sha256": "181109544b7e8ce43fb8cf918a0153f8e499a882b93f41f67f1d4bbdf870026d",
+      "byte_size": 655684,
+      "line_count": 424,
+      "feature_count": 334,
+      "reason": "auto"
+    },
+    {
       "id": "SNAP-b33569aa",
       "filename": "matrix_2026-10-08T05-44-36-740Z_b33569aa.md",
       "created_at": "2026-10-08T05:44:36.740Z",
@@ -131,26 +151,6 @@
       "byte_size": 540753,
       "line_count": 380,
       "feature_count": 292,
-      "reason": "auto"
-    },
-    {
-      "id": "SNAP-2a031f16",
-      "filename": "matrix_2026-10-06T20-45-41-726Z_2a031f16.md",
-      "created_at": "2026-10-06T20:45:41.726Z",
-      "sha256": "2a031f166d8c442adeed0b363a2542033cb87f95f4184ef473f7d062d3f0e2db",
-      "byte_size": 527451,
-      "line_count": 376,
-      "feature_count": 287,
-      "reason": "auto"
-    },
-    {
-      "id": "SNAP-d5219aa7",
-      "filename": "matrix_2026-10-06T20-25-32-760Z_d5219aa7.md",
-      "created_at": "2026-10-06T20:25:32.760Z",
-      "sha256": "d5219aa7542ca856ba8c0ddca98226077fffb2e73f24916a292890b02472e63c",
-      "byte_size": 524880,
-      "line_count": 375,
-      "feature_count": 286,
       "reason": "auto"
     }
   ]

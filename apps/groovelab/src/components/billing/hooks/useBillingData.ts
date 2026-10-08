@@ -60,25 +60,32 @@ export function useBillingData(initialSchoolId?: string) {
   }, []);
 
   const getPaidInvoices = (schoolId: string): string[] => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const stored = localStorage.getItem(`paid_invoices_${schoolId}`);
-      const parsed = stored ? JSON.parse(stored) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    // Zero-Trust: Read exclusively from authoritative PostgreSQL dbInvoices state
+    return dbInvoices
+      .filter(i => i.school_id === schoolId && i.status === 'paid')
+      .map(i => i.invoice_number || i.id);
   };
 
-  const toggleInvoicePaid = (schoolId: string, invoiceId: string) => {
-    const current = getPaidInvoices(schoolId);
-    let updated: string[];
-    if (current.includes(invoiceId)) {
-      updated = current.filter(id => id !== invoiceId);
-    } else {
-      updated = [...current, invoiceId];
+  const toggleInvoicePaid = async (schoolId: string, invoiceId: string) => {
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mark_invoice_as_paid', {
+        p_invoice_id: invoiceId
+      });
+      if (rpcErr) {
+        // Direct PostgreSQL Fallback if RPC not loaded
+        const match = dbInvoices.find(i => (i.id === invoiceId || i.invoice_number === invoiceId) && i.school_id === schoolId);
+        const nextStatus = match?.status === 'paid' ? 'open' : 'paid';
+        await supabase
+          .from('invoices')
+          .update({
+            status: nextStatus,
+            paid_at: nextStatus === 'paid' ? new Date().toISOString() : null
+          })
+          .or(`id.eq.${invoiceId},invoice_number.eq.${invoiceId}`);
+      }
+    } catch (e) {
+      console.warn('[useBillingData] Error toggling invoice payment status:', e);
     }
-    localStorage.setItem(`paid_invoices_${schoolId}`, JSON.stringify(updated));
     setTick(t => t + 1);
     fetchBillingData();
   };
@@ -397,7 +404,7 @@ export function useBillingData(initialSchoolId?: string) {
       });
 
       const calculatedInvoices: Invoice[] = (schools || [])
-        .filter(school => !school.name.toLowerCase().includes('groove academy'))
+        .filter(school => school.status !== 'archived' && !(school as any).is_demo_tenant)
         .map(school => {
           const stats = userStatsMap[school.id] || aggregateSchoolMetrics(school, [], []);
           const canonical = getSchoolCanonicalBilling(school, stats, masterPricing);
@@ -457,7 +464,13 @@ export function useBillingData(initialSchoolId?: string) {
             storageUsedBytes: stats.storageUsedBytes,
             storageAddonMonthlyFee: stats.storageAddonMonthlyFee,
             contractStartDate: school.contract_start_date || null,
-            createdAt: school.created_at || null
+            createdAt: school.created_at || null,
+            sepaIban: (school as any).sepa_iban || (school as any).billing_iban || '',
+            sepaBic: (school as any).sepa_bic || (school as any).billing_bic || '',
+            sepaAccountHolder: (school as any).sepa_account_holder || school.name || '',
+            sepaMandateId: (school as any).sepa_mandate_id || '',
+            sepaMandateDate: (school as any).sepa_mandate_date || '',
+            billingIban: (school as any).billing_iban || ''
           };
         });
 
@@ -520,28 +533,13 @@ export function useBillingData(initialSchoolId?: string) {
             i.id === canonicalInvId || i.id === legacyInvId || i.id === `INV-${y}-${monthStr}` || i.id === invId
           );
 
-          let paidInvoicesList: string[] = [];
-          try {
-            const raw = localStorage.getItem(`paid_invoices_${inv.schoolId}`);
-            paidInvoicesList = raw ? JSON.parse(raw) : [];
-            if (!Array.isArray(paidInvoicesList)) paidInvoicesList = [];
-          } catch {
-            paidInvoicesList = [];
-          }
-
-          const isMarkedPaid = 
-            paidInvoicesList.includes(canonicalInvId) || 
-            paidInvoicesList.includes(legacyInvId) || 
-            paidInvoicesList.includes(previewId) ||
-            paidInvoicesList.includes(invId);
+          const isMarkedPaid = dbMatch ? (dbMatch.status === 'paid' || dbMatch.status === 'Bezahlt') : false;
 
           let status = isCreated ? 'Versendet' : 'Vorschau';
           let amount = inv.total;
           if (dbMatch) {
             status = dbMatch.status;
             amount = dbMatch.amount;
-          } else if (isMarkedPaid) {
-            status = 'paid';
           }
 
           if (isCreated && status !== 'paid' && status !== 'cancelled' && status !== 'Bezahlt') {

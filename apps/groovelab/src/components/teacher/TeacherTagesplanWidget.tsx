@@ -167,7 +167,7 @@ export const TeacherTourDemoSchedule: React.FC<TeacherTourDemoScheduleProps> = (
             alignItems: windowWidth < 768 ? 'stretch' : 'center',
             justifyContent: 'space-between',
             gap: windowWidth < 768 ? '4px' : '14px',
-            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.08)',
+            boxShadow: 'none',
             minWidth: 0
           }}>
             {windowWidth < 768 ? (
@@ -413,7 +413,7 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
           WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(239, 68, 68, 0.22)',
           borderRadius: '18px',
-          boxShadow: '0 4px 20px -4px rgba(220, 38, 38, 0.12), 0 1px 3px rgba(0, 0, 0, 0.02)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
@@ -423,9 +423,9 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
       >
         <style>{`
           @keyframes campusIssuePulse {
-            0% { transform: scale(0.985); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
-            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-            100% { transform: scale(1); box-shadow: 0 4px 20px -4px rgba(220, 38, 38, 0.12); }
+            0% { transform: scale(0.985); box-shadow: none; }
+            70% { transform: scale(1); box-shadow: none; }
+            100% { transform: scale(1); box-shadow: none; }
           }
         `}</style>
         {relevantRoomIssuesToday.map(issue => {
@@ -460,7 +460,7 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                  boxShadow: '0 1px 3px rgba(239, 68, 68, 0.12)'
+                  boxShadow: 'none'
                 }}>
                   <DoorOpen size={13} color="#dc2626" />
                 </div>
@@ -601,7 +601,7 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
                   alignItems: 'center',
                   gap: '4px',
                   flexShrink: 0,
-                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.30)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale-mini"
@@ -1308,7 +1308,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                              borderLeft: slotBorderLeft,
                              cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                             boxShadow: isCurrentSlot ? (isWrapUp ? '0 8px 24px rgba(234, 179, 8, 0.16), 0 2px 6px rgba(234, 179, 8, 0.08)' : '0 8px 24px rgba(52, 168, 83, 0.12), 0 2px 6px rgba(52, 168, 83, 0.06)') : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
+                             boxShadow: 'none',
                              minWidth: 0,
                              boxSizing: 'border-box',
                              overflow: 'hidden',
@@ -1380,7 +1380,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                         fontSize: '0.68rem',
                                         color: '#854d0e',
                                         flexShrink: 0,
-                                        boxShadow: '0 1px 3px rgba(234, 179, 8, 0.15)'
+                                        boxShadow: 'none'
                                       }}>
                                         <Clock size={10} color="#854d0e" />
                                         Abschluss ({minutesToSlotEnd} Min.)
@@ -1829,16 +1829,14 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                       (slotOccId && activeChatOccIds?.has(slotOccId)) ||
                                       (slot.occurrence_id && activeChatOccIds?.has(String(slot.occurrence_id))) ||
                                       (slotSchedId && slotDate && activeChatOccIds?.has(`virtual-${slotSchedId}-${slotDate}`)) ||
-                                      (studentCanonicalId && slotDate && activeChatOccIds?.has(`${studentCanonicalId}_${slotDate}`)) ||
-                                      (studentCanonicalId && activeChatOccIds?.has(String(studentCanonicalId)))
+                                      (studentCanonicalId && slotDate && activeChatOccIds?.has(`${studentCanonicalId}_${slotDate}`))
                                     );
 
                                     const hasSlotUnread = Boolean(
                                       (slotOccId && unreadChatOccIds?.has(slotOccId)) ||
                                       (slot.occurrence_id && unreadChatOccIds?.has(String(slot.occurrence_id))) ||
                                       (slotSchedId && slotDate && unreadChatOccIds?.has(`virtual-${slotSchedId}-${slotDate}`)) ||
-                                      (studentCanonicalId && slotDate && unreadChatOccIds?.has(`${studentCanonicalId}_${slotDate}`)) ||
-                                      (studentCanonicalId && unreadChatOccIds?.has(String(studentCanonicalId)))
+                                      (studentCanonicalId && slotDate && unreadChatOccIds?.has(`${studentCanonicalId}_${slotDate}`))
                                     );
 
                                     return (
@@ -1849,12 +1847,16 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                           if (targetSlot && resolved) {
                                             setActiveChatOcc({
                                               id: targetSlot.id,
+                                              schedule_id: slotSchedId,
+                                              occurrence_id: targetSlot?.occurrence_id || slot.occurrence_id,
                                               student_id: resolved.canonicalId,
                                               teacher_id: targetSlot.teacher_id || userId,
                                               date: targetSlot.date,
                                               start_time: targetSlot.timeSlot,
                                               student: {
-                                                first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler')
+                                                first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler'),
+                                                last_name: resolved.resolvedStudent.last_name || '',
+                                                avatar_url: resolved.resolvedStudent.avatar_url || resolved.resolvedStudent.photo_url
                                               }
                                             });
                                           }
@@ -1899,7 +1901,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                               background: '#eab308',
                                               border: 'none',
                                               animation: 'pulse 1.5s infinite',
-                                              boxShadow: '0 0 6px rgba(234, 179, 8, 0.6)'
+                                              boxShadow: 'none'
                                             }} 
                                             title="Neue ungelesene Nachricht vorhanden"
                                           />
@@ -2171,7 +2173,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                 {!slot.isGroup && isRescheduledPending && (
                                   <span 
                                     title="Terminverschiebung ausstehend (noch nicht bestätigt)"
-                                    style={{ background: '#fef3c7', color: '#b45309', border: '1px dashed #f59e0b', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 750, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)', letterSpacing: '0.01em' }}
+                                    style={{ background: '#fef3c7', color: '#b45309', border: '1px dashed #f59e0b', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 750, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', boxShadow: 'none', letterSpacing: '0.01em' }}
                                   >
                                     <Clock size={11} strokeWidth={2.5} color="#b45309" />
                                     <span>Unbestätigt</span>
@@ -2180,7 +2182,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                 {!slot.isGroup && isRescheduledConfirmed && (
                                   <span 
                                     title="Terminverschiebung vom Schüler bestätigt"
-                                    style={{ background: '#fef3c7', color: '#854d0e', border: '1.5px solid #eab308', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)', letterSpacing: '0.01em' }}
+                                    style={{ background: '#fef3c7', color: '#854d0e', border: '1.5px solid #eab308', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', boxShadow: 'none', letterSpacing: '0.01em' }}
                                   >
                                     <Check size={11} strokeWidth={2.8} color="#854d0e" />
                                     <span>Bestätigt</span>

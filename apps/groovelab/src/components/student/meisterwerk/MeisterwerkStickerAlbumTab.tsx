@@ -212,27 +212,27 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             }
             @keyframes unlockedCardPulse {
               0%, 100% {
-                box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.45), 0 0 16px var(--sticker-glow, rgba(52, 168, 83, 0.3)), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+                box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.16);
                 border-color: var(--sticker-border, rgba(52, 168, 83, 0.7));
               }
               50% {
-                box-shadow: 0 14px 34px -2px rgba(0, 0, 0, 0.55), 0 0 26px var(--sticker-glow-active, rgba(74, 222, 128, 0.55)), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+                box-shadow: 0 14px 34px -2px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.28);
                 border-color: var(--sticker-border-active, rgba(74, 222, 128, 0.95));
               }
             }
             @keyframes hallOfFameCardPulse {
               0%, 100% {
-                box-shadow: 0 12px 32px -4px rgba(234, 179, 8, 0.3), 0 0 20px rgba(234, 179, 8, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+                box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
                 border-color: rgba(234, 179, 8, 0.75);
               }
               50% {
-                box-shadow: 0 18px 42px -2px rgba(234, 179, 8, 0.5), 0 0 32px rgba(250, 204, 21, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+                box-shadow: 0 18px 42px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
                 border-color: rgba(250, 204, 21, 1);
               }
             }
             @keyframes stickerGlow {
-              0%, 100% { box-shadow: 0 0 15px rgba(52, 168, 83, 0.25); }
-              50% { box-shadow: 0 0 28px rgba(52, 168, 83, 0.5); }
+              0%, 100% { box-shadow: none; }
+              50% { box-shadow: none; }
             }
             @keyframes peelIn {
               0% { transform: scale(0.7) rotate(-6deg); opacity: 0; }
@@ -241,11 +241,11 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             }
             @keyframes activeMilestoneBreathingGlow {
               0%, 100% {
-                box-shadow: 0 12px 36px -4px rgba(234, 179, 8, 0.45), 0 0 0 2px rgba(234, 179, 8, 0.7);
+                box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.45);
                 transform: translateY(0);
               }
               50% {
-                box-shadow: 0 18px 45px -2px rgba(234, 179, 8, 0.65), 0 0 0 3.5px rgba(250, 204, 21, 0.95);
+                box-shadow: 0 18px 45px -2px rgba(0, 0, 0, 0.55);
                 transform: translateY(-3px);
               }
             }
@@ -510,7 +510,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                     gap: '4px',
                     padding: '4px 10px',
                     borderRadius: '10px',
-                    boxShadow: '0 2px 4px rgba(234, 179, 8, 0.25)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"
@@ -662,7 +662,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                   borderRadius: '26px',
                   padding: isMobileOrSim ? '20px 18px' : '26px 32px',
                   color: '#ffffff',
-                  boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.7), 0 0 35px rgba(56, 189, 248, 0.08)',
+                  boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.7)',
                   position: 'relative',
                   overflow: 'hidden',
                   border: '1.5px solid rgba(255, 255, 255, 0.12)',
@@ -695,7 +695,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 4px 12px rgba(234, 179, 8, 0.2)'
+                          boxShadow: 'none'
                         }}>
                           <Trophy size={20} color="#facc15" strokeWidth={2.4} />
                         </div>
@@ -714,7 +714,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '5px',
-                          boxShadow: '0 0 12px rgba(234, 179, 8, 0.2)'
+                          boxShadow: 'none'
                         }}>
                           <Star size={11} fill="#facc15" color="#facc15" /> {rankTitle}
                         </span>
@@ -742,7 +742,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                             borderRadius: '20px',
                             padding: '10px 16px',
                             cursor: 'pointer',
-                            boxShadow: '0 10px 24px -6px rgba(0, 0, 0, 0.5), 0 0 16px rgba(56, 189, 248, 0.15)'
+                            boxShadow: '0 10px 24px -6px rgba(0, 0, 0, 0.5)'
                           }}
                           className="hover-scale"
                         >
@@ -758,7 +758,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                             position: 'relative',
                             overflow: 'hidden',
                             flexShrink: 0,
-                            boxShadow: '0 0 20px rgba(56, 189, 248, 0.35)'
+                            boxShadow: 'none'
                           }}>
                             <span style={{ fontSize: '1.7rem', userSelect: 'none' }}>{currentCoverSticker.emoji}</span>
                             <img
@@ -881,7 +881,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         height: '100%',
                         background: 'linear-gradient(90deg, #34a853 0%, #4ade80 70%, #facc15 100%)',
                         borderRadius: '10px',
-                        boxShadow: '0 0 10px rgba(74, 222, 128, 0.6)',
+                        boxShadow: 'none',
                         transition: 'width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
                       }} />
                     </div>
@@ -899,7 +899,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '12px',
-                    boxShadow: '0 4px 16px rgba(234, 179, 8, 0.12)',
+                    boxShadow: 'none',
                     backdropFilter: 'blur(12px)',
                     flexShrink: 0
                   }}>
@@ -1868,7 +1868,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 4px 14px rgba(234, 179, 8, 0.25)'
+                          boxShadow: 'none'
                         }}>
                           <Compass size={24} color="#facc15" strokeWidth={2.2} />
                         </div>
@@ -1969,7 +1969,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         height: '100%',
                         background: 'linear-gradient(90deg, #06b6d4 0%, #3b82f6 35%, #8b5cf6 65%, #facc15 100%)',
                         borderRadius: '10px',
-                        boxShadow: '0 0 12px rgba(250, 204, 21, 0.4)',
+                        boxShadow: 'none',
                         transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
                       }} />
                     </div>
@@ -2066,7 +2066,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                   gap: '18px',
                   width: '100%',
                   boxSizing: 'border-box',
-                  boxShadow: '0 16px 36px -8px rgba(15, 23, 42, 0.5), 0 0 24px rgba(234, 179, 8, 0.12)',
+                  boxShadow: '0 16px 36px -8px rgba(15, 23, 42, 0.5)',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
@@ -2101,7 +2101,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 2px 10px rgba(234, 179, 8, 0.25)'
+                        boxShadow: 'none'
                       }}>
                         <Award size={22} color="#facc15" strokeWidth={2.2} />
                       </div>
@@ -2158,7 +2158,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                     borderRadius: '26px',
                     padding: isMobileOrSim ? '20px 16px' : '28px 30px',
                     border: '1.5px solid rgba(255, 255, 255, 0.12)',
-                    boxShadow: '0 16px 36px -8px rgba(15, 23, 42, 0.4), 0 0 24px rgba(234, 179, 8, 0.15)',
+                    boxShadow: '0 16px 36px -8px rgba(15, 23, 42, 0.4)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '20px',
@@ -2506,7 +2506,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           fontSize: '1.6rem',
                           fontWeight: 900,
                           color: '#facc15',
-                          boxShadow: '0 0 16px rgba(234, 179, 8, 0.25)'
+                          boxShadow: 'none'
                         }}>
                           ∞
                         </div>
@@ -2917,7 +2917,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           fontSize: '0.86rem',
                           fontWeight: 950,
                           cursor: 'pointer',
-                          boxShadow: '0 4px 16px rgba(245, 158, 11, 0.35)',
+                          boxShadow: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

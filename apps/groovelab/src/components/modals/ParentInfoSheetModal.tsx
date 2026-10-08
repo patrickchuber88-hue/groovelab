@@ -388,7 +388,7 @@ export const ParentInfoSheetModal: React.FC<ParentInfoSheetModalProps> = ({
                 fontWeight: 900,
                 cursor: isGenerating || !blobUrl ? 'not-allowed' : 'pointer',
                 opacity: isGenerating || !blobUrl ? 0.6 : 1,
-                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.12s ease'
               }}
             >

@@ -1588,7 +1588,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                     fontSize: '0.78rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
@@ -1646,7 +1646,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
               fontSize: '0.82rem',
               fontWeight: 850,
               cursor: saving ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',

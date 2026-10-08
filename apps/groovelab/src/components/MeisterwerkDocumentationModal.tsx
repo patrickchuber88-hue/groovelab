@@ -196,8 +196,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isInsideSimMobile = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait');
-  const isInsideSimTabletLandscape = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape');
+  const isInsideSimMobile = useMemo(() => typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'), [windowWidth]);
+  const isInsideSimTabletLandscape = useMemo(() => typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape'), [windowWidth]);
   const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
   const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2903,19 +2903,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
         @keyframes ambientGoldBreathing {
           0%, 100% {
-            box-shadow: 0 4px 18px -2px rgba(245, 158, 11, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.50);
+            box-shadow: none;
             border-color: rgba(253, 224, 71, 0.70);
           }
           50% {
-            box-shadow: 0 4px 28px 3px rgba(251, 191, 36, 0.65), inset 0 1px 3px rgba(255, 255, 255, 0.85);
+            box-shadow: none;
             border-color: rgba(253, 224, 71, 0.95);
           }
         }
-        .modal-content-container {
-          display: flex !important;
-          flex-direction: row !important;
-        }
-        
+        .modal-content-container { display: flex !important; flex-direction: row !important; }
+        .modal-content-container.subview-stacked { flex-direction: column !important; }        
         @media (max-width: 900px) {
           .modal-header-container {
             flex-direction: column !important;
@@ -3107,9 +3104,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           padding: '0',
           position: 'relative'
         }}
-        className="modal-content-container"
+        className={`modal-content-container ${(isMobileOrSim || activeViewMode !== 'document' || activeModalTab !== 'document') ? 'subview-stacked' : ''}`}
       >
-        {!student.is_campus_active && (activeModalTab !== 'document' || activeViewMode !== 'document') && (
+        {!(student?.is_campus_active ?? true) && (activeModalTab !== 'document' || activeViewMode !== 'document') && (
           <div style={{
             width: '100%',
             background: '#f8fafc',
@@ -3836,7 +3833,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   if (isEmbed && !isFullscreen) {
     return (
       <>
-        <div style={{ width: '100%', height: (isMobileOrSim || isMobileView) ? '100%' : 'calc(100vh - 120px)', minHeight: (isMobileOrSim || isMobileView) ? '100%' : '600px', fontFamily: '"Inter", sans-serif', background: activeModalTab === 'stickeralbum' ? '#0f172a' : undefined }}>
+        <div style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1, fontFamily: '"Inter", sans-serif', background: activeModalTab === 'stickeralbum' ? '#0f172a' : undefined }}>
           {content}
         </div>
 

@@ -6,7 +6,7 @@
 // - Kombi-Vorteil Bundle: 19,90 € / Mo. flat rate per music school (saves 4,90 € / Mo.).
 // - Service Fee: 0,49 € / Mo. per active admin/teacher profile (Admin & Secretary profiles are included free).
 // - Student Activations: 0,49 € / Mo. per active student (with 10% annual discount or 20% September start discount).
-// - Direct Parent Billing (Campus only): Full (0,49 €) or Partial (0,40 € parent / 0,09 € school).
+// - Direct Parent Billing (Campus only): Full (0,49 €).
 // - Hardship / Sibling exemptions supported.
 // - STRICTLY NO SEPA, payment credentials, contracts, or student email addresses stored.
 
@@ -21,7 +21,7 @@ export interface BillingCalculationInput {
   billingDiscountType?: 'monthly' | 'annual_10' | 'schoolyear_start_20';
   exemptStudentCount?: number; // Hardship / Sibling exempt students
   parentPaidStudentCount?: number; // Students whose parents already paid direct annual fee (Double-Billing Guard)
-  directBillingMode?: 'none' | 'full' | 'partial';
+  directBillingMode?: 'none' | 'full';
   studentProfiles?: Array<{
     custom_student_price?: number | null;
     locked_student_price?: number | null;
@@ -144,11 +144,6 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
   if (directBillingMode === 'full' && hasCampusModule) {
     parentContributionTotal = Number((billableCampusCount * rateStudent).toFixed(2));
     schoolContributionTotal = Number(((payableExemptStudents * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
-  } else if (directBillingMode === 'partial' && hasCampusModule) {
-    const parentPortion = Number((rateStudent * 0.816).toFixed(2));
-    const schoolPortion = Number((rateStudent - parentPortion).toFixed(2));
-    parentContributionTotal = Number((billableCampusCount * parentPortion).toFixed(2));
-    schoolContributionTotal = Number(((billableCampusCount * schoolPortion) + (payableExemptStudents * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
   } else {
     schoolContributionTotal = Number((studentActivationFeeTotal + (payableExemptStudents * effectiveStudentRate)).toFixed(2));
   }
@@ -197,7 +192,7 @@ export interface SchoolRatesInput {
 
 export function resolveEffectiveSchoolRates(
   school?: SchoolRatesInput | null,
-  masterRates?: { priceCampus?: number; priceGroovelab?: number; priceKombi?: number; priceTeacher?: number; priceStudent?: number; pricePassiveStudent?: number; freeMonthsPerYear?: number }
+  masterRates?: { priceCampus?: number; priceGroovelab?: number; priceKombi?: number; priceTeacher?: number; priceStudent?: number; pricePassiveStudent?: number; priceStorageAddon?: number; freeMonthsPerYear?: number }
 ) {
   const master = masterRates || {};
   const locked = school?.locked_contract_pricing || {};
@@ -209,6 +204,7 @@ export function resolveEffectiveSchoolRates(
     priceTeacher: school?.custom_price_teacher ?? locked.priceTeacher ?? master.priceTeacher ?? 0.49,
     priceStudent: school?.custom_price_student ?? locked.priceStudent ?? master.priceStudent ?? 0.49,
     pricePassiveStudent: school?.custom_price_passive_student ?? locked.pricePassiveStudent ?? master.pricePassiveStudent ?? 0.09,
+    priceStorageAddon: master.priceStorageAddon ?? 2.90,
     freeMonthsPerYear: school?.custom_free_months_per_year ?? locked.freeMonthsPerYear ?? master.freeMonthsPerYear ?? 0,
   };
 }

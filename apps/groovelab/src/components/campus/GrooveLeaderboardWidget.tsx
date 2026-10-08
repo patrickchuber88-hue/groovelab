@@ -555,7 +555,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 3px 10px rgba(234, 88, 12, 0.25)',
+                  boxShadow: 'none',
                   minHeight: '44px'
                 }}
                 className="hover-scale-mini"
@@ -875,7 +875,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 6px rgba(234, 88, 12, 0.20)',
+                boxShadow: 'none',
                 minHeight: '40px'
               }}
               className="hover-scale-mini"

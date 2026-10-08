@@ -155,7 +155,7 @@ export function StudentHeroTab({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
-                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.2)'
+                  boxShadow: 'none'
                 }}>
                   <span>👑</span>
                   <span>Meister-Abschluss (10/10)</span>

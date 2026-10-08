@@ -179,7 +179,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   const pendingStorageSchools = useMemo(() => (schools.schools || []).filter((s: any) => 
     s && 
-    !s.name?.toLowerCase().includes('groove academy') && 
+    !s.is_demo_tenant && s.status !== 'archived' && 
     (s.storage_addon_status === 'pending_activation' || 
      s.storage_addon_status === 'pending_provisioning' || 
      s.storage_addon_status === 'pending_hetzner' || 
@@ -261,7 +261,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              boxShadow: '0 4px 16px rgba(220, 38, 38, 0.1)'
+              boxShadow: 'none'
             }}>
               <Shield size={24} color="#dc2626" />
               <div>
@@ -316,7 +316,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   flexWrap: 'wrap',
                   gap: '14px',
                   marginBottom: '24px',
-                  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)'
+                  boxShadow: 'none'
                 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
@@ -497,7 +497,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               color: '#ffffff',
               padding: '14px 22px',
               borderRadius: '16px',
-              boxShadow: '0 10px 30px rgba(5, 150, 105, 0.35)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               gap: '12px',

@@ -2432,7 +2432,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             gap: '8px',
             padding: '12px 24px',
             pointerEvents: 'all',
-            boxShadow: 'inset 0 0 0 1.5px rgba(239, 68, 68, 0.3)'
+            boxShadow: 'none'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 800, fontSize: '0.84rem' }}>
@@ -2461,7 +2461,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
                 borderRadius: '999px',
                 transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
+                boxShadow: 'none'
               }}
             />
           </div>
@@ -2681,7 +2681,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: '0 1px 2px rgba(124, 58, 237, 0.06)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
                 whiteSpace: 'nowrap'
@@ -2747,7 +2747,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: '0 1px 2px rgba(220, 38, 38, 0.06)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
@@ -3092,7 +3092,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                       background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
                       borderRadius: '999px',
                       transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: '0 0 8px rgba(239, 68, 68, 0.4)'
+                      boxShadow: 'none'
                     }} 
                   />
                 </div>
@@ -3155,7 +3155,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                   fontSize: '0.86rem',
                   fontWeight: 950,
                   cursor: isDeleting ? 'wait' : 'pointer',
-                  boxShadow: '0 2px 10px rgba(239, 68, 68, 0.35)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   display: 'flex',
                   alignItems: 'center',
@@ -3379,7 +3379,7 @@ export const RetroCassettePlayer: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: '0 2px 5px rgba(99, 102, 241, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale-mini"

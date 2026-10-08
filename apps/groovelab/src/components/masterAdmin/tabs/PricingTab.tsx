@@ -842,7 +842,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 fontSize: '0.95rem',
                 fontWeight: 900,
                 cursor: pricingSaving ? 'wait' : 'pointer',
-                boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                boxShadow: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

@@ -543,11 +543,11 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
           localStorage.setItem(`groovelab_storage_addon_gb_${schoolId}`, String(storageAddonGbFromSource));
           localStorage.setItem(`campus_storage_addon_gb_${schoolId}`, String(storageAddonGbFromSource));
         }
-        setSchoolName(schoolData.name || 'Musäk Bad Säckingen');
-        setSchoolStreet(schoolData.street || 'Karl-Fürstenberg-Str.');
-        setSchoolHouseNumber(schoolData.house_number || '59');
-        setSchoolZipCode(schoolData.zip_code || '79618');
-        setSchoolCity(schoolData.city || 'Rheinfelden');
+        setSchoolName(schoolData.name || '');
+        setSchoolStreet(schoolData.street || '');
+        setSchoolHouseNumber(schoolData.house_number || '');
+        setSchoolZipCode(schoolData.zip_code || '');
+        setSchoolCity(schoolData.city || '');
         setSchoolPhoneNumber(schoolData.phone || '');
         setSchoolEmail(schoolData.email || schoolData.contact_email || '');
         setAbsenceEmail(schoolData.absence_email || '');

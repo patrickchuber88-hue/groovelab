@@ -506,7 +506,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                 height: '8px',
                 borderRadius: '50%',
                 backgroundColor: '#ef4444',
-                boxShadow: '0 0 6px rgba(239, 68, 68, 0.6)'
+                boxShadow: 'none'
               }} />
             )}
           </button>
@@ -875,7 +875,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1497,7 +1497,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     fontSize: '0.85rem',
                     fontWeight: 800,
                     cursor: (!content.trim() || isSubmitting) ? 'not-allowed' : 'pointer',
-                    boxShadow: (!content.trim() || isSubmitting) ? 'none' : `0 4px 14px ${accentColor}35`,
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >

@@ -241,7 +241,7 @@ export const PublicContractVerificationView: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(21, 128, 61, 0.25)'
+                boxShadow: 'none'
               }}>
                 <ShieldCheck size={24} strokeWidth={2.2} />
               </div>
@@ -317,7 +317,7 @@ export const PublicContractVerificationView: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '18px',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)'
+                boxShadow: 'none'
               }}>
                 <div style={{
                   width: '56px',
@@ -329,7 +329,7 @@ export const PublicContractVerificationView: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 6px 16px rgba(21, 128, 61, 0.3)'
+                  boxShadow: 'none'
                 }}>
                   <CheckCircle2 size={32} strokeWidth={2.5} />
                 </div>
@@ -603,7 +603,7 @@ export const PublicContractVerificationView: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
-              boxShadow: '0 4px 16px rgba(220, 38, 38, 0.08)'
+              boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{

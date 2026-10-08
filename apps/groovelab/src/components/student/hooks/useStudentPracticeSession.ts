@@ -221,7 +221,7 @@ export function useStudentPracticeSession({
           setSessionActive(false);
           setSecondsElapsed(0);
           setIsSessionPaused(false);
-          const notice = 'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt GrooveLab geöffnet! 🛑';
+          const notice = 'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt der Fokus-Timer geöffnet! 🛑';
           setSessionAbortedNotice(notice);
           try {
             window.dispatchEvent(new CustomEvent('campus_focus_session_aborted', {
@@ -250,18 +250,9 @@ export function useStudentPracticeSession({
         .eq('user_id', studentId)
         .order('created_at', { ascending: false });
 
-      let combinedLogs: any[] = (!error && data) ? data : [];
-      try {
-        const localLogsKey = `cg_local_fokus_logs_${studentId}`;
-        const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
-        if (localLogs && localLogs.length > 0) {
-          const remoteIds = new Set(combinedLogs.map((l: any) => l.id));
-          const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
-          combinedLogs = [...missingLocal, ...combinedLogs];
-        }
-      } catch (e) {}
-
-      setFokusLogs(combinedLogs);
+      if (!error && data) {
+        setFokusLogs(data);
+      }
     } catch (err) {
       console.error('Error fetching fokus logs:', err);
     }
@@ -272,11 +263,11 @@ export function useStudentPracticeSession({
   }, [fetchFokusLogs]);
 
   // Finish Practice Session
-  const finishPracticeSession = async (customXp?: number) => {
+  const finishPracticeSession = async (customXp?: number, streakOverride?: number) => {
     setIsSessionPaused(false);
     isSessionPausedRef.current = false;
     const elapsed = secondsElapsedRef.current;
-    if (elapsed <= 0) {
+    if (elapsed < 10) {
       setSessionActive(false);
       setSecondsElapsed(0);
       return;
@@ -305,7 +296,7 @@ export function useStudentPracticeSession({
         }
       } catch (_) {}
 
-      // 2. Fallback: Direkter Insert (durch Trigger trg_validate_fokus_log abgesichert)
+      // 2. Fallback: Direkter Insert (durch Trigger trg_validate_fokus_log abgesichert, Serverzeit-SSOT)
       if (!logData) {
         const { data: insData, error: logErr } = await supabase
           .from('fokus_logs')
@@ -315,8 +306,7 @@ export function useStudentPracticeSession({
             duration_minutes: durationMinutes,
             is_extra: false,
             flame_level: durationMinutes >= 30 ? 'Große Flamme' : durationMinutes >= 15 ? 'Mittlere Flamme' : 'Kleine Flamme',
-            xp_earned: xpGained,
-            created_at: simNow.toISOString()
+            xp_earned: xpGained
           })
           .select()
           .single();
@@ -335,13 +325,21 @@ export function useStudentPracticeSession({
         }
       }
 
-      const currentStreak = avatar?.streak_flame || 0;
+      const currentStreak = streakOverride ?? avatar?.streak_flame ?? studentUser?.streak_flame ?? 0;
       const newStreak = currentStreak === 0 ? 1 : currentStreak;
+      const dailyGoal = getTargetMinutes ? getTargetMinutes(currentStreak) : 3;
+      const sessionCompletedTarget = elapsed >= (dailyGoal * 60);
 
       setCelebrationDetails({
+        exactSeconds: elapsed,
+        sessionMinutes: durationMinutes,
         durationMinutes,
-        xpGained,
-        newStreak
+        dailyGoal,
+        sessionCompletedTarget,
+        streakFlame: newStreak,
+        streak: newStreak,
+        newStreak,
+        xpGained
       });
       setShowCelebration(true);
       setSecondsElapsed(0);

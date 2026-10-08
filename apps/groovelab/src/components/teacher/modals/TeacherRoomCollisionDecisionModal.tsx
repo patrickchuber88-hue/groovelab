@@ -99,7 +99,7 @@ export const TeacherRoomCollisionDecisionModal: React.FC<TeacherRoomCollisionDec
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+                boxShadow: 'none',
                 flexShrink: 0
               }}
             >

@@ -238,7 +238,7 @@ export const FloatingMiniPlayer: React.FC<FloatingMiniPlayerProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >

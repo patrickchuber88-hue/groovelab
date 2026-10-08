@@ -135,7 +135,7 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
                 fontSize: '0.85rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                boxShadow: 'none'
               }}
             >
               2FA Aktivieren

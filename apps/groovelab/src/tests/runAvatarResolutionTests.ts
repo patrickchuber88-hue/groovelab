@@ -204,27 +204,30 @@ const coachAdmin = {
 assert.strictEqual(resolveGrooveLabTeacherAvatar(coachAdmin), '/avatar_ghost.jpg');
 console.log('✔ Test 14: Dual-role coach (admin + teacher) in GrooveLab receives ghost musician avatar instead of chalkboard');
 
-// Test 15: Teacher Peter in Campus context resolves to 3D instrument avatar, NEVER chalkboard and NEVER musician avatar
-const campusTeacherPeter = {
-  id: 'teacher-peter',
-  first_name: 'Peter',
-  last_name: 'Pan',
+// Test 15: Teacher Patrick in Campus context resolves to 3D instrument avatar, NEVER chalkboard and NEVER musician avatar
+const campusTeacherPatrick = {
+  id: '11079eae-664a-49a4-8692-771d83a3193c',
+  first_name: 'Patrick',
+  last_name: 'Huber',
   role: 'teacher',
   roles: ['admin', 'teacher'],
   instrument: 'Gitarre',
   photo_url: '/campus_login_hero.png'
 };
-assert.strictEqual(resolveCampusStudentAvatar({ ...campusTeacherPeter, isTeacherContext: true }), '/avatars/gitarre_avatar_new.png');
-console.log('✔ Test 15: Teacher Peter Pan in Campus context receives instrument avatar (/avatars/gitarre_avatar_new.png), NEVER chalkboard or musician avatar');
+assert.strictEqual(resolveCampusStudentAvatar({ ...campusTeacherPatrick, isTeacherContext: true }), '/avatars/gitarre_avatar_new.png');
+console.log('✔ Test 15: Teacher Patrick Huber in Campus context receives instrument avatar (/avatars/gitarre_avatar_new.png), NEVER chalkboard or musician avatar');
 
-// Test 16: formatTeacherFullName normalizes Peter with initial 'P.' or 'Petersen' to 'Peter Pan'
+// Test 16: formatTeacherFullName guarantees full name notation for teachers
 import { formatTeacherFullName } from '../utils/nameHelper';
-assert.strictEqual(formatTeacherFullName('Peter', 'P.'), 'Peter Pan');
-assert.strictEqual(formatTeacherFullName('Peter', 'Petersen'), 'Peter Pan');
-assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'P.' }), 'Peter Pan');
-assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'Petersen' }), 'Peter Pan');
+assert.strictEqual(formatTeacherFullName('Patrick', 'Huber'), 'Patrick Huber');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Patrick', last_name: 'Huber' }), 'Patrick Huber');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Patrick', full_last_name: 'Huber', last_name: 'H.' }), 'Patrick Huber');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Severin', last_name: 'L.' }), 'Severin L.');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'P.' }), 'Peter P.');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'Petersen' }), 'Peter Petersen');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Severin', full_last_name: 'Landenberger', last_name: 'L.' }), 'Severin Landenberger');
 assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', full_last_name: 'Pan', last_name: 'P.' }), 'Peter Pan');
-console.log('✔ Test 16: formatTeacherFullName guarantees full name Peter Pan for teacher Peter');
+console.log('✔ Test 16: formatTeacherFullName guarantees full name Patrick Huber for teacher Patrick and respects full_last_name');
 
 // Test 17: GrooveLab Student Musician Avatar Invariant (0,1% Goldstandard)
 import { resolveGrooveLabStudentAvatar, isInstrumentAvatar } from '../utils/avatarResolutionEngine';

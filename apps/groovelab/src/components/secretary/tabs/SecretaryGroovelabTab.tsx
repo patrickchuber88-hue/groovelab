@@ -213,7 +213,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               display: 'flex', 
               alignItems: 'center', 
               gap: '4px',
-              boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)',
+              boxShadow: 'none',
               zIndex: 10
             }}>
               <AlertCircle size={10} fill="white" /> HILFE
@@ -319,7 +319,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 12px #34a853' }}></span>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', boxShadow: 'none' }}></span>
         Coaches vor Ort
       </div>
       <div style={{ 
@@ -854,7 +854,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   fontSize: '0.6rem',
                                   fontWeight: 900,
                                   animation: 'pulse-red 1s infinite',
-                                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
+                                  boxShadow: 'none',
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '2px',
@@ -1283,7 +1283,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                         border: 'none',
                         cursor: 'pointer',
                         fontFamily: 'Urbanist',
-                        boxShadow: '0 4px 10px rgba(251,188,5,0.25)',
+                        boxShadow: 'none',
                         transition: 'all 0.2s'
                       }}
                     >
@@ -1450,7 +1450,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       .status-toggle-btn.groove-active-yellow {
                         background: #fef3c7;
                         color: #b45309;
-                        box-shadow: 0 2px 8px rgba(245,158,11,0.12);
+                        box-shadow: none;
                       }
                       .status-toggle-btn.groove-active-yellow:hover {
                         background: #fde68a !important;
@@ -1873,7 +1873,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                         border: 'none',
                         cursor: 'pointer',
                         fontFamily: 'Urbanist',
-                        boxShadow: '0 4px 10px rgba(251,188,5,0.25)',
+                        boxShadow: 'none',
                         transition: 'all 0.2s'
                       }}
                     >
@@ -2039,7 +2039,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       .status-toggle-btn.groove-active-yellow {
                         background: #fef3c7;
                         color: #b45309;
-                        box-shadow: 0 2px 8px rgba(245,158,11,0.12);
+                        box-shadow: none;
                       }
                       .status-toggle-btn.groove-active-yellow:hover {
                         background: #fde68a !important;
@@ -2722,7 +2722,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.35)'
+                            boxShadow: 'none'
                           }}>
                             {activeGroovelabSettingsModal === 'bands' && <Users size={22} color="#ffffff" />}
                             {activeGroovelabSettingsModal === 'songs' && <Music size={22} color="#ffffff" />}
@@ -3148,7 +3148,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             fontWeight: 800,
                             fontSize: '0.84rem',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)'
+                            boxShadow: 'none'
                           }}
                         >
                           Fertig

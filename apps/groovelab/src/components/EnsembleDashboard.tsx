@@ -432,7 +432,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                   alignItems: 'center',
                   gap: '10px',
                   cursor: 'pointer',
-                  boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)',
+                  boxShadow: 'none',
                   transition: 'transform 0.2s, box-shadow 0.2s'
                 }}
               >
@@ -690,7 +690,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                       background: '#eab308', 
                       padding: '16px 24px', 
                       borderRadius: '20px', 
-                      boxShadow: '0 10px 25px rgba(234, 179, 8, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s ease-in-out'
                     }}>
                       <Search size={22} color="white" />

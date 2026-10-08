@@ -121,9 +121,9 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
     doc.line(margin, footY - 3, pageWidth - margin, footY - 3);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.2);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256-${sha256Digest.slice(0, 24)}... • Amtliche Ausfertigung für Schulträger & Rechnungsprüfungsamt`, margin, footY);
+    doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256:${sha256Digest} • Amtliche Ausfertigung für Schulträger`, margin, footY);
     doc.text(`Patrick Huber • Softwareentwicklung & Cloud-Dienstleistungen • Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden`, margin, footY + 4);
     doc.text(`Stand: ${dateStr}`, pageWidth - margin, footY + 2, { align: 'right' });
 

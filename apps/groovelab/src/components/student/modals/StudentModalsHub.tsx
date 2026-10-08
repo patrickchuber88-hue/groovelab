@@ -359,14 +359,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
             if (setFamilyProfiles) {
               setFamilyProfiles((prev: any[]) => {
                 const filtered = prev.filter((p: any) => p.id !== newProfile.id);
-                const updated = [...filtered, newProfile];
-                try {
-                  localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
-                  const localProfs = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
-                  const updatedLocal = [...localProfs.filter((p: any) => p.id !== newProfile.id), newProfile];
-                  localStorage.setItem('groovelab_local_profiles', JSON.stringify(updatedLocal));
-                } catch (e) {}
-                return updated;
+                return [...filtered, newProfile];
               });
             }
           }}

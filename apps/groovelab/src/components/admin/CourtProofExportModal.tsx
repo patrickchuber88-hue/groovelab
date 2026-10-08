@@ -26,8 +26,10 @@ interface ExportResult {
     payload_sha256: string;
     legal_basis: string;
     certified_by: string;
+    disclaimer_rdg_notice?: string;
     herrenberg_status_attestation?: {
       compliance_standard: string;
+      rdg_disclaimer?: string;
       didactic_autonomy: string;
       room_allocation_sovereignty: string;
       time_tracking_status: string;
@@ -100,8 +102,10 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
         ...rawResult,
         manifest: {
           ...rawResult.manifest,
+          disclaimer_rdg_notice: 'Dieses technische Metadaten- und Dispositions-Protokoll dokumentiert ausschließlich tatsächliche Systemvorgänge und Raumbelegungen. Es stellt keine Rechtsberatung gem. § 2 RDG dar und ersetzt im Statusfeststellungsverfahren nach § 7a SGB IV keine Einzelfallprüfung der vertraglichen Vereinbarungen und der tatsächlichen Durchführung durch die zuständigen Behörden (Deutsche Rentenversicherung Bund) oder Gerichte der Sozialgerichtsbarkeit.',
           herrenberg_status_attestation: {
             compliance_standard: 'BSG B 12 R 3/20 R & § 7a / § 28p SGB IV',
+            rdg_disclaimer: 'Technisches Dispositions-Protokoll ohne Rechtsberatungscharakter (§ 3 RDG)',
             didactic_autonomy: 'Lehrkräfte stimmen Termine autonom didaktisch ab; 0 Weisungen der Schulleitung.',
             room_allocation_sovereignty: 'Zweistufiges Dispositionsmodell: Raumhoheit verbleibt bei der Schulverwaltung.',
             time_tracking_status: 'Ausschluss digitaler Zeiterfassung und Stechuhren für freie Lehrkräfte.',
@@ -151,7 +155,7 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Beweissicherer Mandanten-Export"
+      aria-label="Pädagogisches Dispositions- und Metadaten-Protokoll"
       style={{
         position: 'fixed',
         inset: 0,
@@ -205,10 +209,10 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
             </div>
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Beweissicherer Mandanten-Export
+                Pädagogisches Dispositions- &amp; Metadaten-Protokoll
               </h2>
               <span style={{ fontSize: '13px', color: '#64748b' }}>
-                Revisionssicherer Export (Non-Repudiation)
+                Revisionssichere technische Dokumentation (§ 371a ZPO)
               </span>
             </div>
           </div>
@@ -249,8 +253,8 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
               lineHeight: '1.5'
             }}
           >
-            <strong>🏛️ IT-Forensik Standard:</strong> Dieser Export erzeugt ein atomares Dossier aller 
-            Schüler-, Raum- und Unterrichtsmetadaten Ihrer Musikschule. Der Datensatz wird auf dem Server 
+            <strong>🏛️ Revisionssichere Metadaten-Dokumentation:</strong> Dieser Export erzeugt ein atomares Protokoll aller 
+            pädagogischen Raum-, Stundenplan- und Termindispositionen Ihrer Musikschule (§ 371a ZPO). Der Datensatz wird auf dem Server 
             mit einem unverfälschbaren <strong>SHA-256 Hash</strong> signiert und im Revisions-Audit-Log versiegelt.
           </div>
 
@@ -309,7 +313,7 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
                 <CheckCircle2 size={13} aria-hidden="true" />
-                <span>Herrenberg Status-Attest (BSG B 12 R 3/20 R) im Dossier integriert</span>
+                <span>Pädagogisches Dispositions-Protokoll (BSG B 12 R 3/20 R / § 3 RDG) im Dossier integriert</span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
@@ -416,7 +420,7 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
             ) : (
               <>
                 <Download size={16} aria-hidden="true" />
-                <span>{exportResult ? 'Erneut herunterladen' : 'Dossier signieren & herunterladen'}</span>
+                <span>{exportResult ? 'Erneut herunterladen' : 'Protokoll signieren & herunterladen'}</span>
               </>
             )}
           </button>

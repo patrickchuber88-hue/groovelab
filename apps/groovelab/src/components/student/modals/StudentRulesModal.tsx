@@ -35,7 +35,7 @@ export const StudentRulesModal: React.FC<StudentRulesModalProps> = ({
             cursor: 'pointer',
             width: '100%',
             minHeight: '48px',
-            boxShadow: '0 4px 14px rgba(234, 88, 12, 0.25)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',

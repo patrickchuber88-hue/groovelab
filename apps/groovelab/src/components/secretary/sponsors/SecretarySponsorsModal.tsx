@@ -376,7 +376,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
               height: '46px',
               borderRadius: '14px',
               background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              boxShadow: '0 8px 18px -3px rgba(217, 119, 6, 0.35)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -613,7 +613,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                   fontSize: '0.8rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)'
+                  boxShadow: 'none'
                 }}
               >
                 <Plus size={15} /> Partner anlegen
@@ -1141,7 +1141,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                     fontSize: '0.8rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(217, 119, 6, 0.3)'
+                    boxShadow: 'none'
                   }}
                 >
                   Speichern

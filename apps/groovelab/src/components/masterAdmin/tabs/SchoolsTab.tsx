@@ -12,6 +12,7 @@ import { isSchoolBypassActive } from '../../../domain/pricingEngine';
 import { isSchoolTrialActive, resolveStorageAddonFee } from '../../../domain/schoolMetricsAggregator';
 
 import type { School } from '../MasterAdminTypes';
+import { ProvisionSchoolModal } from '../modals/ProvisionSchoolModal';
 
 interface SchoolsTabProps {
   schools: School[];
@@ -60,16 +61,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
   // Slide-Over Provisioning Modal
   const [showProvisionModal, setShowProvisionModal] = useState(false);
-  const [newSchoolName, setNewSchoolName] = useState('');
-  const [newSchoolZip, setNewSchoolZip] = useState('');
-  const [newSchoolCity, setNewSchoolCity] = useState('');
-  const [newSchoolEmail, setNewSchoolEmail] = useState('');
-  const [newSchoolContact, setNewSchoolContact] = useState('');
-  const [newSchoolPhone, setNewSchoolPhone] = useState('');
-  const [newSchoolModule, setNewSchoolModule] = useState<'none' | 'kombi' | 'campus' | 'groovelab'>('none');
-  const [newSchoolTrialMode, setNewSchoolTrialMode] = useState<'trial_30' | 'trial_14' | 'trial_60' | 'bypass' | 'paid'>('trial_30');
-  const [newSchoolNotes, setNewSchoolNotes] = useState('');
-  const [provisioning, setProvisioning] = useState(false);
 
   // Success Kit Modal after Provisioning
   const [magicInviteData, setMagicInviteData] = useState<{
@@ -96,11 +87,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   const [extendingTrialId, setExtendingTrialId] = useState<string | null>(null);
   const [activeMrrTooltipSchoolId, setActiveMrrTooltipSchoolId] = useState<string | null>(null);
 
-  // Filter out unwanted test schools
+  // Filter out inactive or demo schools
   const sanitizedSchools = useMemo(() => {
     return (schools || []).filter(s => {
-      const name = (s.name || '').toLowerCase();
-      return !name.includes('groove academy');
+      return !(s as any).is_demo_tenant && s.status !== 'archived';
     });
   }, [schools]);
 
@@ -488,77 +478,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     }
   };
 
-  // Form Submit: Provision School via Slide-Over Modal
-  const handleCreateSchool = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSchoolName.trim()) return;
-
-    try {
-      setProvisioning(true);
-      const isTrialMode = newSchoolTrialMode.startsWith('trial_');
-      let trialDays = 30;
-      if (newSchoolTrialMode === 'trial_14') trialDays = 14;
-      if (newSchoolTrialMode === 'trial_60') trialDays = 60;
-
-      const trialUntil = isTrialMode 
-        ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString() 
-        : null;
-
-      const tokenUuid = crypto.randomUUID();
-      const tokenExpires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-
-      const schoolPayload = {
-        name: newSchoolName.trim(),
-        zip_code: newSchoolZip.trim() || null,
-        city: newSchoolCity.trim() || null,
-        billing_email: newSchoolEmail.trim() || null,
-        billing_contact_person: newSchoolContact.trim() || null,
-        phone_number: newSchoolPhone.trim() || null,
-        operator_notes: newSchoolNotes.trim() || null,
-        invite_token: tokenUuid,
-        invite_expires_at: tokenExpires,
-        has_campus_subscription: newSchoolModule === 'campus' || newSchoolModule === 'kombi',
-        has_groovelab_subscription: newSchoolModule === 'groovelab' || newSchoolModule === 'kombi',
-        storage_addon_gb: 0,
-        storage_addon_monthly_fee: 0.00,
-        storage_addon_status: 'none',
-        extra_billing_option: null,
-        is_billing_booked: false,
-        is_trial: isTrialMode,
-        trial_until: trialUntil,
-        subscription_bypass: newSchoolTrialMode === 'bypass',
-        status: 'active',
-        is_approved: true,
-        created_at: new Date().toISOString()
-      };
-
-      const createdSchool = await onProvisionSchool(schoolPayload);
-
-      // Generate Magic Invite link
-      const inviteUrl = `${window.location.origin}/?school_id=${createdSchool.id}&invite=school_onboarding&token=${tokenUuid}`;
-      setShowProvisionModal(false);
-      setMagicInviteData({
-        schoolName: createdSchool.name,
-        loginUrl: inviteUrl,
-        email: newSchoolEmail.trim(),
-        contactPerson: newSchoolContact.trim() || 'Schulleitung'
-      });
-
-      // Reset form
-      setNewSchoolName('');
-      setNewSchoolZip('');
-      setNewSchoolCity('');
-      setNewSchoolEmail('');
-      setNewSchoolContact('');
-      setNewSchoolPhone('');
-      setNewSchoolNotes('');
-    } catch (err: any) {
-      console.error('Fehler bei der Schul-Provisionierung:', err);
-      alert('Fehler beim Anlegen: ' + (err.message || err));
-    } finally {
-      setProvisioning(false);
-    }
-  };
 
   return (
     <div style={{
@@ -674,7 +593,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.28)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             className="hover-scale-mini"
@@ -695,7 +614,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           borderRadius: '20px',
           padding: '20px 22px',
           color: '#ffffff',
-          boxShadow: '0 10px 24px rgba(16, 185, 129, 0.24)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -868,7 +787,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: '0 2px 6px rgba(217, 119, 6, 0.10)'
+                boxShadow: 'none'
               }}
             >
               <Clock size={12} />
@@ -892,7 +811,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: '0 2px 6px rgba(194, 65, 12, 0.10)'
+                boxShadow: 'none'
               }}
             >
               <ShieldAlert size={12} />
@@ -916,7 +835,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.10)'
+                boxShadow: 'none'
               }}
             >
               <AlertCircle size={12} />
@@ -1638,7 +1557,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '3px',
-                              boxShadow: '0 2px 5px rgba(2, 132, 199, 0.20)',
+                              boxShadow: 'none',
                               flexShrink: 0
                             }}
                             className="hover-scale-mini"
@@ -2084,323 +2003,14 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 6. SLIDE-OVER MODAL: PROVISION NEW SCHOOL                               */}
+      {/* 6. SLIDE-OVER MODAL: PROVISION NEW SCHOOL (Autarkic Satellit)          */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {showProvisionModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.45)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.22)',
-            border: '1px solid #e2e8f0',
-            maxWidth: '560px',
-            width: '100%',
-            padding: '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                  Neue Musikschule provisionieren
-                </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
-                  Legt einen neuen Mandanten an und generiert ein sofortiges Bereitstellungs-Kit.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowProvisionModal(false)}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  color: '#64748b'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Name */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Name der Musikschule *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newSchoolName}
-                  onChange={(e) => setNewSchoolName(e.target.value)}
-                  placeholder="z. B. Musikakademie Freiburg"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* PLZ & Ort */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                    PLZ
-                  </label>
-                  <input
-                    type="text"
-                    value={newSchoolZip}
-                    onChange={(e) => setNewSchoolZip(e.target.value)}
-                    placeholder="79098"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                    Ort
-                  </label>
-                  <input
-                    type="text"
-                    value={newSchoolCity}
-                    onChange={(e) => setNewSchoolCity(e.target.value)}
-                    placeholder="Freiburg"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Schulleiter & Telefon */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                    Schulleiter / Kontaktperson
-                  </label>
-                  <input
-                    type="text"
-                    value={newSchoolContact}
-                    onChange={(e) => setNewSchoolContact(e.target.value)}
-                    placeholder="z. B. Michael Weber"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                    Telefonnummer / Handy
-                  </label>
-                  <input
-                    type="tel"
-                    value={newSchoolPhone}
-                    onChange={(e) => setNewSchoolPhone(e.target.value)}
-                    placeholder="0761 1234567"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* E-Mail */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Schulleiter E-Mail
-                </label>
-                <input
-                  type="email"
-                  value={newSchoolEmail}
-                  onChange={(e) => setNewSchoolEmail(e.target.value)}
-                  placeholder="leitung@musikakademie.de"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* Modulpaket Segmented */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase' }}>
-                  Modulpaket
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                  {[
-                    { id: 'none', label: 'Ungebucht' },
-                    { id: 'kombi', label: 'Kombi' },
-                    { id: 'campus', label: 'Campus' },
-                    { id: 'groovelab', label: 'GrooveLab' }
-                  ].map(m => {
-                    const isSel = newSchoolModule === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setNewSchoolModule(m.id as any)}
-                        style={{
-                          padding: '9px',
-                          borderRadius: '12px',
-                          border: isSel ? '1.5px solid #059669' : '1px solid #cbd5e1',
-                          background: isSel ? '#ecfdf5' : '#ffffff',
-                          color: isSel ? '#059669' : '#475569',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Testphase Mode */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase' }}>
-                  Testphase &amp; Modus
-                </label>
-                <select
-                  value={newSchoolTrialMode}
-                  onChange={(e) => setNewSchoolTrialMode(e.target.value as any)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.84rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="trial_30">30 Tage Testphase (Standard)</option>
-                  <option value="trial_14">14 Tage Schnell-Test</option>
-                  <option value="trial_60">60 Tage Intensiv-Test</option>
-                  <option value="bypass">Abo-Bypass (Dauerhaft Kostenfrei / Partner)</option>
-                  <option value="paid">Sofort kostenpflichtig aktivieren</option>
-                </select>
-              </div>
-
-              {/* Interne Betreiber-Notiz */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Interne Betreiber-Notiz (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newSchoolNotes}
-                  onChange={(e) => setNewSchoolNotes(e.target.value)}
-                  placeholder="z. B. Erstkontakt Telefonat: Ziel ist Kombi-Paket für 50 Schüler"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={provisioning}
-                style={{
-                  padding: '13px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.88rem',
-                  fontWeight: 850,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.28)',
-                  marginTop: '8px'
-                }}
-              >
-                <Plus size={16} />
-                <span>{provisioning ? 'Wird provisioniert...' : 'Schule anlegen & Einladungs-Kit generieren'}</span>
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProvisionSchoolModal
+        isOpen={showProvisionModal}
+        onClose={() => setShowProvisionModal(false)}
+        onProvisionSchool={onProvisionSchool}
+        onProvisionSuccess={(inviteData) => setMagicInviteData(inviteData)}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* 7. POPUP: NO-EMAIL BEREITSTELLUNGS-KIT                                  */}
@@ -2647,7 +2257,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                     fontSize: '0.84rem',
                     fontWeight: 850,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(220, 38, 38, 0.28)'
+                    boxShadow: 'none'
                   }}
                 >
                   {suspending ? 'Wird gesperrt...' : 'Mandanten kostenpflichtig sperren'}

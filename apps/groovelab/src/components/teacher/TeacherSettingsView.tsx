@@ -304,7 +304,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s'
                     }}
                     className="hover-scale"

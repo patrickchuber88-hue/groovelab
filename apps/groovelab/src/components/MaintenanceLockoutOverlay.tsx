@@ -361,7 +361,7 @@ export const MaintenanceLockoutOverlay: React.FC<MaintenanceLockoutOverlayProps>
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 10px 25px rgba(245, 158, 11, 0.35)'
+          boxShadow: 'none'
         }}>
           <Wrench size={38} color="#ffffff" />
         </div>

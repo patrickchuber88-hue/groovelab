@@ -109,7 +109,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 24px auto',
-                boxShadow: '0 10px 30px rgba(234, 179, 8, 0.2)',
+                boxShadow: 'none',
               }}
             >
               <Users size={50} />
@@ -453,7 +453,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 10px 25px rgba(234, 179, 8, 0.3)',
+                    boxShadow: 'none',
                     transition: 'all 0.2s',
                     minHeight: '44px',
                   }}
@@ -583,7 +583,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 32px auto',
-                boxShadow: '0 10px 30px rgba(245, 158, 11, 0.2)',
+                boxShadow: 'none',
               }}
             >
               <Zap size={50} fill="currentColor" />

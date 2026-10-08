@@ -270,7 +270,7 @@ return (
                     fontWeight: 950,
                     fontSize: '0.96rem',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 22px rgba(34, 197, 94, 0.28)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

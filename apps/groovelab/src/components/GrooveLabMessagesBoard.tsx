@@ -305,7 +305,7 @@ export default function GrooveLabMessagesBoard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
                 title="Neue Mitteilung verfassen"
@@ -442,7 +442,7 @@ export default function GrooveLabMessagesBoard({
                     gap: '8px',
                     transition: 'all 0.2s',
                     position: 'relative',
-                    boxShadow: isSelected ? '0 4px 15px rgba(234, 179, 8, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale-mini"
                 >
@@ -456,7 +456,7 @@ export default function GrooveLabMessagesBoard({
                       height: '10px',
                       borderRadius: '50%',
                       background: '#eab308',
-                      boxShadow: '0 0 10px #eab308'
+                      boxShadow: 'none'
                     }} />
                   )}
 
@@ -594,7 +594,7 @@ export default function GrooveLabMessagesBoard({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >
@@ -921,7 +921,7 @@ export default function GrooveLabMessagesBoard({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 15px rgba(234, 179, 8, 0.3)'
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
               >

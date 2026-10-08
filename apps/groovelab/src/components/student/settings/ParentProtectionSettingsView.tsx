@@ -273,7 +273,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         justifyContent: 'space-between',
         gap: '12px',
         flexWrap: 'wrap',
-        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.12)'
+        boxShadow: 'none'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
@@ -286,7 +286,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+            boxShadow: 'none'
           }}>
             <ShieldCheck size={20} />
           </div>
@@ -354,7 +354,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             flexDirection: 'column',
             gap: '10px',
             textAlign: 'left',
-            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.10)'
+            boxShadow: 'none'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

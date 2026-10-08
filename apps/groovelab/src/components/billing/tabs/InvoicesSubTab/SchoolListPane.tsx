@@ -134,7 +134,7 @@ export const SchoolListPane: React.FC<SchoolListPaneProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.06)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   opacity: isExportingGobd ? 0.7 : 1
                 }}
@@ -169,7 +169,7 @@ export const SchoolListPane: React.FC<SchoolListPaneProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.06)',
+                boxShadow: 'none',
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               onMouseOver={(e) => {

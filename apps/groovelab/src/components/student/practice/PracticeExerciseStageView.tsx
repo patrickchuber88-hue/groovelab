@@ -238,7 +238,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
       `}</style>
 
       {/* ========================================================================= */}
-      /* 🚀 DAS 0,1% ASYMMETRISCHE 2-ZONEN-GRID                                     */
+      {/* 🚀 DAS 0,1% ASYMMETRISCHE 2-ZONEN-GRID                                     */}
       {/* ========================================================================= */}
       <div className="practice-exercise-bento-grid">
         
@@ -436,7 +436,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                      boxShadow: 'none',
                       flexShrink: 0
                     }}
                     className="hover-scale-mini"
@@ -512,7 +512,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                         background: isDone ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
                         color: isDone ? '#ffffff' : '#64748b',
                         border: isDone ? 'none' : '1.5px solid #cbd5e1',
-                        boxShadow: isDone ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale-mini"
                       title={`Durchlauf ${step} umschalten`}
@@ -558,7 +558,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  boxShadow: '0 8px 20px rgba(22, 163, 74, 0.30)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
@@ -822,7 +822,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
               borderRadius: '16px',
               background: '#fffdf0',
               border: '1.5px solid #fde047',
-              boxShadow: '0 2px 8px rgba(250, 204, 21, 0.12)'
+              boxShadow: 'none'
             }}>
               <HelpCircle size={15} color="#ca8a04" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>

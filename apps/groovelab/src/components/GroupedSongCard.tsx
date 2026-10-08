@@ -299,7 +299,7 @@ export function GroupedSongCard({
           flex: 1, 
           background: 'white', 
           borderLeft: `${isMobile ? '5px' : '8px'} solid ${isBandReady ? '#f59e0b' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || '#cbd5e1')}`,
-          boxShadow: activeSkill.progress >= 90 && !activeSkill.is_stage_ready ? `0 0 30px ${brandColor}22` : '0 10px 30px rgba(0,0,0,0.02)',
+          boxShadow: 'none',
           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
           cursor: 'pointer'
         }}
@@ -320,7 +320,7 @@ export function GroupedSongCard({
             display: 'flex', 
             alignItems: 'center', 
             gap: '6px', 
-            boxShadow: '0 8px 16px rgba(245, 158, 11, 0.4)', 
+            boxShadow: 'none', 
             zIndex: 20,
             border: 'none'
           }}>
@@ -751,7 +751,7 @@ export function GroupedSongCard({
                   background: '#fefce8', border: '1.5px solid #fef08a', 
                   display: 'flex', alignItems: 'center', gap: '12px', 
                   color: '#854d0e', fontSize: '0.88rem', fontWeight: 800,
-                  boxShadow: '0 4px 12px rgba(202, 138, 4, 0.08)'
+                  boxShadow: 'none'
                 }}>
                   <Clock size={20} color="#ca8a04" />
                   <div>
@@ -772,7 +772,7 @@ export function GroupedSongCard({
                     color: 'white', border: 'none', 
                     fontWeight: 900, fontSize: '1rem', cursor: 'pointer', 
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
-                    boxShadow: isChallengeHovered ? `0 15px 30px rgba(0,0,0,0.3)` : `0 12px 24px ${brandColor}44`,
+                    boxShadow: 'none',
                     transform: isChallengeHovered ? 'translateY(-2px)' : 'none',
                     transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                   }} 
@@ -846,7 +846,7 @@ export function GroupedSongCard({
                   </div>
                   
                   {isFullyStaffed ? (
-                    <div style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', color: '#0f172a', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)', border: 'none' }}>
+                    <div style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', color: '#0f172a', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: 'none', border: 'none' }}>
                       <Star size={14} fill="#0f172a" stroke="#0f172a" /> VOLLSTÄNDIG
                     </div>
                   ) : (
@@ -882,7 +882,7 @@ export function GroupedSongCard({
                           display: 'flex', alignItems: 'center', gap: '10px', 
                           background: 'white', padding: '8px 14px', borderRadius: '16px', 
                           border: member.user_id === userId ? '1.5px solid #ef4444' : '1px solid #f1f5f9',
-                          boxShadow: member.user_id === userId ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)' 
+                          boxShadow: 'none' 
                         }}>
                           <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', background: '#f1f5f9', flexShrink: 0 }}>
                             {member.user_id ? (
@@ -957,7 +957,7 @@ export function GroupedSongCard({
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
               cursor: 'pointer', transition: 'all 0.2s',
               flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(244, 63, 94, 0.1)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
             title="Arrangement entfernen"

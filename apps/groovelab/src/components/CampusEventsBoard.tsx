@@ -6532,7 +6532,7 @@ export function CampusEventsBoard({
                             background: '#7c3aed',
                             display: 'inline-block',
                             flexShrink: 0,
-                            boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                            boxShadow: 'none'
                           }} 
                         />
                       </span>
@@ -6606,7 +6606,7 @@ export function CampusEventsBoard({
                 borderRadius: '12px',
                 flexShrink: 0,
                 position: 'relative',
-                boxShadow: hasMessages ? '0 1px 4px rgba(202, 138, 4, 0.15)' : 'none'
+                boxShadow: 'none'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = hasMessages ? '#fef08a' : '#f1f5f9'}
               onMouseLeave={(e) => e.currentTarget.style.background = hasMessages ? '#fefce8' : '#f8fafc'}
@@ -7546,7 +7546,7 @@ export function CampusEventsBoard({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.06)'
+            boxShadow: 'none'
           }}>
             <Sparkles size={26} color={brandColor} />
           </div>
@@ -8180,7 +8180,7 @@ export function CampusEventsBoard({
                         borderRadius: '14px',
                         padding: '12px 16px',
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.05)',
+                        boxShadow: 'none',
                         transition: 'all 0.2s',
                         display: 'flex',
                         flexDirection: 'column',
@@ -8188,11 +8188,11 @@ export function CampusEventsBoard({
                       }}
                       onMouseEnter={e => {
                         e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.1)';
+                        e.currentTarget.style.boxShadow = 'none';
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.transform = 'none';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.05)';
+                        e.currentTarget.style.boxShadow = 'none';
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -9635,7 +9635,7 @@ export function CampusEventsBoard({
                               padding: '12px 16px',
                               borderRadius: '16px 16px 4px 16px',
                               fontSize: '0.82rem',
-                              boxShadow: '0 4px 12px ' + brandColor + '20',
+                              boxShadow: 'none',
                               lineHeight: 1.45
                             }}>
                               <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -9702,7 +9702,7 @@ export function CampusEventsBoard({
                         fontSize: '0.8rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px ' + brandColor + '30',
+                        boxShadow: 'none',
                         transition: 'transform 0.15s, opacity 0.15s'
                       }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
@@ -9976,7 +9976,7 @@ export function CampusEventsBoard({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)'
+                  boxShadow: 'none'
                 }}>
                   <span style={{ fontSize: '1.1rem' }}>⚠️</span>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -12163,7 +12163,7 @@ export function CampusEventsBoard({
                                    borderRadius: '50%',
                                    backgroundColor: '#ffffff',
                                    border: `2.5px solid ${hasConflict ? '#ff3b30' : (pp.is_pause ? '#f59e0b' : brandColor)}`,
-                                   boxShadow: `0 0 0 4px ${hasConflict ? 'rgba(255, 59, 48, 0.1)' : (pp.is_pause ? 'rgba(245, 158, 11, 0.15)' : `${brandColor}15`)}`,
+                                   boxShadow: 'none',
                                    zIndex: 1,
                                    transition: 'all 0.2s ease'
                                  }} />
@@ -12937,7 +12937,7 @@ export function CampusEventsBoard({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: '0 1px 2px rgba(52, 168, 83, 0.02)'
+                                boxShadow: 'none'
                               }}
                             >
                               {count}x {name}
@@ -13206,7 +13206,7 @@ export function CampusEventsBoard({
                         fontSize: '0.74rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: `0 2px 5px ${brandColor}30`,
+                        boxShadow: 'none',
                         transition: 'all 0.2s',
                         outline: 'none'
                       }}
@@ -13702,15 +13702,15 @@ export function CampusEventsBoard({
         @keyframes calendarPulse {
           0% {
             transform: scale(1);
-            box-shadow: 0 4px 12px rgba(52, 168, 83, 0.25);
+            box-shadow: none;
           }
           50% {
             transform: scale(1.03);
-            box-shadow: 0 6px 18px rgba(52, 168, 83, 0.4);
+            box-shadow: none;
           }
           100% {
             transform: scale(1);
-            box-shadow: 0 4px 12px rgba(52, 168, 83, 0.25);
+            box-shadow: none;
           }
         }
         .pulse-calendar {
@@ -13719,16 +13719,16 @@ export function CampusEventsBoard({
         @keyframes conflictPulse {
           0% {
             border-color: rgba(239, 68, 68, 0.4);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.05);
+            box-shadow: none;
           }
           50% {
             border-color: rgba(239, 68, 68, 0.85);
-            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+            box-shadow: none;
             transform: scale(1.005);
           }
           100% {
             border-color: rgba(239, 68, 68, 0.4);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.05);
+            box-shadow: none;
           }
         }
         .conflict-pulse-card {
@@ -13825,7 +13825,7 @@ export function CampusEventsBoard({
         }
         .google-input:focus {
           border-color: ${brandColor};
-          box-shadow: 0 0 0 1px ${brandColor};
+          box-shadow: none;
         }
 
         .google-chip {
@@ -14529,7 +14529,7 @@ export function CampusEventsBoard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
@@ -14704,7 +14704,7 @@ export function CampusEventsBoard({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >

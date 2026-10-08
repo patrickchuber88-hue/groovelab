@@ -610,7 +610,7 @@ export const SecretaryAnnouncementsView: React.FC<SecretaryAnnouncementsViewProp
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(234, 67, 53, 0.25)'
+                boxShadow: 'none'
               }}
             >
               <CheckCircle size={16} />

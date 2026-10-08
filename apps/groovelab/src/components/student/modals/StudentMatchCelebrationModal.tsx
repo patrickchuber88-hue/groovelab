@@ -52,7 +52,7 @@ export const StudentMatchCelebrationModal: React.FC<StudentMatchCelebrationModal
           borderRadius: '28px',
           padding: '32px 24px',
           textAlign: 'center',
-          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 50px rgba(52, 168, 83, 0.25)',
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.8)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -70,7 +70,7 @@ export const StudentMatchCelebrationModal: React.FC<StudentMatchCelebrationModal
           padding: '4px 14px',
           borderRadius: '99px',
           border: 'none',
-          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)'
+          boxShadow: 'none'
         }}>
           ✨ Live aus deinem Unterricht
         </div>
@@ -108,7 +108,7 @@ export const StudentMatchCelebrationModal: React.FC<StudentMatchCelebrationModal
             fontSize: '0.94rem',
             fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: '0 6px 20px rgba(22, 163, 74, 0.45)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease',
             display: 'flex',
             alignItems: 'center',

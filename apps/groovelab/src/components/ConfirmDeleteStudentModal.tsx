@@ -318,7 +318,7 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)'
+                  boxShadow: 'none'
                 }}
               >
                 {isSubmitting ? (

@@ -315,7 +315,7 @@ export const StudentRescheduleDecisionModal: React.FC<StudentRescheduleDecisionM
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 12px rgba(21, 128, 61, 0.28)',
+                boxShadow: 'none',
                 transition: 'transform 0.15s ease'
               }}
             >

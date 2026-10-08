@@ -156,7 +156,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 6px 16px -2px rgba(5, 150, 105, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <Award size={24} />
@@ -187,7 +187,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
                 display: 'flex',
                 alignItems: 'center',
                 gap: '7px',
-                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.2s ease'
               }}
             >

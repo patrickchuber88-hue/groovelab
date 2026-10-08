@@ -353,7 +353,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           if (tInst.toLowerCase() !== 'musiker' && tInst.toLowerCase() !== 'instrument') return tInst;
         }
       }
-      return 'Gitarre';
+      return '';
     }
     return raw;
   };
@@ -6313,7 +6313,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             fontSize: '0.88rem',
             cursor: onboardingSubmitting ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s',
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -6388,9 +6388,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           100% { opacity: 1; }
         }
         @keyframes conflictPulse {
-          0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.2); }
-          50% { border-color: rgba(239, 68, 68, 0.9); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.15); }
-          100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.2); }
+          0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: none; }
+          50% { border-color: rgba(239, 68, 68, 0.9); box-shadow: none; }
+          100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: none; }
         }
         .conflict-pulse-card {
           animation: conflictPulse 2s infinite ease-in-out !important;
@@ -6630,7 +6630,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         color: 'white', border: 'none', fontWeight: 800, padding: '5px 12px',
                         borderRadius: '9px', fontSize: '0.74rem', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: '5px',
-                        boxShadow: '0 2px 6px rgba(22,163,74,0.3)',
+                        boxShadow: 'none',
                         transition: 'all 0.16s ease'
                       }}
                     >
@@ -6689,7 +6689,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               setActiveTab('calendar');
               loadInitialData();
             }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
+            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'none' }}
           >
             Zurück zur Ansicht
           </button>
@@ -6943,7 +6943,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      boxShadow: '0 4px 16px rgba(16, 185, 129, 0.12)',
+                      boxShadow: 'none',
                       animation: 'floating-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
                     }}
                   >
@@ -6957,7 +6957,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#ffffff',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                        boxShadow: 'none'
                       }}>
                         <ArrowLeftRight size={18} strokeWidth={2.4} />
                       </div>
@@ -9047,7 +9047,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               display: 'flex',
                               alignItems: 'center',
                               gap: '3px',
-                              boxShadow: '0 1px 4px rgba(21, 128, 61, 0.35)',
+                              boxShadow: 'none',
                               pointerEvents: 'none',
                               zIndex: 15
                             }}>
@@ -9162,7 +9162,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  boxShadow: '0 1px 3px rgba(52, 168, 83, 0.35)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s ease'
                                 }}
                                 onMouseOver={e => { e.currentTarget.style.background = '#2e9549'; }}
@@ -9424,7 +9424,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
@@ -10275,7 +10275,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     }}
                     style={{
                       flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#0f172a',
-                      border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(234,179,8,0.3)'
+                      border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: 'none'
                     }}
                   >
                     Pause Speichern
@@ -10340,7 +10340,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#1a73e8',
-                    boxShadow: '0 4px 12px rgba(26, 115, 232, 0.12)'
+                    boxShadow: 'none'
                   }}>
                     <Calendar size={22} />
                   </div>
@@ -10397,7 +10397,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s'
                   }}
                   className="hover-scale-mini"
@@ -10478,7 +10478,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#d97706',
-                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.15)'
+                    boxShadow: 'none'
                   }}>
                     <AlertCircle size={22} />
                   </div>
@@ -10686,7 +10686,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#34a853',
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)'
+                    boxShadow: 'none'
                   }}>
                     <Sparkles size={22} />
                   </div>
@@ -10746,7 +10746,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   fontSize: '0.82rem',
                   fontWeight: 800,
                   border: '1px solid #bbf7d0',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)'
+                  boxShadow: 'none'
                 }}>
                   {autoScheduleReportData.overallScore >= 90 ? 'Exzellent' : 'Sehr gut'}
                 </div>
@@ -10829,7 +10829,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 6px 20px rgba(22, 163, 74, 0.25)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
                 className="hover-scale-mini"
@@ -10880,7 +10880,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#34a853',
-                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.18)'
+                boxShadow: 'none'
               }}>
                 <Sparkles size={28} className="animate-spin-slow" />
               </div>
@@ -10911,7 +10911,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     background: 'linear-gradient(90deg, #34a853 0%, #22c55e 100%)',
                     borderRadius: '10px',
                     transition: 'width 0.15s ease-out',
-                    boxShadow: '0 0 12px rgba(52, 168, 83, 0.4)'
+                    boxShadow: 'none'
                   }} />
                 </div>
 
@@ -11070,7 +11070,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                    boxShadow: 'none'
                   }}
                 >
                   <X size={14} strokeWidth={2.5} />

@@ -61,7 +61,7 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
         // 🏛️ Deep Forest Campus Green Gradient für maximalen Text-Kontrast (WCAG AAA)
         background: 'linear-gradient(135deg, #14532d 0%, #15803d 50%, #166534 100%)',
         border: '1.5px solid rgba(255, 255, 255, 0.25)',
-        boxShadow: '0 4px 14px rgba(20, 83, 45, 0.28), 0 1px 3px rgba(0, 0, 0, 0.12)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
         padding: isMobilePortrait ? '10px 14px' : '14px 20px',
         marginBottom: isMobilePortrait ? '6px' : '8px',
         position: 'relative',

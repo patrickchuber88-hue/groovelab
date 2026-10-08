@@ -296,7 +296,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.15)'
+              boxShadow: 'none'
             }}>
               <RotateCw size={22} strokeWidth={2.4} />
             </div>
@@ -385,7 +385,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                   background: '#fefce8',
                   color: '#713f12',
                   border: '1.2px solid #eab308',
-                  boxShadow: '0 1px 3px rgba(234, 179, 8, 0.2)',
+                  boxShadow: 'none',
                   fontSize: '0.74rem',
                   fontWeight: 850,
                   cursor: 'pointer',
@@ -409,7 +409,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: '#ffffff',
                   border: 'none',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                  boxShadow: 'none',
                   fontSize: '0.74rem',
                   fontWeight: 850,
                   cursor: 'pointer',
@@ -1020,7 +1020,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
               padding: '3px 8px',
               borderRadius: '100px',
               border: '1.2px solid #eab308',
-              boxShadow: '0 1px 2px rgba(234, 179, 8, 0.15)'
+              boxShadow: 'none'
             }}>
               {reactivateCount} zum Übertragen
             </span>
@@ -1092,7 +1092,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                boxShadow: 'none'
               }}
               className="hover-scale"
             >

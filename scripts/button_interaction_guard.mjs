@@ -204,26 +204,53 @@ let accessibleModalsCount = 0;
 let totalModalsCount = 0;
 let modalViolationFiles = [];
 
-for (const file of tsxFiles) {
-  if (file.includes('/tests/') || file.includes('__tests__')) continue;
+// False-Negative Blindspot Elimination: Actively traverse all source files ending in Modal.tsx or Dialog.tsx
+const modalFiles = tsxFiles.filter(file => {
+  if (file.includes('/tests/') || file.includes('__tests__')) return false;
+  const base = path.basename(file);
+  return base.endsWith('Modal.tsx') || base.endsWith('Dialog.tsx');
+});
+
+for (const file of modalFiles) {
+  totalModalsCount++;
   const content = fs.readFileSync(file, 'utf-8');
-  
-  // Audit modal dialogs: must declare role="dialog" and aria-modal="true"
-  const modalMatches = content.match(/<div[^>]*\brole\s*=\s*["']dialog["'][^>]*>/gi) || [];
-  for (const m of modalMatches) {
-    totalModalsCount++;
-    if (m.includes('aria-modal="true"') || m.includes("aria-modal='true'")) {
-      accessibleModalsCount++;
-    } else {
-      modalViolationFiles.push(path.relative(ROOT_DIR, file));
-    }
+  const relPath = path.relative(ROOT_DIR, file);
+
+  // Check 1: Must declare role="dialog" or delegate to modal shell/component
+  const hasRoleDialog = 
+    /role\s*=\s*["']dialog["']|role=\{[^}]*dialog[^}]*\}/.test(content) ||
+    content.includes('<PwaModalShell') ||
+    /<[A-Z]\w*Modal/.test(content);
+
+  // Check 2: Must declare aria-modal="true" or delegate to modal shell/component
+  const hasAriaModal = 
+    /aria-modal\s*=\s*(?:["']true["']|\{true\})/.test(content) ||
+    content.includes('<PwaModalShell') ||
+    /<[A-Z]\w*Modal/.test(content);
+
+  // Check 3: Must declare aria-labelledby or aria-label or delegate to modal shell/component
+  const hasAriaLabelledBy = 
+    /aria-labelledby\s*=|aria-label\s*=|ariaLabel\s*=/.test(content) ||
+    content.includes('<PwaModalShell') ||
+    /<[A-Z]\w*Modal/.test(content);
+
+  if (hasRoleDialog && hasAriaModal && hasAriaLabelledBy) {
+    accessibleModalsCount++;
+  } else {
+    const missing = [];
+    if (!hasRoleDialog) missing.push('role="dialog"');
+    if (!hasAriaModal) missing.push('aria-modal="true"');
+    if (!hasAriaLabelledBy) missing.push('aria-labelledby / aria-label');
+    modalViolationFiles.push(`${relPath} (missing: ${missing.join(', ')})`);
   }
 }
 
 recordCheck(
-  'Check 3: BFSG 2025 / WCAG 2.2 AA WAI-ARIA Dialog Semantics (role="dialog" & aria-modal="true")',
+  'Check 3: BFSG 2025 / WCAG 2.2 AA WAI-ARIA Dialog Semantics (role="dialog", aria-modal="true" & aria-labelledby)',
   modalViolationFiles.length === 0 && totalModalsCount > 50,
-  `Verified WAI-ARIA dialog semantics across ${accessibleModalsCount}/${totalModalsCount} modal dialogs (0 violations).`
+  modalViolationFiles.length === 0
+    ? `Verified WAI-ARIA dialog semantics across all ${accessibleModalsCount}/${totalModalsCount} modal dialog files (0 blindspots, 0 violations).`
+    : `Found modal dialog(s) missing WAI-ARIA dialog semantics in: ${modalViolationFiles.slice(0, 3).join(', ')}`
 );
 
 // -----------------------------------------------------------------------------

@@ -140,25 +140,18 @@ export interface LegalDocumentDefinition {
  * Calculates or formats a SHA-256 checksum of a given text.
  */
 export async function computeSha256(text: string): Promise<string> {
-  try {
-    if (typeof window !== 'undefined' && window.crypto?.subtle) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(text.trim());
-      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (e) {
-    console.warn('[LegalContent] SubtleCrypto failed, using deterministic hash fallback:', e);
+  const subtleCrypto = (typeof window !== 'undefined' && window.crypto?.subtle) 
+    || (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle);
+
+  if (subtleCrypto) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text.trim());
+    const hashBuffer = await subtleCrypto.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
-  // Deterministic fallback hash if Web Crypto is unavailable
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
-  }
-  return `sha256_fallback_${Math.abs(hash).toString(16).padStart(16, '0')}`;
+
+  throw new Error('[LegalContent] CryptographicEngineUnavailable: WebCrypto SubtleCrypto is required for SHA-256 digest computation (§ 371a ZPO / OWASP ASVS Fail-Closed).');
 }
 
 export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
@@ -197,6 +190,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 (7) **Ausfall- & Vertretungs-Botendienst (Ausschluss von Unterrichtsausfall-Haftung):** Die Übermittlung von Abwesenheiten, Vertretungsanfragen oder Unterrichtsausfällen über die Plattform stellt einen rein technischen Botendienst im Auftrag des jeweiligen Nutzers dar. Die Plattform übernimmt keine Gewähr für das tatsächliche Zustandekommen von Vertretungsunterricht oder die erfolgreiche Benachrichtigung aller Erziehungsberechtigten. Bei Unterrichtsausfällen verbleibt die Organisations- und Informationspflicht vollumfänglich bei der Musikschule und ihren Lehrkräften über die herkömmlichen Primärwege (Telefon, E-Mail). Schadensersatzansprüche gegen den Betreiber wegen ausgefallener Unterrichtsstunden, vergeblicher Anfahrten von Schülern oder entgangener Unterrichtsgebühren sind vollumfänglich ausgeschlossen.
 (8) **Notfall-, Nachrangigkeits- & Schadenminderungsklausel (§ 254 BGB):** Die Musikschule verpflichtet sich im Rahmen ihrer vertraglichen Schadensminderungspflicht (§ 254 BGB), den regulären Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform redundant vorzuhalten. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt; Raum- und Terminabstimmungen sind über die Primärkanäle abzuwickeln. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers.
 (9) **Vertragsschluss, Annahmevorbehalt & Vertretungsbefugnis:** Die Darstellung der Plattform im Internet stellt kein bindendes Angebot, sondern eine Aufforderung zur Abgabe einer Bestellung dar (invitatio ad offerendum). Ein Rechtsanspruch auf Abschluss eines Nutzungsvertrages oder die Bereitstellung eines Schul-Tenants besteht nicht. Der Betreiber behält sich vor, Registrierungsanfragen von Einrichtungen nach pflichtgemäßem Ermessen – insbesondere bei Kapazitätsengpässen oder berechtigten Sicherheitsbedenken – abzulehnen. Die für die Einrichtung handelnde Person versichert mit der digitalen Registrierung und Freischaltung des Schul-Tenants, zur rechtsgeschäftlichen Vertretung der Musikschule bzw. ihres Trägers berechtigt zu sein oder im ausdrücklichen Auftrag der vertretungsberechtigten Leitung oder des Trägers zu handeln.
+(10) **Ausschluss von Schutzwirkungen zugunsten Dritter (§ 328 BGB):** Dieser B2B-Infrastrukturvertrag entfaltet keinerlei drittschützende Wirkung. Schülerinnen, Schüler, Erziehungsberechtigte sowie Lehrkräfte der Musikschule sind ausdrücklich nicht in den vertraglichen Schutzbereich einbezogen. Eine Haftung des Betreibers gegenüber Dritten nach den Grundsätzen des Vertrages mit Schutzwirkung zugunsten Dritter ist vollumfänglich ausgeschlossen. Sämtliche vertraglichen Ansprüche aus dem Unterrichtsverhältnis sind von Dritten ausschließlich gegenüber der Musikschule als Vertragspartnerin geltend zu machen.
 
 ### 2. Auftragsverarbeitungsvertrag gem. Art. 28 DSGVO & Datensouveränität
 (1) **Verantwortlichkeit & Weisungsgebundenheit:** Die Musikschule ist und bleibt datenschutzrechtlich die alleinige „Verantwortliche“ (Art. 4 Nr. 7 DSGVO) für alle von ihr verarbeiteten Schüler-, Lehrkräfte- und Verwaltungsdaten. Der Betreiber verarbeitet personenbezogene Daten ausschließlich als weisungsgebundener Auftragsverarbeiter (Art. 28 DSGVO) zur Erfüllung dieses Vertrages. Ergänzend gilt die gesonderte Vereinbarung zur Auftragsverarbeitung (AVV) als integraler Vertragsbestandteil.
@@ -239,6 +233,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 (3) **Rechtsnatur der 1-Tap Kontaktdokumentation („Erreicht“):** Soweit Lehrkräfte im Rahmen des Ausfall- oder Krisenmanagements die telefonische Kontaktaufnahme zu Schülern bzw. Erziehungsberechtigten per 1-Tap als „Erreicht“ quittieren, handelt es sich um eine rein interne pädagogische Dokumentationsnotiz der handelnden Lehrkraft. Dieser Vermerk begründet keine gesetzliche Zugangsfiktion gem. § 130 BGB oder einen rechtssicheren Zugangsnachweis gegenüber den Erziehungsberechtigten.
 (4) **Institutioneller Kinderschutz & Vier-Augen-Prinzip (§ 8a SGB VIII):** Chatverläufe zwischen Lehrkräften und minderjährigen Schülern sind für Erziehungsberechtigte über das Eltern-Portal transparent einsehbar (Vier-Augen-Prinzip). Ein unüberwachter Privatchat zwischen Minderjährigen untereinander ist serverseitig ausgeschlossen. Verdachtsmeldungen können an kinderschutz@campus-groovelab.de gerichtet werden.
 (5) **Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG):** Die Plattform verzichtet vollständig auf Funktionen zur Verhaltens- oder Leistungskontrolle von Lehrkräften.
+(6) **Freistellung von Ansprüchen Dritter (Hold-Harmless bei Schulorganisation & Lehrkräfte-Fehlverhalten):** Die Musikschule stellt den Betreiber im Innenverhältnis von sämtlichen Ansprüchen, Bußgeldern und Kosten frei, die Schüler, Eltern, Lehrkräfte oder Aufsichtsbehörden wegen schulorganisatorischer Pflichtverletzungen, Verletzungen der pädagogischen Aufsichtspflicht (§ 832 BGB), Verstößen gegen das Kindeswohl (§ 8a SGB VIII) oder unbefugten Aufnahmen/Uploads von Lehrkräften gegen den Betreiber geltend machen, es sei denn, der Betreiber hat die Pflichtverletzung nachweislich vorsätzlich oder grob fahrlässig verursacht.
 
 ### 6. B2B-Gewährleistung, Haftungsbegrenzung & Versicherungsschutz
 (1) **Ausschluss anfänglicher Mängel (§ 536a Abs. 1 Alt. 1 BGB):** Die verschuldensunabhängige Haftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) wird ausdrücklich und vollumfänglich ausgeschlossen.
@@ -853,7 +848,7 @@ ________________________________________________________________________________
     isMandatory: false,
     version: ACTIVE_LEGAL_VERSION,
     summaryPoints: [
-      'Inklusions-Leitbild & BFSG-Enterprise-Garantie: Vollgeltung des BFSG 2025 & freiwilliger Verzicht auf Kleinstunternehmer-Ausnahmen (§ 3 Abs. 2 BFSG)',
+      'Inklusions-Leitbild & Barrierefreiheits-Standard: Gesetzliche Ausnahme für Kleinstunternehmen (§ 3 Abs. 2 BFSG) bei freiwilliger Einhaltung der Qualitätsstandards nach WCAG 2.2 (Stufe AA) und EN 301 549',
       'Verbindlicher Status: „Teilweise vereinbar“ mit harmonisierter europäischer Norm EN 301 549 V3.2.1 und WCAG 2.2 AA (Durchführungsbeschluss (EU) 2018/1523)',
       'Tastatur-Vollbedienbarkeit (WCAG 2.1.1), Focus Not Obscured (WCAG 2.4.11/12) & 2-Klick-Zuweisung im Stundenplan (WCAG 2.5.7)',
       'Multi-Sensorische Musikdidaktik: Haptische Web-Vibration für Gehörlose, optisches Metronom & WAI-ARIA Slider-Semantik für Sehbehinderte',
@@ -865,7 +860,7 @@ ________________________________________________________________________________
     fullTextMarkdown: `
 ### 1. Unser Inklusions-Leitbild & Geltungsbereich
 (1) Campus-Groovelab (Diensteanbieter: Patrick Huber) verpflichtet sich zu digitaler Barrierefreiheit und gelebter Inklusion im Musikschulwesen. Ziel ist es, allen Schülerinnen, Schülern, Eltern und Lehrkräften unabhängig von sensorischen, motorischen oder kognitiven Beeinträchtigungen einen gleichberechtigten und intuitiven Zugang zu zeitgemäßer Musikbildung und Schulorganisation zu ermöglichen.
-(2) **Geltungsbereich & Freiwillige Enterprise-Garantie:** Diese Erklärung gilt für die gesamte Web- und PWA-Plattform Campus-Groovelab. Für den B2C-Eltern-Checkout (Schüler-Direktabrechnung) gilt das **Barrierefreiheitsstärkungsgesetz (BFSG 2025 zur Umsetzung der Richtlinie (EU) 2019/882 / European Accessibility Act)** uneingeschränkt. Die Plattform **verzichtet ausdrücklich auf die Inanspruchnahme von Kleinstunternehmer-Ausnahmen (§ 3 Abs. 2 BFSG)**, um Schulträgern und öffentlichen Auftraggebern maximale Rechtssicherheit bei Vergaben nach § 12d BGG und den Landes-Behindertengleichstellungsgesetzen (L-BGG) zu garantieren.
+(2) **Geltungsbereich & Gesetzliche Ausnahme für Kleinstunternehmen (§ 3 Abs. 2 BFSG):** Diese Erklärung gilt für die gesamte Web- und PWA-Plattform Campus-Groovelab. Als inhabergeführtes Kleinstunternehmen mit weniger als zehn Beschäftigten und einem Jahresumsatz von höchstens 2 Millionen Euro fällt der Betreiber unter die **gesetzliche Ausnahme des § 3 Abs. 2 BFSG** (zur Umsetzung der Richtlinie (EU) 2019/882 / European Accessibility Act). Die im Folgenden dokumentierten Barrierefreiheitsmaßnahmen und die Orientierung an den **Web Content Accessibility Guidelines (WCAG) 2.2 auf Konformitätsstufe AA** sowie der harmonisierten Norm **EN 301 549 V3.2.1** erfolgen freiwillig aus hohem pädagogischen und ethischen Qualitätsanspruch zur Förderung inklusiver Musikbildung, ohne hierdurch eine über § 3 Abs. 2 BFSG hinausgehende gesetzliche Marktzugangs- oder Haftungsverpflichtung zu begründen.
 
 ### 2. Stand der Vereinbarkeit mit den Anforderungen
 (1) Diese Webanwendung ist wegen der nachfolgend aufgeführten fachlich-didaktischen Ausnahmen **teilweise vereinbar** mit den Anforderungen der europäischen Norm **EN 301 549 V3.2.1** sowie den **Web Content Accessibility Guidelines (WCAG) 2.2 auf Konformitätsstufe AA** gem. Durchführungsbeschluss (EU) 2018/1523.
@@ -934,7 +929,7 @@ Sollten Sie auf Ihre Kontaktaufnahme über den Feedback-Mechanismus innerhalb vo
     summaryPoints: [
       'Diensteanbieter: Patrick Huber, Softwareentwicklung & Cloud-Dienstleistungen (Einzelunternehmen), Rheinfelden (Baden)',
       'Zuständige Gewerbebehörde: Gewerbeamt der Stadt Rheinfelden (Baden), Kirchplatz 2, 79618 Rheinfelden (Baden)',
-      'Elektronischer 2-Wege-Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14): kontakt@campus-groovelab.de & In-App-Support',
+      'Elektronischer & telefonischer Schnellkontakt (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07): Telefon (Mo & Do 09:00–11:00 Uhr MEZ), kontakt@campus-groovelab.de & In-App-Support',
       'DSA Art. 11, 12 & 16: Zentrale behördliche Kontaktstelle & strukturiertes Meldeverfahren für Urheberrechtsverletzungen (copyright@campus-groovelab.de)',
       'Umsatzsteuer: Steuerbefreit gem. § 19 UStG (DE) / § 6 Abs. 1 Z 27 UStG 1994 (AT) / Art. 8 MWSTG (CH)',
       'Redaktionell Verantwortlicher gem. § 18 Abs. 2 MStV / § 25 MedienG: Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)',
@@ -961,14 +956,16 @@ Campus-Groovelab ist eine eigenständige Softwareentwicklung von Patrick Huber. 
 
 ---
 
-### 3. Elektronische Kontaktaufnahme & Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07 / Art. 3 UWG CH)
+### 3. Elektronische Kontaktaufnahme, Telefon & Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07 / Art. 3 UWG CH)
 - **E-Mail:** kontakt@campus-groovelab.de
 - **Support & Schulbetreuung:** support@campus-groovelab.de
+- **Telefon:** +49 (0) 7623 / 741 78 40
+- **Telefonische Servicezeiten:** Montag 09:00–11:00 Uhr & Donnerstag 09:00–11:00 Uhr MEZ
 - **In-App-Support & Ticketsystem:** Direkt über das integrierte Hilfe-Zentrum (2-Wege-Schnellkontakt mit protokollierter Ticketnummer)
 - **Website:** https://campus-groovelab.de
 
-**⚡ Effizienter elektronischer 2-Wege-Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14):**  
-Gemäß der Rechtsprechung des Europäischen Gerichtshofs (EuGH, Urteil vom 16.10.2008 – C-298/07) sowie des Bundesgerichtshofs (BGH, Urteil vom 25.02.2010 – I ZR 238/14) erfolgt die unmittelbare und effiziente Kommunikation über zwei vollwertige elektronische Schnellkontaktwege (E-Mail & In-App-Supportsystem mit protokollierter Ticketnummer). Dies gewährleistet eine lückenlose Dokumentation, prioritäre Bearbeitung und eine Antwortzeit an Werktagen **in der Regel innerhalb von 60 Minuten** (Kernzeiten: Mo 09:00–12:00 Uhr • Do 08:00–10:00 Uhr MEZ).
+**⚡ Unmittelbare Erreichbarkeit & effizienter Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14):**  
+Gemäß § 5 Abs. 1 Nr. 2 DDG sowie der europäischen und bundesgerichtlichen Rechtsprechung wird eine unmittelbare und effiziente Kommunikation sowohl über telefonische Sprechzeiten (Mo & Do 09:00–11:00 Uhr MEZ) als auch über zwei vollwertige elektronische Schnellkontaktwege (E-Mail & In-App-Supportsystem mit protokollierter Ticketnummer) gewährleistet. Dies sichert eine lückenlose Dokumentation, prioritäre Bearbeitung und eine Antwortzeit an Werktagen **in der Regel innerhalb von 60 Minuten** (Kernzeiten: Mo 09:00–12:00 Uhr • Do 08:00–11:00 Uhr MEZ).
 
 **🛡️ Hinweis zur Zuständigkeit:**  
 Für Auskünfte zu Unterrichtszeiten, Stundenplänen, Raumzuteilungen, Lehrkraft-Vertretungen, Abwesenheitsmeldungen oder Musikschulverträgen wenden Sie sich bitte direkt an das **Sekretariat Ihrer Musikschule vor Ort**. Der Plattform-Support betreut als technischer Infrastrukturdienstleister ausschließlich Software-, Login- und Systemfragen.

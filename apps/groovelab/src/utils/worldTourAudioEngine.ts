@@ -15,6 +15,7 @@
  */
 
 import { WorldTourNote, WorldTourRepeatSection } from '../types/worldTour';
+import { acquireAudioStream } from '../services/audioPermissionService';
 
 export interface AudioNoteEvent {
   noteIndex: number;
@@ -769,7 +770,7 @@ export class WorldTourAudioEngine {
         return false;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await acquireAudioStream({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,

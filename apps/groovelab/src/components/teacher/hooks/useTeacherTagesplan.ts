@@ -400,6 +400,29 @@ export function useTeacherTagesplan({
           .or(`sender_id.eq.${effectiveTeacherId},recipient_id.eq.${effectiveTeacherId}`)
       ]);
 
+// 🏛️ 0,1% Goldstandard: Datums-Extraktion für termingekoppelte Shoutbox-Zuordnung
+const extractOccurrenceDateFromMessage = (msg: any): string | null => {
+  if (!msg) return null;
+  if (msg.occurrence_id) {
+    const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
+    if (matchVirtual) return matchVirtual[0];
+  }
+  const text = String(msg.content || '');
+  const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (matchIso) {
+    return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+  }
+  const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (matchFullYear) {
+    const day = matchFullYear[1].padStart(2, '0');
+    const month = matchFullYear[2].padStart(2, '0');
+    let year = matchFullYear[3];
+    if (year.length === 2) year = `20${year}`;
+    return `${year}-${month}-${day}`;
+  }
+  return null;
+};
+
       if (msgRes.data) {
         const occIds = new Set<string>();
         const unreadOccIds = new Set<string>();
@@ -413,10 +436,19 @@ export function useTeacherTagesplan({
                 unreadOccIds.add(occId);
               }
             }
-            if (m.sender_id) {
-              occIds.add(String(m.sender_id));
-              if (m.recipient_id === effectiveTeacherId && m.is_read === false) {
-                unreadOccIds.add(String(m.sender_id));
+            // 🏛️ 0,1% Goldstandard: Datumsbezogene Indizierung (${studentId}_${extDate})
+            const extDate = extractOccurrenceDateFromMessage(m);
+            if (extDate) {
+              if (m.sender_id) {
+                const key = `${m.sender_id}_${extDate}`;
+                occIds.add(key);
+                if (m.recipient_id === effectiveTeacherId && m.is_read === false) {
+                  unreadOccIds.add(key);
+                }
+              }
+              if (m.recipient_id) {
+                const key = `${m.recipient_id}_${extDate}`;
+                occIds.add(key);
               }
             }
           }

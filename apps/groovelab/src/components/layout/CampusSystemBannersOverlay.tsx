@@ -115,7 +115,7 @@ export const CampusSystemBannersOverlay: React.FC<CampusSystemBannersOverlayProp
               fontSize: '0.78rem',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              boxShadow: '0 2px 6px rgba(180, 83, 9, 0.2)'
+              boxShadow: 'none'
             }}
           >
             Jetzt ansehen &amp; freischalten
@@ -126,21 +126,26 @@ export const CampusSystemBannersOverlay: React.FC<CampusSystemBannersOverlayProp
         <Suspense fallback={null}>
           <PwaUpdateToast 
             onUpdate={async () => {
+              setShowPwaUpdateToast(false);
               try {
-                if ('caches' in window) {
-                  const keys = await caches.keys();
-                  await Promise.all(keys.map(k => caches.delete(k)));
-                }
                 if ('serviceWorker' in navigator) {
                   const reg = await navigator.serviceWorker.getRegistration();
                   if (reg && reg.waiting) {
+                    let reloaded = false;
+                    const triggerReload = () => {
+                      if (!reloaded) {
+                        reloaded = true;
+                        window.location.reload();
+                      }
+                    };
+                    navigator.serviceWorker.addEventListener('controllerchange', triggerReload, { once: true });
                     reg.waiting.postMessage({ action: 'skipWaiting' });
+                    setTimeout(triggerReload, 1200);
+                    return;
                   }
                 }
-                localStorage.removeItem('campus_installed_cache_version');
-                sessionStorage.removeItem('campus_app_loaded_version');
               } catch {}
-              window.location.replace('/?v=' + Date.now());
+              window.location.reload();
             }}
             onDismiss={() => setShowPwaUpdateToast(false)}
           />

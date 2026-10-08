@@ -311,7 +311,7 @@ export const SecretarySubjectsView: React.FC<SecretarySubjectsViewProps> = ({
                 border: 'none',
                 cursor: 'pointer',
                 fontFamily: 'Urbanist',
-                boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)',
+                boxShadow: 'none',
                 transition: 'all 0.2s'
               }}
             >
@@ -638,7 +638,7 @@ export const SecretarySubjectsView: React.FC<SecretarySubjectsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: 'none' }}
                 >
                   Fach anlegen
                 </button>
@@ -742,7 +742,7 @@ export const SecretarySubjectsView: React.FC<SecretarySubjectsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: 'none' }}
                 >
                   Änderungen speichern
                 </button>

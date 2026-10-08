@@ -417,7 +417,7 @@ export function DeviceSetupScreen({
 
   return (
     <div className="app-container flex-center" style={{ flexDirection: 'column', padding: '40px 20px', textAlign: 'center', background: '#f9fafb' }}>
-      <div className="school-logo" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: 24, boxShadow: '0 8px 24px rgba(234, 179, 8, 0.2)' }}>
+      <div className="school-logo" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: 24, boxShadow: 'none' }}>
         <Music size={40} />
       </div>
       <h1 
@@ -505,7 +505,7 @@ export function DeviceSetupScreen({
                 justifyContent: 'center',
                 color: '#854d0e',
                 marginBottom: '16px',
-                boxShadow: '0 8px 20px rgba(234, 179, 8, 0.15)'
+                boxShadow: 'none'
               }}>
                 <Lock size={28} />
               </div>
@@ -532,7 +532,7 @@ export function DeviceSetupScreen({
                         border: isFilled ? '2px solid #ca8a04' : '2px solid #cbd5e1',
                         transform: isFilled ? 'scale(1.15)' : 'scale(1)',
                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: isFilled ? '0 2px 8px rgba(234, 179, 8, 0.35)' : 'none'
+                        boxShadow: 'none'
                       }}
                     />
                   );
@@ -1126,7 +1126,7 @@ export function DeviceSetupScreen({
               fontSize: '0.78rem',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: `0 2px 4px rgba(234, 179, 8, 0.2)`,
+              boxShadow: 'none',
               transition: 'transform 0.15s'
             }}
             className="hover-scale"
@@ -1346,7 +1346,7 @@ export function DeviceSetupScreen({
                     fontSize: '0.95rem',
                     fontWeight: 800,
                     cursor: (adminLoginLoading || adminTotpInput.length !== 6) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 8px 24px rgba(22, 163, 74, 0.25)',
+                    boxShadow: 'none',
                     opacity: (adminLoginLoading || adminTotpInput.length !== 6) ? 0.6 : 1
                   }}
                 >

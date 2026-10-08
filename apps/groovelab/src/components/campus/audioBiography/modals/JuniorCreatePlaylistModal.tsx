@@ -100,7 +100,7 @@ export const JuniorCreatePlaylistModal: React.FC<JuniorCreatePlaylistModalProps>
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 6px 16px rgba(16, 185, 129, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <Disc size={26} />
@@ -302,7 +302,7 @@ export const JuniorCreatePlaylistModal: React.FC<JuniorCreatePlaylistModalProps>
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0,
-                          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.4)'
+                          boxShadow: 'none'
                         }}
                       >
                         <Check size={13} color="#ffffff" strokeWidth={3} />
@@ -391,7 +391,7 @@ export const JuniorCreatePlaylistModal: React.FC<JuniorCreatePlaylistModalProps>
               fontSize: '0.94rem',
               cursor: newJuniorPlaylistTitle.trim() ? 'pointer' : 'not-allowed',
               opacity: newJuniorPlaylistTitle.trim() ? 1 : 0.5,
-              boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

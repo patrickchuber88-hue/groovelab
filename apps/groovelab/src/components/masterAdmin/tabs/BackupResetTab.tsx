@@ -590,7 +590,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.08)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseOver={(e) => {
@@ -690,7 +690,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseOver={(e) => {
@@ -798,7 +798,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             borderRadius: '20px',
             padding: '20px 22px',
             border: '1px solid #a7f3d0',
-            boxShadow: '0 4px 16px rgba(16,185,129,0.06)',
+            boxShadow: 'none',
             cursor: 'pointer',
             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
@@ -887,7 +887,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+              boxShadow: 'none'
             }}>
               <ShieldCheck size={22} />
             </div>
@@ -930,7 +930,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+                boxShadow: 'none'
               }}
             >
               <Award size={14} />
@@ -1560,7 +1560,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(5, 150, 105, 0.3)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale-mini"
                 >
@@ -2406,7 +2406,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)'
+                boxShadow: 'none'
               }}
               className="hover-scale-mini"
             >
@@ -2561,7 +2561,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               borderRadius: '24px',
               padding: '28px',
               border: '1px solid #fde68a',
-              boxShadow: '0 4px 16px rgba(234, 179, 8, 0.05)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -2629,7 +2629,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               borderRadius: '24px',
               padding: '28px',
               border: '2px solid #fecdd3',
-              boxShadow: '0 4px 16px rgba(225, 29, 72, 0.05)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',

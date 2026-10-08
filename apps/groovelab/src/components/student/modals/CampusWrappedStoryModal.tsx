@@ -220,7 +220,7 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
 
                   {wrappedData.isPremium ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-                      <div style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)' }}>
+                      <div style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
                         <Trophy size={36} color="white" />
                       </div>
                       <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fbbf24' }}>

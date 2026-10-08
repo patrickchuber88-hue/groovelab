@@ -115,7 +115,7 @@ export function useTeacherData({
   const [selectedRoomId, setSelectedRoomId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`groovelab_teacher_selected_room_id_${activePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id');
-      if (saved) return saved;
+      if (saved && saved !== CANONICAL_GROOVELAB_STUDIO_ROOM.id && !saved.startsWith('canonical-')) return saved;
     }
     if (initialSchoolId) {
       const cached = getCachedRoomsSync(initialSchoolId, activePlatform);
@@ -125,7 +125,7 @@ export function useTeacherData({
   });
 
   useEffect(() => {
-    if (selectedRoomId) {
+    if (selectedRoomId && selectedRoomId !== CANONICAL_GROOVELAB_STUDIO_ROOM.id && !selectedRoomId.startsWith('canonical-')) {
       localStorage.setItem('groovelab_teacher_selected_room_id', selectedRoomId);
       localStorage.setItem(`groovelab_teacher_selected_room_id_${activePlatform}`, selectedRoomId);
     }
@@ -425,15 +425,16 @@ export function useTeacherData({
 
           if (effectiveRooms.length > 0) {
             let chosenRoomId = selectedRoomIdRef.current;
-            const currentHasStations = chosenRoomId && stationsList.some((s: any) => s.room_id === chosenRoomId);
+            const isChosenCanonical = !chosenRoomId || chosenRoomId === CANONICAL_GROOVELAB_STUDIO_ROOM.id || chosenRoomId.startsWith('canonical-');
+            const currentHasStations = !isChosenCanonical && stationsList.some((s: any) => s.room_id === chosenRoomId);
 
-            if (!chosenRoomId || !effectiveRooms.some((r: any) => r.id === chosenRoomId) || (!currentHasStations && stationsList.length > 0)) {
+            if (isChosenCanonical || !effectiveRooms.some((r: any) => r.id === chosenRoomId) || (!currentHasStations && stationsList.length > 0)) {
               const roomWithStations = effectiveRooms.find((r: any) => stationsList.some((s: any) => s.room_id === r.id));
               if (roomWithStations) {
                 chosenRoomId = roomWithStations.id;
               } else {
                 const savedRoomId = typeof window !== 'undefined' ? (localStorage.getItem(`groovelab_teacher_selected_room_id_${activePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id')) : null;
-                if (savedRoomId && effectiveRooms.some((r: any) => r.id === savedRoomId)) {
+                if (savedRoomId && savedRoomId !== CANONICAL_GROOVELAB_STUDIO_ROOM.id && !savedRoomId.startsWith('canonical-') && effectiveRooms.some((r: any) => r.id === savedRoomId)) {
                   chosenRoomId = savedRoomId;
                 } else {
                   chosenRoomId = effectiveRooms[0].id;

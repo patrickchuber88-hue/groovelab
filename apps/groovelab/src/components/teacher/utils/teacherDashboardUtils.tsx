@@ -216,5 +216,5 @@ export const resolveStudentInstrument = (slotInst?: string | null, studentInst?:
   if (!isInvalid(slotInst)) return slotInst!.trim();
   if (!isInvalid(studentInst)) return studentInst!.trim();
   if (!isInvalid(teacherInst)) return teacherInst!.trim();
-  return 'Gitarre';
+  return '';
 };

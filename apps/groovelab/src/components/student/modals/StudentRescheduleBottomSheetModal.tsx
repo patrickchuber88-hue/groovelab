@@ -268,7 +268,7 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 0 10px rgba(16, 185, 129, 0.15)'
+              boxShadow: 'none'
             }}>
               <Check size={38} strokeWidth={3} />
             </div>
@@ -376,7 +376,7 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
             borderRadius: '14px',
             padding: '12px 14px',
             border: isReactivation ? '1.5px solid #10b981' : '1.5px solid #10b981',
-            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.12)',
+            boxShadow: 'none',
             minWidth: 0
           }}>
             <div style={{
@@ -458,7 +458,7 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
                 justifyContent: 'center',
                 gap: '8px',
                 cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(34, 197, 94, 0.35)',
+                boxShadow: 'none',
                 transition: 'transform 0.1s ease',
                 opacity: isConfirming ? 0.7 : 1
               }}
@@ -544,7 +544,7 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
                   justifyContent: 'center',
                   gap: '8px',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)'
+                  boxShadow: 'none'
                 }}
               >
                 <KeyRound size={18} strokeWidth={2.5} />

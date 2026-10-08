@@ -937,8 +937,8 @@ export const WorldTourStaffNotation: React.FC<WorldTourStaffNotationProps> = ({
                               </text>
                             )}
 
-                            {/* Tabulatur Fret- / Finger-Zahl */}
-                            {transposed.hasTablature && note.displayFret !== undefined && (
+                            {/* Tabulatur Fret- / Finger-Zahl - 0,1% Goldstandard: Pausen besitzen NIEMALS eine Tabulaturziffer */}
+                            {transposed.hasTablature && !isRest && note.displayFret !== undefined && (
                               <g>
                                 <rect
                                   x={noteX - 6}

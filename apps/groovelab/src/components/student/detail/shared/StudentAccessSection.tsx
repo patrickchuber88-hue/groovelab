@@ -301,7 +301,7 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
               fontSize: '0.78rem',
               fontWeight: 800,
               color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)'
+              boxShadow: 'none'
             }}
           >
             <Check size={16} color="#ffffff" />

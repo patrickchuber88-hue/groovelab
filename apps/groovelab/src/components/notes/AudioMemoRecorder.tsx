@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
+import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { byteFrequencyToDawMeterPercent } from '../../utils/audioVuMeterHelper';
 
 interface AudioMemoRecorderProps {
@@ -78,7 +79,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
           (user?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${user.id}`) === 'true');
 
         if (!isParentAudioAllowed) {
-          setErrorMsg('Tonaufnahmen sind für dieses Schülerprofil standardmäßig deaktiviert (Kinderschutz & Art. 8 DSGVO). Bitte wende dich an deine Eltern.');
+          setErrorMsg('Tonaufnahmen sind für dieses Schülerprofil elterlich geschützt (Kinderschutz nach Vertraulichkeit des Wortes & Art. 8 DSGVO). Deine Eltern können die Tonaufnahme im Elternbereich mit ihrer Eltern-PIN freischalten.');
           return;
         }
       }
@@ -242,10 +243,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
 
       let finalUrl = '';
       if (!error) {
-        const { data: publicUrlData } = supabase.storage
-          .from('campus-assets')
-          .getPublicUrl(filePath);
-        finalUrl = publicUrlData?.publicUrl || '';
+        finalUrl = await getSecureAudioUrl(filePath, 'campus-assets', 1800);
 
         // Update school storage quota
         if (targetSchoolId && audioBlob.size) {
@@ -366,7 +364,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
       borderRadius: '16px',
       padding: '14px 18px',
       marginTop: '10px',
-      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.06)'
+      boxShadow: 'none'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -440,7 +438,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(52, 168, 83, 0.2)'
+                boxShadow: 'none'
               }}
             >
               <Mic size={14} />
@@ -463,7 +461,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.2)'
+                boxShadow: 'none'
               }}
             >
               <Square size={14} />
@@ -516,7 +514,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 8px rgba(52, 168, 83, 0.2)'
+                  boxShadow: 'none'
                 }}
               >
                 <Check size={14} />

@@ -67,7 +67,7 @@ export const MasterIdleLockModal: React.FC<MasterIdleLockModalProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ea4335',
-            boxShadow: '0 8px 16px -4px rgba(234, 67, 53, 0.2)',
+            boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.2)',
           }}
         >
           <Lock size={36} />

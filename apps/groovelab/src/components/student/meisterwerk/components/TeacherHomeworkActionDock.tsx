@@ -261,7 +261,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
             display: 'flex',
             alignItems: 'center',
             gap: isMobileView ? '8px' : '12px',
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.28)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease',
             textAlign: 'left',
             outline: 'none',
@@ -977,7 +977,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)'
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
               >
@@ -1309,7 +1309,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 0 24px rgba(250, 204, 21, 0.5)',
+                      boxShadow: 'none',
                       animation: 'pulse 0.5s infinite'
                     }}
                   >
@@ -1333,7 +1333,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: isUploadingAudio ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 10px 25px -5px rgba(250, 204, 21, 0.4)',
+                      boxShadow: 'none',
                       transition: 'transform 0.15s ease'
                     }}
                     className="hover-scale"
@@ -1359,7 +1359,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 0 24px rgba(239, 68, 68, 0.5)',
+                      boxShadow: 'none',
                       animation: 'pulse 1s infinite'
                     }}
                   >
@@ -1434,7 +1434,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                   fontSize: '0.86rem',
                   fontWeight: 850,
                   cursor: isRecordingAudio ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 2px 8px rgba(250, 204, 21, 0.35)'
+                  boxShadow: 'none'
                 }}
                 className={isRecordingAudio ? '' : 'hover-scale'}
               >

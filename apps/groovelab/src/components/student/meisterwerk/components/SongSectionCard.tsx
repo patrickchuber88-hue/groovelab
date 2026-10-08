@@ -128,7 +128,7 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               color: '#ffffff',
               border: 'none',
-              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.28)',
+              boxShadow: 'none',
               padding: '3px 10px',
               borderRadius: '99px'
             }}>

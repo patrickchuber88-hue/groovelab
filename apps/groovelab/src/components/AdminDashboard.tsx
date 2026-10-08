@@ -264,7 +264,7 @@ export function AdminDashboard({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.3)',
+          boxShadow: 'none',
           zIndex: 100
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

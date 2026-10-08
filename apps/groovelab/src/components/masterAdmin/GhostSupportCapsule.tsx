@@ -343,7 +343,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
           inset: 0,
           zIndex: 9999990,
           pointerEvents: 'none',
-          boxShadow: 'inset 0 0 0 2px rgba(56, 189, 248, 0.35), inset 0 0 20px rgba(56, 189, 248, 0.08)',
+          border: '2px solid rgba(56, 189, 248, 0.5)', boxShadow: 'none',
           transition: 'box-shadow 0.3s ease'
         }} 
       />
@@ -427,7 +427,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 8px rgba(56, 189, 248, 0.5)',
+                boxShadow: 'none',
                 flexShrink: 0
               }}>
                 <Eye size={12} color="#ffffff" />
@@ -582,7 +582,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease',
                 flexShrink: 0
               }}

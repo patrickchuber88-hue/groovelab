@@ -690,7 +690,7 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
               borderRadius: '11px',
               background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
               border: '1px solid rgba(255, 255, 255, 0.4)',
-              boxShadow: '0 4px 10px rgba(22, 163, 74, 0.25)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

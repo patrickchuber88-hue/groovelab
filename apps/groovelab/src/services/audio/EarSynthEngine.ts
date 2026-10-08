@@ -128,41 +128,51 @@ export class EarSynthEngine {
         velocity,
         destination: this.masterGain
       });
-    } else {
-      // 🎻 Warme Streicher / Strings-Pad: Sägezahn + Tiefpass mit weichem Einblenden
+      // 🎻 0,1% Warme Streicher (3-stimmiges Ensemble mit Orchester-Chorus & Butterworth-Holzfilter)
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
+      const osc3 = ctx.createOscillator();
       const filter = ctx.createBiquadFilter();
       const voiceGain = ctx.createGain();
 
       osc1.type = 'sawtooth';
       osc1.frequency.setValueAtTime(freq, now);
+      osc1.detune.setValueAtTime(0, now);
 
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(freq * 1.002, now); // Subtiles Schwebungs-Detune
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(freq, now);
+      osc2.detune.setValueAtTime(3.8, now); // +3.8 Cent Schwebung (Geigen-Chorus)
+
+      osc3.type = 'triangle';
+      osc3.frequency.setValueAtTime(freq, now);
+      osc3.detune.setValueAtTime(-3.8, now); // -3.8 Cent Schwebung (Cello/Viola-Körper)
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(2400, now);
-      filter.Q.setValueAtTime(2.0, now);
+      const cutoff = Math.min(6500, Math.max(1800, freq * 4.2));
+      filter.frequency.setValueAtTime(cutoff, now);
+      filter.Q.setValueAtTime(0.707, now); // Butterworth Dämpfung ohne steile Synth-Resonanzspitze
 
-      const attack = Math.min(0.08, duration * 0.2);
-      const release = 0.14;
+      const attack = 0.07; // 70ms weicher Bogenansatz
+      const release = 0.18; // 180ms samtiges Legato-Ausklingen
       const noteEndTime = now + duration;
 
       voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(velocity * 0.75, now + attack);
-      voiceGain.gain.setValueAtTime(velocity * 0.68, Math.max(now + attack + 0.01, noteEndTime));
+      voiceGain.gain.linearRampToValueAtTime(velocity * 0.55, now + attack);
+      voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0005, velocity * 0.42), noteEndTime);
       voiceGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
       osc1.connect(filter);
       osc2.connect(filter);
+      osc3.connect(filter);
       filter.connect(voiceGain);
       voiceGain.connect(this.masterGain);
 
       osc1.start(now);
       osc2.start(now);
+      osc3.start(now);
       osc1.stop(noteEndTime + release + 0.02);
       osc2.stop(noteEndTime + release + 0.02);
+      osc3.stop(noteEndTime + release + 0.02);
     }
   }
 
@@ -202,14 +212,14 @@ export class EarSynthEngine {
       this.playNote(targetMidi, durationPerNote, 0.38, 0, customTimbre);
       this.playNote(rootMidi, durationPerNote + 0.2, 0.35, durationPerNote * 0.9, customTimbre);
     } else {
-      // Harmonisch (gleichzeitig)
-      this.playNote(rootMidi, durationPerNote * 1.5, 0.3, 0, customTimbre);
-      this.playNote(targetMidi, durationPerNote * 1.5, 0.3, 0, customTimbre);
+      // Harmonisch (gleichzeitig mit 5ms natürlichem Griffversatz)
+      this.playNote(rootMidi, durationPerNote * 1.5, 0.30, 0, customTimbre);
+      this.playNote(targetMidi, durationPerNote * 1.5, 0.30, 0.005, customTimbre);
     }
   }
 
   /**
-   * Spielt einen Akkord (Block oder Arpeggio)
+   * Spielt einen Akkord (Block oder Arpeggio) mit 0,1% Human Strumming & Headroom-Schutz
    */
   public playChord(
     rootMidi: number, 
@@ -218,21 +228,25 @@ export class EarSynthEngine {
     totalDuration: number = 2.0,
     customTimbre?: SoundEngineTimbre
   ) {
+    const headRoom = Math.max(0.42, 1.0 / Math.sqrt(intervals.length));
+
     if (mode === 'block') {
-      intervals.forEach(semi => {
-        this.playNote(rootMidi + semi, totalDuration, 0.28, 0, customTimbre);
+      intervals.forEach((semi, idx) => {
+        // 7ms subtiles Human-Strumming für organisches Greifen
+        const noteDelay = idx * 0.007;
+        this.playNote(rootMidi + semi, totalDuration, 0.32 * headRoom, noteDelay, customTimbre);
       });
     } else if (mode === 'arpeggio_up') {
       const step = 0.22;
       intervals.forEach((semi, idx) => {
-        this.playNote(rootMidi + semi, totalDuration - (idx * step), 0.32, idx * step, customTimbre);
+        this.playNote(rootMidi + semi, totalDuration - (idx * step), 0.36 * headRoom, idx * step, customTimbre);
       });
     } else {
       // Arpeggio down
       const reversed = [...intervals].reverse();
       const step = 0.22;
       reversed.forEach((semi, idx) => {
-        this.playNote(rootMidi + semi, totalDuration - (idx * step), 0.32, idx * step, customTimbre);
+        this.playNote(rootMidi + semi, totalDuration - (idx * step), 0.36 * headRoom, idx * step, customTimbre);
       });
     }
   }

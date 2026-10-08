@@ -264,13 +264,13 @@ export function StudentBandMatchingSuite({
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
-                                      boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)',
+                                      boxShadow: 'none',
                                       gap: '16px',
                                       marginBottom: '20px',
                                       animation: 'slideUp 0.3s ease-out'
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                        <div style={{ background: '#34a853', color: 'white', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(52, 168, 83, 0.2)' }}>
+                                        <div style={{ background: '#34a853', color: 'white', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
                                           <CheckCircle size={24} />
                                         </div>
                                         <div>
@@ -502,7 +502,7 @@ export function StudentBandMatchingSuite({
                                               background: 'linear-gradient(135deg, #fef08a, #fde047)', 
                                               color: '#854d0e', borderRadius: '20px', fontWeight: 900, textAlign: 'center',
                                               border: '1px solid #eab308',
-                                              boxShadow: '0 8px 25px rgba(234,179,8,0.2)',
+                                              boxShadow: 'none',
                                               fontSize: '1rem',
                                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                                             }}>
@@ -537,7 +537,7 @@ export function StudentBandMatchingSuite({
                                                   color: '#0f172a',
                                                   fontWeight: 900,
                                                   border: 'none',
-                                                  boxShadow: '0 12px 28px rgba(234, 179, 8, 0.35)',
+                                                  boxShadow: 'none',
                                                   minHeight: '44px',
                                                   touchAction: 'manipulation'
                                                 }}

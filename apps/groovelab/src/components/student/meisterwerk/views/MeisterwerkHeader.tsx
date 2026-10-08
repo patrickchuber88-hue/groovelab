@@ -240,7 +240,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   fontWeight: 850,
                   fontSize: '0.76rem',
                   flexShrink: 0,
-                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)'
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
                 title="Hausaufgabe an Schüler zuweisen"
@@ -623,7 +623,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   fontWeight: 850,
                   fontSize: '0.80rem',
                   flexShrink: 0,
-                  boxShadow: '0 2px 10px rgba(2, 132, 199, 0.35)'
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
                 title="Hausaufgabe an Schüler zuweisen"
@@ -775,7 +775,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
             color: '#92400e',
             zIndex: 45,
             flexShrink: 0,
-            boxShadow: '0 2px 6px rgba(245, 158, 11, 0.10)'
+            boxShadow: 'none'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

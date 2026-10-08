@@ -145,9 +145,9 @@ export const StudentContributionsModal: React.FC<StudentContributionsModalProps>
         {/* Close Button */}
         <button 
           onClick={onClose}
-          style={{ background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', border: 'none', borderRadius: '14px', padding: '12px 20px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', marginTop: '28px', width: '100%', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)', transition: 'all 0.2s' }}
-          onMouseOver={e => e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 168, 83, 0.25)'}
-          onMouseOut={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 168, 83, 0.15)'}
+          style={{ background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', border: 'none', borderRadius: '14px', padding: '12px 20px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', marginTop: '28px', width: '100%', boxShadow: 'none', transition: 'all 0.2s' }}
+          onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
+          onMouseOut={e => e.currentTarget.style.opacity = '1'}
         >
           Schließen
         </button>

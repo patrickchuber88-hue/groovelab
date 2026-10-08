@@ -1742,7 +1742,7 @@ export const SongArchitectureWizardModal: React.FC<SongArchitectureWizardModalPr
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 10px rgba(22, 163, 74, 0.3)'
+                boxShadow: 'none'
               }}
               className="hover-scale"
             >

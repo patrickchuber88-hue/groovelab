@@ -75,9 +75,10 @@ export function transposePitch(pitch: string, semitones: number, preferFlats: bo
 
 /**
  * Resolves guitar fret and string for standard tuning (E4, B3, G3, D3, A2, E2).
+ * 0,1% Goldstandard: Gibt null bei Pausen (REST) oder ungültigen Pitches zurück.
  */
-export function calculateGuitarFretAndString(pitch: string): { fret: number; stringIndex: number } {
-  if (pitch === 'REST') return { fret: 0, stringIndex: 0 };
+export function calculateGuitarFretAndString(pitch: string): { fret: number; stringIndex: number } | null {
+  if (!pitch || pitch === 'REST') return null;
   
   // Standard guitar string base pitches in semitones (octave * 12 + noteVal)
   const guitarStrings = [
@@ -90,7 +91,7 @@ export function calculateGuitarFretAndString(pitch: string): { fret: number; str
   ];
 
   const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
-  if (!match) return { fret: 0, stringIndex: 0 };
+  if (!match) return null;
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   const targetSemi = (octave + 1) * 12 + noteVal;
@@ -103,15 +104,16 @@ export function calculateGuitarFretAndString(pitch: string): { fret: number; str
     }
   }
 
-  return { fret: 0, stringIndex: 0 };
+  return null;
 }
 
 /**
  * Resolves E-Bass fret and string for standard 4-string tuning (G2, D2, A1, E1).
  * Completely replaces legacy '% 7' modulo hack with real ergonomic bass fretboard math.
+ * 0,1% Goldstandard: Gibt null bei Pausen (REST) zurück.
  */
-export function calculateBassFretAndString(pitch: string): { fret: number; stringIndex: number } {
-  if (pitch === 'REST') return { fret: 0, stringIndex: 0 };
+export function calculateBassFretAndString(pitch: string): { fret: number; stringIndex: number } | null {
+  if (!pitch || pitch === 'REST') return null;
 
   const bassStrings = [
     { name: 'G2', base: 43 }, // index 0 (G string)
@@ -121,7 +123,7 @@ export function calculateBassFretAndString(pitch: string): { fret: number; strin
   ];
 
   const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
-  if (!match) return { fret: 0, stringIndex: 0 };
+  if (!match) return null;
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   const targetSemi = (octave + 1) * 12 + noteVal;
@@ -140,15 +142,16 @@ export function calculateBassFretAndString(pitch: string): { fret: number; strin
     return { fret: Math.min(20, topDiff), stringIndex: 0 };
   }
 
-  return { fret: 0, stringIndex: 3 };
+  return null;
 }
 
 /**
  * Resolves Ukulele fret and string for standard G-C-E-A tuning.
  * Completely replaces legacy '% 5' modulo hack.
+ * 0,1% Goldstandard: Gibt null bei Pausen (REST) zurück.
  */
-export function calculateUkuleleFretAndString(pitch: string): { fret: number; stringIndex: number } {
-  if (pitch === 'REST') return { fret: 0, stringIndex: 0 };
+export function calculateUkuleleFretAndString(pitch: string): { fret: number; stringIndex: number } | null {
+  if (!pitch || pitch === 'REST') return null;
 
   // Standard Ukulele strings: 1st=A4 (69), 2nd=E4 (64), 3rd=C4 (60), 4th=G4 (67)
   const ukeStrings = [
@@ -159,7 +162,7 @@ export function calculateUkuleleFretAndString(pitch: string): { fret: number; st
   ];
 
   const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
-  if (!match) return { fret: 0, stringIndex: 0 };
+  if (!match) return null;
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   const targetSemi = (octave + 1) * 12 + noteVal;
@@ -171,18 +174,19 @@ export function calculateUkuleleFretAndString(pitch: string): { fret: number; st
     }
   }
 
-  return { fret: 0, stringIndex: 0 };
+  return null;
 }
 
 /**
  * Resolves Violin (Geige) string and 1st-position fingering (0-4).
  * Strings: 0=E5 (64), 1=A4 (57), 2=D4 (50), 3=G3 (43).
+ * 0,1% Goldstandard: Gibt null bei Pausen (REST) zurück.
  */
-export function calculateViolinStringAndFinger(pitch: string): { finger: number; stringIndex: number } {
-  if (pitch === 'REST') return { finger: 0, stringIndex: 0 };
+export function calculateViolinStringAndFinger(pitch: string): { finger: number; stringIndex: number } | null {
+  if (!pitch || pitch === 'REST') return null;
 
   const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
-  if (!match) return { finger: 0, stringIndex: 0 };
+  if (!match) return null;
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   const targetSemi = octave * 12 + noteVal;
@@ -219,12 +223,13 @@ export function calculateViolinStringAndFinger(pitch: string): { finger: number;
  * Resolves Viola / Cello string and 1st-position fingering (0-4).
  * Viola: 0=A4 (57), 1=D4 (50), 2=G3 (43), 3=C3 (36).
  * Cello: 0=A3 (45), 1=D3 (38), 2=G2 (31), 3=C2 (24).
+ * 0,1% Goldstandard: Gibt null bei Pausen (REST) zurück.
  */
-export function calculateViolaCelloStringAndFinger(pitch: string, isCello: boolean = false): { finger: number; stringIndex: number } {
-  if (pitch === 'REST') return { finger: 0, stringIndex: 0 };
+export function calculateViolaCelloStringAndFinger(pitch: string, isCello: boolean = false): { finger: number; stringIndex: number } | null {
+  if (!pitch || pitch === 'REST') return null;
 
   const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
-  if (!match) return { finger: 0, stringIndex: 0 };
+  if (!match) return null;
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   const targetSemi = octave * 12 + noteVal;
@@ -261,12 +266,13 @@ export function calculateViolaCelloStringAndFinger(pitch: string, isCello: boole
 /**
  * Resolves Double Bass (Kontrabass) string and fingering (0, 1, 2, 4).
  * Strings: 0=G2 (31), 1=D2 (26), 2=A1 (21), 3=E1 (16).
+ * 0,1% Goldstandard: Gibt null bei Pausen (REST) zurück.
  */
-export function calculateDoubleBassStringAndFinger(pitch: string): { finger: number; stringIndex: number } {
-  if (pitch === 'REST') return { finger: 0, stringIndex: 0 };
+export function calculateDoubleBassStringAndFinger(pitch: string): { finger: number; stringIndex: number } | null {
+  if (!pitch || pitch === 'REST') return null;
 
   const match = pitch.match(/^([A-G][#b]?)([0-9])$/);
-  if (!match) return { finger: 0, stringIndex: 0 };
+  if (!match) return null;
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   const targetSemi = octave * 12 + noteVal;
@@ -378,12 +384,13 @@ export function projectScoreForInstrument(
         tabLabel: 'TAB',
         tabStringLabels: ['e', 'B', 'G', 'D', 'A', 'E'],
         notes: score.notes.map(note => {
-          const tab = calculateGuitarFretAndString(note.pitch);
+          const isRest = note.pitch === 'REST';
+          const tab = (enableTabs && !isRest) ? calculateGuitarFretAndString(note.pitch) : null;
           return {
             ...note,
             displayPitch: note.pitch,
-            displayFret: enableTabs ? tab.fret : undefined,
-            displayString: enableTabs ? tab.stringIndex : undefined
+            displayFret: tab?.fret,
+            displayString: tab?.stringIndex
           };
         })
       };
@@ -400,13 +407,14 @@ export function projectScoreForInstrument(
         tabLabel: 'TAB',
         tabStringLabels: ['G', 'D', 'A', 'E'],
         notes: score.notes.map(note => {
+          const isRest = note.pitch === 'REST';
           const lowerPitch = transposePitch(note.pitch, -12, isFlatKey);
-          const tab = calculateBassFretAndString(lowerPitch);
+          const tab = (enableTabs && !isRest) ? calculateBassFretAndString(lowerPitch) : null;
           return {
             ...note,
             displayPitch: lowerPitch,
-            displayFret: enableTabs ? tab.fret : undefined,
-            displayString: enableTabs ? tab.stringIndex : undefined
+            displayFret: tab?.fret,
+            displayString: tab?.stringIndex
           };
         })
       };
@@ -423,12 +431,13 @@ export function projectScoreForInstrument(
         tabLabel: 'TAB',
         tabStringLabels: ['A', 'E', 'C', 'G'],
         notes: score.notes.map(note => {
-          const tab = calculateUkuleleFretAndString(note.pitch);
+          const isRest = note.pitch === 'REST';
+          const tab = (enableTabs && !isRest) ? calculateUkuleleFretAndString(note.pitch) : null;
           return {
             ...note,
             displayPitch: note.pitch,
-            displayFret: enableTabs ? tab.fret : undefined,
-            displayString: enableTabs ? tab.stringIndex : undefined
+            displayFret: tab?.fret,
+            displayString: tab?.stringIndex
           };
         })
       };
@@ -446,14 +455,17 @@ export function projectScoreForInstrument(
         tabLabel: 'FING',
         tabStringLabels: isViola ? ['A', 'D', 'G', 'C'] : ['E', 'A', 'D', 'G'],
         notes: score.notes.map(note => {
-          const fingering = isViola
-            ? calculateViolaCelloStringAndFinger(note.pitch, false)
-            : calculateViolinStringAndFinger(note.pitch);
+          const isRest = note.pitch === 'REST';
+          const fingering = (enableTabs && !isRest)
+            ? (isViola
+                ? calculateViolaCelloStringAndFinger(note.pitch, false)
+                : calculateViolinStringAndFinger(note.pitch))
+            : null;
           return {
             ...note,
             displayPitch: note.pitch,
-            displayFret: enableTabs ? fingering.finger : undefined,
-            displayString: enableTabs ? fingering.stringIndex : undefined
+            displayFret: fingering?.finger,
+            displayString: fingering?.stringIndex
           };
         })
       };
@@ -471,15 +483,18 @@ export function projectScoreForInstrument(
         tabLabel: 'FING',
         tabStringLabels: isDoubleBass ? ['G', 'D', 'A', 'E'] : ['A', 'D', 'G', 'C'],
         notes: score.notes.map(note => {
+          const isRest = note.pitch === 'REST';
           const lowerPitch = transposePitch(note.pitch, -12, isFlatKey);
-          const fingering = isDoubleBass
-            ? calculateDoubleBassStringAndFinger(lowerPitch)
-            : calculateViolaCelloStringAndFinger(lowerPitch, true);
+          const fingering = (enableTabs && !isRest)
+            ? (isDoubleBass
+                ? calculateDoubleBassStringAndFinger(lowerPitch)
+                : calculateViolaCelloStringAndFinger(lowerPitch, true))
+            : null;
           return {
             ...note,
             displayPitch: lowerPitch,
-            displayFret: enableTabs ? fingering.finger : undefined,
-            displayString: enableTabs ? fingering.stringIndex : undefined
+            displayFret: fingering?.finger,
+            displayString: fingering?.stringIndex
           };
         })
       };

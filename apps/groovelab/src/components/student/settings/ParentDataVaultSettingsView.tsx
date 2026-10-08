@@ -240,7 +240,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 3px 10px rgba(37, 99, 235, 0.2)',
+              boxShadow: 'none',
               opacity: downloadingSection !== null ? 0.6 : 1
             }}
             className="hover-scale"
@@ -305,7 +305,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 3px 10px rgba(162, 28, 175, 0.2)',
+              boxShadow: 'none',
               opacity: downloadingSection !== null ? 0.6 : 1
             }}
             className="hover-scale"
@@ -370,7 +370,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 3px 10px rgba(22, 163, 74, 0.2)',
+              boxShadow: 'none',
               opacity: downloadingSection !== null ? 0.6 : 1
             }}
             className="hover-scale"

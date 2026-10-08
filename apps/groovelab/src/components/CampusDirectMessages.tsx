@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { logApplicationAudit } from '../services/auditLogService';
 import { CampusGroovelabText } from './CampusGroovelabBrand';
@@ -74,9 +74,10 @@ import { CampusTopicCard, CampusTopicReaction } from './CampusTopicCard';
 import { CampusTopicComposer } from './CampusTopicComposer';
 import { logSecurityEvent } from '../services/auditLogService';
 import { primeDecryptedCache } from '../lib/security/messageCrypto';
-import { CompactAppointmentEventCard, parseLocalDate, extractOccurrenceDateFromMessage } from './messages/CompactAppointmentEventCard';
+import { extractOccurrenceDateFromMessage, parseLocalDate } from './messages/CompactAppointmentEventCard';
 import { CampusUnifiedChatMessage } from './messages/CampusUnifiedChatMessage';
 import { playChatMessageSentSound, triggerChatHapticFeedback } from '../utils/chatSoundAndHaptics';
+import { getLocalGroupsCache, setLocalGroupsCache, getLocalChannelsCache, setLocalChannelsCache, getLocalTeachersCache, setLocalTeachersCache } from '../hooks/useCampusMessagingData';
 
 const GROUP_ICON_MAP: Record<string, any> = {
   guitar: Guitar, acoustic_guitar: Music, piano: Layers, drums: Disc, mic: Mic, violin: Activity,
@@ -124,18 +125,12 @@ export const resolveGroupIconAndColor = (group: any) => {
 };
 
 export const APPLE_AVATAR_GRADIENTS = [
-  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', text: '#ffffff' }, // Emerald
-  { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', text: '#ffffff' }, // Royal Blue
-  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', text: '#ffffff' }, // Violet / Amethyst
-  { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', text: '#ffffff' }, // Amber / Gold
-  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', text: '#ffffff' }, // Rose / Pink
-  { bg: 'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)', text: '#ffffff' }, // Cyan / Ocean
-  { bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', text: '#ffffff' }, // Sunset Orange
-  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', text: '#ffffff' }, // Teal
-  { bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', text: '#ffffff' }, // Studio Indigo
-  { bg: 'linear-gradient(135deg, #e11d48 0%, #9f1239 100%)', text: '#ffffff' }, // Crimson
-  { bg: 'linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)', text: '#ffffff' }, // Lime / Olive
-  { bg: 'linear-gradient(135deg, #64748b 0%, #334155 100%)', text: '#ffffff' }  // Slate / Graphit
+  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', text: '#ffffff' },
+  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', text: '#ffffff' },
+  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)', text: '#ffffff' },
+  { bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', text: '#ffffff' },
+  { bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #e11d48 0%, #9f1239 100%)', text: '#ffffff' },
+  { bg: 'linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #64748b 0%, #334155 100%)', text: '#ffffff' }
 ];
 
 export const getDeterministicAvatarGradient = (userOrNameOrId: any, fallbackInitial?: string) => {
@@ -225,14 +220,10 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
     return (
       <div style={{ position: 'relative', flexShrink: 0, ...style }}>
         <div style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: `${radius}px`,
+          width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`,
           background: variant === 'on-dark' ? 'rgba(255, 255, 255, 0.22)' : `${colorKey}16`,
           border: variant === 'on-dark' ? '1.5px solid rgba(255, 255, 255, 0.38)' : `1.5px solid ${colorKey}38`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.15)' : `0 2px 8px ${colorKey}18`,
           boxSizing: 'border-box'
         }}>
@@ -240,22 +231,9 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
         </div>
         {(user.unreadCount || 0) > 0 && (
           <div style={{
-            position: 'absolute',
-            bottom: '-2px',
-            right: '-2px',
-            background: '#ea4335',
-            color: 'white',
-            borderRadius: '50%',
-            width: '18px',
-            height: '18px',
-            fontSize: '0.65rem',
-            fontWeight: 900,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)',
-            zIndex: 2
+            position: 'absolute', bottom: '-2px', right: '-2px', background: '#ea4335', color: 'white',
+            borderRadius: '50%', width: '18px', height: '18px', fontSize: '0.65rem', fontWeight: 900,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', boxShadow: 'none', zIndex: 2
           }}>
             {user.unreadCount}
           </div>
@@ -295,21 +273,10 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
     <div style={{ position: 'relative', flexShrink: 0, ...style }}>
       <div 
         style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: '50%',
-          background: gradient.bg,
-          border: '2px solid #ffffff',
-          boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: gradient.text,
-          fontWeight: 850,
-          fontSize: fontSize,
-          letterSpacing: '-0.02em',
-          userSelect: 'none',
-          boxSizing: 'border-box'
+          width: `${size}px`, height: `${size}px`, borderRadius: '50%', background: gradient.bg,
+          border: '2px solid #ffffff', boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: gradient.text,
+          fontWeight: 850, fontSize: fontSize, letterSpacing: '-0.02em', userSelect: 'none', boxSizing: 'border-box'
         }}
       >
         <span>{initials}</span>
@@ -320,19 +287,9 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
         <div 
           title="Verifizierte Lehrkraft"
           style={{
-            position: 'absolute',
-            bottom: '-2px',
-            right: '-2px',
-            width: `${cornerBadgeSize}px`,
-            height: `${cornerBadgeSize}px`,
-            borderRadius: '50%',
-            background: '#15803d',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
-            zIndex: 2
+            position: 'absolute', bottom: '-2px', right: '-2px', width: `${cornerBadgeSize}px`, height: `${cornerBadgeSize}px`,
+            borderRadius: '50%', background: '#15803d', border: 'none', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.18)', zIndex: 2
           }}
         >
           <GraduationCap size={Math.round(cornerBadgeSize * 0.65)} color="#ffffff" strokeWidth={2.4} />
@@ -341,19 +298,9 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
         <div 
           title="Erziehungsberechtigte"
           style={{
-            position: 'absolute',
-            bottom: '-2px',
-            right: '-2px',
-            width: `${cornerBadgeSize}px`,
-            height: `${cornerBadgeSize}px`,
-            borderRadius: '50%',
-            background: '#1d4ed8',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
-            zIndex: 2
+            position: 'absolute', bottom: '-2px', right: '-2px', width: `${cornerBadgeSize}px`, height: `${cornerBadgeSize}px`,
+            borderRadius: '50%', background: '#1d4ed8', border: 'none', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.18)', zIndex: 2
           }}
         >
           <ShieldCheck size={Math.round(cornerBadgeSize * 0.65)} color="#ffffff" strokeWidth={2.4} />
@@ -393,7 +340,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           border: 'none',
-          boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)',
+          boxShadow: 'none',
           zIndex: 3
         }}>
           {user.unreadCount}
@@ -434,14 +381,7 @@ interface CampusDirectMessagesProps {
   currentUserId?: string;
   schoolUsers: any[];
   campusMessages: any[];
-  onSendMessage: (
-    recipientId: string, 
-    content: string, 
-    groupId?: string, 
-    channelId?: string, 
-    parentMessageId?: string, 
-    subject?: string
-  ) => Promise<any>;
+  onSendMessage: (recipientId: string, content: string, groupId?: string, channelId?: string, parentMessageId?: string, subject?: string) => Promise<any>;
   onMarkAsRead: (senderId: string) => Promise<void>;
   onMarkGroupAsRead?: (groupId: string) => Promise<void>;
   onMarkChannelAsRead?: (channelId: string, groupId: string) => Promise<void>;
@@ -460,30 +400,63 @@ export function CampusDirectMessages({
   onMarkAsRead,
   onMarkGroupAsRead,
   onMarkChannelAsRead,
-  selectedRecipient,
+  selectedRecipient: rawSelectedRecipient,
   setSelectedRecipient,
   studentToTeacherChat = true,
   onNavigateToSchedule
 }: CampusDirectMessagesProps) {
-  console.log('[CampusDirectMessages Debug]', {
-    user,
-    schoolUsersLength: schoolUsers?.length,
-    schoolUsersSample: schoolUsers?.[0],
-    isStudent: user?.role?.toLowerCase() === 'student'
-  });
+  const effectiveUid = currentUserId || 
+    (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id')) : null) || 
+    user?.id;
+
+  const checkIsMobile = () => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+  };
+  const [isMobile, setIsMobile] = useState(checkIsMobile);
+
+  const seedTeacher = useMemo(() => {
+    if (user?.role?.toLowerCase() === 'student' && user?.teacher_id) {
+      const match = (schoolUsers || []).find((su: any) => su.id === user.teacher_id);
+      if (match) return match;
+      if (user?.teacher_name) return { id: user.teacher_id, first_name: user.teacher_name, role: 'teacher' };
+    }
+    return null;
+  }, [user?.role, user?.teacher_id, user?.teacher_name, schoolUsers]);
+
+  const selectedRecipient = rawSelectedRecipient || (!isMobile && seedTeacher ? seedTeacher : null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [typedMessage, setTypedMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUpRef = useRef(false);
+  const lastRecipientIdRef = useRef<string | null>(null);
+  const lastChannelIdRef = useRef<string | null>(null);
+  const lastSubTabRef = useRef<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
-  const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
+  const [assignedStudents, setAssignedStudents] = useState<any[]>(() => {
+    const studentId = effectiveUid || user?.id || '';
+    const cachedTeachers = getLocalTeachersCache(studentId);
+    if (cachedTeachers && cachedTeachers.length > 0) return cachedTeachers;
+    if (user?.role?.toLowerCase() === 'student' && user?.teacher_id) {
+      const match = (schoolUsers || []).find((su: any) => su.id === user.teacher_id);
+      if (match) return [match];
+      if (user?.teacher_name) return [{ id: user.teacher_id, first_name: user.teacher_name, role: 'teacher' }];
+    }
+    return [];
+  });
+  const [isAssignedLoading, setIsAssignedLoading] = useState<boolean>(() => {
+    const studentId = effectiveUid || user?.id || '';
+    const cached = getLocalTeachersCache(studentId);
+    return !(cached.length > 0 || (user?.role?.toLowerCase() === 'student' && user?.teacher_id));
+  });
   const [respectWarning, setRespectWarning] = useState<ChatRespectValidationResult | null>(null);
 
   // Groups & Channels State
   const [activeMainTab, setActiveMainTab] = useState<'students' | 'groups'>('students');
-  const [campusGroups, setCampusGroups] = useState<any[]>([]);
+  const [campusGroups, setCampusGroups] = useState<any[]>(() => getLocalGroupsCache(effectiveUid || user?.id || ''));
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [groupMembersDetails, setGroupMembersDetails] = useState<any[]>([]);
@@ -545,12 +518,6 @@ export function CampusDirectMessages({
     if (!isTeacher) return false;
     return isQuietHoursActive(selectedRecipient.quiet_hours);
   }, [selectedRecipient]);
-  const checkIsMobile = () => {
-    if (typeof window === 'undefined') return false;
-    return window.innerWidth < 768 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
-  };
-
-  const [isMobile, setIsMobile] = useState(checkIsMobile);
 
 // 🛡️ Tier-1 Enterprise+ Local Storage Read Receipts Cache (Offline-First / Zero-Bounce)
 const getLocalChannelReads = (uid: string): Map<string, number> => {
@@ -675,10 +642,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
   } catch (e) {}
 };
 
-  const effectiveUid = currentUserId || 
-    (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id')) : null) || 
-    user?.id;
-
   const isStudentViewer = typeof window !== 'undefined' && (
     sessionStorage.getItem('groovelab_active_workspace') === 'student' ||
     Boolean(sessionStorage.getItem('groovelab_selected_student_id')) ||
@@ -784,8 +747,34 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
           const teacherMap = new Map<string, any>();
 
-          // 1. Direct teacher_id on student profile
+          // 0,1% Goldstandard Instant Seed: SWR Cache & Direkte Lehrkraft sofort vorab registrieren (<1ms)
+          const cachedTeachers = getLocalTeachersCache(studentId);
+          cachedTeachers.forEach(t => { if (t?.id) teacherMap.set(t.id, t); });
+
           const directTeacherId = user?.teacher_id;
+          if (directTeacherId) {
+            const matchInSchool = (schoolUsers || []).find((su: any) => su.id === directTeacherId);
+            if (matchInSchool) {
+              teacherMap.set(directTeacherId, matchInSchool);
+            } else if (user?.teacher_name) {
+              teacherMap.set(directTeacherId, { id: directTeacherId, first_name: user.teacher_name, role: 'teacher' });
+            }
+          }
+          if (campusMessages && campusMessages.length > 0) {
+            campusMessages.forEach((m: any) => {
+              if (m.group_id) return;
+              const partnerId = m.sender_id === studentId ? m.recipient_id : m.sender_id;
+              if (partnerId && partnerId !== studentId && !teacherMap.has(partnerId)) {
+                const matchInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
+                if (matchInSchool) teacherMap.set(partnerId, matchInSchool);
+              }
+            });
+          }
+          if (teacherMap.size > 0) {
+            setAssignedStudents(Array.from(teacherMap.values()));
+          }
+
+          // 1. Direct teacher_id on student profile (Full remote sync)
           if (directTeacherId && isUUID(directTeacherId)) {
             const { data: directTeacher } = await supabase
               .from('users')
@@ -797,30 +786,32 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             }
           }
 
-          // 2. Teachers from schedules
+          // 2. Teachers from schedules with embedded relation
           try {
             const { data: scheds } = await supabase
               .from('schedules')
-              .select('teacher_id')
+              .select('teacher_id, teacher:users!teacher_id(id, first_name, last_name, photo_url, role)')
               .eq('student_id', studentId);
             (scheds || []).forEach((sc: any) => {
               if (sc.teacher_id && !teacherMap.has(sc.teacher_id)) {
                 const matchInSchool = (schoolUsers || []).find((su: any) => su.id === sc.teacher_id);
-                if (matchInSchool) teacherMap.set(sc.teacher_id, matchInSchool);
+                const teacherObj = matchInSchool || sc.teacher;
+                if (teacherObj) teacherMap.set(sc.teacher_id, teacherObj);
               }
             });
           } catch (e) {}
 
-          // 3. Teachers from schedule_occurrences
+          // 3. Teachers from schedule_occurrences with embedded relation
           try {
             const { data: occs } = await supabase
               .from('schedule_occurrences')
-              .select('teacher_id')
+              .select('teacher_id, teacher:users!teacher_id(id, first_name, last_name, photo_url, role)')
               .eq('student_id', studentId);
             (occs || []).forEach((o: any) => {
               if (o.teacher_id && !teacherMap.has(o.teacher_id)) {
                 const matchInSchool = (schoolUsers || []).find((su: any) => su.id === o.teacher_id);
-                if (matchInSchool) teacherMap.set(o.teacher_id, matchInSchool);
+                const teacherObj = matchInSchool || o.teacher;
+                if (teacherObj) teacherMap.set(o.teacher_id, teacherObj);
               }
             });
           } catch (e) {}
@@ -847,11 +838,13 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           }
 
           const result = Array.from(teacherMap.values());
-          console.log('[CampusDirectMessages] Teachers for student:', studentId, 'Count:', result.length);
           setAssignedStudents(result);
+          if (studentId && result.length > 0) {
+            setLocalTeachersCache(studentId, result);
+          }
         } catch (err) {
           console.error('[CampusDirectMessages] Error fetching student teachers:', err);
-        }
+        } finally { setIsAssignedLoading(false); }
       };
 
       fetchStudentTeachers();
@@ -1002,7 +995,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         setAssignedStudents(result);
       } catch (err) {
         console.error('[CampusDirectMessages] Unexpected error in fetchAssignedStudents:', err);
-      }
+      } finally { setIsAssignedLoading(false); }
     };
 
     fetchAssignedStudents();
@@ -1182,6 +1175,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       });
 
       setCampusGroups(processed);
+      if (uid) setLocalGroupsCache(uid, processed);
     } catch (err) {
       console.error('[CampusDirectMessages] Error in fetchCampusGroups:', err);
     }
@@ -1215,15 +1209,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
         if (g.unreadCount !== unreadCount || g.lastMessage?.id !== lastMsg?.id) {
           hasChanged = true;
-          return {
-            ...g,
-            lastMessage: lastMsg,
-            unreadCount,
-            lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(g.created_at)
-          };
+          return { ...g, lastMessage: lastMsg, unreadCount, lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(g.created_at) };
         }
         return g;
       });
+      if (hasChanged && uid) setLocalGroupsCache(uid, updated);
       return hasChanged ? updated : prev;
     });
   }, [campusMessages, effectiveUid, channelReads]);
@@ -1294,6 +1284,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
       const channels = data || [];
       setGroupChannels(channels);
+      if (groupId) setLocalChannelsCache(groupId, channels);
 
       // Goldstandard: Set active channel to first channel with unread messages, or default # allgemein
       setActiveChannelId(prev => {
@@ -1331,6 +1322,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
   useEffect(() => {
     if (selectedRecipient?.is_group && selectedRecipient?.id) {
+      const cached = getLocalChannelsCache(selectedRecipient.id);
+      if (cached && cached.length > 0) {
+        setGroupChannels(cached);
+        const def = cached.find((c: any) => c.is_default) || cached[0];
+        if (def) setActiveChannelId(def.id);
+      }
       fetchGroupChannels(selectedRecipient.id);
     } else {
       setGroupChannels([]);
@@ -1854,18 +1851,21 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
   // Controlled scroll to bottom of messages container
   const scrollToBottom = (smooth = false) => {
-    if (chatScrollContainerRef.current) {
-      chatScrollContainerRef.current.scrollTo({
-        top: chatScrollContainerRef.current.scrollHeight,
-        behavior: smooth ? 'smooth' : 'auto'
-      });
+    isUserScrolledUpRef.current = false;
+    const el = chatScrollContainerRef.current;
+    if (el) {
+      if (smooth) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
     } else {
       messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
     }
   };
 
   useEffect(() => {
-    if (!isMobile && !selectedRecipient) {
+    if (!isMobile && !rawSelectedRecipient) {
       if (isStudent && studentCombinedList.length > 0) {
         const unreadConvo = studentCombinedList.find(p => (p.unreadCount || 0) > 0);
         const directTeacher = studentCombinedList.find(p => !p.is_group && String(p.id) === String(user?.teacher_id));
@@ -1880,7 +1880,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         }
       }
     }
-  }, [isMobile, finalPartnersList, filteredGroupsList, studentCombinedList, selectedRecipient, setSelectedRecipient, user?.teacher_id, isStudent, activeMainTab]);
+  }, [isMobile, rawSelectedRecipient, isStudent, studentCombinedList, user?.teacher_id, setSelectedRecipient, activeMainTab, filteredGroupsList, finalPartnersList]);
 
   const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
 
@@ -1989,15 +1989,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       setGroupMembersDetails([]);
     }
   }, [selectedRecipient?.id, selectedRecipient?.is_group, user?.id]);
-
-  // 2. Instant scroll when changing recipient or channel (zero-wobble container scroll)
-  useEffect(() => {
-    if (!selectedRecipient) return;
-    const timer = setTimeout(() => {
-      scrollToBottom(false);
-    }, 20);
-    return () => clearTimeout(timer);
-  }, [selectedRecipient?.id, activeChannelId, activeSubTab]);
 
   // 3. Automatische Gelesen-Funktion (Auto-Read Engine)
   // Wenn ein Kanal oder eine Nachricht geöffnet wurde, gilt sie sofort und revisionssicher als gelesen.
@@ -2467,9 +2458,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     return activeThreadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m) && !extractOccurrenceDateFromMessage(m));
   }, [activeThreadMessages]);
 
-  // Genuine human messages in 1:1 chat (Chat tab: strictly human dialogues, excluding topics and thread replies)
+  // Genuine human messages in 1:1 chat (Chat tab: strictly human dialogues & topics, excluding thread replies)
   const humanMessages = useMemo(() => {
-    return activeThreadMessages.filter(m => !isSystemMessage(m) && !m.parent_message_id && !m.subject && m.message_type !== 'topic' && !String(m.content || '').startsWith('📌 ['));
+    return activeThreadMessages.filter(m => !isSystemMessage(m) && !m.parent_message_id);
   }, [activeThreadMessages]);
 
   // Count of genuine human messages in 1:1 chat (Chat tab)
@@ -2496,9 +2487,15 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
   }, [activeSubTab, allOccurrenceTabs]);
 
-  // Unified chronological timeline for 1:1 chat (including direct dialogues & system event cards, excluding topics & thread replies)
+  // 🛡️ 0.1% Goldstandard Unified Stream: All root messages (dialogues, appointments & topics) in chronological timeline
   const unifiedTimelineMessages = useMemo(() => {
-    return activeThreadMessages.filter(m => !m.parent_message_id && !m.subject && m.message_type !== 'topic' && !String(m.content || '').startsWith('📌 ['));
+    return activeThreadMessages.filter(m => !m.parent_message_id);
+  }, [activeThreadMessages]);
+
+  const topicRepliesCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    activeThreadMessages.forEach(m => { if (m.parent_message_id) map.set(m.parent_message_id, (map.get(m.parent_message_id) || 0) + 1); });
+    return map;
   }, [activeThreadMessages]);
 
   // 5. Messages displayed in the chat area for currently active sub-tab (Unified Timeline)
@@ -2506,8 +2503,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     const rawList = selectedRecipient?.is_group ? activeThreadMessages : unifiedTimelineMessages;
     
     // Canonical Coalescing & Deduplication of System Event Cards (0.1% Goldstandard)
-    // Coalesces duplicate system broadcasts (e.g. absence reset notification + cancellation_reset)
-    // for the same event date/occurrence within a 15-minute window into a single authoritative card.
+    const checkReactivation = (m: any, c: string, l: string) => m.message_type === 'cancellation_reset' || c.includes('🔄') || l.includes('reaktiviert') || l.includes('zurückgesetzt') || l.includes('wiederhergestellt') || l.includes('regulär statt') || l.includes('entwarnung') || l.includes('einsatzbereit');
+    const checkCancellation = (m: any, c: string, l: string) => (m.message_type === 'reschedule_notification' && (c.includes('❌') || l.includes('abgesagt'))) || c.includes('❌') || l.includes('termin abgesagt') || l.includes('fällt aus') || l.includes('abgesagt') || l.includes('storniert');
+
     const result: any[] = [];
     for (let i = 0; i < rawList.length; i++) {
       const msg = rawList[i];
@@ -2518,10 +2516,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
       const content = String(msg.content || '');
       const lower = content.toLowerCase();
-      const isReactivation = msg.message_type === 'cancellation_reset' ||
-        content.includes('🔄') || lower.includes('reaktiviert') || lower.includes('zurückgesetzt') || lower.includes('wiederhergestellt') || lower.includes('regulär statt') || lower.includes('entwarnung') || lower.includes('einsatzbereit');
-      const isCancellation = (msg.message_type === 'reschedule_notification' && (content.includes('❌') || lower.includes('abgesagt'))) ||
-        content.includes('❌') || lower.includes('termin abgesagt') || lower.includes('fällt aus') || lower.includes('abgesagt') || lower.includes('storniert');
+      const isReactivation = checkReactivation(msg, content, lower);
+      const isCancellation = checkCancellation(msg, content, lower);
 
       const occDate = extractOccurrenceDateFromMessage(msg) || (msg.occurrence_id ? String(msg.occurrence_id) : null);
       const msgTime = new Date(msg.created_at).getTime();
@@ -2531,35 +2527,95 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         if (!isSystemMessage(prev)) return false;
         const prevContent = String(prev.content || '');
         const prevLower = prevContent.toLowerCase();
-        const prevIsReactivation = prev.message_type === 'cancellation_reset' ||
-          prevContent.includes('🔄') || prevLower.includes('reaktiviert') || prevLower.includes('zurückgesetzt') || prevLower.includes('wiederhergestellt') || prevLower.includes('regulär statt') || prevLower.includes('entwarnung') || prevLower.includes('einsatzbereit');
-        const prevIsCancellation = (prev.message_type === 'reschedule_notification' && (prevContent.includes('❌') || prevLower.includes('abgesagt'))) ||
-          prevContent.includes('❌') || prevLower.includes('termin abgesagt') || prevLower.includes('fällt aus') || prevLower.includes('abgesagt') || prevLower.includes('storniert');
+        const prevIsReactivation = checkReactivation(prev, prevContent, prevLower);
+        const prevIsCancellation = checkCancellation(prev, prevContent, prevLower);
 
         const prevOccDate = extractOccurrenceDateFromMessage(prev) || (prev.occurrence_id ? String(prev.occurrence_id) : null);
         const prevTime = new Date(prev.created_at).getTime();
 
-        const timeDiff = Math.abs(msgTime - prevTime);
-        if (timeDiff > 15 * 60 * 1000) return false;
-
-        if (isReactivation && prevIsReactivation) {
-          if (occDate && prevOccDate && occDate === prevOccDate) return true;
-          if (!occDate || !prevOccDate) return true;
-        }
-        if (isCancellation && prevIsCancellation) {
-          if (occDate && prevOccDate && occDate === prevOccDate) return true;
-          if (!occDate || !prevOccDate) return true;
+        if (Math.abs(msgTime - prevTime) > 15 * 60 * 1000) return false;
+        const isSameType = (isReactivation && prevIsReactivation) || (isCancellation && prevIsCancellation);
+        if (isSameType) {
+          return (!occDate || !prevOccDate || occDate === prevOccDate);
         }
         return false;
       });
 
-      if (hasTwinInResult) {
-        continue;
+      if (!hasTwinInResult) {
+        result.push(msg);
       }
-      result.push(msg);
     }
     return result;
   }, [activeThreadMessages, selectedRecipient?.is_group, unifiedTimelineMessages]);
+
+  // 🛡️ 0.1% Enterprise Goldstandard: 4-Tier Frame-Anchored Scroll-to-Bottom Engine
+  useLayoutEffect(() => {
+    if (!selectedRecipient) return;
+    const el = chatScrollContainerRef.current;
+    if (!el) return;
+
+    // Reset user scroll lock when switching chats/channels/tabs
+    const isChatSwitch = lastRecipientIdRef.current !== selectedRecipient.id || 
+                         lastChannelIdRef.current !== activeChannelId ||
+                         lastSubTabRef.current !== activeSubTab;
+    if (isChatSwitch) {
+      isUserScrolledUpRef.current = false;
+      lastRecipientIdRef.current = selectedRecipient.id;
+      lastChannelIdRef.current = activeChannelId;
+      lastSubTabRef.current = activeSubTab;
+    }
+
+    if (isUserScrolledUpRef.current) return;
+
+    // Tier 1: Instant synchronous layout scroll (< 1ms before paint)
+    el.scrollTop = el.scrollHeight;
+
+    // Tier 2: Double requestAnimationFrame after browser layout & subgrid settling
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      if (chatScrollContainerRef.current && !isUserScrolledUpRef.current) {
+        chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight;
+      }
+      raf2 = requestAnimationFrame(() => {
+        if (chatScrollContainerRef.current && !isUserScrolledUpRef.current) {
+          chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight;
+        }
+      });
+    });
+
+    // Tier 3: 50ms fallback for deferred media/avatar loading
+    const timer = setTimeout(() => {
+      if (chatScrollContainerRef.current && !isUserScrolledUpRef.current) {
+        chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight;
+      }
+    }, 50);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(timer);
+    };
+  }, [selectedRecipient?.id, activeChannelId, activeSubTab, displayedMessages.length]);
+
+  // Tier 4: ResizeObserver on chat container to re-anchor when images/audio load
+  useEffect(() => {
+    const el = chatScrollContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (!isUserScrolledUpRef.current && chatScrollContainerRef.current) {
+        chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight;
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const handleChatScroll = useCallback(() => {
+    const el = chatScrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isUserScrolledUpRef.current = distanceFromBottom > 150;
+  }, []);
 
   const activeRootTopics = useMemo(() => {
     if (selectedRecipient?.is_group) {
@@ -2876,17 +2932,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               placeholder={isStudent ? "Suchen..." : activeMainTab === 'groups' ? "Gruppe suchen..." : "Schüler suchen..."}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 38px',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                background: 'white',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
+              style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -2896,22 +2942,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               type="button"
               onClick={() => setFilterType('all')}
               style={{
-                padding: '10px 18px',
-                borderRadius: '999px',
-                border: 'none',
-                background: filterType === 'all' ? '#34a853' : '#e2e8f0',
-                color: filterType === 'all' ? 'white' : '#64748b',
-                fontSize: '0.82rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                minHeight: '44px',
-                minWidth: '44px',
-                touchAction: 'manipulation',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxSizing: 'border-box'
+                padding: '10px 18px', borderRadius: '999px', border: 'none',
+                background: filterType === 'all' ? '#34a853' : '#e2e8f0', color: filterType === 'all' ? 'white' : '#64748b',
+                fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', minHeight: '44px',
+                minWidth: '44px', touchAction: 'manipulation', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box'
               }}
             >
               Alle
@@ -2920,35 +2954,18 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               type="button"
               onClick={() => setFilterType('unread')}
               style={{
-                padding: '10px 18px',
-                borderRadius: '999px',
-                border: 'none',
-                background: filterType === 'unread' ? '#34a853' : '#e2e8f0',
-                color: filterType === 'unread' ? 'white' : '#64748b',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                minHeight: '36px',
-                boxSizing: 'border-box'
+                padding: '10px 18px', borderRadius: '999px', border: 'none',
+                background: filterType === 'unread' ? '#34a853' : '#e2e8f0', color: filterType === 'unread' ? 'white' : '#64748b',
+                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center',
+                gap: '6px', minHeight: '36px', boxSizing: 'border-box'
               }}
             >
               <span>Ungelesen</span>
               {(isStudent ? studentCombinedList.filter(p => (p.unreadCount || 0) > 0).length : activeMainTab === 'groups' ? filteredGroupsList.filter(g => (g.unreadCount || 0) > 0).length : partnersWithMetadata.filter(p => p.unreadCount > 0).length) > 0 && (
                 <span style={{
-                  background: filterType === 'unread' ? 'white' : '#34a853',
-                  color: filterType === 'unread' ? '#34a853' : 'white',
-                  borderRadius: '50%',
-                  width: '16px',
-                  height: '16px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.65rem',
-                  fontWeight: 900
+                  background: filterType === 'unread' ? 'white' : '#34a853', color: filterType === 'unread' ? '#34a853' : 'white',
+                  borderRadius: '50%', width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '0.65rem', fontWeight: 900
                 }}>
                   {isStudent ? studentCombinedList.filter(p => (p.unreadCount || 0) > 0).length : activeMainTab === 'groups' ? filteredGroupsList.filter(g => (g.unreadCount || 0) > 0).length : partnersWithMetadata.filter(p => p.unreadCount > 0).length}
                 </span>
@@ -2982,7 +2999,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                    boxShadow: 'none',
                     transition: 'all 0.2s',
                     minHeight: '44px'
                   }}
@@ -3022,7 +3039,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         borderRadius: '16px',
                         background: isSelected ? '#f0fdf4' : 'transparent',
                         border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
-                        boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
+                        boxShadow: 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
                         transition: 'all 0.2s',
@@ -3086,7 +3103,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           {/* STUDENT COMBINED LIST (TEACHERS + GROUPS) */}
           {isStudent && (
             <div>
-              {studentCombinedList.length === 0 ? (
+              {isAssignedLoading && studentCombinedList.length === 0 ? (
+                [1, 2, 3].map(i => (
+                  <div key={`skel-student-${i}`} className="animate-pulse" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', marginBottom: '6px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#f1f5f9' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ height: '14px', width: '60%', background: '#f1f5f9', borderRadius: '4px', marginBottom: '6px' }} />
+                      <div style={{ height: '10px', width: '40%', background: '#f1f5f9', borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                ))
+              ) : studentCombinedList.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
                   {filterType === 'unread' ? (
                     <>
@@ -3141,7 +3168,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           borderRadius: '16px',
                           background: isSelected ? '#f0fdf4' : 'transparent',
                           border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
-                          boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
+                          boxShadow: 'none',
                           cursor: 'pointer',
                           marginBottom: '6px',
                           transition: 'all 0.2s',
@@ -3224,7 +3251,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         borderRadius: '16px',
                         background: isSelected ? '#f0fdf4' : 'transparent',
                         border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
-                        boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
+                        boxShadow: 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
                         transition: 'all 0.2s',
@@ -3273,7 +3300,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           {/* TEACHER STUDENTS LIST */}
           {!isStudent && activeMainTab === 'students' && (
             <div>
-              {finalPartnersList.length === 0 ? (
+              {isAssignedLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
+                  {[1, 2, 3].map(i => <div key={`skel-tab-${i}`} className="animate-pulse" style={{ height: '48px', borderRadius: '12px', background: '#f1f5f9' }} />)}
+                </div>
+              ) : finalPartnersList.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
                   <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
                   <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Keine Chatpartner gefunden</div>
@@ -3308,7 +3339,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         borderRadius: '16px',
                         background: isSelected ? '#f0fdf4' : 'transparent',
                         border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
-                        boxShadow: isSelected ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none',
+                        boxShadow: 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
                         transition: 'all 0.2s',
@@ -3421,7 +3452,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               maxWidth: '100%',
               boxSizing: 'border-box',
               overflow: 'hidden',
-              boxShadow: '0 4px 16px rgba(21, 128, 61, 0.16)'
+              boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '14px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 {isMobile && (
@@ -3682,7 +3713,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           background: isActive ? '#34a853' : '#f1f5f9',
                           borderRadius: '100px',
                           padding: canDelete ? '2px 4px 2px 10px' : '2px 12px',
-                          boxShadow: isActive ? '0 2px 6px rgba(52, 168, 83, 0.28)' : 'none',
+                          boxShadow: 'none',
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -4084,7 +4115,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         alignItems: 'center',
                         gap: '5px',
                         transition: 'all 0.15s ease',
-                        boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale"
                     >
@@ -4111,6 +4142,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             {/* Message History */}
             <div 
               ref={chatScrollContainerRef}
+              onScroll={handleChatScroll}
               role="tabpanel"
               id={selectedRecipient.is_group ? `panel-${activeChannelId || 'default'}` : `panel-${activeSubTab}`}
               aria-labelledby={selectedRecipient.is_group ? `tab-${activeChannelId || 'default'}` : undefined}
@@ -4196,7 +4228,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     alignItems: isMobile ? 'stretch' : 'center',
                     justifyContent: 'space-between',
                     gap: isMobile ? '14px' : '16px',
-                    boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.1), 0 4px 10px -2px rgba(0,0,0,0.03)',
+                    boxShadow: 'none',
                     backdropFilter: 'blur(12px)',
                     boxSizing: 'border-box'
                   }}>
@@ -4209,7 +4241,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         borderRadius: '14px',
                         background: '#ffffff',
                         border: '1.5px solid #bbf7d0',
-                        boxShadow: '0 3px 10px rgba(52, 168, 83, 0.12)',
+                        boxShadow: 'none',
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
@@ -4318,7 +4350,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             gap: '8px',
                             flexWrap: 'wrap',
                             marginTop: '4px',
-                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.05)',
+                            boxShadow: 'none',
                             minWidth: 0
                           }}>
                             {/* Original Stammtermin Pill */}
@@ -4391,7 +4423,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
-                        boxShadow: stammterminText ? '0 3px 12px rgba(217, 119, 6, 0.3)' : '0 3px 12px rgba(52, 168, 83, 0.25)',
+                        boxShadow: 'none',
                         flexShrink: 0,
                         width: isMobile ? '100%' : 'auto',
                         minHeight: isMobile ? '44px' : undefined,
@@ -4468,7 +4500,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                               alignItems: 'center',
                               gap: '6px',
                               cursor: 'pointer',
-                              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                              boxShadow: 'none',
                               transition: 'all 0.15s ease',
                               touchAction: 'manipulation'
                             }}
@@ -4593,6 +4625,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       currentOcc={matchedOcc}
                       isSuperseded={isSuperseded}
                       appointmentContextLabel={occContext?.label}
+                      replyCount={topicRepliesCountMap.get(msg.id) || 0}
+                      onOpenTopicThread={(topicId) => {
+                        setOneOnOneMode('threads');
+                        setFocusedTopicId(topicId);
+                      }}
                     />
                   );
                 });
@@ -4671,7 +4708,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
-                        boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                        boxShadow: 'none',
                         whiteSpace: 'nowrap',
                         touchAction: 'manipulation'
                       }}
@@ -4914,7 +4951,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     }}
                     onFocus={e => {
                       e.target.style.borderColor = '#15803d';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(21, 128, 61, 0.12)';
+                      e.target.style.boxShadow = 'none';
                     }}
                     onBlur={e => {
                       e.target.style.borderColor = '#e2e8f0';
@@ -4941,7 +4978,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       justifyContent: 'center',
                       cursor: !typedMessage.trim() ? 'not-allowed' : 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: !typedMessage.trim() ? 'none' : '0 2px 8px rgba(21, 128, 61, 0.28)',
+                      boxShadow: 'none',
                       flexShrink: 0,
                       touchAction: 'manipulation'
                     }}
@@ -4989,18 +5026,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
-              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)'
+              boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: '14px',
-                  padding: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backdropFilter: 'blur(4px)'
-                }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '14px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
                   <MessageSquare size={26} color="white" />
                 </div>
                 <div>
@@ -5015,33 +5044,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
               {/* Status Badges */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                <span style={{
-                  padding: '4px 10px',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: '#ffffff',
-                  fontSize: '0.7rem',
-                  fontWeight: 800,
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, border: '1px solid rgba(255, 255, 255, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <ShieldCheck size={12} color="#ffffff" />
                   <span>DSGVO-Geschützt</span>
                 </span>
-                <span style={{
-                  padding: '4px 10px',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: '#ffffff',
-                  fontSize: '0.7rem',
-                  fontWeight: 800,
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, border: '1px solid rgba(255, 255, 255, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <Calendar size={12} color="#ffffff" />
                   <span>Stundenplan-Synchron</span>
                 </span>
@@ -5051,25 +5058,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             {/* Dashboard Content */}
             <div style={{ flex: 1, padding: isMobile ? '16px' : '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }} className="custom-scrollbar">
               {/* Quick Start Card */}
-              <div style={{
-                background: 'white',
-                borderRadius: '16px',
-                padding: '20px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row',
-                alignItems: isMobile ? 'flex-start' : 'center',
-                justifyContent: 'space-between',
-                gap: '16px'
-              }}>
+              <div style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: '16px' }}>
                 <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                    Wähle einen Gesprächspartner
-                  </h4>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, margin: '4px 0 0 0' }}>
-                    Wähle einen Chat aus der linken Liste oder klicke unten auf einen Kontakt, um eine Unterhaltung zu beginnen.
-                  </p>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Wähle einen Gesprächspartner</h4>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, margin: '4px 0 0 0' }}>Wähle einen Chat aus der linken Liste oder klicke unten auf einen Kontakt, um eine Unterhaltung zu beginnen.</p>
                 </div>
               </div>
 
@@ -5080,7 +5072,14 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 </h4>
 
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(210px, 1fr))', gap: '12px' }}>
-                  {finalPartnersList.map(partner => (
+                  {isAssignedLoading ? (
+                    [1, 2, 3].map(i => <div key={`skel-card-${i}`} className="animate-pulse" style={{ height: '76px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0' }} />)
+                  ) : finalPartnersList.length === 0 ? (
+                    <div style={{ gridColumn: '1 / -1', padding: '24px', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#94a3b8', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
+                      Noch keine aktiven Schüler-Kontakte zugewiesen.
+                    </div>
+                  ) : (
+                    finalPartnersList.map(partner => (
                     <button
                       key={`hero-${partner.id}`}
                       onClick={() => {
@@ -5128,7 +5127,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         </div>
                       </div>
                     </button>
-                  ))}
+                  )))}
                 </div>
               </div>
             </div>
@@ -5271,7 +5270,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   marginTop: '6px', width: '100%', padding: '12px 16px', borderRadius: '16px', border: '1px solid #bae6fd',
                   background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', color: '#0284c7', fontSize: '0.88rem',
                   fontWeight: 800, cursor: isVerifyingPin ? 'not-allowed' : 'pointer', opacity: isVerifyingPin ? 0.6 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: 'none'
                 }}
                 className="hover-scale"
               >

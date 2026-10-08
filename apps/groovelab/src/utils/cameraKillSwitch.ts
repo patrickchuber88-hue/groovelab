@@ -26,12 +26,19 @@ export function initGlobalCameraKillSwitch(): void {
       (window as any).stopAllCameras = () => {
         if ((window as any)._activeMediaStreams) {
           (window as any)._activeMediaStreams.forEach((stream: MediaStream) => {
-            stream.getTracks().forEach(track => {
-              track.stop();
-              stream.removeTrack(track);
+            // 📷 0,1% Goldstandard: Stoppt strikt und ausnahmslos VIDEO-Tracks (QR-Scanner / Kamera)!
+            // Audio-Tracks (Mikrofon, Stimmgerät, Loopstation) bleiben 100% geschützt und aktiv!
+            stream.getVideoTracks().forEach(track => {
+              try {
+                track.stop();
+                stream.removeTrack(track);
+              } catch (_) {}
             });
           });
-          (window as any)._activeMediaStreams = [];
+          // Behalte Streams, die weiterhin aktive Audio-Tracks haben
+          (window as any)._activeMediaStreams = (window as any)._activeMediaStreams.filter(
+            (stream: MediaStream) => stream.active && stream.getAudioTracks().length > 0
+          );
         }
       };
 

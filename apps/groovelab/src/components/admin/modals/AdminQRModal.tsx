@@ -315,7 +315,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
               justifyContent: 'center', 
               gap: '10px', 
               marginTop: '16px', 
-              boxShadow: `0 15px 35px ${(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') : brandColor}50`, 
+              boxShadow: 'none', 
               transition: 'all 0.2s' 
             }} 
           >
@@ -454,7 +454,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
               justifyContent: 'center',
               gap: '8px',
               marginTop: '10px',
-              boxShadow: '0 15px 35px rgba(225, 29, 72, 0.05)',
+              boxShadow: 'none',
               transition: 'all 0.2s'
             }}
             onMouseEnter={(e) => {

@@ -168,7 +168,8 @@ export const RegistrationAccessModal: React.FC<RegistrationAccessModalProps> = (
           background: '#ffffff',
           borderRadius: '24px',
           padding: '28px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           display: 'flex',
           flexDirection: 'column',
           gap: '20px',
@@ -219,7 +220,7 @@ export const RegistrationAccessModal: React.FC<RegistrationAccessModalProps> = (
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 8px 16px -4px rgba(52, 168, 83, 0.2)'
+            boxShadow: 'none'
           }}>
             {isSuccess ? <CheckCircle2 size={30} /> : <ShieldCheck size={30} />}
           </div>
@@ -289,14 +290,14 @@ export const RegistrationAccessModal: React.FC<RegistrationAccessModalProps> = (
                   fontWeight: 600,
                   color: isLockedOut ? '#9a3412' : '#0f172a',
                   outline: 'none',
-                  boxShadow: error ? '0 0 0 3px rgba(239, 68, 68, 0.15)' : (isLockedOut ? '0 0 0 3px rgba(249, 115, 22, 0.15)' : 'none'),
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
                 onFocus={(e) => {
                   if (!error && !isLockedOut) {
                     e.currentTarget.style.borderColor = '#34a853';
                     e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }
                 }}
                 onBlur={(e) => {
@@ -401,7 +402,7 @@ export const RegistrationAccessModal: React.FC<RegistrationAccessModalProps> = (
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: isLockedOut ? 'none' : '0 4px 14px rgba(52, 168, 83, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s'
               }}
               onMouseEnter={(e) => {

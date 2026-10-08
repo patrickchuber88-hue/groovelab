@@ -73,7 +73,7 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+            boxShadow: 'none'
           }}>
             <CheckCircle size={30} />
           </div>
@@ -129,7 +129,7 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
                   borderRadius: '16px',
                   background: '#ffffff',
                   border: '1.5px solid #fed7aa',
-                  boxShadow: '0 2px 6px rgba(245, 158, 11, 0.04)',
+                  boxShadow: 'none',
                   textAlign: 'left'
                 }}
               >
@@ -174,7 +174,7 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
                         fontSize: '0.74rem',
                         fontWeight: 850,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale"
                       title="Absage widerrufen und Termin im Stundenplan reaktivieren"

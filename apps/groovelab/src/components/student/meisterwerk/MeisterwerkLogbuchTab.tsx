@@ -378,7 +378,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                        boxShadow: 'none'
                       }}>
                         <Award size={24} strokeWidth={2.4} />
                       </div>
@@ -465,7 +465,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)'
+                                  boxShadow: 'none'
                                 }}
                                 title="Aufnahme stoppen & im Meisterwerk archivieren"
                               >
@@ -497,7 +497,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '5px',
-                                  boxShadow: '0 1px 4px rgba(22, 101, 52, 0.08)'
+                                  boxShadow: 'none'
                                 }}
                                 title="100% Meisterwerk-Aufnahme im Unterricht starten"
                               >
@@ -533,7 +533,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '5px',
-                                boxShadow: '0 2px 6px rgba(202, 138, 4, 0.15)'
+                                boxShadow: 'none'
                               }}
                               title="Offizielle Meisterwerk-Goldurkunde öffnen"
                             >
@@ -553,7 +553,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '5px',
-                              boxShadow: '0 1px 4px rgba(21, 128, 61, 0.08)'
+                              boxShadow: 'none'
                             }}>
                               <span>🏆</span>
                               <span>Meisterwerk</span>

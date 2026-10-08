@@ -1309,7 +1309,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                             textTransform: 'uppercase', 
                             letterSpacing: '0.1em', 
                             transform: 'rotate(-2deg)', 
-                            boxShadow: '0 4px 15px rgba(234, 179, 8, 0.4)',
+                            boxShadow: 'none',
                             border: 'none',
                             display: 'flex',
                             alignItems: 'center',
@@ -1405,7 +1405,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        boxShadow: `0 8px 24px ${brandColor}15`,
+                        boxShadow: 'none',
                         animation: 'pulse-subtle 3s infinite ease-in-out'
                       }}>
                         <Music size={28} color={brandColor} />
@@ -1687,7 +1687,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                           border: isPendingOffer 
                                             ? (isMe ? '3px dashed #eab308' : '2px dashed rgba(234, 179, 8, 0.4)')
                                             : ((isMe || isMastered) ? `3px solid #ef4444` : (u ? '1px solid rgba(255,255,255,0.1)' : '2px dashed rgba(255,255,255,0.2)')),
-                                          boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
+                                          boxShadow: 'none',
                                           display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
                                           filter: (u && !isMastered && !isPendingOffer) ? 'grayscale(100%)' : 'none',
                                           opacity: (u && !isMastered && !isPendingOffer) ? 0.6 : 1
@@ -2147,7 +2147,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                             padding: '0 16px', 
                             cursor: (isPostingShout || !newShoutMessage.trim()) ? 'default' : 'pointer', 
                             opacity: (isPostingShout || !newShoutMessage.trim()) ? 0.4 : 1,
-                            boxShadow: (isPostingShout || !newShoutMessage.trim()) ? 'none' : `0 4px 15px ${brandColor}44`,
+                            boxShadow: 'none',
                             transition: 'all 0.2s',
                             display: 'flex',
                             alignItems: 'center',

@@ -289,7 +289,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
     <main id="main-content" tabIndex={-1} className={`main-content ${isSidebarRailCollapsed ? 'sidebar-collapsed' : ''}`} style={{ 
       overflowY: windowWidth <= 768 
         ? ((isStudent && activeStudentTab === 'live') || isMobileActiveChat ? 'hidden' : 'auto') 
-        : ((activeStudentTab !== 'live') ? 'auto' : 'hidden'), 
+        : ((activeStudentTab !== 'live' && !['homework', 'homework_book'].includes(activeStudentTab)) ? 'auto' : 'hidden'), 
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
       overscrollBehaviorY: 'contain',
@@ -322,7 +322,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           justifyContent: 'space-between',
           fontSize: '0.78rem',
           fontWeight: 700,
-          boxShadow: '0 2px 10px rgba(2, 132, 199, 0.25)',
+          boxShadow: 'none',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           flexWrap: 'wrap',
           gap: '8px'
@@ -522,7 +522,11 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
       {user.role?.toLowerCase() === 'student' && (
         <div style={{ 
-          display: (activePlatform === 'campus' && activeStudentTab !== 'messages') ? 'block' : 'none',
+          display: (activePlatform === 'campus' && activeStudentTab !== 'messages') ? (['homework', 'homework_book'].includes(activeStudentTab) ? 'flex' : 'block') : 'none',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          height: '100%',
           width: '100%'
         }}>
           <ErrorBoundary>

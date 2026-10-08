@@ -523,7 +523,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(217, 119, 6, 0.3)'
+              boxShadow: 'none'
             }}
           >
             <Shield size={32} color="#ffffff" />
@@ -624,8 +624,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           to { transform: rotate(360deg) translateZ(0); }
         }
         @keyframes activeStepGlow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(30, 215, 96, 0.45); }
-          50% { box-shadow: 0 0 0 8px rgba(30, 215, 96, 0); }
+          0%, 100% { box-shadow: none; }
+          50% { box-shadow: none; }
         }
         @keyframes countInPulse {
           0% { transform: scale(0.6); opacity: 0; }
@@ -635,11 +635,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         @keyframes seasonalGlowPulse {
           0%, 100% {
             transform: translate3d(0, 0, 0);
-            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 4px 14px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
           }
           50% {
             transform: translate3d(0, -3px, 0);
-            box-shadow: 0 6px 24px 3px rgba(245, 158, 11, 0.45), 0 2px 8px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
           }
         }
         .spotify-card-hover {
@@ -889,7 +889,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   fontSize: '0.8rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s ease'
                 }}
                 className="hover-scale"

@@ -269,7 +269,7 @@ export const SongInstrumentPedagogyView: React.FC<SongInstrumentPedagogyViewProp
                             justifyContent: 'center',
                             fontSize: '0.62rem',
                             fontWeight: 900,
-                            boxShadow: '0 0 6px rgba(34, 197, 94, 0.8)',
+                            boxShadow: 'none',
                             cursor: 'pointer'
                           }}
                           className="hover-scale"

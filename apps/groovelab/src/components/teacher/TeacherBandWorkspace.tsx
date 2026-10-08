@@ -129,7 +129,7 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
             border: '1px dashed #e2e8f0',
             borderRadius: '32px'
           }}>
-            <div style={{ background: '#e0e7ff', color: '#4f46e5', padding: '16px', borderRadius: '24px', boxShadow: '0 8px 20px rgba(79, 70, 229, 0.1)' }}>
+            <div style={{ background: '#e0e7ff', color: '#4f46e5', padding: '16px', borderRadius: '24px', boxShadow: 'none' }}>
               <CheckCircle size={36} />
             </div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Alles bereit!</h3>

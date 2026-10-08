@@ -93,7 +93,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
           <div style={{
             background: 'linear-gradient(135deg, #ef4444, #dc2626)',
             borderRadius: '16px', padding: '12px', flexShrink: 0,
-            boxShadow: '0 6px 20px rgba(239,68,68,0.3)',
+            boxShadow: 'none',
           }}>
             <AlertTriangle size={22} color="white" />
           </div>

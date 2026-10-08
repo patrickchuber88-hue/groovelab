@@ -42,7 +42,7 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
       }
       .google-btn-primary:hover {
         background: #b71904;
-        box-shadow: 0 4px 12px rgba(216, 30, 5, 0.25);
+        box-shadow: none;
       }
       .google-btn-secondary {
         background: rgba(255, 255, 255, 0.8);

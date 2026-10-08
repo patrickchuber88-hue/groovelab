@@ -445,21 +445,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const [isMidiConnected, setIsMidiConnected] = useState<boolean>(false);
   const [midiDevices, setMidiDevices] = useState<string[]>([]);
 
-  // Persistent Student XP & Session Vault Accumulator (Synchronized with Ground Truth)
+  // Persistent Student XP Accumulator (PostgreSQL SSOT)
   const [studentBaseXp, setStudentBaseXp] = useState<number>(() => {
-    if (typeof window !== 'undefined' && student?.id) {
-      try {
-        const cachedBonus = localStorage.getItem(`campus_bonus_xp_${student.id}`);
-        if (cachedBonus !== null) {
-          const parsed = parseInt(cachedBonus, 10);
-          if (!isNaN(parsed) && parsed >= 0) return parsed;
-        }
-        const off = JSON.parse(localStorage.getItem(`cg_offline_stats_${student.id}`) || 'null');
-        if (typeof off?.current_xp === 'number') return off.current_xp;
-        const offPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${student.id}`) || 'null');
-        if (typeof offPractice?.xp === 'number') return offPractice.xp;
-      } catch (_) {}
-    }
     const dbXp = student?.campus_xp ?? student?.xp;
     return typeof dbXp === 'number' ? dbXp : 0;
   });
@@ -493,7 +480,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           student?.xp || 0
         );
         setStudentBaseXp(actualXp);
-        localStorage.setItem(`campus_bonus_xp_${student.id}`, String(actualXp));
       } catch (_) {}
     };
     fetchLatestXp();
@@ -951,48 +937,25 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     hasCommittedRef.current = true;
 
     if (student?.id) {
-      const key = `campus_bonus_xp_${student.id}`;
-      const current = Number(localStorage.getItem(key) || 0);
-      const updated = current + xpToCommit;
-      localStorage.setItem(key, String(updated));
       setStudentBaseXp(prev => prev + xpToCommit);
 
-      // Persist practice minutes to Supabase & Briefing Board KPIs
+      // Persist practice minutes to Supabase & Briefing Board KPIs (PostgreSQL SSOT)
       const minutesToAdd = Math.max(1, Math.round(secondsToCommit / 60));
       (async () => {
         try {
           const nowIso = new Date().toISOString();
 
-          // 1. Lokaler Fokus-Log Cache für sofortiges Reaktiv-Update im Briefing-Dashboard
-          const localFokusKey = `cg_local_fokus_logs_${student.id}`;
-          const existingLocalLogs = JSON.parse(localStorage.getItem(localFokusKey) || '[]');
-          const newFokusLog = {
-            id: 'groove_' + Date.now(),
-            user_id: student.id,
-            student_id: student.id,
-            duration_minutes: minutesToAdd,
-            duration_seconds: secondsToCommit,
-            xp_earned: xpToCommit,
-            is_extra: false,
-            created_at: nowIso
-          };
-          localStorage.setItem(localFokusKey, JSON.stringify([newFokusLog, ...existingLocalLogs]));
-
-          // 2. Insert in public.fokus_logs für persistente Archivierung (mit explizitem xp_earned)
+          // 1. Insert in public.fokus_logs für persistente Archivierung (mit explizitem xp_earned)
           await supabase.from('fokus_logs').insert({
             user_id: student.id,
             student_id: student.id,
             duration_minutes: minutesToAdd,
             duration_seconds: secondsToCommit,
             xp_earned: xpToCommit,
-            is_extra: false,
-            created_at: nowIso
+            is_extra: false
           });
 
-          // 3 & 4. Update avatars table and student_stats table are completely handled automatically
-          // by the 0.1% Goldstandard Backend-Trigger (trg_fokus_logs_stats_sync)
-
-          // 5. Update students practice_minutes_today
+          // 2. Update students practice_minutes_today
           try {
             const { data } = await supabase
               .from('students')
@@ -1008,12 +971,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               })
               .eq('id', student.id);
           } catch (_) {}
-
-          // 6. Reconcile authoritative total XP to local state
-          const cachedAvXp = Number(localStorage.getItem(`campus_bonus_xp_${student.id}`) || 0);
-          const authoritativeTotalXp = cachedAvXp + xpToCommit;
-          localStorage.setItem(`campus_bonus_xp_${student.id}`, String(authoritativeTotalXp));
-          setStudentBaseXp(authoritativeTotalXp);
         } catch (err) {
           console.warn('[GrooveTrainer] Practice minutes & XP sync note:', err);
         }
@@ -1784,7 +1741,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(234, 88, 12, 0.25)',
+            boxShadow: 'none',
             flexShrink: 0
           }}>
             <Radio size={isNotebook ? 19 : 16} color="#ffffff" strokeWidth={2.4} />

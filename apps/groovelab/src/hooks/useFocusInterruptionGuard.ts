@@ -10,6 +10,8 @@ export interface UseFocusInterruptionGuardOptions {
   toolName?: string;
   /** Ob der Benutzer innerhalb der App vom Tool weggewechselt ist (z. B. anderes Board/Tab) */
   isLeavingTool?: boolean;
+  /** Ob aktuell eine Hardware-/Berechtigungsabfrage (z. B. Mikrofon) läuft, bei der System-Blur-Events ignoriert werden */
+  isPermissionPending?: boolean;
   /** Callback beim endgültigen Abbruch (Timeout oder 2. Strike) */
   onAbort: (reason: FocusAbortReason) => void;
   /** Optionaler Callback beim Start der Kulanz oder jedem Tick */
@@ -51,6 +53,7 @@ export function useFocusInterruptionGuard({
   isActive,
   toolName = 'Übe-Tool',
   isLeavingTool = false,
+  isPermissionPending = false,
   onAbort,
   onGraceWarning,
   onRecovered
@@ -265,6 +268,13 @@ export function useFocusInterruptionGuard({
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isFocused = isMobile ? true : document.hasFocus();
 
+      // 🛡️ Fail-Safe: Wenn eine modale Browser-Berechtigungsabfrage (z. B. Mikrofonzugriff) aktiv ist,
+      // entzieht der native Betriebssystem-Dialog dem Fenster den Fokus (!isFocused).
+      // In diesem Zustand ignorieren wir Blur-Events, es sei denn der Tab wird tatsächlich versteckt (document.hidden).
+      if (isPermissionPending && !document.hidden) {
+        return;
+      }
+
       if (document.hidden || !isFocused) {
         handleInterruptionStart();
       } else if (!isLeavingTool && isInterruptedRef.current) {
@@ -281,7 +291,7 @@ export function useFocusInterruptionGuard({
       window.removeEventListener('blur', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [isActive, isAborted, isLeavingTool, handleInterruptionStart, handleRecovery]);
+  }, [isActive, isAborted, isLeavingTool, isPermissionPending, handleInterruptionStart, handleRecovery]);
 
   // Reset bei Deaktivierung der Session
   useEffect(() => {

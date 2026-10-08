@@ -242,7 +242,7 @@ export const TrialInfoModal: React.FC<TrialInfoModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s'
               }}
             >

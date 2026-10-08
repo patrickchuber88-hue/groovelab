@@ -683,7 +683,7 @@ export const JuniorMilestonesSection: React.FC<JuniorMilestonesSectionProps> = (
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                  boxShadow: 'none'
                 }}
               >
                 <Mic size={15} strokeWidth={2.4} />

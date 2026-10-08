@@ -298,7 +298,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
     };
   }, [(masterPricing as any)?.specialOffers]);
 
-  const validSchools = schools.filter(s => !s.name?.toLowerCase().includes('groove academy'));
+  const validSchools = schools.filter(s => !(s as any).is_demo_tenant && s.status !== 'archived');
 
   // 1-Click Incident Presets
   const applyIncidentPreset = (presetKey: 'hetzner' | 'db_upgrade' | 'ddos' | 'decix') => {
@@ -521,7 +521,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
       groovelabStudentCount: groovelabStudents,
       passiveStudentCount: passiveStudents,
       storageAddonMonthlyFee: storageFee,
-      directBillingMode: s.student_billing_option === 'student_full' ? 'full' : (s.student_billing_option === 'student_partial' ? 'partial' : 'none'),
+      directBillingMode: s.student_billing_option === 'student_full' ? 'full' : 'none',
       rates
     });
 
@@ -932,7 +932,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           color: '#ffffff',
           padding: '12px 20px',
           borderRadius: '16px',
-          boxShadow: '0 12px 32px rgba(4, 120, 87, 0.3)',
+          boxShadow: 'none',
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
@@ -1001,7 +1001,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               height: '7px',
               borderRadius: '50%',
               background: isMaintenanceMode ? '#ef4444' : '#10b981',
-              boxShadow: isMaintenanceMode ? '0 0 6px #ef4444' : '0 0 5px #10b981'
+              boxShadow: 'none'
             }} />
             <span>{isMaintenanceMode ? 'Wartung Aktiv' : 'Online'}</span>
           </div>
@@ -1187,7 +1187,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: isMaintenanceMode ? '0 2px 8px rgba(239, 68, 68, 0.20)' : '0 1px 3px rgba(15, 23, 42, 0.03)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease',
               whiteSpace: 'nowrap'
             }}
@@ -1232,7 +1232,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           justifyContent: 'space-between',
           gap: '16px',
           marginBottom: '20px',
-          boxShadow: '0 8px 24px -4px rgba(217, 119, 6, 0.12)'
+          boxShadow: 'none'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
@@ -1245,7 +1245,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: '#d97706',
-              boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)'
+              boxShadow: 'none'
             }}>
               <Wrench size={20} />
             </div>
@@ -1311,7 +1311,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                 fontSize: '0.84rem',
                 fontWeight: 750,
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
               onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
@@ -1388,7 +1388,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           borderRadius: '22px',
           padding: '22px 20px',
           border: '1px solid rgba(15, 23, 42, 0.08)',
-          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -1396,12 +1396,12 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 8px 26px -2px rgba(16, 185, 129, 0.08), 0 3px 8px -1px rgba(15, 23, 42, 0.04)';
+          e.currentTarget.style.boxShadow = 'none';
           e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.35)';
         }}
         onMouseOut={(e) => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 2px 6px -1px rgba(15, 23, 42, 0.02)';
+          e.currentTarget.style.boxShadow = 'none';
           e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
         }}
         >
@@ -1543,7 +1543,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           borderRadius: '22px',
           padding: '22px 20px',
           border: '1px solid rgba(15, 23, 42, 0.08)',
-          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -1551,12 +1551,12 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 8px 26px -2px rgba(2, 132, 199, 0.08)';
+          e.currentTarget.style.boxShadow = 'none';
           e.currentTarget.style.borderColor = 'rgba(2, 132, 199, 0.25)';
         }}
         onMouseOut={(e) => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 2px 6px -1px rgba(15, 23, 42, 0.02)';
+          e.currentTarget.style.boxShadow = 'none';
           e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
         }}
         >
@@ -1591,7 +1591,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                   height: '7px',
                   borderRadius: '50%',
                   background: measuredUsersLiveNow > 0 ? '#10b981' : '#94a3b8',
-                  boxShadow: measuredUsersLiveNow > 0 ? '0 0 6px #10b981' : 'none'
+                  boxShadow: 'none'
                 }} />
                 {measuredUsersLiveNow > 0 ? `${measuredUsersLiveNow} Live` : '0 Live'}
               </span>
@@ -2586,7 +2586,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)'
+                      boxShadow: 'none'
                     }}
                     className="hover-scale-mini"
                   >

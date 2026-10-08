@@ -192,7 +192,7 @@ export const TeacherMakeupRadarWidget: React.FC<TeacherMakeupRadarWidgetProps> =
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 2px 8px rgba(11, 87, 208, 0.2)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s'
                     }}
                   >

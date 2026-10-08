@@ -57,7 +57,7 @@ export const TeacherAbsenceEndedModal: React.FC<TeacherAbsenceEndedModalProps> =
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 8px 24px rgba(52, 168, 83, 0.18)'
+          boxShadow: 'none'
         }}>
           <CheckCircle size={32} color="#34a853" strokeWidth={2.5} />
         </div>
@@ -107,7 +107,7 @@ export const TeacherAbsenceEndedModal: React.FC<TeacherAbsenceEndedModalProps> =
             fontWeight: 900,
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(52, 168, 83, 0.35)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease'
           }}
           onMouseEnter={e => {

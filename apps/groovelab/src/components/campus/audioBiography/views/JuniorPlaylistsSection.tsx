@@ -59,7 +59,7 @@ export const JuniorPlaylistsSection: React.FC<JuniorPlaylistsSectionProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(99, 102, 241, 0.15)'
+              boxShadow: 'none'
             }}
           >
             <Disc size={22} />
@@ -90,7 +90,7 @@ export const JuniorPlaylistsSection: React.FC<JuniorPlaylistsSectionProps> = ({
             fontSize: '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)'
+            boxShadow: 'none'
           }}
           className="hover-scale"
         >
@@ -424,7 +424,7 @@ export const JuniorPlaylistsSection: React.FC<JuniorPlaylistsSectionProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <Plus size={22} strokeWidth={2.8} />

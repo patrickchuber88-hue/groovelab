@@ -416,7 +416,7 @@ export const DateSimulationDevWidget: React.FC = () => {
             borderRadius: '20px',
             padding: '12px 14px',
             boxSizing: 'border-box',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4), 0 0 30px rgba(250, 204, 21, 0.35)',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
             color: '#0f172a',
             fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif",
             animation: 'slideUpFade 0.2s cubic-bezier(0.16, 1, 0.3, 1)'

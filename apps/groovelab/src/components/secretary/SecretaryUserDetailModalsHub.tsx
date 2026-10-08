@@ -261,7 +261,7 @@ export function SecretaryUserDetailModalsHub({
               </button>
               <button
                 onClick={() => { setShowUnassignedWarning(false); handleSaveAndApproveAll(true); }}
-                style={{ flex: 1.2, padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #34a853, #22c55e)', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,168,83,0.3)' }}
+                style={{ flex: 1.2, padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #34a853, #22c55e)', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
               >
                 Trotzdem freigeben
               </button>

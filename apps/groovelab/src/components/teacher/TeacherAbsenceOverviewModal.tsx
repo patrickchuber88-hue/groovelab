@@ -240,7 +240,7 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
             display: 'flex',
             flexDirection: 'column',
             gap: '2px',
-            boxShadow: '0 1px 3px rgba(16, 185, 129, 0.05)'
+            boxShadow: 'none'
           }}>
             <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Bestätigt / Erreicht

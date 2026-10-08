@@ -628,7 +628,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    boxShadow: '0 6px 15px rgba(66, 133, 244, 0.15)'
+                    boxShadow: 'none'
                   }}
                 >
                   <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -650,7 +650,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    boxShadow: '0 6px 15px rgba(52, 168, 83, 0.15)'
+                    boxShadow: 'none'
                   }}
                 >
                   <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -672,7 +672,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    boxShadow: '0 6px 15px rgba(251, 188, 5, 0.15)'
+                    boxShadow: 'none'
                   }}
                 >
                   <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -694,7 +694,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    boxShadow: '0 6px 15px rgba(234, 67, 53, 0.15)'
+                    boxShadow: 'none'
                   }}
                 >
                   <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -853,7 +853,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   borderRadius: '24px',
                   padding: '24px 22px',
                   color: '#ffffff',
-                  boxShadow: '0 12px 30px rgba(52, 168, 83, 0.28)',
+                  boxShadow: 'none',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '16px'
@@ -1008,7 +1008,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                                 fontSize: '0.75rem',
                                 fontWeight: 850,
                                 cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(11, 87, 208, 0.2)'
+                                boxShadow: 'none'
                               }}
                             >
                               Einlösen

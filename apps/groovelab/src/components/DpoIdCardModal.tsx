@@ -132,7 +132,7 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
         }}
         onClick={onClose}
       >
-        <div role="dialog" aria-modal="true"
+        <div role="dialog" aria-modal="true" aria-labelledby="dpo-id-card-modal-title"
           className="dsb-modal-box"
           style={{
             background: '#ffffff',
@@ -170,12 +170,12 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)'
+                boxShadow: 'none'
               }}>
                 <ShieldCheck size={26} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                <h3 id="dpo-id-card-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
                   🪪 DSB-Prüfausweis (Art. 38 DSGVO)
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -399,7 +399,7 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
+                boxShadow: 'none',
                 transition: 'all 0.2s ease'
               }}
               onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}

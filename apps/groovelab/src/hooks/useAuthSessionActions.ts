@@ -383,37 +383,9 @@ export function useAuthSessionActions({
     const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
 
     let effectiveUser = userToLogin;
-    if (!effectiveUser && isLocalhost) {
-      const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || (isLocalhost ? '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' : '')) : (isLocalhost ? '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' : '');
-      if (!targetSchoolId) {
-        console.warn('[useAuthSessionActions] Fail-Closed: Cannot construct session without a resolved school_id.');
-        return;
-      }
-      const isStudent = existingWorkspace === 'student' || userId === '15102f5e-c504-4c33-93ab-436285197c8c';
-      const isTeacher = existingWorkspace === 'teacher' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '11079eae-664a-49a4-8692-771d83a3193c';
-      const isMaster = existingWorkspace === 'master_admin' || userId === '88888888-8888-8888-8888-888888888888';
-      effectiveUser = {
-        id: userId,
-        first_name: isStudent ? 'Linus' : (isTeacher ? 'Peter' : (isMaster ? 'Master' : 'Manuel')),
-        last_name: isStudent ? 'K.' : (isTeacher ? 'Pan' : (isMaster ? 'Admin' : 'Wagner')),
-        name: isStudent ? 'Linus K.' : (isTeacher ? 'Peter Pan' : (isMaster ? 'Master Admin' : 'Manuel Wagner')),
-        role: isMaster ? 'admin' : (isStudent ? 'student' : (isTeacher ? 'teacher' : 'admin')),
-        roles: isTeacher ? ['teacher', 'admin'] : [isMaster ? 'admin' : (isStudent ? 'student' : 'admin')],
-        contract_ends_at: null,
-        contract_decision_made: true,
-        is_external_vocalist: false,
-        is_campus_active: true,
-        is_groovelab_active: true,
-        is_master_admin: isMaster,
-        schools: {
-          id: targetSchoolId,
-          name: 'Musäk Bad Säckingen',
-          has_campus_subscription: true,
-          has_groovelab_subscription: true,
-          is_billing_booked: true,
-          subscription_bypass: true
-        }
-      } as any;
+    if (!effectiveUser) {
+      console.warn('[useAuthSessionActions] Fail-Closed: Cannot establish session without a valid user record.');
+      return;
     }
 
     if (effectiveUser?.role === 'student' && effectiveUser.contract_ends_at) {

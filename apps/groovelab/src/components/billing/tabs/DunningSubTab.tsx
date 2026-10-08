@@ -81,7 +81,7 @@ export const DunningSubTab: React.FC<DunningSubTabProps> = ({
                   <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 14px', fontWeight: 800, color: '#0f172a' }}>{inv.schoolName}</td>
                     <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 700 }}>{invId}</td>
-                    <td style={{ padding: '12px 14px', color: '#dc2626', fontWeight: 700 }}>Seit 14 Tagen überfällig</td>
+                    <td style={{ padding: '12px 14px', color: '#dc2626', fontWeight: 700 }}>Seit 30 Tagen überfällig</td>
                     <td style={{ padding: '12px 14px', fontWeight: 800, textAlign: 'right', color: '#0f172a' }}>{inv.total.toFixed(2).replace('.', ',')} €</td>
                     <td style={{ padding: '12px 14px' }}>
                       <span style={{ fontSize: '0.70rem', padding: '3px 8px', borderRadius: '6px', background: '#fee2e2', color: '#b91c1c', fontWeight: 800 }}>

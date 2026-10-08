@@ -63,7 +63,7 @@ export class HomeworkBookErrorBoundary extends React.Component<HomeworkBookError
               fontWeight: 800,
               fontSize: '1rem',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(52,168,83,0.3)'
+              boxShadow: 'none'
             }}
           >
             Erneut versuchen

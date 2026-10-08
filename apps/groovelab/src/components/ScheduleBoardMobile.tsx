@@ -482,7 +482,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           if (tInst.toLowerCase() !== 'musiker' && tInst.toLowerCase() !== 'instrument') return tInst;
         }
       }
-      return 'Gitarre';
+      return '';
     }
     return raw;
   };
@@ -5255,7 +5255,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
             fontSize: '0.88rem',
             cursor: onboardingSubmitting ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s',
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -5332,9 +5332,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           100% { opacity: 1; }
         }
         @keyframes conflictPulse {
-          0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.2); }
-          50% { border-color: rgba(239, 68, 68, 0.9); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.15); }
-          100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.2); }
+          0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: none; }
+          50% { border-color: rgba(239, 68, 68, 0.9); box-shadow: none; }
+          100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: none; }
         }
         .conflict-pulse-card {
           animation: conflictPulse 2s infinite ease-in-out !important;
@@ -5758,7 +5758,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               setActiveTab('calendar');
               loadInitialData();
             }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
+            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'none' }}
           >
             Zurück zur Ansicht
           </button>
@@ -5847,7 +5847,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               borderRadius: '50%',
                               background: '#22c55e',
                               display: 'inline-block',
-                              boxShadow: '0 0 4px rgba(34, 197, 94, 0.5)',
+                              boxShadow: 'none',
                               flexShrink: 0
                             }}
                           />
@@ -6061,7 +6061,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               justifyContent: 'space-between',
               gap: '10px',
               marginBottom: '6px',
-              boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
+              boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
@@ -6137,7 +6137,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 justifyContent: 'space-between',
                 gap: '12px',
                 marginBottom: '6px',
-                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
+                boxShadow: 'none'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <AlertTriangle size={18} strokeWidth={2.4} color="#b45309" aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -7218,7 +7218,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
                                 cursor: 'grab',
-                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
+                                boxShadow: 'none',
                                 zIndex: 10,
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none',
@@ -8116,7 +8116,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px',
-                          boxShadow: '0 2px 6px rgba(52, 168, 83, 0.12)',
+                          boxShadow: 'none',
                           transition: 'all 0.2s',
                           boxSizing: 'border-box'
                         }}
@@ -9005,7 +9005,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     }}
                     style={{
                       flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#0f172a',
-                      border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(234,179,8,0.3)'
+                      border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: 'none'
                     }}
                   >
                     Pause Speichern
@@ -9070,7 +9070,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#1a73e8',
-                    boxShadow: '0 4px 12px rgba(26, 115, 232, 0.12)'
+                    boxShadow: 'none'
                   }}>
                     <Calendar size={22} />
                   </div>
@@ -9127,7 +9127,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s'
                   }}
                   className="hover-scale-mini"
@@ -9208,7 +9208,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#d97706',
-                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.15)'
+                    boxShadow: 'none'
                   }}>
                     <AlertCircle size={22} />
                   </div>
@@ -9421,7 +9421,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#34a853',
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)'
+                    boxShadow: 'none'
                   }}>
                     <Sparkles size={22} />
                   </div>
@@ -9481,7 +9481,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   fontSize: '0.82rem',
                   fontWeight: 800,
                   border: '1px solid #bbf7d0',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)',
+                  boxShadow: 'none',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px'
@@ -9577,7 +9577,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 6px 20px rgba(22, 163, 74, 0.25)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
                 className="hover-scale-mini"
@@ -9628,7 +9628,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#34a853',
-                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.18)'
+                boxShadow: 'none'
               }}>
                 <Sparkles size={28} className="animate-spin-slow" />
               </div>
@@ -9659,7 +9659,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     background: 'linear-gradient(90deg, #34a853 0%, #22c55e 100%)',
                     borderRadius: '10px',
                     transition: 'width 0.15s ease-out',
-                    boxShadow: '0 0 12px rgba(52, 168, 83, 0.4)'
+                    boxShadow: 'none'
                   }} />
                 </div>
 
@@ -9946,7 +9946,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     <Trash2 size={16} color="#991b1b" />
                     <span>Alle Zuteilungen zurücksetzen</span>
                   </button>
-                  <button type="button" onClick={() => { handleLockAndSend(); setShowDesignerToolsSheet(false); }} style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', border: 'none', color: '#ffffff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)', marginTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <button type="button" onClick={() => { handleLockAndSend(); setShowDesignerToolsSheet(false); }} style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', border: 'none', color: '#ffffff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', textAlign: 'center', boxShadow: 'none', marginTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                     <Send size={16} />
                     <span>Abstimmen & Freigeben</span>
                   </button>
@@ -10156,7 +10156,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(52, 168, 83, 0.35)'
+                  boxShadow: 'none'
                 }}
               >
                 <Settings size={14} strokeWidth={2.4} aria-hidden="true" />

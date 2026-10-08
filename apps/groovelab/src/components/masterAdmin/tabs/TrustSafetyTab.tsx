@@ -731,7 +731,7 @@ export function TrustSafetyTab() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"
@@ -782,7 +782,7 @@ export function TrustSafetyTab() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"

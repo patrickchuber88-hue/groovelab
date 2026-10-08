@@ -680,7 +680,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             borderRadius: '12px',
             fontSize: '0.80rem',
             fontWeight: 900,
-            boxShadow: '0 4px 14px -2px rgba(6, 182, 212, 0.40)',
+            boxShadow: 'none',
             letterSpacing: '0.01em'
           }}>
             <Radio size={14} color="#ffffff" strokeWidth={2.4} />
@@ -769,7 +769,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             border: a4Reference !== 440 ? '1.5px solid #06b6d4' : '1.5px solid #e2e8f0',
             borderRadius: '14px',
             padding: '2px 4px',
-            boxShadow: a4Reference !== 440 ? '0 2px 8px rgba(6, 182, 212, 0.20)' : '0 2px 5px rgba(0,0,0,0.02)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease'
           }}>
             <button
@@ -894,9 +894,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               fontSize: '0.84rem',
               fontWeight: 900,
               cursor: 'pointer',
-              boxShadow: isListening
-                ? '0 4px 14px rgba(239, 68, 68, 0.28)'
-                : '0 4px 14px rgba(6, 182, 212, 0.28)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             className="hover-scale"
@@ -938,11 +936,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           : '1.5px solid #e2e8f0',
         borderRadius: '28px',
         padding: '36px 24px 28px 24px',
-        boxShadow: isInTune
-          ? '0 16px 48px -6px rgba(34, 197, 94, 0.30), 0 0 28px rgba(34, 197, 94, 0.20)'
-          : isListening
-          ? '0 12px 36px -4px rgba(6, 182, 212, 0.18), 0 2px 8px rgba(6, 182, 212, 0.08)'
-          : '0 10px 28px -4px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02)',
+        boxShadow: 'none',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -965,7 +959,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+            boxShadow: 'none',
             animation: 'pulse 1.8s infinite',
             zIndex: 10
           }}>
@@ -1180,7 +1174,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
+                  boxShadow: 'none'
                 }}>
                   <Check size={18} strokeWidth={3} />
                   <span>Perfekt gestimmt! (±0 ct)</span>
@@ -1197,7 +1191,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                   display: 'flex',
                   alignItems: 'center',
                   gap: '7px',
-                  boxShadow: '0 3px 12px rgba(217, 119, 6, 0.15)'
+                  boxShadow: 'none'
                 }}>
                   <ArrowUp size={17} strokeWidth={3} />
                   <span>Fester drehen ({centsDeviation} ct)</span>
@@ -1214,7 +1208,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                   display: 'flex',
                   alignItems: 'center',
                   gap: '7px',
-                  boxShadow: '0 3px 12px rgba(234, 88, 12, 0.15)'
+                  boxShadow: 'none'
                 }}>
                   <ArrowDown size={17} strokeWidth={3} />
                   <span>Lockerer drehen (+{centsDeviation} ct)</span>
@@ -1251,7 +1245,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  boxShadow: '0 8px 24px rgba(6, 182, 212, 0.35)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   minHeight: '52px'
                 }}
@@ -1403,13 +1397,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                         : '#1e293b',
                       cursor: 'pointer',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isLocked
-                        ? '0 4px 14px rgba(6, 182, 212, 0.25)'
-                        : isTuned
-                        ? '0 3px 10px rgba(16, 185, 129, 0.22)'
-                        : isSelected
-                        ? '0 3px 10px rgba(6, 182, 212, 0.18)'
-                        : '0 2px 5px rgba(0,0,0,0.02)',
+                      boxShadow: 'none',
                       outline: 'none',
                       touchAction: 'manipulation'
                     }}

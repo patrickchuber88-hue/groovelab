@@ -27,7 +27,7 @@ export const ExecutiveMonthlyReportModal: React.FC<ExecutiveMonthlyReportModalPr
 }) => {
   if (!isOpen) return null;
 
-  const validSchools = schools.filter(s => !s.name?.toLowerCase().includes('groove academy'));
+  const validSchools = schools.filter(s => !(s as any).is_demo_tenant && s.status !== 'archived');
   const b2bCampusCount = validSchools.filter(s => s.has_campus_subscription && !s.has_groovelab_subscription && !s.subscription_bypass).length;
   const b2bGroovelabCount = validSchools.filter(s => !s.has_campus_subscription && s.has_groovelab_subscription && !s.subscription_bypass).length;
   const b2bKombiCount = validSchools.filter(s => s.has_campus_subscription && s.has_groovelab_subscription && !s.subscription_bypass).length;

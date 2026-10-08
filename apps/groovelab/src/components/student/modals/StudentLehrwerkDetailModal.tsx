@@ -272,7 +272,7 @@ return (
                       fontWeight: 850,
                       fontSize: '0.86rem',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(34, 197, 94, 0.28)',
+                      boxShadow: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -383,7 +383,7 @@ return (
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.25)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s ease'
                                 }}
                                 className="hover-scale-subtle"

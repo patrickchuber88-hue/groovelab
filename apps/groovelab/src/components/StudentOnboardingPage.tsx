@@ -1130,7 +1130,7 @@ Deine Vorteile auf einen Blick:
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 14px rgba(21, 128, 61, 0.2)',
+                      boxShadow: 'none',
                       marginTop: '4px'
                     }}
                     className="hover-scale"

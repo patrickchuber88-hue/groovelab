@@ -26,6 +26,7 @@ import { fixWebmDuration } from '../../../utils/webmDurationPatcher';
 import { saveOfflineAudioRecord, removeOfflineAudioRecord } from '../../../utils/offlineAudioVault';
 import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../../domain/stickersAndTresor';
 import { isUUID } from '../../../utils/uuidValidator';
+import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
 import { useDictationInput } from '../../../hooks/useVoiceToText';
 import { getSimulatedNow, getISOWeekRaw } from '../utils/teacherDashboardUtils';
 import {
@@ -208,44 +209,10 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
         if (dbSongs) schoolSongs = dbSongs;
         if (isMounted) setAllSchoolSongs(schoolSongs);
 
-        // C) Zugewiesene Lehrwerke & Übestände ermitteln
+        // C) Zugewiesene Lehrwerke & Übestände ermitteln (DB progress_matrix = SSOT)
         let assignedList: AssignedBookItem[] = [];
 
-        // 1. Aus localStorage student_lehrwerke_progress
-        try {
-          const storedLwProgress = localStorage.getItem('student_lehrwerke_progress');
-          if (storedLwProgress) {
-            const parsed = JSON.parse(storedLwProgress);
-            const studentItems = parsed.filter((item: any) => String(item.studentId) === String(sId));
-            studentItems.forEach((lw: any) => {
-              const bookTitle = lw.bookTitle || lw.title || lw.lehrwerkTitle || 'Lehrwerk';
-              const totalPages = lw.totalPages || lw.total_pages || 50;
-              const pageStates = lw.pageStates || {};
-              
-              // Finde die höchste aktive/geübte Seite
-              let maxPage = 0;
-              Object.keys(pageStates).forEach(pStr => {
-                const p = parseInt(pStr, 10);
-                if (!isNaN(p) && p > maxPage) maxPage = p;
-              });
-
-              const targetP = maxPage > 0 ? maxPage + 1 : 1;
-              const pNote = pageStates[targetP]?.homeworkNotes || pageStates[targetP]?.notes || '';
-              assignedList.push({
-                id: lw.id || lw.lehrwerkId,
-                lehrwerkId: lw.lehrwerkId || lw.id,
-                title: bookTitle,
-                totalPages,
-                lastPracticedPage: maxPage > 0 ? maxPage : 1,
-                selectedPages: [targetP],
-                isSelected: true,
-                pageNotes: pNote
-              });
-            });
-          }
-        } catch {}
-
-        // 2. Aus progress_matrix ergänzen/heilen
+        // 1. Primär: Aus progress_matrix (SSOT)
         if (isUUID(sId)) {
           const { data: pmRows } = await supabase
             .from('progress_matrix')
@@ -256,10 +223,9 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
           if (pmRows && pmRows.length > 0) {
             pmRows.forEach((row: any) => {
               if (row.topic_name && row.topic_name.includes(' - Seite ')) {
-                const parts = row.topic_name.split(' - Seite ');
-                const bTitle = parts[0].trim();
-                const pNum = parseInt(parts[1], 10);
-
+                const [rawTitle, pStr] = row.topic_name.split(' - Seite ');
+                const bTitle = rawTitle.trim();
+                const pNum = parseInt(pStr, 10);
                 const existing = assignedList.find(a => a.title.toLowerCase() === bTitle.toLowerCase());
                 if (existing) {
                   if (!isNaN(pNum) && pNum > existing.lastPracticedPage) {
@@ -280,6 +246,36 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
               }
             });
           }
+        }
+
+        // 2. Sekundär-Fallback: student_lehrwerke_progress nur falls DB noch leer
+        if (assignedList.length === 0) {
+          try {
+            const storedLwProgress = localStorage.getItem('student_lehrwerke_progress');
+            if (storedLwProgress) {
+              const studentItems = JSON.parse(storedLwProgress).filter((item: any) => String(item.studentId) === String(sId));
+              studentItems.forEach((lw: any) => {
+                const bookTitle = lw.bookTitle || lw.title || lw.lehrwerkTitle || 'Lehrwerk';
+                const pageStates = lw.pageStates || {};
+                let maxPage = 0;
+                Object.keys(pageStates).forEach(pStr => {
+                  const p = parseInt(pStr, 10);
+                  if (!isNaN(p) && p > maxPage) maxPage = p;
+                });
+                const targetP = maxPage > 0 ? maxPage + 1 : 1;
+                assignedList.push({
+                  id: lw.id || lw.lehrwerkId,
+                  lehrwerkId: lw.lehrwerkId || lw.id,
+                  title: bookTitle,
+                  totalPages: lw.totalPages || lw.total_pages || 50,
+                  lastPracticedPage: maxPage > 0 ? maxPage : 1,
+                  selectedPages: [targetP],
+                  isSelected: true,
+                  pageNotes: pageStates[targetP]?.homeworkNotes || pageStates[targetP]?.notes || ''
+                });
+              });
+            }
+          } catch {}
         }
 
         if (isMounted) setAssignedBooks(assignedList);
@@ -336,27 +332,11 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
 
         if (isMounted) setStudentSongs(loadedSongs);
 
-        // E) Bisherigen Wochen-Fahrplan Text laden
+        // E) Bisherigen Wochen-Fahrplan Text laden (DB progress_matrix = SSOT)
         let initialText = '';
         let foundExisting = false;
 
-        // Aus localStorage candidate keys
-        const localHwNotes = localStorage.getItem(`campus_homework_notes_${sId}`);
-        if (localHwNotes) {
-          try {
-            const parsed = JSON.parse(localHwNotes);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const textNotes = parsed.filter(n => typeof n === 'string' && !isInternalMetadataNote(n) && !n.startsWith('AUDIO:'));
-              if (textNotes.length > 0) {
-                initialText = textNotes.join('\n\n');
-                foundExisting = true;
-              }
-            }
-          } catch {}
-        }
-
-        // Falls noch leer: DB progress_matrix abfragen
-        if (!initialText && isUUID(sId)) {
+        if (isUUID(sId)) {
           const { data: latestHw } = await supabase
             .from('progress_matrix')
             .select('homework_notes')
@@ -373,6 +353,18 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
               foundExisting = true;
             }
           }
+        }
+
+        // Fallback auf localStorage nur wenn in DB noch nichts existiert
+        if (!initialText) {
+          try {
+            const rawNotes = localStorage.getItem(`campus_homework_notes_${sId}`);
+            const textNotes = rawNotes ? (JSON.parse(rawNotes) as any[]).filter(n => typeof n === 'string' && !isInternalMetadataNote(n) && !n.startsWith('AUDIO:')) : [];
+            if (textNotes.length > 0) {
+              initialText = textNotes.join('\n\n');
+              foundExisting = true;
+            }
+          } catch {}
         }
 
         if (isMounted) {
@@ -690,8 +682,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
             .upload(filePath, recordedAudioBlob, { contentType: recordedAudioBlob.type, upsert: true });
 
           if (!upErr) {
-            const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
-            finalAudioPublicUrl = pubData.publicUrl;
+            finalAudioPublicUrl = await getSecureAudioUrl(filePath, 'campus-assets', 1800);
             audioTokens.push(`AUDIO:${finalAudioPublicUrl}|${audioRecordSeconds || 10}|${new Date().toISOString()}|Play-Along Take|teacher|shared_with_teacher||||BPM:${metronomeBpm}`);
           }
         } catch (e) {
@@ -1967,7 +1958,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"

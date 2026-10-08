@@ -17,6 +17,7 @@ export interface OnsetHitEvent {
 
 export type OnsetListener = (hit: OnsetHitEvent) => void;
 export type LevelListener = (level: number) => void;
+import { acquireAudioStream } from '../audioPermissionService';
 
 export class AcousticOnsetEngine {
   private static instance: AcousticOnsetEngine | null = null;
@@ -127,7 +128,7 @@ export class AcousticOnsetEngine {
         }
       };
 
-      this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.mediaStream = await acquireAudioStream(constraints);
       this.sourceNode = this.audioCtx.createMediaStreamSource(this.mediaStream);
 
       // 3. Audio Shaping Filter:

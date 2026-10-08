@@ -4,7 +4,9 @@ import {
   GraduationCap, 
   ShieldCheck, 
   Calendar, 
-  Flag 
+  Flag,
+  Pin,
+  MessageSquare
 } from 'lucide-react';
 import { CampusDynamicAvatar } from '../CampusDirectMessages';
 import { CompactAppointmentEventCard } from './CompactAppointmentEventCard';
@@ -62,6 +64,8 @@ export interface CampusUnifiedChatMessageProps {
   currentOcc?: any;
   isSuperseded?: boolean;
   appointmentContextLabel?: string | null;
+  replyCount?: number;
+  onOpenTopicThread?: (topicId: string) => void;
 }
 
 /**
@@ -84,7 +88,9 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
   pedagogicalBanner,
   currentOcc,
   isSuperseded = false,
-  appointmentContextLabel
+  appointmentContextLabel,
+  replyCount,
+  onOpenTopicThread
 }) => {
   const isSelf = msg.sender_id === currentUserId;
   const isSys = isChatMessageSystem(msg);
@@ -171,6 +177,12 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
   const cleanContent = rawContent.startsWith('enc:')
     ? '[Verschlüsselte Nachricht]'
     : cleanChatMessageContent(rawContent);
+
+  // 🛡️ 0.1% Goldstandard: Topic & Subject extraction
+  const fallbackTopicMatch = rawContent.match(/^📌\s*\[(.*?)\]/);
+  const topicSubject = msg.subject || (fallbackTopicMatch ? fallbackTopicMatch[1] : null);
+  const isTopicMessage = Boolean(topicSubject || msg.message_type === 'topic');
+  const displayContent = cleanContent.replace(/^📌\s*\[(.*?)\]\s*/, '');
 
   return (
     <React.Fragment>
@@ -367,7 +379,57 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
               whiteSpace: 'pre-wrap'
             }}
           >
-            <div>{cleanContent}</div>
+            {isTopicMessage && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.70rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.02em',
+                  color: isSelf ? '#bbf7d0' : '#15803d',
+                  marginBottom: '4px',
+                  textTransform: 'uppercase'
+                }}
+              >
+                <Pin size={11} strokeWidth={2.4} />
+                <span>Thema{topicSubject ? `: ${topicSubject}` : ''}</span>
+              </div>
+            )}
+            <div>{displayContent}</div>
+
+            {/* Optional Topic Reply Count Pill */}
+            {Boolean(replyCount && replyCount > 0) && (
+              <div style={{ marginTop: '8px', marginBottom: '2px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenTopicThread?.(msg.id);
+                  }}
+                  aria-label={`${replyCount} Antworten im Thema ansehen`}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '8px',
+                    background: isSelf ? 'rgba(255, 255, 255, 0.2)' : '#f0fdf4',
+                    border: isSelf ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid #bbf7d0',
+                    color: isSelf ? '#ffffff' : '#15803d',
+                    fontSize: '0.74rem',
+                    fontWeight: 750,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: 'none'
+                  }}
+                >
+                  <MessageSquare size={12} strokeWidth={2.4} />
+                  <span>{replyCount} {replyCount === 1 ? 'Antwort' : 'Antworten'} • In Themen ansehen →</span>
+                </button>
+              </div>
+            )}
 
             {/* Time & Read Status metadata inside the bubble */}
             <div

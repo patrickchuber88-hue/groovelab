@@ -63,10 +63,10 @@ export const MicroScoreOrientationLock: React.FC<MicroScoreOrientationLockProps>
         }
         @keyframes pulseGlowRing {
           0%, 100% {
-            box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+            box-shadow: none;
           }
           50% {
-            box-shadow: 0 0 0 16px rgba(99, 102, 241, 0);
+            box-shadow: none;
           }
         }
       `}</style>

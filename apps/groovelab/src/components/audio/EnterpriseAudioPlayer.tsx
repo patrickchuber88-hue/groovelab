@@ -362,7 +362,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
               fontSize: '0.9rem',
               fontWeight: 900,
               cursor: isLoading ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 8px rgba(250, 204, 21, 0.35)',
+              boxShadow: 'none',
               touchAction: 'manipulation'
             }}
           >

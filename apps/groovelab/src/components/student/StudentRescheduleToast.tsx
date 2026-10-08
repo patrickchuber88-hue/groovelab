@@ -95,7 +95,7 @@ export const StudentRescheduleToast: React.FC<StudentRescheduleToastProps> = ({
         WebkitBackdropFilter: 'blur(24px)',
         borderRadius: '20px',
         border: '1.5px solid rgba(245, 158, 11, 0.28)',
-        boxShadow: '0 14px 38px -4px rgba(180, 83, 9, 0.16), 0 4px 14px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 14px 38px -4px rgba(15, 23, 42, 0.12), 0 4px 14px rgba(0, 0, 0, 0.05)',
         padding: '16px 18px',
         display: 'flex',
         alignItems: 'center',
@@ -125,7 +125,7 @@ export const StudentRescheduleToast: React.FC<StudentRescheduleToastProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
-        boxShadow: '0 2px 6px rgba(180, 83, 9, 0.10)'
+        boxShadow: 'none'
       }}>
         <RotateCcw size={20} strokeWidth={2.4} />
       </div>
@@ -203,7 +203,7 @@ export const StudentRescheduleToast: React.FC<StudentRescheduleToastProps> = ({
         alignItems: 'center',
         gap: '6px',
         flexShrink: 0,
-        boxShadow: '0 3px 10px rgba(21, 128, 61, 0.28)',
+        boxShadow: 'none',
         letterSpacing: '-0.01em'
       }}>
         <span>Prüfen</span>

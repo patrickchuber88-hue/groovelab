@@ -1061,7 +1061,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         )}
 
         {/* Header: Apple HIG Dual-Tier Full-Width Stage */}
-        <div style={{ background: "linear-gradient(135deg, #15803d 0%, #166534 100%)", display: "flex", flexDirection: "column", color: "#ffffff", boxShadow: "0 4px 16px rgba(21, 128, 61, 0.16)", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
+        <div style={{ background: "linear-gradient(135deg, #15803d 0%, #166534 100%)", display: "flex", flexDirection: "column", color: "#ffffff", boxShadow: "none", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
           {/* Tier 1: Identitäts- & Steuerungs-Ebene (100% Breite) */}
           <div style={{ padding: isMobile ? "calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 10px) 14px 8px 14px" : "14px 24px 10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", boxSizing: "border-box" }}>
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "9px" : "12px", minWidth: 0, flex: 1, overflow: "hidden" }}>
@@ -1146,7 +1146,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '10px',
-            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.04)',
+            boxShadow: 'none',
             flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
@@ -1192,7 +1192,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 alignItems: 'center',
                 gap: '5px',
                 whiteSpace: 'nowrap',
-                boxShadow: isLessonPast ? 'none' : '0 2px 8px rgba(21, 128, 61, 0.25)',
+                boxShadow: 'none',
                 transition: 'background 0.15s ease',
                 flexShrink: 0
               }}
@@ -1335,7 +1335,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     whiteSpace: 'nowrap',
                     cursor: isLessonPast ? 'not-allowed' : 'pointer',
                     opacity: isLessonPast ? 0.6 : 1,
-                    boxShadow: isLessonPast ? 'none' : '0 2px 8px rgba(16, 185, 129, 0.28)',
+                    boxShadow: 'none',
                     flexShrink: 0,
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1363,7 +1363,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     whiteSpace: 'nowrap',
                     cursor: isLessonPast ? 'not-allowed' : 'pointer',
                     opacity: isLessonPast ? 0.6 : 1,
-                    boxShadow: isLessonPast ? 'none' : '0 1px 3px rgba(220, 38, 38, 0.10)',
+                    boxShadow: 'none',
                     flexShrink: 0,
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1465,7 +1465,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   fontSize: isMobile ? '0.74rem' : '0.82rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.22)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1619,7 +1619,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   onFocus={e => {
                     if (!isFrozen) {
                       e.target.style.borderColor = effectiveIsParentUnlocked ? '#2563eb' : '#15803d';
-                      e.target.style.boxShadow = effectiveIsParentUnlocked ? '0 0 0 3px rgba(37, 99, 235, 0.18)' : '0 0 0 3px rgba(21, 128, 61, 0.15)';
+                      e.target.style.boxShadow = 'none';
                     }
                   }}
                   onBlur={e => {
@@ -1644,7 +1644,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
-                    boxShadow: isFrozen || !chatTypedMessage.trim() ? 'none' : (effectiveIsParentUnlocked ? '0 2px 8px rgba(37, 99, 235, 0.28)' : '0 2px 8px rgba(21, 128, 61, 0.25)'),
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease',
                     flexShrink: 0
                   }}
@@ -1842,7 +1842,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                         border: isFilled ? '2px solid #2563eb' : '2px solid #cbd5e1',
                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                         transform: isFilled ? 'scale(1.15)' : 'scale(1)',
-                        boxShadow: isFilled ? '0 0 10px rgba(37, 99, 235, 0.35)' : 'none'
+                        boxShadow: 'none'
                       }}
                     />
                   );
@@ -1960,7 +1960,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.08)',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease',
                     touchAction: 'manipulation'
                   }}

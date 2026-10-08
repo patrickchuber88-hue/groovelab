@@ -506,7 +506,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
             <div style={{
               width: '38px', height: '38px', borderRadius: '12px', background: '#ecfdf5',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.25rem', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
+              fontSize: '1.25rem', boxShadow: 'none'
             }}>
               ✨
             </div>
@@ -584,7 +584,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
-                    boxShadow: selectedGoalType === 'milestone' ? '0 6px 20px rgba(16, 185, 129, 0.18)' : '0 2px 6px rgba(0,0,0,0.03)',
+                    boxShadow: 'none',
                     transition: 'all 0.18s ease'
                   }}
                   className="hover-scale"
@@ -595,7 +595,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                         width: '48px', height: '48px', borderRadius: '16px',
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.4rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)', flexShrink: 0
+                        fontSize: '1.4rem', boxShadow: 'none', flexShrink: 0
                       }}>
                         🏆
                       </div>
@@ -688,7 +688,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
-                    boxShadow: selectedGoalType === 'playlist' ? '0 6px 20px rgba(139, 92, 246, 0.18)' : '0 2px 6px rgba(0,0,0,0.03)',
+                    boxShadow: 'none',
                     transition: 'all 0.18s ease'
                   }}
                   className="hover-scale"
@@ -699,7 +699,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                         width: '48px', height: '48px', borderRadius: '16px',
                         background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.4rem', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)', flexShrink: 0
+                        fontSize: '1.4rem', boxShadow: 'none', flexShrink: 0
                       }}>
                         🎵
                       </div>
@@ -909,7 +909,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
-                    boxShadow: selectedGoalType === 'gift' ? '0 6px 20px rgba(249, 115, 22, 0.18)' : '0 2px 6px rgba(0,0,0,0.03)',
+                    boxShadow: 'none',
                     transition: 'all 0.18s ease'
                   }}
                   className="hover-scale"
@@ -920,7 +920,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                         width: '48px', height: '48px', borderRadius: '16px',
                         background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: 'white',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.4rem', boxShadow: '0 4px 12px rgba(249, 115, 22, 0.35)', flexShrink: 0
+                        fontSize: '1.4rem', boxShadow: 'none', flexShrink: 0
                       }}>
                         🎁
                       </div>
@@ -1041,7 +1041,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                  boxShadow: 'none',
                   marginTop: '6px'
                 }}
                 className="hover-scale"
@@ -1068,7 +1068,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '3rem',
-                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25)'
+                boxShadow: 'none'
               }}>
                 {instrumentInfo.emoji}
               </div>
@@ -1140,7 +1140,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >
@@ -1191,7 +1191,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     justifyContent: 'center',
                     fontSize: '3.6rem',
                     fontWeight: 900,
-                    boxShadow: '0 0 36px rgba(245, 158, 11, 0.6)',
+                    boxShadow: 'none',
                     animation: 'pulse 1s infinite'
                   }}>
                     {countInNumber}
@@ -1218,7 +1218,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     alignItems: 'center',
                     justifyContent: 'center',
                     animation: 'pulse 1.5s infinite',
-                    boxShadow: '0 0 24px rgba(239, 68, 68, 0.4)'
+                    boxShadow: 'none'
                   }}>
                     <Mic size={44} color="#ef4444" />
                   </div>
@@ -1275,7 +1275,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '10px',
-                      boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)'
+                      boxShadow: 'none'
                     }}
                     className="hover-scale"
                   >
@@ -1302,7 +1302,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.2)'
+                boxShadow: 'none'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{
@@ -1316,7 +1316,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     justifyContent: 'center',
                     fontSize: '1.2rem',
                     fontWeight: 900,
-                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
+                    boxShadow: 'none'
                   }}>
                     🪙
                   </div>
@@ -1411,7 +1411,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   borderRadius: '24px',
                   border: '2px solid #f97316',
                   padding: '20px',
-                  boxShadow: '0 8px 24px rgba(249, 115, 22, 0.15)',
+                  boxShadow: 'none',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
@@ -1445,7 +1445,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '10px',
-                      boxShadow: '0 6px 20px rgba(249, 115, 22, 0.35)'
+                      boxShadow: 'none'
                     }}
                     className="hover-scale"
                   >
@@ -1563,7 +1563,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                    boxShadow: 'none',
                     opacity: isSaving ? 0.7 : 1
                   }}
                   className="hover-scale"

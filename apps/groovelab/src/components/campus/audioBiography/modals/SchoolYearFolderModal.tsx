@@ -168,7 +168,7 @@ export const SchoolYearFolderModal: React.FC<SchoolYearFolderModalProps> = ({
               fontSize: '0.82rem',
               fontWeight: 900,
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
           >

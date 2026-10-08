@@ -222,26 +222,8 @@ export function computeGroundTruthMetrics({
   const now = simulatedDate || getEngineSimulatedNow();
   const todayStr = toEngineYYYYMMDD(now);
 
-  // Merge any local logs from localStorage for offline/local simulation resilience
-  let mergedLogs: any[] = [...(fokusLogs || [])];
-  const candidateIds = new Set<string>();
-  if (user?.id) candidateIds.add(String(user.id));
-  if (stats?.student_id) candidateIds.add(String(stats.student_id));
-  if (avatar?.user_id) candidateIds.add(String(avatar.user_id));
-
-  try {
-    if (typeof window !== 'undefined') {
-      candidateIds.forEach(id => {
-        const localLogsKey = `cg_local_fokus_logs_${id}`;
-        const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
-        if (Array.isArray(localLogs) && localLogs.length > 0) {
-          const remoteIds = new Set(mergedLogs.map((l: any) => l.id));
-          const missing = localLogs.filter((l: any) => l && l.id && !remoteIds.has(l.id));
-          mergedLogs = [...missing, ...mergedLogs];
-        }
-      });
-    }
-  } catch (e) {}
+  // Autoritative SSOT: Fokus-Logs stammen ausnahmslos aus PostgreSQL
+  const mergedLogs: any[] = [...(fokusLogs || [])];
 
   // 1. Compute XP from all logs
   const computedXpFromLogs = mergedLogs.reduce((sum: number, log: any) => {
@@ -256,35 +238,18 @@ export function computeGroundTruthMetrics({
   const masteredPagesSet = getMasteredPagesSet(progressMatrix);
   const songsXp = masteredSongsSet.size * 50;
   const lehrwerkPagesXp = masteredPagesSet.size * 10;
-  
-  let offlineXp = 0;
-  let offlineStreak = 0;
-  let offlineTotalFocus = 0;
-  try {
-    if (typeof window !== 'undefined') {
-      candidateIds.forEach(id => {
-        const s = JSON.parse(localStorage.getItem(`cg_offline_stats_${id}`) || 'null');
-        if (s) {
-          if (s.current_xp) offlineXp = Math.max(offlineXp, s.current_xp);
-          if (s.streak_flame) offlineStreak = Math.max(offlineStreak, s.streak_flame);
-          if (s.total_focus_minutes) offlineTotalFocus = Math.max(offlineTotalFocus, s.total_focus_minutes);
-        }
-        const p = JSON.parse(localStorage.getItem(`cg_offline_practice_${id}`) || 'null');
-        if (p) {
-          if (p.xp) offlineXp = Math.max(offlineXp, p.xp);
-          if (p.streak_flame) offlineStreak = Math.max(offlineStreak, p.streak_flame);
-          if (p.total_focus_minutes) offlineTotalFocus = Math.max(offlineTotalFocus, p.total_focus_minutes);
-        }
-      });
-    }
-  } catch (e) {}
 
-  const groundTruthTotalXp = Math.max(
+  // 🏛️ 0,1% Goldstandard SSOT: Keine vorzeitigen Teilsummen als Gesamt-XP ausgeben,
+  // solange die autoritative Basis (avatar.xp / student_stats.current_xp) noch im Ladezustand ist.
+  const authoritativeBaseline = Math.max(
     avatar?.xp || 0,
     stats?.current_xp || 0,
-    offlineXp,
-    computedXpFromLogs + songsXp + lehrwerkPagesXp
+    user?.campus_xp || 0,
+    user?.xp || 0
   );
+  const groundTruthTotalXp = authoritativeBaseline > 0
+    ? Math.max(authoritativeBaseline, computedXpFromLogs + songsXp + lehrwerkPagesXp)
+    : (avatar || stats ? (computedXpFromLogs + songsXp + lehrwerkPagesXp) : 0);
 
   // 3. Compute distinct mastered dates
   const masteredDatesSet = new Set<string>();
@@ -307,16 +272,6 @@ export function computeGroundTruthMetrics({
   if (user?.joker_used_at) {
     shieldDatesSet.add(toEngineYYYYMMDD(new Date(user.joker_used_at)));
   }
-  try {
-    if (typeof window !== 'undefined') {
-      candidateIds.forEach(id => {
-        const localShields = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${id}`) || '[]');
-        if (Array.isArray(localShields)) {
-          localShields.forEach((d: string) => shieldDatesSet.add(d));
-        }
-      });
-    }
-  } catch (e) {}
 
   let computedStreak = 0;
   const checkDate = new Date(now);
@@ -358,8 +313,8 @@ export function computeGroundTruthMetrics({
     }
   }
 
-  // Fallback to avatar/stats streak if higher and valid
-  const finalStreak = Math.max(computedStreak, avatar?.streak_flame || 0, stats?.streak_flame || 0, offlineStreak);
+  // Fallback to avatar/stats streak if higher and valid (Postgres SSOT)
+  const finalStreak = Math.max(computedStreak, avatar?.streak_flame || 0, stats?.streak_flame || 0);
 
   // 5. Compute today's practice seconds & minutes
   const todayLogs = mergedLogs.filter((log: any) => log.created_at && toEngineYYYYMMDD(new Date(log.created_at)) === todayStr);
@@ -416,7 +371,7 @@ export function computeGroundTruthMetrics({
   const totalFocusSecs = mergedLogs.reduce((sum: number, log: any) => {
     return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
   }, 0);
-  const totalFocusMins = Math.max(stats?.total_focus_minutes || 0, offlineTotalFocus, Math.round(totalFocusSecs / 60));
+  const totalFocusMins = Math.max(stats?.total_focus_minutes || 0, Math.round(totalFocusSecs / 60));
 
   // 9. Check if daily target is completed
   const hasCompletedTargetToday = (

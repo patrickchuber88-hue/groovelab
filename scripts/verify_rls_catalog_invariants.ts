@@ -39,7 +39,7 @@ const results: InvariantCheckResult[] = [];
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ RLS & SCHEMA CATALOG INVARIANT AUDIT');
 console.log('    Standards: DIN EN ISO/IEC 27001 (A.8.20/A.8.24) & BSI C5 Kriterienkatalog');
-console.log('    Validating 22 Forensic Architecture & Performance Invariants...');
+console.log('    Validating 23 Forensic Architecture & Performance Invariants...');
 console.log('════════════════════════════════════════════════════════════════════\n');
 
 if (!fs.existsSync(MIGRATION_389)) {
@@ -781,6 +781,42 @@ function verifyInvariant22(): InvariantCheckResult {
 }
 
 // ------------------------------------------------------------------------------
+// INVARIANT 23: Mandatory School Profile Trigger & Zero-Bypass SQL Security (Migration 539)
+// ------------------------------------------------------------------------------
+function verifyInvariant23(): InvariantCheckResult {
+  const findings: string[] = [];
+  const m539File = path.join(MIGRATIONS_DIR, '539_enterprise_security_hardening_sql_bypasses.sql');
+  if (!fs.existsSync(m539File)) {
+    findings.push('Migration 539 file missing at supabase/migrations/539_enterprise_security_hardening_sql_bypasses.sql');
+  } else {
+    const m539Content = fs.readFileSync(m539File, 'utf-8');
+    if (!m539Content.includes('trg_enforce_school_mandatory_profile')) {
+      findings.push('Migration 539 missing trg_enforce_school_mandatory_profile trigger');
+    }
+    if (!m539Content.includes('is_demo_tenant')) {
+      findings.push('Migration 539 missing is_demo_tenant column declaration');
+    }
+    if (!m539Content.includes('MANDATORY_FIELD_MISSING')) {
+      findings.push('Migration 539 missing MANDATORY_FIELD_MISSING fail-closed exception');
+    }
+    if (m539Content.includes("'test-campus'") || m539Content.includes('20ebecf465c192667822feac7b049d50ad76fa0c42289f61b0a514d0ff9e6bf9')) {
+      findings.push('Migration 539 contains forbidden plaintext bypass or mock contract hash');
+    }
+  }
+
+  const passed = findings.length === 0;
+  return {
+    id: 23,
+    name: 'Mandatory School Onboarding & Zero-Bypass SQL Security (Migration 539)',
+    passed,
+    details: passed
+      ? 'Migration 539 verified: Mandatory school profile trigger (trg_enforce_school_mandatory_profile), is_demo_tenant, and zero plaintext bypasses sealed.'
+      : `Failed: ${findings.join('; ')}`,
+    findings
+  };
+}
+
+// ------------------------------------------------------------------------------
 // LIVE CATALOG AUDIT ENGINE (Checks pg_policies, pg_views, pg_proc when connected)
 // ------------------------------------------------------------------------------
 export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed: boolean; message: string }> {
@@ -859,6 +895,7 @@ results.push(verifyInvariant19());
 results.push(verifyInvariant20());
 results.push(verifyInvariant21());
 results.push(verifyInvariant22());
+results.push(verifyInvariant23());
 
 let failedCount = 0;
 
@@ -880,7 +917,7 @@ if (liveResult.executed) {
 
 console.log('\n════════════════════════════════════════════════════════════════════');
 if (failedCount === 0) {
-  console.log(`🎉 ALL 22 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
+  console.log(`🎉 ALL 23 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
   console.log('   OWASP ASVS Level 3 / DSGVO Art. 5, 8, 25, 32 / Sub-MS Invariants Sealed.');
   console.log('════════════════════════════════════════════════════════════════════\n');
   process.exit(0);

@@ -20,6 +20,7 @@ import {
   INSTRUMENT_WORKLET_PROCESSOR_NAME, 
   getInstrumentWorkletBlobUrl 
 } from './InstrumentAudioWorkletProcessor';
+import { acquireAudioStream } from '../audioPermissionService';
 
 export type MetricsListener = (metrics: AudioEngineMetrics) => void;
 export type StateListener = (state: AudioCaptureState) => void;
@@ -202,7 +203,7 @@ export class AudioCaptureEngine {
         throw new Error('[AudioCaptureEngine] getUserMedia is not supported in this browser environment.');
       }
 
-      this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.mediaStream = await acquireAudioStream(constraints);
 
       // Verify acquired hardware track settings
       const track = this.mediaStream.getAudioTracks()[0];

@@ -94,7 +94,7 @@ export const getAvatarLevelFrameStyle = (level: number = 1): AvatarFrameStyle =>
   if (safeLevel === 3) {
     return {
       border: '3.5px solid #f59e0b',
-      boxShadow: '0 0 18px rgba(245, 158, 11, 0.48), inset 0 0 6px rgba(251, 191, 36, 0.25)',
+      boxShadow: 'none',
       badgeLabel: 'Stufe 3 • Gold',
       badgeBg: '#fef3c7',
       badgeColor: '#92400e',
@@ -106,7 +106,7 @@ export const getAvatarLevelFrameStyle = (level: number = 1): AvatarFrameStyle =>
   if (safeLevel === 2) {
     return {
       border: '3px solid #34a853',
-      boxShadow: '0 0 14px rgba(52, 168, 83, 0.38)',
+      boxShadow: 'none',
       badgeLabel: 'Stufe 2 • Smaragd',
       badgeBg: '#dcfce7',
       badgeColor: '#166534',

@@ -395,7 +395,7 @@ export function StudentBriefingRightSidebar({
                                       borderRadius: '50%',
                                       background: '#ea4335',
                                       border: 'none',
-                                      boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
+                                      boxShadow: 'none'
                                     }} />
                                   )}
                                 </div>
@@ -422,7 +422,7 @@ export function StudentBriefingRightSidebar({
                               flexDirection: 'column',
                               alignItems: 'center',
                               gap: '10px',
-                              boxShadow: '0 4px 16px rgba(34, 197, 94, 0.06)',
+                              boxShadow: 'none',
                               margin: '6px 0'
                             }}>
                               <div style={{
@@ -433,7 +433,7 @@ export function StudentBriefingRightSidebar({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)',
+                                boxShadow: 'none',
                                 fontSize: '1.3rem'
                               }}>
                                 🎶
@@ -462,7 +462,7 @@ export function StudentBriefingRightSidebar({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
+                                    boxShadow: 'none'
                                   }}
                                 >
                                   <span>🎧</span>
@@ -702,7 +702,7 @@ export function StudentBriefingRightSidebar({
                                         fontSize: '0.82rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
-                                        boxShadow: '0 2px 6px rgba(217, 119, 6, 0.15)',
+                                        boxShadow: 'none',
                                         transition: 'all 0.2s',
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -729,7 +729,7 @@ export function StudentBriefingRightSidebar({
                                       fontSize: '0.82rem', 
                                       fontWeight: 800, 
                                       cursor: 'pointer',
-                                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
+                                      boxShadow: 'none',
                                       transition: 'all 0.2s',
                                       position: 'relative',
                                       zIndex: 10,
@@ -757,7 +757,7 @@ export function StudentBriefingRightSidebar({
                                       fontSize: '0.82rem', 
                                       fontWeight: 800, 
                                       cursor: 'pointer',
-                                      boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
+                                      boxShadow: 'none',
                                       transition: 'all 0.2s',
                                       position: 'relative',
                                       zIndex: 10,
@@ -840,7 +840,7 @@ export function StudentBriefingRightSidebar({
                             display: 'flex',
                             flexDirection: 'column',
                             background: '#34a853',
-                            boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                            boxShadow: 'none',
                             borderRadius: '16px',
                             padding: '12px 14px',
                             gap: '8px',

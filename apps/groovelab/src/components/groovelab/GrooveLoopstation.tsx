@@ -471,10 +471,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const [calibrationWaveform, setCalibrationWaveform] = useState<number[] | null>(null);
+  const [isPermissionPending, setIsPermissionPending] = useState(false);
+  const isPermissionPendingRef = useRef(false);
+  useEffect(() => { isPermissionPendingRef.current = isPermissionPending; }, [isPermissionPending]);
   const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4'>('4/4');
   const [barLength, setBarLength] = useState<1 | 2 | 4 | 8>(4);
-  const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth' | 'rock_beat' | 'hiphop_beat' | 'shuffle_beat' | 'funk_beat'>('rock_beat');
+  const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth' | 'rock_beat' | 'hiphop_beat' | 'shuffle_beat' | 'funk_beat'>('wood');
   const timeSignatureRef = useRef(timeSignature);
   const barLengthRef = useRef(barLength);
   const metronomeSoundRef = useRef(metronomeSound);
@@ -1403,7 +1406,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       // erklingt der Beat stets in voller didaktischer Lautstärke.
       const shouldDuckAcousticBleed = isCurrentlyRecording && hasTrack1 && !useHeadphonesRef.current;
       const targetMetronomeGain = shouldDuckAcousticBleed
-        ? 0
+        ? (baseMetronomeGain * 0.15)
         : (time === undefined ? (baseMetronomeGain || 0.45) : baseMetronomeGain);
 
       if (targetMetronomeGain <= 0) return;
@@ -1423,12 +1426,14 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const beatSecs = 60.0 / bpm;
 
       // 🥁 Premium 0,1% Goldstandard Studio Drum Library (Echte Pop/Rock Samples mit Fallback)
+      // 🛡️ Master Headroom Bus: Klicks & Drums laufen über masterGain & masterCompressor (-3 dBFS Schutz)
+      const clickDestination = masterGainRef.current || ctx.destination;
       const playKick = (t: number, gainVal: number, _subFreq = 45, punch = 1.0) => {
         StudioSampleLibrary.trigger(ctx, 'kick', {
           time: t,
           velocity: Math.min(1.2, gainVal * 1.15),
           pitchMultiplier: punch,
-          destination: ctx.destination
+          destination: clickDestination
         });
       };
 
@@ -1436,7 +1441,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         StudioSampleLibrary.trigger(ctx, isClap ? 'clap' : 'snare', {
           time: t,
           velocity: Math.min(1.2, gainVal * 0.95),
-          destination: ctx.destination
+          destination: clickDestination
         });
       };
 
@@ -1444,7 +1449,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         StudioSampleLibrary.trigger(ctx, isOpen ? 'hatOpen' : 'hatClosed', {
           time: t,
           velocity: Math.min(1.2, gainVal * (isOpen ? 0.75 : 0.60)),
-          destination: ctx.destination
+          destination: clickDestination
         });
       };
 
@@ -1525,7 +1530,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.035);
 
         osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
+        gainNode.connect(clickDestination);
         osc.start(playTime);
         osc.stop(playTime + 0.045);
       } else if (soundType === 'rimshot') {
@@ -1547,9 +1552,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         stickGain.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.008);
 
         bodyOsc.connect(bodyGain);
-        bodyGain.connect(ctx.destination);
+        bodyGain.connect(clickDestination);
         stickOsc.connect(stickGain);
-        stickGain.connect(ctx.destination);
+        stickGain.connect(clickDestination);
 
         bodyOsc.start(playTime);
         bodyOsc.stop(playTime + 0.02);
@@ -1573,7 +1578,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         noiseGain.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.006);
         noise.connect(bp);
         bp.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
+        noiseGain.connect(clickDestination);
         noise.start(playTime);
         noise.stop(playTime + 0.01);
       } else if (soundType === 'cowbell') {
@@ -1597,7 +1602,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         osc1.connect(bp);
         osc2.connect(bp);
         bp.connect(gainNode);
-        gainNode.connect(ctx.destination);
+        gainNode.connect(clickDestination);
 
         osc1.start(playTime);
         osc2.start(playTime);
@@ -1617,7 +1622,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.012);
 
         osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
+        gainNode.connect(clickDestination);
         osc.start(playTime);
         osc.stop(playTime + 0.015);
       }
@@ -1874,8 +1879,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     isAutoSequenceActiveRef.current = true;
     isCapturingContinuousAudioRef.current = true;
     setAutoSequenceStatus('WARTE AUF MIKROFON...');
+    isPermissionPendingRef.current = true;
+    setIsPermissionPending(true);
     try {
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      isPermissionPendingRef.current = false;
+      setIsPermissionPending(false);
       await stabilizeAudioStream(stream, 300);
       mediaStreamRef.current = stream;
       await detectHeadphones(stream);
@@ -1891,83 +1900,31 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const ctx = audioContextRef.current!;
       const sourceNode = ctx.createMediaStreamSource(stream);
 
-      const workletCode = `
-        class RecorderProcessor extends AudioWorkletProcessor {
-          constructor() { 
-            super(); 
-            this.isActive = true; 
-          }
-          process(inputs, outputs) {
-            if (!this.isActive) return true;
-            const input = inputs[0];
-            if (input && input.length > 0 && input[0]) {
-              this.port.postMessage({ data: input[0], time: currentTime });
-            }
-            const output = outputs[0];
-            if (output) {
-              for (let channel = 0; channel < output.length; channel++) {
-                output[channel].fill(0);
-              }
-            }
-            return true;
-          }
-        }
-        registerProcessor('recorder-worklet', RecorderProcessor);
-      `;
-      const blob = new Blob([workletCode], { type: 'application/javascript' });
-      const workletUrl = URL.createObjectURL(blob);
-
-      let processorNode: AudioNode;
-      try {
-        if (!isWorkletRegisteredRef.current) {
-          await ctx.audioWorklet.addModule(workletUrl);
-          isWorkletRegisteredRef.current = true;
-        }
-        const workletNode = new AudioWorkletNode(ctx, 'recorder-worklet');
-        workletNode.port.postMessage({ type: 'SET_HEADPHONES', value: useHeadphonesRef.current });
-        processorNode = workletNode;
-        processorNodeRef.current = workletNode;
-      } catch (e) {
-        console.warn("AudioWorklet fallback", e);
-        processorNode = ctx.createScriptProcessor(4096, 1, 1);
-        processorNodeRef.current = processorNode;
-      }
-      URL.revokeObjectURL(workletUrl);
+      // 🎙️ Universal Web Audio PCM Capture (100% Safari WebKit & Chromium kompatibel gem. useMeisterwerkAudioRecording.ts)
+      const processorNode = ctx.createScriptProcessor(4096, 1, 1);
+      processorNodeRef.current = processorNode;
 
       const muteNode = ctx.createGain();
-      muteNode.gain.value = 0;
+      muteNode.gain.setValueAtTime(0, ctx.currentTime);
 
       const continuousPCMData: Float32Array[] = [];
       let totalSamplesRecorded = 0;
       let isFirstBlock = true;
 
-      if (processorNode instanceof AudioWorkletNode) {
-        processorNode.port.onmessage = (e) => {
-          if (!isCapturingContinuousAudioRef.current) return;
-          if (isFirstBlock) {
-            continuousRecordStartTimeRef.current = e.data.time;
-            isFirstBlock = false;
-          }
-          const inputData = e.data.data;
-          continuousPCMData.push(new Float32Array(inputData));
-          totalSamplesRecorded += inputData.length;
-        };
-      } else {
-        (processorNode as ScriptProcessorNode).onaudioprocess = (e) => {
-          if (!isCapturingContinuousAudioRef.current) return;
-          if (isFirstBlock) {
-            const bufferDuration = e.inputBuffer.length / e.inputBuffer.sampleRate;
-            continuousRecordStartTimeRef.current = ctx.currentTime - bufferDuration;
-            isFirstBlock = false;
-          }
-          const inputData = e.inputBuffer.getChannelData(0);
-          continuousPCMData.push(new Float32Array(inputData));
-          totalSamplesRecorded += inputData.length;
+      processorNode.onaudioprocess = (e) => {
+        if (!isCapturingContinuousAudioRef.current) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        if (isFirstBlock) {
+          const bufferDuration = inputData.length / e.inputBuffer.sampleRate;
+          continuousRecordStartTimeRef.current = ctx.currentTime - bufferDuration;
+          isFirstBlock = false;
+        }
+        continuousPCMData.push(new Float32Array(inputData));
+        totalSamplesRecorded += inputData.length;
 
-          const outputData = e.outputBuffer.getChannelData(0);
-          outputData.fill(0);
-        };
-      }
+        const outputData = e.outputBuffer.getChannelData(0);
+        outputData.fill(0);
+      };
 
       const getFullPCMBuffer = (): AudioBuffer | null => {
         if (totalSamplesRecorded === 0) return null;
@@ -2034,6 +1991,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       const cleanupContinuousRecording = () => {
         isCapturingContinuousAudioRef.current = false;
+        try { (processorNode as any).onaudioprocess = null; } catch (e) {}
         try { processorNode.disconnect(); } catch (e) {}
         try { sourceNode.disconnect(); } catch (e) {}
         try { muteNode.disconnect(); } catch (e) {}
@@ -2077,7 +2035,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               if (completeSliced) {
                 audioBuffersRef.current[trackId] = completeSliced;
                 const currentSource = activeSourcesRef.current[trackId];
-                if (currentSource && (isAutoSequenceActiveRef.current || isPlayingRef.current)) {
+                if (isAutoSequenceActiveRef.current || isPlayingRef.current) {
                   const playTime = ctx.currentTime + 0.030;
                   const elapsed = playTime - (sequenceStartTimeRef.current + (tStartTicks + 16) * beatSecs);
                   const trackDurationSec = trackDurationMs / 1000;
@@ -2111,7 +2069,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   connectTrackNode(trackId, gainNode, ctx);
 
                   const oldGain = gainNodesRef.current[trackId];
-                  if (oldGain) {
+                  if (oldGain && currentSource) {
                     try {
                       if (typeof (oldGain.gain as any).cancelAndHoldAtTime === 'function') {
                         (oldGain.gain as any).cancelAndHoldAtTime(playTime);
@@ -2122,10 +2080,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                       oldGain.gain.linearRampToValueAtTime(0, playTime + 0.005);
                       currentSource.stop(playTime + 0.005);
                     } catch (e) {}
+                    currentSource.onended = () => {
+                      try { oldGain?.disconnect(); } catch (e) {}
+                    };
                   }
-                  currentSource.onended = () => {
-                    try { oldGain?.disconnect(); } catch (e) {}
-                  };
 
                   newSource.start(playTime, playOffset);
                   activeSourcesRef.current[trackId] = newSource;
@@ -2323,11 +2281,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         if (!audioContextRef.current || !isAutoSequenceActiveRef.current) return;
 
         const lag = audioContextRef.current.currentTime - nextNoteTimeRef.current;
-        if (lag > 0.15) {
-          console.error("Loopstation timing lag detected:", lag);
+        if (lag > 3.0) {
           handleReset();
-          alert("Audio-Timing-Fehler: Der Browser war kurz überlastet und die Loopstation lief asynchron. Die Aufnahme wurde gestoppt. Bitte starte sie neu.");
           return;
+        }
+        if (lag > 0.35) {
+          currentTickRef.current = Math.min(totalTicks, currentTickRef.current + Math.max(0, Math.floor(lag / beatSecs)));
+          nextNoteTimeRef.current = audioContextRef.current.currentTime + 0.05;
         }
 
         while (nextNoteTimeRef.current < audioContextRef.current.currentTime + 0.1) {
@@ -2505,16 +2465,31 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       console.error(err);
       alert('Mikrofonfehler.');
       setIsAutoSequenceActive(false);
+    } finally {
+      isPermissionPendingRef.current = false;
+      setIsPermissionPending(false);
     }
   };
 
   const handlePlayToggle = () => {
     initAudio();
-    if (isPlaying) {
-      stopAll();
-    } else {
-      playAll();
+    if (isAutoSequenceActive && tracks[0]?.url) {
+      // 🎯 1-Spur-Solo-Loop: Beendet Kette zu Folgespuren und lässt Spur 1 als Endlos-Loop laufen
+      isAutoSequenceActiveRef.current = false;
+      isCapturingContinuousAudioRef.current = false;
+      setIsAutoSequenceActive(false);
+      setAutoSequenceStatus('');
+      setCountInBeats(null);
+      if (lookaheadTimerRef.current) { clearTimeout(lookaheadTimerRef.current); lookaheadTimerRef.current = null; }
+      if (uiSyncFrameRef.current) { cancelAnimationFrame(uiSyncFrameRef.current); uiSyncFrameRef.current = null; }
+      if (mediaStreamRef.current) { mediaStreamRef.current.getTracks().forEach(t => t.stop()); mediaStreamRef.current = null; }
+      setTracks(prev => prev.map(t => ({ ...t, isRecording: false, isWaiting: false })));
+      if (audioBuffersRef.current[1] && !isPlayingRef.current) playAll();
+      announceA11y('Aufnahmekette beendet. Spur 1 läuft im Endlos-Loop.');
+      return;
     }
+    if (isPlaying) stopAll();
+    else playAll();
   };
 
   const playTrackBuffer = (trackId: number, offset = 0, loop = false, startTime = 0) => {
@@ -2817,8 +2792,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     );
 
     await initAudio();
+    isPermissionPendingRef.current = true;
+    setIsPermissionPending(true);
     try {
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      isPermissionPendingRef.current = false;
+      setIsPermissionPending(false);
       await stabilizeAudioStream(stream, 300);
       mediaStreamRef.current = stream;
 
@@ -2984,6 +2963,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     } catch (err) {
       console.error('Mic error:', err);
       alert('Mikrofonzugriff verweigert.');
+    } finally {
+      isPermissionPendingRef.current = false;
+      setIsPermissionPending(false);
     }
   };
 
@@ -3580,13 +3562,16 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         mediaStreamRef.current = null;
       }
 
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(e => console.warn(e));
-        audioContextRef.current = null;
-        masterCompressorRef.current = null;
+      if (masterGainRef.current) {
+        try { masterGainRef.current.disconnect(); } catch (e) {}
         masterGainRef.current = null;
-        processorNodeRef.current = null;
       }
+      if (masterCompressorRef.current) {
+        try { masterCompressorRef.current.disconnect(); } catch (e) {}
+        masterCompressorRef.current = null;
+      }
+      processorNodeRef.current = null;
+      audioContextRef.current = null;
 
       tracksRef.current.forEach((t) => {
         if (t.url) URL.revokeObjectURL(t.url);
@@ -3642,7 +3627,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const isPause = isAutoSequenceActive && !autoSequenceStatus.includes("AUFNAHME") && !autoSequenceStatus.includes("FERTIG");
   const isAnyTrackRecording = tracks.some(t => t.isRecording);
-  const isRecordingActive = tracks.some(t => t.isRecording || t.isWaiting) || isAutoSequenceActive;
+  const isRecordingActive = (tracks.some(t => t.isRecording || t.isWaiting) || isAutoSequenceActive) && !isPermissionPending;
 
   // 🛡️ Enterprise Anti-Ablenkungs- & Fokus-Wächter: Aufnahme sofort abbrechen & verwerfen
   const discardActiveRecording = () => {
@@ -3667,6 +3652,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const focusGuard = useFocusInterruptionGuard({
     isActive: isRecordingActive,
+    isPermissionPending,
     toolName: 'Groove Loopstation',
     onAbort: () => {
       discardActiveRecording();
@@ -3719,62 +3705,20 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         }}
       />
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes pulse-recording-card {
-          0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.25); border-color: #ea4335; }
-          70% { box-shadow: 0 0 0 8px rgba(234, 67, 53, 0); border-color: rgba(234, 67, 53, 0.4); }
-          100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); border-color: #ea4335; }
-        }
-        .recording-card-pulse {
-          animation: pulse-recording-card 2s infinite ease-in-out;
-        }
-        @keyframes glow-record {
-          0% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); }
-          50% { filter: drop-shadow(0 0 12px rgba(234, 67, 53, 0.8)); }
-          100% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); }
-        }
-        @keyframes glow-play {
-          0% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); }
-          50% { filter: drop-shadow(0 0 10px rgba(52, 168, 83, 0.65)); }
-          100% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); }
-        }
-        @keyframes glow-pause {
-          0% { filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.3)); }
-          50% { filter: drop-shadow(0 0 12px rgba(234, 179, 8, 0.8)); }
-          100% { filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.3)); }
-        }
-        .glow-record {
-          animation: glow-record 2s infinite ease-in-out;
-        }
-        .glow-play {
-          animation: glow-play 2s infinite ease-in-out;
-        }
-        .glow-pause {
-          animation: glow-pause 2s infinite ease-in-out;
-        }
-        @keyframes central-pulse-play {
-          0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
-          50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(52,168,83,0.25); }
-          100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
-        }
-        @keyframes central-pulse-rec {
-          0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
-          50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(234,67,53,0.35); }
-          100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
-        }
-        @keyframes central-pulse-pause {
-          0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
-          50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(234,179,8,0.35); }
-          100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
-        }
-        .central-pulse-play {
-          animation: central-pulse-play 2s infinite ease-in-out;
-        }
-        .central-pulse-rec {
-          animation: central-pulse-rec 2s infinite ease-in-out;
-        }
-        .central-pulse-pause {
-          animation: central-pulse-pause 2s infinite ease-in-out;
-        }
+        @keyframes pulse-recording-card { 0% { box-shadow: none; border-color: #ea4335; } 70% { box-shadow: none; border-color: rgba(234, 67, 53, 0.4); } 100% { box-shadow: none; border-color: #ea4335; } }
+        .recording-card-pulse { animation: pulse-recording-card 2s infinite ease-in-out; }
+        @keyframes glow-record { 0% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); } 50% { filter: drop-shadow(0 0 12px rgba(234, 67, 53, 0.8)); } 100% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); } }
+        @keyframes glow-play { 0% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); } 50% { filter: drop-shadow(0 0 10px rgba(52, 168, 83, 0.65)); } 100% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); } }
+        @keyframes glow-pause { 0% { filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.3)); } 50% { filter: drop-shadow(0 0 12px rgba(234, 179, 8, 0.8)); } 100% { filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.3)); } }
+        .glow-record { animation: glow-record 2s infinite ease-in-out; }
+        .glow-play { animation: glow-play 2s infinite ease-in-out; }
+        .glow-pause { animation: glow-pause 2s infinite ease-in-out; }
+        @keyframes central-pulse-play { 0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } }
+        @keyframes central-pulse-rec { 0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } }
+        @keyframes central-pulse-pause { 0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } }
+        .central-pulse-play { animation: central-pulse-play 2s infinite ease-in-out; }
+        .central-pulse-rec { animation: central-pulse-rec 2s infinite ease-in-out; }
+        .central-pulse-pause { animation: central-pulse-pause 2s infinite ease-in-out; }
         @keyframes shimmer {
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
@@ -3831,7 +3775,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         .groovelab-fader::-webkit-slider-thumb:hover {
           transform: scale(1.08);
           border-color: #34a853;
-          box-shadow: 0 4px 10px -1px rgba(52, 168, 83, 0.25), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 1px 0 #ffffff;
+          box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.18), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #ffffff;
         }
         .groovelab-fader::-webkit-slider-thumb:active {
           cursor: grabbing;
@@ -3988,7 +3932,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               fontSize: "0.76rem",
               boxSizing: "border-box",
               marginBottom: "14px",
-              boxShadow: "0 2px 8px rgba(16, 185, 129, 0.12)"
+              boxShadow: "none"
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#065f46", fontWeight: 850 }}>
                 <span style={{ fontSize: "1.05rem" }}>✨</span>
@@ -4073,7 +4017,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 6px 16px rgba(217, 119, 6, 0.2)'
+                boxShadow: 'none'
               }}>
                 <Zap size={28} color="#d97706" />
               </div>
@@ -4100,7 +4044,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 fontSize: '0.86rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                boxShadow: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px'
@@ -4707,7 +4651,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   fontWeight: 700,
                   cursor: isExporting ? 'not-allowed' : 'pointer',
                   width: '100%',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s ease',
                   letterSpacing: '0.02em'
                 }}
@@ -5324,7 +5268,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 justifyContent: 'space-between',
                 gap: '8px',
                 transition: 'all 0.25s ease',
-                boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)'
+                boxShadow: 'none'
               }}
               className="hover-scale-mini tactile-btn"
               title="Klicken, um Audio- & Latenzeinstellungen zu öffnen"
@@ -5359,7 +5303,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
-              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.12)',
+              boxShadow: 'none',
               marginTop: '4px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

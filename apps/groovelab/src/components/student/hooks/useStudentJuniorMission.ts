@@ -21,14 +21,17 @@ export interface UseStudentJuniorMissionParams {
     setSessionActive: (active: boolean) => void;
     setSecondsElapsed: (secs: number) => void;
     setShowCelebration: (show: boolean) => void;
-    finishPracticeSession: (xpBonus?: number) => Promise<any>;
+    finishPracticeSession: (xpBonus?: number, streakOverride?: number) => Promise<any>;
     fokusLogs?: any[];
     isSessionPaused?: boolean;
     setIsSessionPaused?: (paused: boolean) => void;
+    requestOrientationPermission?: () => Promise<boolean>;
   };
   streaks: {
     avatar: any;
     getTargetMinutes: (streak: number) => number;
+    effectiveStreak?: number;
+    currentXp?: number;
   };
   localProgress: any;
   lehrwerke: any[];
@@ -95,8 +98,8 @@ export function useStudentJuniorMission({
 
   // 🏆 Autoritatives Unified Stickers Map (100% harmonisiert mit Übezeit, XP, Streak, Schuljahr)
   const unifiedStickersMap = useMemo(() => {
-    const streak = streaks.avatar?.streak_flame || 0;
-    const xp = streaks.avatar?.xp || 0;
+    const streak = streaks.effectiveStreak ?? streaks.avatar?.streak_flame ?? 0;
+    const xp = streaks.currentXp ?? streaks.avatar?.xp ?? 0;
     return getUnifiedStickersMap({
       practiceMinutes: totalPracticeMinutes,
       xp,
@@ -107,7 +110,7 @@ export function useStudentJuniorMission({
       registeredAt: studentUser?.created_at,
       selectedSchoolYear: getSchoolYearString()
     });
-  }, [streaks.avatar, totalPracticeMinutes, progressItems, studentUser]);
+  }, [streaks.effectiveStreak, streaks.currentXp, streaks.avatar, totalPracticeMinutes, progressItems, studentUser]);
 
   // 🚀 Junior Space Mission: Auto-sync juniorMissionPhase mit practice.sessionActive
   useEffect(() => {
@@ -150,6 +153,7 @@ export function useStudentJuniorMission({
 
   // 🚀 3-2-1 Zündungs-Countdown am Instrument mit klangvollen Zaubertönen
   const startJuniorMissionImmediately = useCallback(() => {
+    practice?.requestOrientationPermission?.();
     clearCountdownTimers();
     setIsJuniorMissionPaused(false);
     isJuniorMissionPausedRef.current = false;

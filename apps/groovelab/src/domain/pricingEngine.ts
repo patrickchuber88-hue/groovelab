@@ -1,88 +1,27 @@
-export type CurrencyCode = 'EUR' | 'CHF';
+import {
+  type CurrencyCode,
+  type CurrencyPricingRates,
+  type StorageTier,
+  MASTER_CURRENCY_RATES,
+  DEFAULT_STORAGE_TIERS,
+  DEFAULT_STORAGE_TIERS_EUR,
+  DEFAULT_STORAGE_TIERS_CHF,
+  getStorageTierByGb,
+  formatCurrency,
+  roundToFiveRappen
+} from '@groovelab/shared';
 
-export interface CurrencyPricingRates {
-  currency: CurrencyCode;
-  symbol: string;
-  priceCampus: number;
-  priceGroovelab: number;
-  priceKombi: number;
-  priceTeacher: number;
-  priceStudent: number;
-  pricePassiveStudent: number;
-  priceStorageAddon: number;
-  kombiSavings: number;
-}
-
-export const MASTER_CURRENCY_RATES: Record<CurrencyCode, CurrencyPricingRates> = {
-  EUR: {
-    currency: 'EUR',
-    symbol: '€',
-    priceCampus: 14.90,
-    priceGroovelab: 9.90,
-    priceKombi: 19.90,
-    priceTeacher: 0.49,
-    priceStudent: 0.49,
-    pricePassiveStudent: 0.09,
-    priceStorageAddon: 1.99,
-    kombiSavings: 4.90,
-  },
-  CHF: {
-    currency: 'CHF',
-    symbol: 'CHF',
-    priceCampus: 19.90,
-    priceGroovelab: 14.90,
-    priceKombi: 29.90,
-    priceTeacher: 1.00,
-    priceStudent: 1.00,
-    pricePassiveStudent: 0.20,
-    priceStorageAddon: 2.90,
-    kombiSavings: 4.90,
-  },
-};
-
-import { formatCurrency, roundToFiveRappen } from '../utils/formatters';
-export { formatCurrency, roundToFiveRappen };
-
-export interface StorageTier {
-  gb: number;
-  price: number;
-  label: string;
-  sublabel: string;
-  desc?: string;
-  recommendedFor?: string;
-}
-
-export const DEFAULT_STORAGE_TIERS: StorageTier[] = [
-  { gb: 0, price: 0, label: '1 GB Basis', sublabel: 'Bis 15 Schüler', desc: '0,00 € / Mo.', recommendedFor: 'Kleine Lehrkraft-Klassen' },
-  { gb: 10, price: 1.99, label: '+10 GB', sublabel: 'Bis 100 Schüler', desc: '1,99 € / Mo.', recommendedFor: 'Kleine Musikschulen' },
-  { gb: 25, price: 3.99, label: '+25 GB', sublabel: 'Bis 250 Schüler', desc: '3,99 € / Mo.', recommendedFor: 'Mittelgroße Musikschulen' },
-  { gb: 50, price: 6.99, label: '+50 GB', sublabel: 'Bis 500 Schüler', desc: '6,99 € / Mo.', recommendedFor: 'Große Musikschulen' },
-  { gb: 100, price: 11.99, label: '+100 GB', sublabel: 'Bis 1.000 Schüler', desc: '11,99 € / Mo.', recommendedFor: 'Sehr große Musikschulen' },
-  { gb: 250, price: 24.99, label: '+250 GB', sublabel: '1.000 bis 2.500+ Schüler', desc: '24,99 € / Mo.', recommendedFor: 'Großschulen & Konservatorien' }
-];
-
-export const getStorageTierByGb = (gb: number, customTiers?: StorageTier[], currency: CurrencyCode = 'EUR'): StorageTier => {
-  const tiers = customTiers && customTiers.length > 0 ? customTiers : DEFAULT_STORAGE_TIERS;
-  const match = tiers.find(t => t.gb === gb);
-  if (match) {
-    if (currency === 'CHF') {
-      const chfPrice = match.price === 0 ? 0 : Number((match.price * 1.45).toFixed(2));
-      return {
-        ...match,
-        price: chfPrice,
-        desc: `${formatCurrency(chfPrice, 'CHF')} / Mo.`
-      };
-    }
-    return match;
-  }
-  const fallbackPrice = gb === 0 ? 0 : Number((gb * (currency === 'CHF' ? 0.35 : 0.25)).toFixed(2));
-  return {
-    gb,
-    price: fallbackPrice,
-    label: `+${gb} GB`,
-    sublabel: 'Individuell',
-    desc: `${formatCurrency(fallbackPrice, currency)} / Mo.`
-  };
+export {
+  type CurrencyCode,
+  type CurrencyPricingRates,
+  type StorageTier,
+  MASTER_CURRENCY_RATES,
+  DEFAULT_STORAGE_TIERS,
+  DEFAULT_STORAGE_TIERS_EUR,
+  DEFAULT_STORAGE_TIERS_CHF,
+  getStorageTierByGb,
+  formatCurrency,
+  roundToFiveRappen
 };
 
 export interface MasterPricingRates {
@@ -208,7 +147,7 @@ export function calculateSchoolEffectiveRates(
   const baseTeacher = (schoolCurrency === 'CHF' && masterPricing.priceTeacher === 0.49) ? currencyMaster.priceTeacher : masterPricing.priceTeacher;
   const baseStudent = (schoolCurrency === 'CHF' && masterPricing.priceStudent === 0.49) ? currencyMaster.priceStudent : masterPricing.priceStudent;
   const basePassive = (schoolCurrency === 'CHF' && (masterPricing.pricePassiveStudent ?? 0.09) === 0.09) ? currencyMaster.pricePassiveStudent : (masterPricing.pricePassiveStudent ?? 0.09);
-  const baseStorage = (schoolCurrency === 'CHF' && (masterPricing.priceStorageAddon ?? 1.99) === 1.99) ? currencyMaster.priceStorageAddon : (masterPricing.priceStorageAddon ?? 2.99);
+  const baseStorage = (schoolCurrency === 'CHF' && (masterPricing.priceStorageAddon ?? 2.90) === 2.90) ? currencyMaster.priceStorageAddon : (masterPricing.priceStorageAddon ?? 2.90);
 
   const defaultRates: EffectiveRates = {
     priceCampus: baseCampus,
@@ -339,7 +278,7 @@ export function calculateSchoolEffectiveRates(
 
   const addonMonthlyFee = school.storage_addon_monthly_fee !== null && school.storage_addon_monthly_fee !== undefined
     ? Number(school.storage_addon_monthly_fee)
-    : (masterPricing.priceStorageAddon ?? 2.99);
+    : (masterPricing.priceStorageAddon ?? 2.90);
 
   const storageGb = Number(school.storage_addon_gb || 0);
   const storageUsed = Number(school.storage_used_bytes || 0);

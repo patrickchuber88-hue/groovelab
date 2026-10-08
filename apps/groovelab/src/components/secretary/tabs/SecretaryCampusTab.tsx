@@ -553,7 +553,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '16px',
-                      boxShadow: '0 4px 12px -2px rgba(22, 163, 74, 0.08)'
+                      boxShadow: 'none'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
@@ -593,7 +593,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           fontWeight: 800,
                           cursor: 'pointer',
                           whiteSpace: 'nowrap',
-                          boxShadow: '0 4px 12px rgba(19, 115, 51, 0.2)',
+                          boxShadow: 'none',
                           transition: 'transform 0.15s, background-color 0.15s'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = '#14532d'}
@@ -614,7 +614,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '14px',
-                      boxShadow: '0 4px 20px rgba(220, 38, 38, 0.08)',
+                      boxShadow: 'none',
                       textAlign: 'left'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -686,7 +686,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '12px',
-                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.04)'
+                          boxShadow: 'none'
                         }}>
                           <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -728,7 +728,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '12px',
-                          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
+                          boxShadow: 'none'
                         }}>
                           <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -1043,7 +1043,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             border: 'none',
                             cursor: 'pointer',
                             fontFamily: 'Urbanist',
-                            boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                            boxShadow: 'none',
                             transition: 'all 0.2s'
                           }}
                         >
@@ -1245,7 +1245,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         .status-toggle-btn.campus-active {
                           background: #e6f4ea;
                           color: #34a853;
-                          box-shadow: 0 2px 8px rgba(52,168,83,0.12);
+                          box-shadow: none;
                         }
                         .status-toggle-btn.campus-active:hover {
                           background: #d1f2dd !important;
@@ -1261,7 +1261,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         .status-toggle-btn.groove-active {
                           background: #fef3c7;
                           color: #b45309;
-                          box-shadow: 0 2px 8px rgba(245,158,11,0.12);
+                          box-shadow: none;
                         }
                         .status-toggle-btn.groove-active:hover {
                           background: #fde68a !important;
@@ -1693,7 +1693,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)',
+                      boxShadow: 'none',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                         <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1739,7 +1739,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: showOnlyPendingReviews ? '0 4px 14px rgba(217, 119, 6, 0.3)' : 'none'
+                            boxShadow: 'none'
                           }}
                         >
                           <Eye size={14} />
@@ -1762,7 +1762,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 2px 10px rgba(217, 119, 6, 0.25)',
+                            boxShadow: 'none',
                             transition: 'all 0.18s ease',
                           }}
                         >
@@ -2782,7 +2782,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                           <button
                             type="submit"
-                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #34a853 0%, #2e944b 100%)', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(52,168,83,0.25)', transition: 'all 0.15s' }}
+                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #34a853 0%, #2e944b 100%)', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: 'none', transition: 'all 0.15s' }}
                           >
                             Einbuchen ⚡
                           </button>
@@ -3270,7 +3270,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.35)'
+                              boxShadow: 'none'
                             }}>
                               {activeCampusSettingsModal === 'boards' && <LayoutGrid size={22} color="#ffffff" />}
                               {activeCampusSettingsModal === 'homework' && <BookOpen size={22} color="#ffffff" />}
@@ -3813,7 +3813,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               fontWeight: 800,
                               fontSize: '0.84rem',
                               cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                              boxShadow: 'none'
                             }}
                           >
                             Fertig
@@ -4934,7 +4934,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                             gap: '4px',
                                             fontSize: '0.64rem',
                                             fontWeight: 800,
-                                            boxShadow: '0 1px 4px rgba(52, 168, 83, 0.25)',
+                                            boxShadow: 'none',
                                             transition: 'all 0.15s ease'
                                           }}
                                           title={`Stundenplan von ${data.teacherName} jetzt freigeben`}
@@ -5018,7 +5018,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                               display: 'flex',
                                               flexDirection: 'column',
                                               gap: '8px',
-                                              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.06)'
+                                              boxShadow: 'none'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#b45309' }}>
@@ -5623,7 +5623,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: '#34a853',
-                      boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)'
+                      boxShadow: 'none'
                     }}>
                       <CheckCircle size={32} strokeWidth={2.4} />
                     </div>
@@ -5759,7 +5759,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       fontSize: '0.88rem',
                       fontWeight: 800,
                       cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)',
+                      boxShadow: 'none',
                       transition: 'all 0.18s ease',
                       width: '100%',
                       outline: 'none'

@@ -63,12 +63,14 @@ assert.strictEqual(
   'Must correctly reverse inverted name in object'
 );
 
-// 1.5 Database Normalizations (Severin Landenberger & Peter Pan)
-assert.strictEqual(formatTeacherFullName('Severin', 'L.'), 'Severin Landenberger');
-assert.strictEqual(formatTeacherFullName({ first_name: 'Severin', last_name: 'L.' }), 'Severin Landenberger');
-assert.strictEqual(formatTeacherFullName('Peter', 'P.'), 'Peter Pan');
-assert.strictEqual(formatTeacherFullName('Peter', 'Petersen'), 'Peter Pan');
-assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'P.' }), 'Peter Pan');
+// 1.5 Canonical Teacher Names and Initial Tests
+assert.strictEqual(formatTeacherFullName('Patrick', 'Huber'), 'Patrick Huber');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Patrick', last_name: 'Huber' }), 'Patrick Huber');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Severin', last_name: 'L.' }), 'Severin L.');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'P.' }), 'Peter P.');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'Petersen' }), 'Peter Petersen');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Severin', full_last_name: 'Landenberger', last_name: 'L.' }), 'Severin Landenberger');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', full_last_name: 'Pan', last_name: 'P.' }), 'Peter Pan');
 
 // 1.6 Fallback
 assert.strictEqual(formatTeacherFullName(null), 'Lehrkraft');
@@ -84,11 +86,14 @@ console.log('▶ [2/4] Testing isTeacherFullName strict validation...');
 
 assert.strictEqual(isTeacherFullName('Severin Landenberger'), true);
 assert.strictEqual(isTeacherFullName('Peter Pan'), true);
+assert.strictEqual(isTeacherFullName('Peter Petersen'), true);
+assert.strictEqual(isTeacherFullName('Patrick Huber'), true);
 assert.strictEqual(isTeacherFullName('Anna Schmidt'), true);
 
 // Rejection of initials (teachers must NEVER be abbreviated)
 assert.strictEqual(isTeacherFullName('Max M.'), false, 'Single letter initial must be rejected for teachers');
 assert.strictEqual(isTeacherFullName('Severin L.'), false, 'Single letter initial must be rejected for teachers');
+assert.strictEqual(isTeacherFullName('Peter P.'), false, 'Single letter initial must be rejected for teachers');
 
 // Rejection of placeholders
 assert.strictEqual(isTeacherFullName('Lehrkraft'), false);

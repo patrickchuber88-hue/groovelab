@@ -285,7 +285,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               alignItems: 'center',
               justifyContent: 'center',
               color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)'
+              boxShadow: 'none'
             }}>
               <ShieldCheck size={24} />
             </div>
@@ -724,7 +724,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: signeeName.trim() ? '0 4px 14px rgba(234, 67, 53, 0.3)' : 'none',
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
                 className="focus-ring"

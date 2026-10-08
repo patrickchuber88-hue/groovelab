@@ -230,7 +230,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(202, 138, 4, 0.3)',
+                boxShadow: 'none',
                 opacity: isExporting ? 0.75 : 1
               }}
               title="Urkunde in Apple QuickLook PDF-Vorschau öffnen (mit Direkt-Druck und Download)"
@@ -278,7 +278,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                boxShadow: 'none'
               }}
             >
               <Printer size={15} />
@@ -330,7 +330,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
               padding: '36px 44px',
               boxSizing: 'border-box',
               position: 'relative',
-              boxShadow: 'inset 0 0 0 6px #fdfbf7, inset 0 0 0 8px rgba(202, 138, 4, 0.4), 0 10px 30px rgba(0,0,0,0.08)',
+              boxShadow: 'inset 0 0 0 6px #fdfbf7, 0 10px 30px rgba(0,0,0,0.08)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -433,7 +433,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
                   height: '56px',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, #fef08a 0%, #ca8a04 100%)',
-                  boxShadow: '0 4px 12px rgba(202, 138, 4, 0.35)',
+                  boxShadow: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

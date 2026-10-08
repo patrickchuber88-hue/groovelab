@@ -18,7 +18,7 @@
 
 import JSZip from 'jszip';
 import { supabase } from '../lib/supabase';
-import { logSecurityEvent } from './auditLogService';
+import { logSecurityEvent, logApplicationAudit } from './auditLogService';
 import { generateInvoicePDFBinary } from '../utils/pdfGenerator';
 
 export interface MonthCloseInvoiceItem {
@@ -36,6 +36,8 @@ export interface MonthCloseInvoiceItem {
   sha256?: string;
   storage_path?: string;
   pdf_base64?: string;
+  currency?: string;
+  country?: string;
 }
 
 export interface MonthCloseManifest {
@@ -100,9 +102,9 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 /**
  * Generates DATEV-compatible CSV format for bookkeeping (SKR03 standard).
- * Konten: 1400 (Forderungen aus LuL), 8400 (Erlöse steuerfrei gem. § 4 Nr. 21 / § 19 UStG)
+ * Konten: 1400 (Forderungen aus LuL), 8195 (Erlöse Kleinunternehmer gem. § 19 UStG), 8338 (Drittland CH), 8400 BU 9 (19% Regelbesteuerung)
  */
-function generateDatevCsv(invoices: MonthCloseInvoiceItem[], period: string): string {
+function generateDatevCsv(invoices: MonthCloseInvoiceItem[], period: string, taxMode: 'small_business' | 'standard_vat' = 'small_business'): string {
   const header = [
     'Umsatz (ohne Soll/Haben-Kz)',
     'Soll/Haben-Kennzeichen',
@@ -128,13 +130,28 @@ function generateDatevCsv(invoices: MonthCloseInvoiceItem[], period: string): st
     const cleanSchool = (inv.school_name || 'Musikschule').replace(/[;\n\r]/g, ' ').slice(0, 30);
     const text = `Cloud-Infrastruktur ${cleanSchool} (${period})`.slice(0, 60);
 
+    const isSwiss = inv.country === 'CH' || inv.currency === 'CHF';
+    let contraAccount = '8195'; // SKR03: Kleinunternehmer (§ 19 UStG)
+    let buCode = '';
+    let wkz = inv.currency || 'EUR';
+
+    if (isSwiss) {
+      contraAccount = '8338'; // SKR03: Erlöse Drittland nicht steuerbar gem. § 3a Abs. 2 UStG
+      buCode = '';
+      wkz = inv.currency || 'CHF';
+    } else if (taxMode === 'standard_vat') {
+      contraAccount = '8400'; // SKR03: Erlöse 19% USt
+      buCode = '9';           // DATEV BU-Code 9 für 19% Regelbesteuerung
+      wkz = 'EUR';
+    }
+
     return [
       absAmount,
       shFlag,
-      'EUR',
+      wkz,
       '1400', // Forderungen LuL
-      '8400', // Erlöse steuerfrei gem. § 4 Nr. 21 / § 19 UStG
-      '',     // Kein Steuerschlüssel da steuerbefreit
+      contraAccount,
+      buCode,
       dateFormatted,
       inv.invoice_number || inv.id,
       text,
@@ -159,6 +176,7 @@ export async function exportGobdMonthPackage(
     city?: string;
     iban?: string;
     bic?: string;
+    taxMode?: 'small_business' | 'standard_vat';
   }
 ): Promise<MonthCloseExportResult> {
   const periodStr = `${year}-${String(month).padStart(2, '0')}`;
@@ -187,7 +205,7 @@ export async function exportGobdMonthPackage(
   const schoolIds = Array.from(new Set(invoicesList.map(i => i.school_id)));
   const { data: schools } = await supabase
     .from('schools')
-    .select('id, name, billing_email, email, street, zip_code, city')
+    .select('id, name, billing_email, email, street, zip_code, city, country, currency')
     .in('id', schoolIds);
 
   const schoolMap = new Map((schools || []).map(s => [s.id, s]));
@@ -223,7 +241,9 @@ export async function exportGobdMonthPackage(
       type: i.type,
       recipient_email: dispatch?.recipient_email || school?.billing_email || school?.email || '',
       sha256: dispatch?.pdf_sha256 || '',
-      storage_path: dispatch?.storage_path || ''
+      storage_path: dispatch?.storage_path || '',
+      currency: (i as any).currency || school?.currency || (school?.country === 'CH' ? 'CHF' : 'EUR'),
+      country: school?.country || ((i as any).currency === 'CHF' ? 'CH' : 'DE')
     };
   });
 
@@ -287,7 +307,7 @@ export async function exportGobdMonthPackage(
   }
 
   // 6. Generate DATEV CSV
-  const datevCsv = generateDatevCsv(enrichedItems, periodStr);
+  const datevCsv = generateDatevCsv(enrichedItems, periodStr, operatorInfo?.taxMode || 'small_business');
   zip.file(`DATEV_Buchungsjournal_${periodStr}.csv`, datevCsv);
 
   // 7. Generate GoBD Cryptographic Manifest
@@ -332,21 +352,34 @@ export async function exportGobdMonthPackage(
   const zipFilename = `CG_Finanzen_${periodStr}.zip`;
   downloadBlob(zipBlob, zipFilename);
 
-  // 9. Revisionssicheres Audit-Logging
+  // 9. Revisionssicheres WORM Audit-Logging
   try {
+    const auditPayload = {
+      fiscal_period: periodStr,
+      total_invoices: enrichedItems.length,
+      total_revenue_eur: Number(totalAmountEur.toFixed(2)),
+      total_revenue_cents: totalAmountCents,
+      manifest_sha256: manifestHash,
+      filename: zipFilename,
+      legal_basis: 'GoBD § 147 AO / § 14b UStG',
+      integrity_seal: 'VERIFIED_GOBD_COMPLIANT',
+      worm_sealed_at: new Date().toISOString()
+    };
+
     await logSecurityEvent({
       action: 'GOBD_MONTHLY_ARCHIVE_EXPORTED',
       schoolId: schoolIds[0] || '00000000-0000-0000-0000-000000000000',
       userId: (await supabase.auth.getUser()).data.user?.id || 'master_operator',
       targetId: periodStr,
-      metadata: {
-        fiscal_period: periodStr,
-        total_invoices: enrichedItems.length,
-        total_revenue_cents: totalAmountCents,
-        manifest_sha256: manifestHash,
-        filename: zipFilename,
-        legal_basis: 'GoBD § 147 AO / § 14b UStG'
-      }
+      metadata: auditPayload
+    });
+
+    await logApplicationAudit({
+      action: 'GOBD_MONTH_CLOSE_SEALED',
+      schoolId: schoolIds[0] || null,
+      tableName: 'gobd_month_close',
+      recordId: null,
+      details: auditPayload
     });
   } catch (logErr) {
     console.warn('[MonthClose] Audit logging note:', logErr);

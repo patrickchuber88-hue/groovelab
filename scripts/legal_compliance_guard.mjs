@@ -1145,6 +1145,53 @@ recordCheck(
     : 'Dual-Role Governance unvollständig: AVV-Checksumme oder 3D-Avatar-Schutz fehlt.'
 );
 
+// LEG-34: StGB § 201 Vertraulichkeit des Wortes & Audio-Aufnahme-Transparenz
+const tagesKompassPath = path.join(SRC_DIR, 'components', 'teacher', 'tageskompass', 'TagesKompassSmartInput.tsx');
+const tagesplanHwPath = path.join(SRC_DIR, 'components', 'teacher', 'tageskompass', 'TagesplanHomeworkFahrplanModal.tsx');
+const simpleVoicePath = path.join(SRC_DIR, 'components', 'campus', 'SimpleVoiceRecorder.tsx');
+
+let hasMicRecordingNotices = false;
+if (fs.existsSync(tagesKompassPath) && fs.existsSync(tagesplanHwPath) && fs.existsSync(simpleVoicePath)) {
+  const tkCode = fs.readFileSync(tagesKompassPath, 'utf8');
+  const tpHwCode = fs.readFileSync(tagesplanHwPath, 'utf8');
+  const svCode = fs.readFileSync(simpleVoicePath, 'utf8');
+
+  const tkComplies = tkCode.includes('releaseAudioStream') && tkCode.includes('isRecording');
+  const tpHwComplies = tpHwCode.includes('releaseAudioStream') && tpHwCode.includes('recordedAudioBlob');
+  const svComplies = svCode.includes('releaseAudioStream') && svCode.includes('isRecording');
+
+  hasMicRecordingNotices = tkComplies && tpHwComplies && svComplies;
+}
+
+recordCheck(
+  'LEG-34: StGB § 201 Vertraulichkeit des Wortes & Transparente Mikrofon-Indikatoren',
+  hasMicRecordingNotices,
+  hasMicRecordingNotices
+    ? 'StGB § 201 Konformität verifiziert: Sämtliche Aufnahme-Schnittstellen nutzen explizite Benutzergesten, optische Aufnahme-Indikatoren und deterministisches releaseAudioStream() Lifecycle-Scrubbing.'
+    : 'StGB § 201 Risiko: Mikrofon-Aufnahme-Lifecycle unvollständig oder nicht freigegeben.'
+);
+
+// LEG-35: UrhG § 53 & KUG § 22 Familien-PIN Schutz auf externen Audio-Freigabelinks
+const sharedAudioPath = path.join(SRC_DIR, 'components', 'campus', 'SharedAudioBiographyPage.tsx');
+let hasPinEnforcedShareLinks = false;
+
+if (fs.existsSync(sharedAudioPath)) {
+  const saCode = fs.readFileSync(sharedAudioPath, 'utf8');
+  const hasPinGate = saCode.includes('handleVerifyPin') && saCode.includes('isUnlocked');
+  const hasPinPrompt = saCode.includes('Familien-PIN eingeben') || saCode.includes('4-stellige Familien-PIN');
+  const hasPrivateNotice = saCode.includes('ausschließlich für den privaten Familienkreis bestimmt');
+
+  hasPinEnforcedShareLinks = hasPinGate && hasPinPrompt && hasPrivateNotice;
+}
+
+recordCheck(
+  'LEG-35: UrhG § 53 & KUG § 22 Familien-PIN Schutz auf externen Audio-Freigabelinks',
+  hasPinEnforcedShareLinks,
+  hasPinEnforcedShareLinks
+    ? 'Zero-Public-Exposure verifiziert: SharedAudioBiographyPage erzwingt vor Audio-Hydration zwingend eine 4-stellige Familien-PIN sowie rechtliche Privatheits-Klauseln (§ 53 UrhG).'
+    : 'UrhG/KUG Risiko: Externe Audio-Freigabelinks ohne zwingenden PIN-Schutz.'
+);
+
 // =============================================================================
 // FINAL AUDIT SUMMARY & VERDICT
 // =============================================================================

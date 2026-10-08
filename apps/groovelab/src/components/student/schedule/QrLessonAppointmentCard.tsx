@@ -359,7 +359,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
               alignItems: 'center',
               gap: '4px',
               whiteSpace: 'nowrap',
-              boxShadow: '0 1px 3px rgba(52, 168, 83, 0.3)'
+              boxShadow: 'none'
             }}
             title="Änderung als gelesen markieren"
             aria-label="Änderung als gelesen markieren"
@@ -427,7 +427,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
               alignItems: 'center',
               gap: '5px',
               flexShrink: 0,
-              boxShadow: '0 1px 3px rgba(180, 83, 9, 0.1)'
+              boxShadow: 'none'
             }}
           >
             <Calendar size={14} color="#b45309" strokeWidth={2.4} />
@@ -456,7 +456,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
               alignItems: 'center',
               gap: '4px',
               whiteSpace: 'nowrap',
-              boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)'
+              boxShadow: 'none'
             }}
             title="Absage rückgängig machen"
             aria-label="Terminabsage rückgängig machen"
@@ -485,7 +485,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
                   fontWeight: 800,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 3px rgba(239, 68, 68, 0.3)'
+                  boxShadow: 'none'
                 }}
                 title="Termin verbindlich absagen"
                 aria-label="Terminabsage verbindlich bestätigen"

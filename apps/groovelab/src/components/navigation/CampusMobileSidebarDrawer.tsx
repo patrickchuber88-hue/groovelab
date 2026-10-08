@@ -292,7 +292,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 minWidth: 0,
                 flex: 1
               }}
-              title={school?.name || 'Musäk Bad Säckingen'}
+              title={school?.name || 'Musikschule'}
             >
               <div style={{
                 width: '28px',
@@ -317,7 +317,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 letterSpacing: '-0.01em',
                 fontFamily: "'Plus Jakarta Sans', sans-serif"
               }}>
-                {school?.name || 'Musäk Bad Säckingen'}
+                {school?.name || 'Musikschule'}
               </span>
             </div>
 
@@ -393,7 +393,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                 cursor: 'pointer',
                 transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: '0 1px 3px rgba(239, 68, 68, 0.08)'
+                boxShadow: 'none'
               }}
               className="hover-scale"
             >
@@ -428,7 +428,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
                 cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.2)'
+                boxShadow: 'none'
               }}
               className="hover-scale"
               title="Details zur Probezeit"

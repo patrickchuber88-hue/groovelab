@@ -155,7 +155,7 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
               fontSize: '0.68rem',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.12)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease',
               whiteSpace: 'nowrap'
             }}

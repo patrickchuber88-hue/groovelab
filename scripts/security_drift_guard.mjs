@@ -173,6 +173,41 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'CRITICAL',
     description: 'Monorepo Airgap Invariant: Frontend code (apps/groovelab) must NEVER import server packages (@groovelab/backend-core, @groovelab/bff-server, ssh2). Only @groovelab/shared is permitted.',
     allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-18',
+    name:        'Banned Mock Personas & Default Subject Fallbacks',
+    regex:       /(?:(?:first_name|firstName|lowerFirst)\s*===\s*['"](?:severin|peter)['"]|\|\|\s*['"]Gitarre['"]|return\s*['"]Gitarre['"];)/g,
+    severity:    'HIGH',
+    description: 'Zero Dummy Identitäten & Fachlogik: Statische Persona-Hardcodes ("Severin Landenberger", "Peter Pan") und pauschale Default-Fächer ("Gitarre") sind in Produktions-Utilities streng verboten.',
+    allowedFiles: ['src/tests/', 'src/utils/avatarResolutionEngine.ts'],
+    isViolation: (content, relPath) => {
+      return relPath.includes('src/utils/');
+    }
+  },
+  {
+    id:          'FE-19',
+    name:        'Zero Operator Address Leakage into Tenant Scope',
+    regex:       /(?:(?:school|tenant|userSchool|schoolData)\.(?:street|address)|schoolStreet)\s*\|\|\s*['"][^'"]*Karl-Fürstenberg/gi,
+    severity:    'CRITICAL',
+    description: 'Mandantenschutz & Zero-Data-Leakage: Die private Betreiberadresse (Karl-Fürstenberg-Str) darf niemals als Fallback für fehlende Musikschul-Adressen verwendet werden.',
+    allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-20',
+    name:        'Zero Heuristic Substring Tenant Filtering',
+    regex:       /\b(?:s|school|sch)\.name\.toLowerCase\(\)\.includes\(\s*['"]groove academy['"]\s*\)|\.includes\(\s*['"]groove academy['"]\s*\)/g,
+    severity:    'CRITICAL',
+    description: 'GoBD- und Abrechnungsintegrität: Heuristisches Filtern von Schulen nach Namen (z.B. includes("groove academy")) ist verboten. Verwende stattdessen autoritative Schema-Attribute wie is_demo_tenant und status !== "archived".',
+    allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-21',
+    name:        'Zero Fake Tax Numbers & Bundesbank Test-IBANs in Production',
+    regex:       /(?:DE02[0-9]{18}|04123\/45678)/g,
+    severity:    'CRITICAL',
+    description: 'Rechtssicherheit (§ 14 UStG & SEPA Clearing): Bundesbank-Test-IBANs (DE02...) und Phantasie-Steuernummern (04123/45678) sind im Produktivcode streng verboten. Nutze stattdessen OPERATOR_BANKING_CONFIG oder echte Mandantenbankdaten.',
+    allowedFiles: ['src/tests/']
   }
 ];
 
@@ -241,9 +276,14 @@ let highestDmlMigrationNum = -1;
 
 for (const filePath of migrationFiles) {
   migrationsScanned++;
-  const content  = fs.readFileSync(filePath, 'utf-8');
+  const rawContent  = fs.readFileSync(filePath, 'utf-8');
   const relPath  = path.relative(ROOT_DIR, filePath);
   const baseName = path.basename(filePath);
+
+  // Deterministically strip comments (--.*$ and /* ... */) before all SQL invariant checks
+  const content = rawContent
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--.*$/gm, '');
 
   // Check for handle_users_view_dml definitions
   if (content.includes('FUNCTION public.handle_users_view_dml()')) {
@@ -317,7 +357,7 @@ for (const filePath of migrationFiles) {
 
     // 1% Invariant SQL-05: Zero Destructive DDL & Zero-Downtime Migration Guard (Migrations >= 511)
     if (migNum >= 511) {
-      const isBypassed = content.includes('-- zero-downtime-bypass:');
+      const isBypassed = rawContent.includes('-- zero-downtime-bypass:');
       if (!isBypassed) {
         const destructiveMatch = content.match(/\b(?:DROP\s+COLUMN|RENAME\s+COLUMN|TRUNCATE\s+(?:TABLE\s+)?(?!temp_|tmp_))\b/i);
         if (destructiveMatch) {
@@ -326,6 +366,75 @@ for (const filePath of migrationFiles) {
           process.stderr.write(`       Details: Migrations >= 511 must adhere to Zero-Downtime Deployments (Stripe/GitHub Pattern). Dropping or renaming columns directly breaks live clients. Deprecate first in views, drop only after client migration window, or document with '-- zero-downtime-bypass: <reason>'.\n`);
           violationsCount++;
         }
+      }
+    }
+
+    // 1% Invariant SQL-06: Zero Plaintext Auth-Bypasses or Mock Hashes (Migrations >= 539)
+    if (migNum >= 539) {
+      if (content.includes("'test-campus'") || content.includes('20ebecf465c192667822feac7b049d50ad76fa0c42289f61b0a514d0ff9e6bf9')) {
+        process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Insecure Plaintext Auth Bypass or Hardcoded Mock Hash in Migration ${baseName}\n`);
+        process.stderr.write(`       File: ${relPath}\n`);
+        process.stderr.write(`       Details: Migrations >= 539 must strictly eliminate plaintext token bypasses ('test-campus') and hardcoded mock digests in auth/contract RPCs.\n`);
+        violationsCount++;
+      }
+    }
+
+    // 1% Invariant SQL-07: SECURITY DEFINER Caller Authorization Guard (Migrations >= 540)
+    if (migNum >= 540) {
+      const funcRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?([a-zA-Z0-9_]+)[\s\S]*?AS\s+(\$([a-zA-Z0-9_]*)\$)([\s\S]*?)\2\s*(?:[a-zA-Z0-9_\s=,']*);/gi;
+      let funcMatch;
+      while ((funcMatch = funcRegex.exec(content)) !== null) {
+        const fullFuncDef = funcMatch[0];
+        const funcName = funcMatch[1];
+        const funcBody = funcMatch[4];
+
+        const isSecDefiner = /\bSECURITY\s+DEFINER\b/i.test(fullFuncDef);
+        if (!isSecDefiner) continue;
+
+        // Check if granted to authenticated or anon in this migration
+        const grantRegex = new RegExp(`GRANT\\s+(?:EXECUTE|ALL)\\s+ON\\s+FUNCTION\\s+(?:public\\.)?${funcName}\\b[^;]*\\bTO\\s+[^;]*\\b(?:authenticated|anon)\\b`, 'i');
+        const isGrantedToAuthOrAnon = grantRegex.test(content);
+
+        if (!isGrantedToAuthOrAnon) continue;
+
+        // Exempt authoritative login/challenge functions
+        const isLoginOrChallengeExempt = [
+          'authenticate_by_credential',
+          'authenticate_webauthn_credential'
+        ].includes(funcName);
+
+        if (isLoginOrChallengeExempt) continue;
+
+        // Verify authoritative caller validation in function body
+        const hasCallerAuth = 
+          funcBody.includes('is_master_admin()') ||
+          funcBody.includes('get_current_user_school_id()') ||
+          funcBody.includes('get_current_authenticated_user_id()') ||
+          funcBody.includes('auth.uid()') ||
+          funcBody.includes('session_leases') ||
+          /\bcurrent_user\s+(?:IN\s*\([^)]*\)|=)/i.test(funcBody) ||
+          funcBody.includes('get_current_user_role()');
+
+        if (!hasCallerAuth) {
+          process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Unchecked SECURITY DEFINER Function in Migration ${baseName}\n`);
+          process.stderr.write(`       Function: ${funcName}\n`);
+          process.stderr.write(`       File: ${relPath}\n`);
+          process.stderr.write(`       Details: SECURITY DEFINER functions exposed to 'authenticated' or 'anon' must validate the caller identity (e.g. is_master_admin(), get_current_user_school_id(), auth.uid(), session_leases, or current_user IN ('postgres', ...)).\n`);
+          violationsCount++;
+        }
+      }
+    }
+
+    // 1% Invariant SQL-08: Zero Plaintext PIN Comparison Guard (Migrations >= 540)
+    if (migNum >= 540) {
+      const pinComparisonRegex = /(?:\b(?:personal_pin|parent_pin)\s*(?:=|<>|!=)\s*(?:p_[a-zA-Z0-9_]+|input[a-zA-Z0-9_]*|v_[a-zA-Z0-9_]+|[a-zA-Z0-9_]*pin[a-zA-Z0-9_]*|encode\s*\(|digest\s*\()|(?:p_[a-zA-Z0-9_]+|input[a-zA-Z0-9_]*|v_[a-zA-Z0-9_]+|[a-zA-Z0-9_]*pin[a-zA-Z0-9_]*|encode\s*\(|digest\s*\()\s*(?:=|<>|!=)\s*\b(?:personal_pin|parent_pin)\b)/i;
+      const pinMatch = content.match(pinComparisonRegex);
+      if (pinMatch) {
+        process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Insecure Plaintext PIN Comparison in Migration ${baseName}\n`);
+        process.stderr.write(`       File: ${relPath}\n`);
+        process.stderr.write(`       Match: "${pinMatch[0]}"\n`);
+        process.stderr.write(`       Details: Migrations >= 540 must strictly eliminate plaintext PIN comparison fallbacks and direct equality/inequality comparisons on personal_pin or parent_pin against parameters. PIN verifications must use verify_personal_pin or verify_parent_pin RPCs.\n`);
+        violationsCount++;
       }
     }
   }

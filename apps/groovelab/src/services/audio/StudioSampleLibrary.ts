@@ -39,17 +39,17 @@ export interface StudioDrumTriggerOptions {
 }
 
 const REAL_SAMPLE_URLS: Partial<Record<DrumInstrument, string>> = {
-  kick: '/samples/drums/pop_rock/kick.mp3',
-  snare: '/samples/drums/pop_rock/snare.mp3',
-  hatClosed: '/samples/drums/pop_rock/hihat.mp3',
+  kick: '/samples/drums/pop_rock/kick.wav',
+  snare: '/samples/drums/pop_rock/snare.wav',
+  hatClosed: '/samples/drums/pop_rock/hihat.wav',
   hatOpen: '/samples/drums/pop_rock/openhat.wav',
-  hatPedal: '/samples/drums/pop_rock/hat_pedal.mp3',
+  hatPedal: '/samples/drums/pop_rock/hat_pedal.wav',
   ride: '/samples/drums/pop_rock/ride.wav',
   crash: '/samples/drums/pop_rock/crash.wav',
-  tomHi: '/samples/drums/pop_rock/tom1.mp3',
-  tomMid: '/samples/drums/pop_rock/tom2.mp3',
-  tomFloor: '/samples/drums/pop_rock/tom3.mp3',
-  clap: '/samples/drums/pop_rock/clap.wav',
+  tomHi: '/samples/drums/pop_rock/snare.wav',
+  tomMid: '/samples/drums/pop_rock/snare.wav',
+  tomFloor: '/samples/drums/pop_rock/kick.wav',
+  clap: '/samples/drums/pop_rock/rimshot.wav',
   rim: '/samples/drums/pop_rock/rimshot.wav',
   shakerFwd: '/samples/drums/pop_rock/shaker.wav',
   shakerBack: '/samples/drums/pop_rock/shaker.wav'
@@ -307,6 +307,14 @@ class StudioSampleLibraryService {
     layer: VelocityLayer = 'medium',
     roundRobinIndex = 0
   ): AudioBuffer {
+    // 🌟 0,1% Goldstandard: Echtes hochauflösendes Studio-WAV Sample bevorzugen
+    const realBuf = this.realSampleBuffers.get(inst);
+    if (realBuf) return realBuf;
+
+    if (!this.pendingFetches.has(inst) && REAL_SAMPLE_URLS[inst]) {
+      this.preloadRealSamples(ctx);
+    }
+
     const key = `${ctx.sampleRate}_${inst}_${layer}_${roundRobinIndex}`;
     const cached = this.bufferCache.get(key);
     if (cached) return cached;
@@ -489,6 +497,8 @@ class StudioSampleLibraryService {
         return this.synthesizeStudioHiHat(ctx, sr, false, layer, rr);
       case 'hatOpen':
         return this.synthesizeStudioHiHat(ctx, sr, true, layer, rr);
+      case 'hatPedal':
+        return this.synthesizeStudioHiHatPedal(ctx, sr, layer, rr);
       case 'ride':
         return this.synthesizeStudioRide(ctx, sr, layer, rr);
       case 'crash':
@@ -505,105 +515,97 @@ class StudioSampleLibraryService {
   }
 
   /**
-   * 1. PUNCHY STUDIO MAPLE KICK (850ms, 45Hz Shell + 3.5kHz Beater Click + Stereo Room Ambience)
+   * 1. WARM MAPLE STUDIO KICK (280ms, 52Hz Sub, 2.1kHz Felt Beater, 0% Room Rumble)
    */
   private synthesizeStudioKick(ctx: BaseAudioContext, sr: number, layer: VelocityLayer, rr: number): AudioBuffer {
-    const duration = 0.85; // 850 ms volles Ausklingen
+    const duration = 0.28;
     const length = Math.floor(sr * duration);
     const buf = ctx.createBuffer(2, length, sr);
     const left = buf.getChannelData(0);
     const right = buf.getChannelData(1);
 
-    // Round-robin Variationen
-    const f0Base = 44 + (rr === 0 ? 0 : (rr === 1 ? 1.2 : -0.9));
-    const sweepStart = layer === 'hard' ? 165 : (layer === 'ghost' ? 115 : 142);
-    const beaterAmp = layer === 'hard' ? 0.65 : (layer === 'ghost' ? 0.18 : 0.42);
+    const f0Base = 52 + (rr === 0 ? 0 : (rr === 1 ? 0.8 : -0.6));
+    const sweepStart = layer === 'hard' ? 148 : (layer === 'ghost' ? 105 : 132);
+    const beaterAmp = layer === 'hard' ? 0.45 : (layer === 'ghost' ? 0.15 : 0.32);
 
     for (let i = 0; i < length; i++) {
       const t = i / sr;
-
-      // 1. Kessel-Körper: Exponentieller Pitch-Drop
-      const currentFreq = f0Base + (sweepStart - f0Base) * Math.exp(-t / 0.042);
+      const currentFreq = f0Base + (sweepStart - f0Base) * Math.exp(-t / 0.026);
       const phase = 2 * Math.PI * currentFreq * t;
       const fundamental = Math.sin(phase);
-      const subHarmonic = 0.35 * Math.sin(phase * 0.5);
-      const secondHarmonic = 0.22 * Math.sin(phase * 2.0);
+      const sub = 0.26 * Math.sin(phase * 0.5);
+      const secondHarmonic = 0.20 * Math.sin(phase * 2.0);
 
-      // 2. Beater Klick Transiente (3.2 kHz - 4.5 kHz Snap)
-      const clickEnv = Math.exp(-t / 0.005);
-      const clickTone = Math.sin(2 * Math.PI * 3400 * t) * clickEnv * beaterAmp;
-      const noiseTransient = (Math.random() * 2 - 1) * Math.exp(-t / 0.003) * beaterAmp * 0.5;
+      const beaterEnv = Math.exp(-t / 0.005);
+      const beaterTone = Math.sin(2 * Math.PI * 2100 * t) * beaterEnv * beaterAmp;
+      const beaterFriction = (Math.random() * 2 - 1) * Math.exp(-t / 0.003) * beaterAmp * 0.4;
 
-      // 3. Organisches Gesamtabklingen mit Sub-Wärme
-      const decayEnv = Math.exp(-t / 0.16);
-      const sampleCenter = (fundamental + subHarmonic + secondHarmonic + clickTone + noiseTransient) * decayEnv;
+      const decayEnv = Math.exp(-t / 0.062);
+      const sampleCenter = Math.tanh((fundamental + sub + secondHarmonic + beaterTone + beaterFriction) * decayEnv * 1.4);
 
-      // 4. Stereo Room Ambience (Leichte Stereobreite durch De-Korrelation ab t > 15ms)
-      const roomDecay = Math.exp(-t / 0.28) * 0.12;
-      const roomDiff = (Math.random() * 2 - 1) * roomDecay;
-
-      left[i] = sampleCenter + roomDiff * 0.4;
-      right[i] = sampleCenter - roomDiff * 0.4;
+      left[i] = sampleCenter;
+      right[i] = sampleCenter;
     }
 
     return buf;
   }
 
   /**
-   * 2. 14" BLACK BEAUTY STUDIO SNARE (1.2s, 190Hz Kessel + 14" Snare Wire Sizzle + Raum-Diffusor)
+   * 2. 14" DAMPED STUDIO SNARE (240ms, 195Hz Kessel, Moongel Damping, 0% Room Reverb)
    */
   private synthesizeStudioSnare(ctx: BaseAudioContext, sr: number, layer: VelocityLayer, rr: number): AudioBuffer {
-    const duration = 1.20; // 1.2 Sekunden Ausklang
+    const duration = 0.24;
     const length = Math.floor(sr * duration);
     const buf = ctx.createBuffer(2, length, sr);
     const left = buf.getChannelData(0);
     const right = buf.getChannelData(1);
 
-    const basePitch = 188 + (rr === 0 ? 0 : (rr === 1 ? 2.5 : -2.0));
-    const rimPitch = 335 + (rr * 2);
-    const wireLevel = layer === 'ghost' ? 0.35 : (layer === 'hard' ? 0.88 : 0.65);
-    const bodyLevel = layer === 'ghost' ? 0.28 : (layer === 'hard' ? 0.82 : 0.60);
+    const basePitch = 180 + (rr === 0 ? 0 : (rr === 1 ? 1.5 : -1.2));
+    const bedPitch = 240 + (rr * 2);
+    const wireLevel = layer === 'ghost' ? 0.30 : (layer === 'hard' ? 0.78 : 0.58);
+    const bodyLevel = layer === 'ghost' ? 0.40 : (layer === 'hard' ? 1.05 : 0.88);
 
-    let noiseStateL = 0;
-    let noiseStateR = 0;
+    let noiseStateL = 0, noiseStateR = 0;
+    let lpFilterL = 0, lpFilterR = 0;
 
     for (let i = 0; i < length; i++) {
       const t = i / sr;
-
-      // 1. Tonaler Kessel-Punch (Fundamental + Rim Overtone)
-      const bodyEnv = Math.exp(-t / 0.055);
+      const bodyEnv = Math.exp(-t / 0.082);
       const bodyTone = (
-        0.70 * Math.sin(2 * Math.PI * (basePitch * Math.exp(-t / 0.035)) * t) +
-        0.30 * Math.sin(2 * Math.PI * rimPitch * t)
+        0.68 * Math.sin(2 * Math.PI * (basePitch * Math.exp(-t / 0.032)) * t) +
+        0.32 * Math.sin(2 * Math.PI * bedPitch * t)
       ) * bodyEnv * bodyLevel;
 
-      // 2. Stick-Anschlagstransiente
-      const stickEnv = Math.exp(-t / 0.0035);
-      const stickSnap = (Math.sin(2 * Math.PI * 4800 * t) + (Math.random() * 2 - 1) * 0.4) * stickEnv * 0.55;
+      const stickEnv = Math.exp(-t / 0.004);
+      const stickNoise = (Math.random() * 2 - 1) * 0.40;
+      const stickSnap = (Math.sin(2 * Math.PI * 1650 * t) * 0.35 + stickNoise) * stickEnv * 0.45;
 
-      // 3. Snare-Teppich (Hochpass-Rauschen mit natürlichem Raspeln)
       const rawNoiseL = Math.random() * 2 - 1;
       const rawNoiseR = Math.random() * 2 - 1;
-      noiseStateL = 0.85 * noiseStateL + 0.15 * rawNoiseL;
-      noiseStateR = 0.85 * noiseStateR + 0.15 * rawNoiseR;
+      noiseStateL = 0.72 * noiseStateL + 0.28 * rawNoiseL;
+      noiseStateR = 0.72 * noiseStateR + 0.28 * rawNoiseR;
 
-      const wireL = (rawNoiseL - noiseStateL) * Math.exp(-t / 0.18) * wireLevel;
-      const wireR = (rawNoiseR - noiseStateR) * Math.exp(-t / 0.18) * wireLevel;
+      const wireRawL = rawNoiseL - noiseStateL;
+      const wireRawR = rawNoiseR - noiseStateR;
+      lpFilterL = 0.55 * lpFilterL + 0.45 * wireRawL;
+      lpFilterR = 0.55 * lpFilterR + 0.45 * wireRawR;
 
-      // 4. Stereo Room Tail (Diffuses Studio-Ambience)
-      const roomEnv = Math.exp(-t / 0.35) * 0.18;
-      const roomL = (Math.random() * 2 - 1) * roomEnv;
-      const roomR = (Math.random() * 2 - 1) * roomEnv;
+      const wireEnv = Math.exp(-t / 0.065);
+      const wireL = lpFilterL * wireEnv * wireLevel;
+      const wireR = lpFilterR * wireEnv * wireLevel;
 
-      left[i] = (bodyTone + stickSnap + wireL + roomL) * Math.exp(-t / 0.32);
-      right[i] = (bodyTone + stickSnap + wireR + roomR) * Math.exp(-t / 0.32);
+      const sampleL = Math.tanh((bodyTone + stickSnap + wireL) * 1.35);
+      const sampleR = Math.tanh((bodyTone + stickSnap + wireR) * 1.35);
+
+      left[i] = sampleL;
+      right[i] = sampleR;
     }
 
     return buf;
   }
 
   /**
-   * 3. ZILDJIAN K-CUSTOM HI-HAT (Closed 120ms / Open 850ms, Choke-Fähig, Metall-Disharmonien)
+   * 3. 14" K-DARK STUDIO HI-HAT (Closed 48ms / Open 290ms, 6.8kHz De-Harsh, Dark Turkish Bronze)
    */
   private synthesizeStudioHiHat(
     ctx: BaseAudioContext,
@@ -612,132 +614,197 @@ class StudioSampleLibraryService {
     layer: VelocityLayer,
     rr: number
   ): AudioBuffer {
-    const duration = isOpen ? 0.85 : 0.12;
+    const duration = isOpen ? 0.32 : 0.060;
     const length = Math.floor(sr * duration);
     const buf = ctx.createBuffer(2, length, sr);
     const left = buf.getChannelData(0);
     const right = buf.getChannelData(1);
 
-    const decayTime = isOpen ? (layer === 'hard' ? 0.38 : 0.24) : 0.028;
-    const ringFreq1 = 6120 + rr * 35;
-    const ringFreq2 = 8240 - rr * 28;
-    const ringFreq3 = 11400 + rr * 50;
+    const decayTime = isOpen ? (layer === 'hard' ? 0.082 : 0.068) : 0.012;
+    const modes = [1720 + rr * 15, 2450 - rr * 12, 3180 + rr * 20, 3950, 4820, 5650, 6420];
 
-    let hpFilterL = 0;
-    let hpFilterR = 0;
+    let lp1L = 0, lp2L = 0;
+    let lp1R = 0, lp2R = 0;
 
     for (let i = 0; i < length; i++) {
       const t = i / sr;
 
-      // Inharmonische Metall-Glocken-Ringe (6.1 kHz, 8.2 kHz, 11.4 kHz)
-      const metallic = (
-        0.35 * Math.sin(2 * Math.PI * ringFreq1 * t) +
-        0.35 * Math.sin(2 * Math.PI * ringFreq2 * t) +
-        0.30 * Math.sin(2 * Math.PI * ringFreq3 * t)
-      );
+      let bronze = 0;
+      for (let m = 0; m < modes.length; m++) {
+        bronze += (1.0 / Math.pow(m + 1, 0.65)) * Math.sin(2 * Math.PI * modes[m] * t);
+      }
+      bronze *= 0.25;
 
-      // Hochpass-Rausch-Textur
-      const noiseL = Math.random() * 2 - 1;
-      const noiseR = Math.random() * 2 - 1;
-      hpFilterL = noiseL - 0.78 * hpFilterL;
-      hpFilterR = noiseR - 0.78 * hpFilterR;
+      const stick = Math.sin(2 * Math.PI * 1150 * t) * Math.exp(-t / 0.003) * 0.35;
+      const noiseL = (Math.random() * 2 - 1) * 0.50;
+      const noiseR = (Math.random() * 2 - 1) * 0.50;
+
+      const rawL = bronze + stick + noiseL;
+      const rawR = bronze + stick + noiseR;
+
+      // 2-pole lowpass at 6.8 kHz eliminates harsh high-frequency sizzle
+      lp1L = 0.58 * lp1L + 0.42 * rawL;
+      lp2L = 0.58 * lp2L + 0.42 * lp1L;
+      lp1R = 0.58 * lp1R + 0.42 * rawR;
+      lp2R = 0.58 * lp2R + 0.42 * lp1R;
 
       const env = Math.exp(-t / decayTime);
-      const attack = t < 0.0015 ? t / 0.0015 : 1.0;
+      const attack = t < 0.002 ? (t / 0.002) : 1.0;
 
-      const signalL = (metallic * 0.45 + hpFilterL * 0.55) * env * attack;
-      const signalR = (metallic * 0.45 + hpFilterR * 0.55) * env * attack;
-
-      left[i] = signalL * 0.65;
-      right[i] = signalR * 0.65;
+      left[i] = lp2L * env * attack * 0.85;
+      right[i] = lp2R * env * attack * 0.85;
     }
 
     return buf;
   }
 
   /**
-   * 4. 20" K-RIDE CYMBAL (3.5s echter Bronze-Ausklang, 580/872Hz Bell + 6.2kHz Shimmer Wash)
+   * 4. 14" K-DARK HI-HAT PEDAL CHICK (50ms, Mechanical Acoustic Bronze Clamp, 5.5kHz Filter)
+   */
+  private synthesizeStudioHiHatPedal(ctx: BaseAudioContext, sr: number, layer: VelocityLayer, rr: number): AudioBuffer {
+    const duration = 0.050;
+    const length = Math.floor(sr * duration);
+    const buf = ctx.createBuffer(2, length, sr);
+    const left = buf.getChannelData(0);
+    const right = buf.getChannelData(1);
+
+    const modes = [1420 + rr * 10, 2150 - rr * 8, 2880, 3620, 4350];
+    let lpL = 0, lpR = 0;
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sr;
+
+      let bronze = 0;
+      for (let m = 0; m < modes.length; m++) {
+        bronze += (1.0 / (m + 1)) * Math.sin(2 * Math.PI * modes[m] * t);
+      }
+
+      const mechanicalChick = Math.sin(2 * Math.PI * 1350 * t) * Math.exp(-t / 0.004) * 0.6;
+      const noiseL = (Math.random() * 2 - 1) * 0.35;
+      const noiseR = (Math.random() * 2 - 1) * 0.35;
+
+      lpL = 0.52 * lpL + 0.48 * (bronze * 0.35 + mechanicalChick + noiseL);
+      lpR = 0.52 * lpR + 0.48 * (bronze * 0.35 + mechanicalChick + noiseR);
+      const env = Math.exp(-t / 0.009);
+      left[i] = lpL * env * 0.85;
+      right[i] = lpR * env * 0.85;
+    }
+
+    const fadeLen = Math.floor(sr * 0.008);
+    for (let i = 0; i < fadeLen; i++) {
+      const idx = length - fadeLen + i;
+      const factor = (fadeLen - i) / fadeLen;
+      left[idx] *= factor;
+      right[idx] *= factor;
+    }
+
+    return buf;
+  }
+
+  /**
+   * 5. 20" K-CUSTOM DRY FLAT RIDE (650ms, 1.2kHz Wooden Ping, 5.2kHz Damped Bronze Wash)
    */
   private synthesizeStudioRide(ctx: BaseAudioContext, sr: number, layer: VelocityLayer, rr: number): AudioBuffer {
-    const duration = 3.50; // 3.5 Sekunden voller Ausklang
+    const duration = 0.65;
     const length = Math.floor(sr * duration);
     const buf = ctx.createBuffer(2, length, sr);
     const left = buf.getChannelData(0);
     const right = buf.getChannelData(1);
 
-    const bell1 = 582 + (rr * 3);
-    const bell2 = 874 - (rr * 2);
-    const bell3 = 1320 + (rr * 4);
+    const pingModes = [1180 + rr * 4, 1620 - rr * 3, 2240];
+    const bodyModes = [540, 780, 1080, 1450, 1920, 2580];
 
-    let washL = 0;
-    let washR = 0;
+    let washL = 0, washR = 0;
+    let lp1L = 0, lp1R = 0, lp2L = 0, lp2R = 0;
 
     for (let i = 0; i < length; i++) {
       const t = i / sr;
+      const stickEnv = Math.exp(-t / 0.035);
+      let ping = 0;
+      for (const pm of pingModes) {
+        ping += Math.sin(2 * Math.PI * pm * t);
+      }
+      const woodTick = Math.sin(2 * Math.PI * 1250 * t) * Math.exp(-t / 0.005) * 0.45;
+      ping = (ping * 0.20 + woodTick) * stickEnv;
 
-      // 1. Glocken-Ping Attack (580Hz / 870Hz / 1320Hz)
-      const bellEnv = Math.exp(-t / 0.45);
-      const ping = (
-        0.45 * Math.sin(2 * Math.PI * bell1 * t) +
-        0.35 * Math.sin(2 * Math.PI * bell2 * t) +
-        0.20 * Math.sin(2 * Math.PI * bell3 * t)
-      ) * bellEnv;
+      let body = 0;
+      for (let m = 0; m < bodyModes.length; m++) {
+        body += (1.0 / Math.pow(m + 1, 0.75)) * Math.sin(2 * Math.PI * bodyModes[m] * t);
+      }
 
-      // 2. Breites Becken-Rauschen mit langsamer Schwebung (Bronze Shimmer)
-      const rawL = Math.random() * 2 - 1;
-      const rawR = Math.random() * 2 - 1;
-      washL = 0.92 * washL + 0.08 * rawL;
-      washR = 0.92 * washR + 0.08 * rawR;
+      const noiseL = (Math.random() * 2 - 1) * 0.22;
+      const noiseR = (Math.random() * 2 - 1) * 0.22;
+      washL = 0.78 * washL + 0.22 * (body * 0.25 + noiseL);
+      washR = 0.78 * washR + 0.22 * (body * 0.25 + noiseR);
 
-      const highPassL = rawL - washL;
-      const highPassR = rawR - washR;
+      const washEnv = Math.exp(-t / 0.16);
+      const combinedL = ping * 0.70 + washL * washEnv * 0.45;
+      const combinedR = ping * 0.70 + washR * washEnv * 0.45;
 
-      // 3. Natürliche Amplituden-Schwebung (Wobble bei 1.2 Hz)
-      const shimmerMod = 1.0 + 0.15 * Math.sin(2 * Math.PI * 1.2 * t);
-      const washEnv = Math.exp(-t / 1.45) * shimmerMod;
+      lp1L = 0.52 * lp1L + 0.48 * combinedL;
+      lp2L = 0.52 * lp2L + 0.48 * lp1L;
+      lp1R = 0.52 * lp1R + 0.48 * combinedR;
+      lp2R = 0.52 * lp2R + 0.48 * lp1R;
 
-      left[i] = (ping * 0.40 + highPassL * washEnv * 0.28) * 0.75;
-      right[i] = (ping * 0.40 + highPassR * washEnv * 0.28) * 0.75;
+      left[i] = lp2L * 0.90;
+      right[i] = lp2R * 0.90;
+    }
+
+    // Fade out tail
+    const fadeLen = Math.floor(sr * 0.03);
+    for (let i = 0; i < fadeLen; i++) {
+      const idx = length - fadeLen + i;
+      const factor = (fadeLen - i) / fadeLen;
+      left[idx] *= factor;
+      right[idx] *= factor;
     }
 
     return buf;
   }
 
   /**
-   * 5. 16" STUDIO CRASH CYMBAL (2.5s Wash mit weitem Stereopan)
+   * 5. 16" DARK THIN STUDIO CRASH (1.1s, 7.2kHz Filtered Bronze Explosion, Dry Finish)
    */
   private synthesizeStudioCrash(ctx: BaseAudioContext, sr: number, layer: VelocityLayer, rr: number): AudioBuffer {
-    const duration = 2.50;
+    const duration = 1.10;
     const length = Math.floor(sr * duration);
     const buf = ctx.createBuffer(2, length, sr);
     const left = buf.getChannelData(0);
     const right = buf.getChannelData(1);
 
-    let stateL = 0;
-    let stateR = 0;
+    const modes = [620, 940, 1380, 1890, 2650, 3480, 4620];
+    let lp1L = 0, lp2L = 0;
+    let lp1R = 0, lp2R = 0;
 
     for (let i = 0; i < length; i++) {
       const t = i / sr;
-      const rawL = Math.random() * 2 - 1;
-      const rawR = Math.random() * 2 - 1;
-      stateL = 0.88 * stateL + 0.12 * rawL;
-      stateR = 0.88 * stateR + 0.12 * rawR;
+      let bronze = 0;
+      for (let m = 0; m < modes.length; m++) {
+        bronze += (1.0 / Math.pow(m + 1, 0.7)) * Math.sin(2 * Math.PI * modes[m] * t);
+      }
 
-      const hpL = rawL - stateL;
-      const hpR = rawR - stateR;
+      const noiseL = (Math.random() * 2 - 1) * 0.60;
+      const noiseR = (Math.random() * 2 - 1) * 0.60;
+      const attack = t < 0.012 ? (t / 0.012) : 1.0;
 
-      const attack = t < 0.008 ? t / 0.008 : 1.0;
-      const env = Math.exp(-t / 0.95) * attack;
+      const rawL = (bronze * 0.30 + noiseL) * attack;
+      const rawR = (bronze * 0.30 + noiseR) * attack;
 
-      left[i] = hpL * env * 0.65;
-      right[i] = hpR * env * 0.65;
+      lp1L = 0.62 * lp1L + 0.38 * rawL;
+      lp2L = 0.62 * lp2L + 0.38 * lp1L;
+      lp1R = 0.62 * lp1R + 0.38 * rawR;
+      lp2R = 0.62 * lp2R + 0.38 * lp1R;
+
+      const env = Math.exp(-t / 0.26);
+      left[i] = lp2L * env * 0.80;
+      right[i] = lp2R * env * 0.80;
     }
 
     return buf;
   }
 
   /**
-   * 6. ROSEWOOD RIMSHOT (Klarer Knack 65ms mit Holzresonanz)
+   * 6. ROSEWOOD STUDIO SIDE-STICK / CROSS-STICK (Acoustic Shell Knock, 0% Cowbell)
    */
   private synthesizeStudioRim(ctx: BaseAudioContext, sr: number, layer: VelocityLayer, rr: number): AudioBuffer {
     const duration = 0.075;
@@ -746,16 +813,44 @@ class StudioSampleLibraryService {
     const left = buf.getChannelData(0);
     const right = buf.getChannelData(1);
 
-    const fWood = 1680 + rr * 20;
+    const fShell = 420 + rr * 8;
+    const fHarmonic = 610 - rr * 6;
+    let bpStateL = 0, bpStateR = 0;
+    let lpStateL = 0, lpStateR = 0;
 
     for (let i = 0; i < length; i++) {
       const t = i / sr;
-      const tone = Math.sin(2 * Math.PI * fWood * t);
-      const snap = (Math.random() * 2 - 1) * Math.exp(-t / 0.003) * 0.6;
-      const env = Math.exp(-t / 0.015);
-      const out = (tone * 0.7 + snap) * env;
-      left[i] = out;
-      right[i] = out;
+      const rawNoiseL = (Math.random() * 2 - 1);
+      const rawNoiseR = (Math.random() * 2 - 1);
+
+      bpStateL = 0.65 * bpStateL + 0.35 * rawNoiseL;
+      bpStateR = 0.65 * bpStateR + 0.35 * rawNoiseR;
+      const clickEnv = Math.exp(-t / 0.0035);
+      const clickL = (rawNoiseL - bpStateL) * clickEnv * 0.70;
+      const clickR = (rawNoiseR - bpStateR) * clickEnv * 0.70;
+
+      const shellEnv = Math.exp(-t / 0.016);
+      const shellTone = (
+        0.65 * Math.sin(2 * Math.PI * fShell * t) +
+        0.35 * Math.sin(2 * Math.PI * fHarmonic * t)
+      ) * shellEnv * 0.45;
+
+      lpStateL = 0.70 * lpStateL + 0.30 * rawNoiseL;
+      lpStateR = 0.70 * lpStateR + 0.30 * rawNoiseR;
+      const wireEnv = Math.exp(-t / 0.022);
+      const wireL = lpStateL * wireEnv * 0.20;
+      const wireR = lpStateR * wireEnv * 0.20;
+
+      left[i] = Math.tanh((clickL + shellTone + wireL) * 1.15);
+      right[i] = Math.tanh((clickR + shellTone + wireR) * 1.15);
+    }
+
+    const fadeLen = Math.floor(sr * 0.015);
+    for (let i = 0; i < fadeLen; i++) {
+      const idx = length - fadeLen + i;
+      const factor = (fadeLen - i) / fadeLen;
+      left[idx] *= factor;
+      right[idx] *= factor;
     }
 
     return buf;

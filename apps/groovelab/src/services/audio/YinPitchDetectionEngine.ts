@@ -31,6 +31,8 @@ export interface YinPitchResult {
   isAudible: boolean;         // True if rms >= squelchThreshold
 }
 
+import { acquireAudioStream } from '../audioPermissionService';
+
 export interface PitchMatchScore {
   cents: number;
   rawCents: number;
@@ -385,7 +387,7 @@ export class RealtimePitchStream {
     }
 
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+      this.mediaStream = await acquireAudioStream({
         audio: {
           echoCancellation: false,
           autoGainControl: false,
@@ -393,6 +395,10 @@ export class RealtimePitchStream {
           channelCount: 1
         }
       });
+
+      if (this.audioContext && this.audioContext.state !== 'closed') {
+        try { this.audioContext.close(); } catch {}
+      }
 
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioCtxClass();

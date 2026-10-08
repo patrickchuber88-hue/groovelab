@@ -385,6 +385,7 @@ export function useSecretaryStaff({
       alert(`Mitarbeiter-Rolle erfolgreich aktualisiert.`);
       await fetchDashboardData();
     } catch (err: any) {
+      await fetchDashboardData();
       alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
     }
   };
@@ -452,6 +453,7 @@ export function useSecretaryStaff({
 
       await fetchDashboardData();
     } catch (err: any) {
+      await fetchDashboardData();
       alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
     }
   };

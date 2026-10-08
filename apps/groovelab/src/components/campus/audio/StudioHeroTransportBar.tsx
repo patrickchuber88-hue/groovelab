@@ -212,7 +212,7 @@ export const StudioHeroTransportBar: React.FC<StudioHeroTransportBarProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
-            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease',
             flex: isMobile ? 1 : 'none',
             touchAction: 'manipulation'

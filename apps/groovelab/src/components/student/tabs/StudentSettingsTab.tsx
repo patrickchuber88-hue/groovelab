@@ -686,7 +686,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   justifyContent: 'center',
                   color: '#ffffff',
                   marginBottom: '16px',
-                  boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)'
+                  boxShadow: 'none'
                 }}>
                   <ShieldCheck size={34} />
                 </div>
@@ -770,7 +770,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '10px',
-                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
@@ -1034,7 +1034,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       fontWeight: 800,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)'
+                      boxShadow: 'none'
                     }}
                     className="hover-scale"
                     title="Elternbereich jetzt sofort sperren"
@@ -1053,7 +1053,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   border: '1.5px solid #10b981',
                   borderRadius: '24px',
                   padding: '24px',
-                  boxShadow: '0 8px 24px -4px rgba(34, 197, 94, 0.12)',
+                  boxShadow: 'none',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
@@ -1070,7 +1070,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+                        boxShadow: 'none'
                       }}>
                         <Sparkles size={24} />
                       </div>
@@ -1095,7 +1095,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                      boxShadow: 'none'
                     }}>
                       <Sparkles size={12} color="#ffffff" />
                       <span>1 Monat gratis schnuppern</span>
@@ -1125,7 +1125,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s',
                         minHeight: '44px',
                         touchAction: 'manipulation'
@@ -1257,7 +1257,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     justifyContent: 'space-between',
                     gap: '14px',
                     flexWrap: 'wrap',
-                    boxShadow: '0 6px 20px rgba(217, 119, 6, 0.12)',
+                    boxShadow: 'none',
                     textAlign: 'left'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1307,7 +1307,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)',
+                        boxShadow: 'none',
                         minHeight: '44px',
                         touchAction: 'manipulation'
                       }}
@@ -2724,7 +2724,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     color: '#ffffff',
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
+                                    boxShadow: 'none',
                                     flexShrink: 0
                                   }}>
                                     <Fingerprint size={22} />
@@ -2945,7 +2945,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               fontWeight: 800,
                               cursor: 'pointer',
                               flexShrink: 0,
-                              boxShadow: '0 2px 6px rgba(21, 128, 61, 0.2)'
+                              boxShadow: 'none'
                             }}
                             className="hover-scale"
                             title="Vertragsurkunde und Widerrufsbelehrung als PDF herunterladen"
@@ -3089,7 +3089,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     justifyContent: 'center',
                     color: '#ffffff',
                     marginBottom: '16px',
-                    boxShadow: '0 8px 24px -4px rgba(2, 132, 199, 0.4)'
+                    boxShadow: 'none'
                   }}>
                     <ShieldCheck size={36} />
                   </div>
@@ -3201,7 +3201,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       fontSize: '0.92rem',
                       fontWeight: 900,
                       cursor: 'pointer',
-                      boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease',
                       display: 'flex',
                       alignItems: 'center',

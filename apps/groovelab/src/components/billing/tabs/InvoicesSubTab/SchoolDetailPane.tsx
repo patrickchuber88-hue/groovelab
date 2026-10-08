@@ -163,7 +163,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
             fontSize: '0.80rem',
             fontWeight: 800,
             cursor: 'pointer',
-            boxShadow: '0 1px 3px rgba(5, 150, 105, 0.08)',
+            boxShadow: 'none',
             transition: 'all 0.15s ease'
           }}
           className="hover-scale-mini"
@@ -354,7 +354,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>Rechnungsbetrag (Netto = Brutto):</span>
                   <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                    Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung) • Fällig zum 01. des Monats
+                    Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung) • Fällig: 30 Tage netto
                   </span>
                 </div>
                 <strong style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34a853', fontFamily: '"Outfit", sans-serif' }}>
@@ -385,7 +385,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>Monatlicher Gesamtbetrag (Brutto):</span>
-                    <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600 }}>Inkl. 19 % MwSt. • Fällig zum 01. des Monats</span>
+                    <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600 }}>Inkl. 19 % MwSt. • Fällig: 30 Tage netto</span>
                   </div>
                   <strong style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34a853', fontFamily: '"Outfit", sans-serif' }}>
                     {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}

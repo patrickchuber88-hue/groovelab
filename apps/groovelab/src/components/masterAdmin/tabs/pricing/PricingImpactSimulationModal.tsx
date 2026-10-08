@@ -167,7 +167,7 @@ export const PricingImpactSimulationModal: React.FC<PricingImpactSimulationModal
               fontSize: '0.88rem',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'

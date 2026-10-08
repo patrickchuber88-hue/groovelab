@@ -590,7 +590,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseOver={(e) => {
@@ -622,7 +622,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             onMouseOver={(e) => {
@@ -771,7 +771,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 fontSize: '0.74rem',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 2px 6px rgba(4, 120, 87, 0.08)',
+                boxShadow: 'none',
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               onMouseOver={(e) => {
@@ -1305,7 +1305,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        boxShadow: '0 4px 14px rgba(5, 150, 105, 0.3)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale-mini"
                     >
@@ -2247,7 +2247,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 8px 20px rgba(245, 158, 11, 0.35)'
+                        boxShadow: 'none'
                       }}>
                         <Wrench size={26} color="#ffffff" />
                       </div>
@@ -2519,7 +2519,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                         height: '7px',
                         borderRadius: '50%',
                         background: '#22c55e',
-                        boxShadow: '0 0 6px #22c55e'
+                        boxShadow: 'none'
                       }} />
                     )}
                     {announcement.isActive ? 'LIVE GESCHALTET' : 'OFFLINE (ENTWURF)'}
@@ -2611,7 +2611,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"
@@ -2640,7 +2640,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"
@@ -3165,7 +3165,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 10px rgba(5, 150, 105, 0.3)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
                 className="hover-scale-mini"
@@ -3298,7 +3298,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               borderRadius: '24px',
               padding: '24px',
               border: '1px solid #fed7aa',
-              boxShadow: '0 4px 20px rgba(249, 115, 22, 0.04)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -3357,7 +3357,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               borderRadius: '24px',
               padding: '24px',
               border: '1px solid #bbf7d0',
-              boxShadow: '0 4px 20px rgba(34, 197, 94, 0.04)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -3671,7 +3671,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '10px',
-                    boxShadow: '0 6px 20px rgba(56, 189, 248, 0.35)',
+                    boxShadow: 'none',
                     transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                   onMouseOver={(e) => {
@@ -4113,7 +4113,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             borderRadius: '24px',
             padding: '28px',
             border: '1px solid #bae6fd',
-            boxShadow: '0 4px 20px rgba(2, 132, 199, 0.05)'
+            boxShadow: 'none'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
               <div>
@@ -4147,7 +4147,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+                    boxShadow: 'none'
                   }}
                 >
                   <Award size={14} color="#ffffff" />

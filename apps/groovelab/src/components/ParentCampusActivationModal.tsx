@@ -18,6 +18,7 @@ import { logSecurityEvent } from '../services/auditLogService';
 import { LegalTextModal } from './LegalTextModal';
 import { generateLocalQrDataUrl } from '../utils/localQrGenerator';
 import { computeSha256, ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS } from '../legal/legalContent';
+import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../config/operatorBanking';
 
 export interface ParentCampusActivationModalProps {
   student: {
@@ -47,9 +48,9 @@ export interface ParentCampusActivationModalProps {
 export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalProps> = ({
   student,
   schoolData,
-  masterBillingIban = 'DE89 3704 0044 0532 9482 11',
-  masterBillingBic = 'GENODEFFXXX',
-  masterBillingCompany = 'Campus-Groovelab Plattformbetrieb',
+  masterBillingIban = formatOperatorIban(),
+  masterBillingBic = OPERATOR_BANKING_CONFIG.bic,
+  masterBillingCompany = OPERATOR_BANKING_CONFIG.companyName,
   annualFee = 5.39,
   isParentUnlocked = false,
   onClose,
@@ -84,17 +85,32 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     isCampusActive: boolean;
   }
 
+  interface LinkStudentSiblingRpcResult { success: boolean; error?: string; linked_sibling_name?: string; sibling_group_id?: string; active_siblings_count?: number; is_third_or_more?: boolean; }
+
   const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'impressum' | 'cancellation' | null>(null);
-  const [linkedSiblings, setLinkedSiblings] = useState<LinkedSibling[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const stored = localStorage.getItem(`campus_family_siblings_${student.school_id || 'school'}`);
-      if (!stored) return [];
-      const parsed = JSON.parse(stored);
-      return parsed.map((item: any) => typeof item === 'string' ? { name: item, isCampusActive: true } : item);
-    } catch (e) { return []; }
-  });
+  const [linkedSiblings, setLinkedSiblings] = useState<LinkedSibling[]>([]);
+  const [siblingError, setSiblingError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!student?.id) return;
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_student_family_profiles', { p_student_id: student.id });
+        if (isMounted && !error && Array.isArray(data)) {
+          const raw = data as Array<{ id: string; first_name: string; last_name?: string | null; is_campus_active?: boolean; payment_status?: string | null }>;
+          setLinkedSiblings(raw.filter(p => p.id !== student.id).map(p => ({
+            name: `${p.first_name} ${p.last_name || ''}`.trim(),
+            id: p.id,
+            isCampusActive: Boolean(p.is_campus_active || p.payment_status === 'paid')
+          })));
+        }
+      } catch (err: unknown) { console.warn('Could not load family profiles:', err); }
+    })();
+    return () => { isMounted = false; };
+  }, [student?.id]);
+
   const [showAddSiblingInput, setShowAddSiblingInput] = useState<boolean>(false);
   const [siblingNameOrPin, setSiblingNameOrPin] = useState<string>('');
   const [siblingLookupLoading, setSiblingLookupLoading] = useState<boolean>(false);
@@ -125,27 +141,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const freeMonthDisplay = isChf ? 'CHF 0.00' : '0,00 €';
   const remainingMonths = schoolYearCalc.remainingPaidMonths;
   const periodDescription = schoolYearCalc.periodDescription;
-  const resolvedSchoolTaxMode = 
-    schoolData?.tax_mode || 
-    schoolData?.opening_hours?.tax_settings?.tax_mode || 
-    (typeof window !== 'undefined' ? localStorage.getItem('cg_school_tax_mode') : null);
-
-  const platformTaxMode: 'small_business' | 'standard_vat' | 'vat_exempt_4_21' = 
-    resolvedSchoolTaxMode === 'vat_exempt_4_21'
-      ? 'vat_exempt_4_21'
-      : (resolvedSchoolTaxMode === 'standard_vat' || (typeof window !== 'undefined' && localStorage.getItem('cg_tax_mode') === 'standard_vat'))
-        ? 'standard_vat'
-        : 'small_business';
-
   const effectiveNetFee = +(effectiveAnnualFee / 1.19).toFixed(2);
   const effectiveVatAmount = +(effectiveAnnualFee - effectiveNetFee).toFixed(2);
   const taxDisclaimer = isChf 
-    ? 'Endpreis (Leistungsort Schweiz, kein gesonderter Steuerausweis)' 
-    : platformTaxMode === 'vat_exempt_4_21'
-      ? 'Endpreis (Umsatzsteuerfreie Bildungsleistung)'
-      : platformTaxMode === 'standard_vat'
-        ? `Endpreis inkl. 19% MwSt. (Netto: ${effectiveNetFee.toFixed(2).replace('.', ',')} € + ${effectiveVatAmount.toFixed(2).replace('.', ',')} € MwSt.)`
-        : 'Endpreis (Kleinunternehmerregelung, kein gesonderter Steuerausweis)';
+    ? 'Endpreis (Leistungsort Schweiz gem. Art. 8 Abs. 1 MWSTG, kein gesonderter Steuerausweis)' 
+    : OPERATOR_BANKING_CONFIG.isVatStandardTaxed
+      ? `Endpreis inkl. 19% MwSt. (Netto: ${effectiveNetFee.toFixed(2).replace('.', ',')} € + ${effectiveVatAmount.toFixed(2).replace('.', ',')} € MwSt.)`
+      : 'Endpreis (Kleinunternehmerregelung gem. § 19 UStG, kein gesonderter Steuerausweis)';
 
   // Generate stable GoBD Reference Code: CG-[HASH8]-[YYMM]
   const referenceCode = generateStudentGoBdCode(student.id || 'TEMP-ID');
@@ -280,21 +282,15 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           .eq('id', student.id);
       }
 
-      try {
-        if (typeof window !== 'undefined') {
-          if (isFamilyBonus) {
-            localStorage.setItem(`campus_paid_${student.id}`, 'true');
-            localStorage.setItem(`campus_payment_status_${student.id}`, 'paid');
-          } else {
-            localStorage.setItem(`campus_payment_status_${student.id}`, 'transfer_pending');
-            localStorage.setItem(`campus_transfer_date_${student.id}`, nowIso);
-            localStorage.removeItem(`campus_paid_${student.id}`);
-          }
-          localStorage.setItem(`campus_active_${student.id}`, 'true');
-          localStorage.setItem(`groovelab_parent_allow_student_audio_${student.id}`, String(allowStudentAudio));
-          localStorage.setItem(`campus_student_ui_level_${student.id}`, selectedUiLevel);
+      if (!isFamilyBonus) {
+        try {
+          await supabase.rpc('request_student_bank_transfer_order', {
+            p_student_id: student.id
+          });
+        } catch (e) {
+          console.warn('[ParentCampusActivationModal] request_student_bank_transfer_order error:', e);
         }
-      } catch (e) {}
+      }
 
       // 🛡️ Revisionssicheres Logging der elterlichen Einwilligung & B2C-Consent-Enforcement (§ 371a ZPO / OWASP ASVS L3)
       const b2cTermsMarkdown = LEGAL_DOCUMENTS.terms_student_platform?.fullTextMarkdown || 'TERMS_STUDENT_PLATFORM';
@@ -709,7 +705,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 6px 16px rgba(52, 168, 83, 0.3)'
+              boxShadow: 'none'
             }} aria-hidden="true">
               {wizardStep === 'pin_gate' ? <Lock size={20} /> :
                wizardStep === 'permissions' ? <ShieldCheck size={20} /> :
@@ -830,7 +826,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               fontWeight: 900,
               padding: '2px 10px',
               borderRadius: '100px',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+              boxShadow: 'none'
             }}>
               🎁 {schoolYearCalc.freePeriodDescription.toUpperCase()}
             </div>
@@ -980,47 +976,33 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                     const inputVal = siblingNameOrPin.trim();
                     if (!inputVal) return;
                     setSiblingLookupLoading(true);
-                    
-                    let isAct = true;
-                    let resolvedName = inputVal;
-                    let resolvedId = '';
+                    setSiblingError(null);
 
                     try {
-                      const { data } = await supabase
-                        .from('users')
-                        .select('id, first_name, last_name, is_campus_active, payment_status, student_billing_payment_method')
-                        .eq('school_id', student.school_id)
-                        .or(`id.eq.${inputVal},first_name.ilike.${inputVal}`)
-                        .limit(1);
+                      const res = await supabase.rpc('link_student_sibling', {
+                        p_current_student_id: student.id,
+                        p_target_credential: inputVal
+                      });
+                      const resData = res.data as LinkStudentSiblingRpcResult | null;
 
-                      if (data && data.length > 0) {
-                        const found = data[0];
-                        resolvedName = found.first_name || inputVal;
-                        resolvedId = found.id;
-                        isAct = Boolean(found.is_campus_active || found.payment_status === 'paid' || found.student_billing_payment_method === 'bank_transfer' || found.student_billing_payment_method === 'family_bonus');
+                      if (res.error || !resData?.success) {
+                        setSiblingError(resData?.error || res.error?.message || 'Verknüpfung fehlgeschlagen. Bitte Nachnamen und Ausweis prüfen.');
                       } else {
-                        const localPaid = localStorage.getItem(`campus_paid_${inputVal}`) === 'true' || localStorage.getItem(`campus_active_${inputVal}`) === 'true';
-                        isAct = localPaid;
+                        const newSibling: LinkedSibling = {
+                          name: resData.linked_sibling_name || inputVal,
+                          id: undefined,
+                          isCampusActive: true
+                        };
+                        setLinkedSiblings(prev => [...prev.filter(s => s.name.toLowerCase() !== newSibling.name.toLowerCase()), newSibling]);
+                        setSiblingNameOrPin('');
+                        setShowAddSiblingInput(false);
                       }
-                    } catch (e) {
-                      console.warn('Sibling lookup error:', e);
+                    } catch (e: unknown) {
+                      const err = e as { message?: string };
+                      setSiblingError(err?.message || 'Verknüpfungsfehler');
                     } finally {
                       setSiblingLookupLoading(false);
                     }
-
-                    const newSibling: LinkedSibling = {
-                      name: resolvedName,
-                      id: resolvedId || undefined,
-                      isCampusActive: isAct
-                    };
-
-                    const nextSiblings = [...linkedSiblings.filter(s => s.name.toLowerCase() !== resolvedName.toLowerCase()), newSibling];
-                    setLinkedSiblings(nextSiblings);
-                    try {
-                      localStorage.setItem(`campus_family_siblings_${student.school_id || 'school'}`, JSON.stringify(nextSiblings));
-                    } catch (e) {}
-                    setSiblingNameOrPin('');
-                    setShowAddSiblingInput(false);
                   }}
                   style={{
                     background: '#0f172a',
@@ -1037,11 +1019,16 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddSiblingInput(false)}
+                  onClick={() => { setShowAddSiblingInput(false); setSiblingError(null); }}
                   style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '0.72rem', cursor: 'pointer' }}
                 >
                   Abbrechen
                 </button>
+              </div>
+            )}
+            {siblingError && (
+              <div style={{ color: '#dc2626', fontSize: '0.72rem', marginTop: '6px', fontWeight: 600 }}>
+                {siblingError}
               </div>
             )}
           </div>
@@ -1298,7 +1285,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 >
                   Datenschutzerklärung
                 </button>
-                {' '}ausdrücklich zu und bestätige die Bereitstellung des Zugangs.
+                {' '}ausdrücklich zu. Ich verlange die sofortige Bereitstellung digitaler Inhalte und nehme zur Kenntnis, dass die Vertragsbestätigung und Widerrufsbelehrung im geschützten Elternbereich dauerhaft zum PDF-Download (§ 312f BGB) bereitgestellt werden.
               </span>
             </label>
 
@@ -1532,7 +1519,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               alignItems: 'center',
               justifyContent: 'center',
               border: '1px solid #bfdbfe',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.15)'
+              boxShadow: 'none'
             }} aria-hidden="true">
               <Lock size={26} />
             </div>
@@ -1637,7 +1624,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '10px',
-                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
@@ -1961,7 +1948,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <span>Weiter zur Ansicht-Wahl ➔</span>
@@ -2134,7 +2121,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                boxShadow: 'none'
               }}
             >
               {isSubmitting ? 'Wird gespeichert...' : '✓ Einrichtung abschließen & App freigeben'}
@@ -2163,7 +2150,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             alignItems: 'center',
             justifyContent: 'center',
             border: '3px solid #bbf7d0',
-            boxShadow: '0 10px 25px rgba(22, 163, 74, 0.25)'
+            boxShadow: 'none'
           }} aria-hidden="true">
             <CheckCircle2 size={38} />
           </div>
@@ -2234,7 +2221,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   fontWeight: 950,
                   fontSize: '1.02rem',
                   cursor: 'pointer',
-                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s'
                 }}
               >

@@ -76,7 +76,7 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+              boxShadow: 'none'
             }}>
               <Eye size={22} />
             </div>
@@ -246,7 +246,7 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+              boxShadow: 'none'
             }}
             className="hover-scale-mini"
           >

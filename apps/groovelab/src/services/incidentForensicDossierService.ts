@@ -14,6 +14,8 @@
 
 import { logSecurityEvent } from './auditLogService';
 import { getOrCreateActiveTrace } from '../utils/w3cTraceContext';
+import { computeDualHashSeal, DualHashSeal } from '../utils/pqcDualHashingEngine';
+import { generateRfc3161TimestampToken, Rfc3161TimestampToken } from './rfc3161TimestampService';
 
 export interface IncidentDossierParams {
   schoolId: string;
@@ -35,6 +37,8 @@ export interface IncidentForensicDossier {
     w3c_trace_id: string;
     w3c_traceparent: string;
     sha256_seal: string;
+    pqc_seal?: DualHashSeal;
+    rfc3161_token?: Rfc3161TimestampToken;
     court_proof_status: 'COURT_EVIDENTIARY_SEALED';
   };
   incident_context: {
@@ -147,6 +151,8 @@ export async function generateIncidentForensicDossier(
 
   const rawJson = JSON.stringify(unsealedPayload, null, 2);
   const sha256Seal = await computeSha256(rawJson);
+  const pqcSeal = await computeDualHashSeal(rawJson);
+  const rfc3161Token = await generateRfc3161TimestampToken(pqcSeal.sha256);
 
   const dossier: IncidentForensicDossier = {
     manifest: {
@@ -159,6 +165,8 @@ export async function generateIncidentForensicDossier(
       w3c_trace_id: trace.traceId,
       w3c_traceparent: trace.traceparent,
       sha256_seal: sha256Seal,
+      pqc_seal: pqcSeal,
+      rfc3161_token: rfc3161Token,
       court_proof_status: 'COURT_EVIDENTIARY_SEALED'
     },
     incident_context: {

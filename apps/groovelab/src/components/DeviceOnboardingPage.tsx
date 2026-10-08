@@ -206,7 +206,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
             fontSize: '0.85rem', 
             fontWeight: 600, 
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
+            boxShadow: 'none',
             transition: 'transform 0.2s, background-color 0.2s'
           }}
           onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
@@ -355,7 +355,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         .apple-device-card.selected {
           border: 1.5px solid #facc15;
           background: rgba(250, 204, 21, 0.05);
-          box-shadow: 0 0 25px rgba(250, 204, 21, 0.12);
+          box-shadow: none;
         }
 
         .apple-device-card.selected:hover {
@@ -380,12 +380,12 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         .apple-btn-primary.enabled {
           background: linear-gradient(180deg, #fde047 0%, #facc15 100%);
           color: #000000;
-          box-shadow: 0 8px 24px rgba(250, 204, 21, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+          box-shadow: none;
         }
 
         .apple-btn-primary.enabled:hover {
           transform: translateY(-1px);
-          box-shadow: 0 12px 28px rgba(250, 204, 21, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+          box-shadow: none;
         }
 
         .apple-btn-primary.enabled:active {
@@ -400,9 +400,9 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         }
 
         @keyframes buttonPulse {
-          0% { box-shadow: 0 8px 24px rgba(250, 204, 21, 0.2), 0 0 0 0 rgba(250, 204, 21, 0.45); }
-          70% { box-shadow: 0 8px 24px rgba(250, 204, 21, 0.25), 0 0 0 10px rgba(250, 204, 21, 0); }
-          100% { box-shadow: 0 8px 24px rgba(250, 204, 21, 0.2), 0 0 0 0 rgba(250, 204, 21, 0); }
+          0% { box-shadow: none; }
+          70% { box-shadow: none; }
+          100% { box-shadow: none; }
         }
 
         .apple-btn-primary.enabled.pulsing {
@@ -503,7 +503,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
 
           {setupSuccess ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 0', gap: '18px', textAlign: 'center' }}>
-              <div style={{ background: '#30d158', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 24px rgba(48,209,88,0.25)' }}>
+              <div style={{ background: '#30d158', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
                 <Check size={28} color="#ffffff" strokeWidth={3} />
               </div>
               <div>

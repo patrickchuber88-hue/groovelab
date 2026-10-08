@@ -76,7 +76,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           background: '#ffffff',
           borderRadius: '28px',
           border: '1.5px solid #fed7aa',
-          boxShadow: '0 25px 50px -12px rgba(217, 119, 6, 0.25), 0 10px 20px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
           padding: '28px 24px',
           display: 'flex',
           flexDirection: 'column',
@@ -121,7 +121,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 8px 24px rgba(217, 119, 6, 0.35)',
+            boxShadow: 'none',
             marginTop: '4px'
           }}
         >
@@ -174,7 +174,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            boxShadow: '0 4px 16px rgba(245, 158, 11, 0.25)',
+            boxShadow: 'none',
             boxSizing: 'border-box'
           }}>
             <div style={{
@@ -185,7 +185,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)'
+              boxShadow: 'none'
             }}>
               <Sparkles size={24} color="#d97706" />
             </div>
@@ -300,7 +300,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 6px 18px rgba(249, 115, 22, 0.40)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale"
@@ -327,7 +327,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.12)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"
@@ -354,7 +354,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.30)',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale"

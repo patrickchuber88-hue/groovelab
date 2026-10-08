@@ -950,7 +950,7 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.35)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >
@@ -965,7 +965,7 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
             {countDown !== null ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '92px', height: '92px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(16, 185, 129, 0.5)' }}>
+                <div style={{ width: '92px', height: '92px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
                   <span style={{ fontSize: '2.8rem', fontWeight: 900, color: 'white' }}>{countDown}</span>
                 </div>
                 <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981' }}>Hände ans Instrument!</span>
@@ -986,7 +986,7 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: isRecording ? '0 10px 28px rgba(239, 68, 68, 0.5)' : '0 10px 28px rgba(16, 185, 129, 0.4)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >

@@ -180,7 +180,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)'
+              boxShadow: 'none'
             }}>
               <CheckCircle2 size={16} color="#10b981" style={{ flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -628,7 +628,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
+                  boxShadow: 'none',
                   letterSpacing: '-0.01em',
                   transition: 'all 0.15s'
                 }}

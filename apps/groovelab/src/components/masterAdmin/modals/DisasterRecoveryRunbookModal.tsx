@@ -119,7 +119,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 6px 16px -2px rgba(239, 68, 68, 0.35)'
+                boxShadow: 'none'
               }}
             >
               <BookOpen size={22} />

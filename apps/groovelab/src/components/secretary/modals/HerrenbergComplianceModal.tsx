@@ -137,7 +137,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
               alignItems: 'center',
               justifyContent: 'center',
               color: '#059669',
-              boxShadow: '0 4px 10px rgba(16, 185, 129, 0.12)'
+              boxShadow: 'none'
             }}>
               <Scale size={22} strokeWidth={2.4} />
             </div>

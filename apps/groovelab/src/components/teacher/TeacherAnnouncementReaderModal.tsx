@@ -70,7 +70,7 @@ export const TeacherAnnouncementReaderModal: React.FC<TeacherAnnouncementReaderM
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(239, 68, 68, 0.15)',
+        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25)',
         display: 'flex',
         flexDirection: 'column',
         gap: '18px',
@@ -251,7 +251,7 @@ export const TeacherAnnouncementReaderModal: React.FC<TeacherAnnouncementReaderM
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 8px 24px rgba(234, 67, 53, 0.35)',
+              boxShadow: 'none',
               transition: 'transform 0.15s ease'
             }}
           >

@@ -361,7 +361,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                   border: 'none',
                   color: 'white', borderRadius: '12px', padding: '8px 14px',
                   fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(52,168,83,0.2)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(52,168,83,0.3)'; }}
@@ -403,7 +403,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
           background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
           color: 'white', borderRadius: '24px', padding: '22px',
           display: 'flex', flexDirection: 'column', gap: '8px',
-          boxShadow: '0 12px 30px -5px rgba(239, 68, 68, 0.35)',
+          boxShadow: 'none',
           border: '1px solid rgba(255,255,255,0.2)',
           backdropFilter: 'blur(20px)',
         }}>
@@ -428,7 +428,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
           background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.95) 0%, rgba(234, 179, 8, 0.95) 100%)',
           color: 'white', borderRadius: '24px', padding: '22px',
           display: 'flex', flexDirection: 'column', gap: '8px',
-          boxShadow: '0 12px 30px -5px rgba(234, 179, 8, 0.35)',
+          boxShadow: 'none',
           border: '1px solid rgba(255,255,255,0.2)',
           backdropFilter: 'blur(20px)',
         }}>
@@ -453,7 +453,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
           background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.95) 0%, rgba(19, 115, 51, 0.95) 100%)',
           color: 'white', borderRadius: '24px', padding: '22px',
           display: 'flex', flexDirection: 'column', gap: '8px',
-          boxShadow: '0 12px 30px -5px rgba(52, 168, 83, 0.3)',
+          boxShadow: 'none',
           border: '1px solid rgba(255,255,255,0.2)',
           backdropFilter: 'blur(20px)',
         }}>
@@ -476,7 +476,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
           background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.95) 0%, rgba(71, 85, 105, 0.95) 100%)',
           color: 'white', borderRadius: '24px', padding: '22px',
           display: 'flex', flexDirection: 'column', gap: '8px',
-          boxShadow: '0 12px 30px -5px rgba(100,116,139,0.25)',
+          boxShadow: 'none',
           border: '1px solid rgba(255,255,255,0.2)',
           backdropFilter: 'blur(20px)',
         }}>
@@ -520,7 +520,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
               <div style={{
                 background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                 borderRadius: '14px', padding: '10px',
-                boxShadow: '0 6px 20px rgba(239,68,68,0.25)',
+                boxShadow: 'none',
                 display: 'flex', alignItems: 'center', justifyItems: 'center'
               }}>
                 <ShieldAlert size={20} color="white" />
@@ -1033,7 +1033,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           cursor: 'pointer', color: 'white', transition: 'all 0.15s',
                           flexShrink: 0,
-                          boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)'
+                          boxShadow: 'none'
                         }}
                         onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = '#ef4444'; }}

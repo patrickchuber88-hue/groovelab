@@ -10,6 +10,7 @@
 
 import { UniversalLatencyEngine } from '../utils/universalLatencyEngine';
 import { acquireAudioLease, releaseAudioLease } from './audio/audioContextPool';
+import { acquireAudioStream } from './audioPermissionService';
 
 export interface AudioRouteInfo {
   routeType: 'speaker' | 'headphones' | 'bluetooth' | 'usb';
@@ -269,7 +270,7 @@ class AudioLatencyService {
     // Request raw mic stream without echo cancellation or noise suppression for true acoustic measurement
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
+      stream = await acquireAudioStream({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,

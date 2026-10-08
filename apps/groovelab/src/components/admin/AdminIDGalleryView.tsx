@@ -137,7 +137,7 @@ export const AdminIDGalleryView: React.FC<AdminIDGalleryViewProps> = ({
         }
       `}</style>
       
-      <div className="glass-panel" style={{ padding: '40px', background: 'rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(20px)', borderRadius: '32px', border: '1px solid rgba(255, 255, 255, 0.3)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)' }}>
+      <div className="glass-panel" style={{ padding: '40px', background: 'rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(20px)', borderRadius: '32px', border: '1px solid rgba(255, 255, 255, 0.3)', boxShadow: 'none' }}>
          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px' }}>
           <div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px', letterSpacing: '-0.03em' }}>ID Gallerie</h2>
@@ -312,7 +312,7 @@ export const AdminIDGalleryView: React.FC<AdminIDGalleryViewProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.3)'
+                boxShadow: 'none'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#d93025'}
               onMouseLeave={(e) => e.currentTarget.style.background = '#ea4335'}

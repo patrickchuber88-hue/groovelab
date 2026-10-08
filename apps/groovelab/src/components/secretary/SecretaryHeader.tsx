@@ -355,7 +355,7 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
                 fontSize: '0.8rem', 
                 cursor: 'pointer', 
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
-                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)', 
+                boxShadow: 'none', 
                 flexShrink: 0 
               }}
               className="hover-scale"

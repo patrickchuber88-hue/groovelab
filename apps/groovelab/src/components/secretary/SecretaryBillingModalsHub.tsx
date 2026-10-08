@@ -550,7 +550,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                 fontSize: '0.82rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.2)'
+                boxShadow: 'none'
               }}
             >
               Schließen
@@ -1396,7 +1396,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                       color: '#b45309',
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 6px rgba(217, 119, 6, 0.1)'
+                      boxShadow: 'none'
                     }}
                   >
                     Widerrufen
@@ -1522,7 +1522,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '12px',
-                    boxShadow: '0 2px 8px rgba(202, 138, 4, 0.08)'
+                    boxShadow: 'none'
                   }}>
                     <Sparkles size={20} color="#ca8a04" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div style={{ fontSize: '0.75rem', color: '#854d0e', lineHeight: 1.45 }}>
@@ -2034,7 +2034,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                     fontSize: '0.78rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)'
+                    boxShadow: 'none'
                   }}
                 >
                   📢 Kündigung mit Frist ({storageTerminationDays} Tage) aktivieren
@@ -2073,12 +2073,12 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               auditHash: selectedInvoice.auditHash,
               activatedStudentsList: selectedInvoice.activatedStudentsList || []
             }}
-            schoolName={schoolName || currentSchoolProfile?.name || 'Musäk Bad Säckingen'}
+            schoolName={schoolName || currentSchoolProfile?.name || 'Musikschule'}
             schoolStreet={(
-              (schoolStreet || currentSchoolProfile?.street || 'Karl-Fürstenberg-Str.') + ' ' + (schoolHouseNumber || currentSchoolProfile?.house_number || '59')
+              (schoolStreet || currentSchoolProfile?.street || '') + ' ' + (schoolHouseNumber || currentSchoolProfile?.house_number || '')
             ).trim()}
-            schoolZipCode={schoolZipCode || currentSchoolProfile?.zip_code || '79618'}
-            schoolCity={schoolCity || currentSchoolProfile?.city || 'Rheinfelden'}
+            schoolZipCode={schoolZipCode || currentSchoolProfile?.zip_code || ''}
+            schoolCity={schoolCity || currentSchoolProfile?.city || ''}
             operatorCompany={operatorCompany || ''}
             operatorContact={operatorContact || ''}
             operatorStreet={operatorStreet || ''}
@@ -2245,7 +2245,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                         fontSize: '0.78rem',
                         fontWeight: 750,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                        boxShadow: 'none'
                       }}
                     >
                       Vertrag verbindlich kündigen

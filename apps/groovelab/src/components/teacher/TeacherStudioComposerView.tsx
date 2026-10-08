@@ -316,7 +316,13 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
     try {
       const stream = await acquireAudioStream();
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+      }
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -326,7 +332,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
       };
 
       recorder.onstop = async () => {
-        const rawAudioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const rawAudioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
         setIsMastering(true);
         let finalBlob: Blob = rawAudioBlob;
         let finalUrl = URL.createObjectURL(rawAudioBlob);
@@ -644,7 +650,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 10px rgba(2, 132, 199, 0.25)'
+            boxShadow: 'none'
           }}>
             <Sparkles size={22} />
           </div>
@@ -1107,7 +1113,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >
@@ -1185,7 +1191,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                        boxShadow: 'none'
                       }}
                       className="hover-scale"
                     >
@@ -1669,7 +1675,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                    boxShadow: 'none'
                   }}
                   className="hover-scale"
                 >
@@ -2128,7 +2134,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                 justifyContent: 'center',
                 gap: '8px',
                 cursor: selectedStudentIds.size === 0 || isSubmitting ? 'not-allowed' : 'pointer',
-                boxShadow: selectedStudentIds.size === 0 ? 'none' : '0 4px 16px rgba(2, 132, 199, 0.35)',
+                boxShadow: 'none',
                 transition: 'transform 0.15s ease'
               }}
               className={selectedStudentIds.size > 0 && !isSubmitting ? 'hover-scale' : ''}

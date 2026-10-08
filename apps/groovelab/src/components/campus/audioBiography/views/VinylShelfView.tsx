@@ -271,7 +271,7 @@ export const VinylShelfView: React.FC<VinylShelfViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
+              boxShadow: 'none',
               zIndex: 2
             }}
           >
@@ -433,7 +433,7 @@ export const VinylShelfView: React.FC<VinylShelfViewProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+              boxShadow: 'none',
               transition: 'all 0.2s ease'
             }}
             className="hover-scale"

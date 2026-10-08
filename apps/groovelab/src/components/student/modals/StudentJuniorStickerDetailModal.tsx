@@ -104,7 +104,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
               padding: '6px 16px',
               borderRadius: '100px',
               border: 'none',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)',
+              boxShadow: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px'
@@ -221,7 +221,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(217, 119, 6, 0.45)',
+                boxShadow: 'none',
                 border: 'none',
                 pointerEvents: 'none'
               }}
@@ -286,7 +286,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
               fontWeight: 950,
               fontSize: '1.1rem',
               cursor: 'pointer',
-              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -312,7 +312,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
                 fontWeight: 950,
                 fontSize: '1rem',
                 cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
+                boxShadow: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

@@ -52,7 +52,7 @@ export const MasteryCompleteModal: React.FC<MasteryCompleteModalProps> = ({
           width: '100%',
           padding: '36px 30px',
           textAlign: 'center',
-          boxShadow: '0 25px 60px -15px rgba(202, 138, 4, 0.4), 0 0 40px rgba(251, 191, 36, 0.15)',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5)',
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
@@ -71,7 +71,7 @@ export const MasteryCompleteModal: React.FC<MasteryCompleteModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 0 35px rgba(251, 191, 36, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.5)',
+            boxShadow: 'none',
             border: '3px solid #fef08a',
             fontSize: '44px'
           }}
@@ -173,7 +173,7 @@ export const MasteryCompleteModal: React.FC<MasteryCompleteModalProps> = ({
             fontWeight: 900,
             fontSize: '0.98rem',
             cursor: 'pointer',
-            boxShadow: '0 6px 20px rgba(251, 191, 36, 0.4)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

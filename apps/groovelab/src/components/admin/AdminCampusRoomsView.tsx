@@ -3166,7 +3166,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     padding: '11px 16px',
                     fontSize: '0.82rem',
                     fontWeight: 850,
-                    boxShadow: '0 8px 24px rgba(124, 58, 237, 0.35)',
+                    boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
@@ -3345,7 +3345,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           fontWeight: 850,
                           cursor: 'pointer',
                           whiteSpace: 'nowrap',
-                          boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)'
+                          boxShadow: 'none'
                         }}
                       >
                         <Clock size={11} strokeWidth={2.4} />
@@ -3694,7 +3694,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                             </span>
                           ) : (
                             <span style={{ padding: '3px 8px', background: '#e6f4ea', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#137333', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853', boxShadow: '0 0 4px #34a853' }} />
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853', boxShadow: 'none' }} />
                               Jetzt frei
                             </span>
                           )}
@@ -3934,7 +3934,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                       right: 0, 
                                       height: '2px', 
                                       background: '#ff453a', 
-                                      boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' 
+                                      boxShadow: 'none' 
                                     }} />
                                   )}
 
@@ -4871,7 +4871,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       justifyContent: 'center',
                       gap: '6px',
                       height: '38px',
-                      boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s ease'
                     }}
                     onMouseEnter={(e) => {

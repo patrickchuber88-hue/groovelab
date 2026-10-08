@@ -154,7 +154,7 @@ export const StudentNicknameSetupModal: React.FC<StudentNicknameSetupModalProps>
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)',
+                boxShadow: 'none',
                 flexShrink: 0
               }}
             >
@@ -268,7 +268,7 @@ export const StudentNicknameSetupModal: React.FC<StudentNicknameSetupModalProps>
                 color: '#b45309',
                 fontWeight: 850,
                 fontSize: '0.78rem',
-                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.15)'
+                boxShadow: 'none'
               }}
             >
               <Dices size={18} color="#d97706" />

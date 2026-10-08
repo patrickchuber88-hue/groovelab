@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   BookOpen, Music, Headphones, FileText, HelpCircle,
-  Play, Pause, Check, AlertTriangle, ChevronRight, Sparkles
+  Play, Pause, Check, AlertTriangle, ChevronRight, Sparkles,
+  AlertCircle, Trash2, Loader2, RotateCw
 } from 'lucide-react';
+import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
 import {
   useAuthoritativeHomeworkPlan, AuthoritativeHomeworkPlan, UseAuthoritativeHomeworkPlanParams
 } from '../hooks/useAuthoritativeHomeworkPlan';
@@ -88,31 +90,212 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [hasAudioError, setHasAudioError] = useState(false);
+  const [isResolvingAudio, setIsResolvingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCleanupRef = useRef<(() => void) | null>(null);
+  const resolvedSourceMapRef = useRef<Map<string, string>>(new Map());
+  const playerIdRef = useRef<string>(`hw-authoritative-widget-${Math.random().toString(36).substring(2, 9)}`);
+
+  const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    const set = new Set<string>();
+    (audioTracks || []).forEach(t => {
+      const clean = (t.url || '').replace(/^["']|["']$/g, '').trim();
+      if (clean) {
+        try {
+          if (localStorage.getItem(`campus_dismissed_audio_${clean}`) === '1') set.add(clean);
+        } catch {}
+      }
+    });
+    const effId = studentId || studentUser?.id;
+    if (effId) {
+      try {
+        [-2, -1, 0, 1, 2].forEach(offset => {
+          const raw = localStorage.getItem(`campus_dismissed_audios_${effId}_${offset}`);
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              list.forEach(u => {
+                const c = (u || '').replace(/^["']|["']$/g, '').trim();
+                if (c) set.add(c);
+              });
+            }
+          }
+        });
+      } catch {}
+    }
+    return set;
+  });
+
+  useEffect(() => {
+    const handleDismissed = (e: any) => {
+      if (e?.detail?.url) {
+        const clean = (e.detail.url || '').replace(/^["']|["']$/g, '').trim();
+        if (clean) setDismissedUrls(prev => new Set(prev).add(clean));
+      }
+    };
+    window.addEventListener('campus-audio-dismissed', handleDismissed);
+    return () => window.removeEventListener('campus-audio-dismissed', handleDismissed);
+  }, []);
+
+  const activeAudioTracks = (audioTracks || []).filter(t => {
+    const clean = (t.url || '').replace(/^["']|["']$/g, '').trim();
+    return clean && !dismissedUrls.has(clean);
+  });
+
+  // Global Audio Bus listener (pauses playback if other audio starts)
+  useEffect(() => {
+    const handleOtherPlay = (e: any) => {
+      if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+          setIsPlayingAudio(false);
+        }
+      }
+    };
+    window.addEventListener('campus-global-audio-play', handleOtherPlay);
+    return () => window.removeEventListener('campus-global-audio-play', handleOtherPlay);
+  }, []);
+
+  // Pre-warm active audio track (0.1% WebKit Autoplay & instant start)
+  const currentPrimaryTrackUrl = activeAudioTracks[0]?.url ? activeAudioTracks[0].url.replace(/^["']|["']$/g, '').trim() : '';
+  useEffect(() => {
+    if (!currentPrimaryTrackUrl) return;
+    let isMounted = true;
+    (async () => {
+      try {
+        if (!resolvedSourceMapRef.current.has(currentPrimaryTrackUrl)) {
+          const res = await resolvePlayableAudioSource(currentPrimaryTrackUrl, 'campus-assets', 1800);
+          const finalRes = res.src ? res : await resolvePlayableAudioSource(currentPrimaryTrackUrl, 'groovelab-assets', 1800).catch(() => res);
+          if (isMounted && finalRes.src) {
+            resolvedSourceMapRef.current.set(currentPrimaryTrackUrl, finalRes.src);
+            if (finalRes.cleanup) audioCleanupRef.current = finalRes.cleanup;
+            if (audioRef.current && !audioRef.current.src) {
+              audioRef.current.src = finalRes.src;
+              audioRef.current.load();
+            }
+          }
+        }
+      } catch {}
+    })();
+    return () => { isMounted = false; };
+  }, [currentPrimaryTrackUrl]);
 
   useEffect(() => {
     return () => {
+      if (audioCleanupRef.current) {
+        try { audioCleanupRef.current(); } catch {}
+        audioCleanupRef.current = null;
+      }
       if (audioRef.current) {
-        audioRef.current.pause();
+        try { audioRef.current.pause(); } catch {}
         audioRef.current = null;
       }
     };
   }, []);
 
-  const toggleAudio = (url: string) => {
+  const toggleAudio = async (rawUrl: string) => {
+    const cleanUrl = (rawUrl || '').replace(/^["']|["']$/g, '').trim();
+    if (!cleanUrl) return;
+
+    if (isPlayingAudio && audioRef.current) {
+      audioRef.current.pause();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    setIsResolvingAudio(true);
+    let playSource = resolvedSourceMapRef.current.get(cleanUrl) || '';
+    if (!playSource) {
+      try {
+        const res = await resolvePlayableAudioSource(cleanUrl, 'campus-assets', 1800);
+        const finalRes = res.src ? res : await resolvePlayableAudioSource(cleanUrl, 'groovelab-assets', 1800).catch(() => res);
+        if (finalRes.src) {
+          playSource = finalRes.src;
+          resolvedSourceMapRef.current.set(cleanUrl, finalRes.src);
+          if (finalRes.cleanup) audioCleanupRef.current = finalRes.cleanup;
+        }
+      } catch {}
+    }
+
+    if (!playSource) {
+      setIsResolvingAudio(false);
+      setHasAudioError(true);
+      return;
+    }
+
     if (!audioRef.current) {
-      audioRef.current = new Audio(url);
+      audioRef.current = new Audio(playSource);
       audioRef.current.ontimeupdate = () => { if (audioRef.current) setAudioCurrentTime(audioRef.current.currentTime); };
       audioRef.current.onloadedmetadata = () => { if (audioRef.current) setAudioDuration(audioRef.current.duration); };
       audioRef.current.onended = () => { setIsPlayingAudio(false); setAudioCurrentTime(0); };
+      audioRef.current.onerror = () => { setIsPlayingAudio(false); setHasAudioError(true); };
+    } else if (audioRef.current.src !== playSource) {
+      audioRef.current.src = playSource;
     }
-    if (audioRef.current.src !== url) audioRef.current.src = url;
-    if (isPlayingAudio) {
-      audioRef.current.pause();
+
+    try {
+      window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
+      await audioRef.current.play();
+      setIsPlayingAudio(true);
+      setHasAudioError(false);
+    } catch (playErr) {
+      console.warn('[AuthoritativeHomeworkWidget] Play error, attempting JIT recovery:', playErr);
+      try {
+        const freshRes = await resolvePlayableAudioSource(cleanUrl, 'campus-assets', 1800);
+        if (freshRes.src && audioRef.current) {
+          audioRef.current.src = freshRes.src;
+          resolvedSourceMapRef.current.set(cleanUrl, freshRes.src);
+          window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
+          await audioRef.current.play();
+          setIsPlayingAudio(true);
+          setHasAudioError(false);
+          setIsResolvingAudio(false);
+          return;
+        }
+      } catch {}
       setIsPlayingAudio(false);
-    } else {
-      audioRef.current.play().then(() => setIsPlayingAudio(true)).catch(err => console.warn('Audio play error:', err));
+      setHasAudioError(true);
+    } finally {
+      setIsResolvingAudio(false);
     }
+  };
+
+  const handleRetryAudio = async (targetUrl: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const cleanUrl = (targetUrl || '').replace(/^["']|["']$/g, '').trim();
+    setHasAudioError(false);
+    resolvedSourceMapRef.current.delete(cleanUrl);
+    await toggleAudio(cleanUrl);
+  };
+
+  const handleDismissAudio = (targetUrl: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const cleanUrl = (targetUrl || '').replace(/^["']|["']$/g, '').trim();
+    if (!cleanUrl) return;
+    try {
+      localStorage.setItem(`campus_dismissed_audio_${cleanUrl}`, '1');
+      const effId = studentId || studentUser?.id;
+      if (effId) {
+        [-1, 0].forEach(offset => {
+          const key = `campus_dismissed_audios_${effId}_${offset}`;
+          try {
+            const current = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(current) && !current.includes(cleanUrl)) {
+              localStorage.setItem(key, JSON.stringify([...current, cleanUrl]));
+            }
+          } catch {}
+        });
+      }
+    } catch {}
+    window.dispatchEvent(new CustomEvent('campus-audio-dismissed', { detail: { url: cleanUrl } }));
+    setDismissedUrls(prev => new Set(prev).add(cleanUrl));
+    if (audioRef.current) {
+      try { audioRef.current.pause(); } catch {}
+    }
+    setIsPlayingAudio(false);
+    setHasAudioError(false);
   };
 
   const formatSeconds = (sec?: number) => {
@@ -145,7 +328,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           padding: '10px 16px', minHeight: '48px',
           background: theme === 'dark' ? '#1e293b' : '#ffffff',
           border: theme === 'dark' ? '1px solid #334154' : '1.5px solid #10b981',
-          borderRadius: '16px', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
+          borderRadius: '16px', boxShadow: 'none',
           cursor: onOpenHomework ? 'pointer' : 'default', transition: 'all 0.15s ease',
           boxSizing: 'border-box', ...style
         }}
@@ -195,13 +378,13 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
             </div>
           )}
 
-          {audioTracks.length > 0 && (
+          {activeAudioTracks.length > 0 && (
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', fontWeight: 800,
               color: '#15803d', background: '#e6f4ea', padding: '3px 8px', borderRadius: '8px'
             }}>
               <Headphones size={12} />
-              <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
+              <span>{activeAudioTracks.length === 1 ? '1 Aufnahme' : `${activeAudioTracks.length} Aufnahmen`}</span>
             </div>
           )}
         </div>
@@ -240,14 +423,14 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               Wochen-Fahrplan
             </span>
           </div>
-          {audioTracks.length > 0 && (
+          {activeAudioTracks.length > 0 && (
             <span style={{
               fontSize: '0.72rem', fontWeight: 800,
               color: '#ffffff',
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               padding: '2px 8px', borderRadius: '100px'
             }}>
-              🎧 {audioTracks.length} {audioTracks.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+              🎧 {activeAudioTracks.length} {activeAudioTracks.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
             </span>
           )}
         </div>
@@ -306,17 +489,6 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           );
         })}
 
-        {studentQuestion && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '10px',
-            background: '#fffdf0', border: '1px solid #fde047', fontSize: '0.80rem', color: '#713f12'
-          }}>
-            <HelpCircle size={13} color="#ca8a04" style={{ flexShrink: 0 }} />
-            <strong style={{ color: '#ca8a04' }}>Deine Frage:</strong>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>„{studentQuestion}“</span>
-          </div>
-        )}
-
         {!effectiveHasActiveHomework && (
           <div style={{ fontSize: '0.80rem', fontWeight: 650, color: isDark ? '#94a3b8' : '#64748b', padding: '4px 6px', fontStyle: 'italic' }}>
             Keine Hausaufgaben aufgegeben – freies Üben!
@@ -340,14 +512,14 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           }}>
             Hausaufgaben
           </span>
-          {audioTracks.length > 0 && (
+          {activeAudioTracks.length > 0 && (
             <span style={{
               fontSize: '0.72rem', fontWeight: 850, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               border: 'none', padding: '2px 8px', borderRadius: '100px',
               display: 'inline-flex', alignItems: 'center', gap: '4px'
-            }} title={`${audioTracks.length} Aufnahme(n) vorhanden`}>
+            }} title={`${activeAudioTracks.length} Aufnahme(n) vorhanden`}>
               <Headphones size={11} strokeWidth={2.4} />
-              <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
+              <span>{activeAudioTracks.length === 1 ? '1 Aufnahme' : `${activeAudioTracks.length} Aufnahmen`}</span>
             </span>
           )}
         </div>
@@ -380,7 +552,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                 width: '28px', height: '28px', borderRadius: '8px',
                 background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#e11d48', boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)', flexShrink: 0
+                color: '#e11d48', boxShadow: 'none', flexShrink: 0
               }}>
                 <BookOpen size={14} strokeWidth={2.4} />
               </div>
@@ -516,7 +688,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
       {studentQuestion && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.88rem', padding: '8px 12px',
-          borderRadius: '12px', background: '#fffdf0', border: '1px solid #fde047', boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
+          borderRadius: '12px', background: '#fffdf0', border: '1px solid #fde047', boxShadow: 'none'
         }}>
           <HelpCircle size={15} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
@@ -536,9 +708,11 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
       )}
 
       {/* 7. Audio Quickie Mini-Player */}
-      {audioTracks.length > 0 && (
+      {activeAudioTracks.length > 0 && (
         <div style={{
-          background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '16px', padding: '10px 14px',
+          background: hasAudioError ? '#fef2f2' : '#f8fafc',
+          border: hasAudioError ? '1.5px solid #fca5a5' : '1.5px solid #e2e8f0',
+          borderRadius: '16px', padding: '10px 14px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: '4px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
@@ -546,28 +720,56 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               type="button"
               role="button"
               tabIndex={0}
-              aria-label={isPlayingAudio ? "Aufnahme pausieren" : "Aufnahme abspielen"}
-              onClick={(e) => { e.stopPropagation(); toggleAudio(audioTracks[0].url); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleAudio(audioTracks[0].url); } }}
+              aria-label={hasAudioError ? "Aufnahme erneut laden" : (isPlayingAudio ? "Aufnahme pausieren" : "Aufnahme abspielen")}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasAudioError) {
+                  handleRetryAudio(activeAudioTracks[0].url, e);
+                } else {
+                  toggleAudio(activeAudioTracks[0].url);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (hasAudioError) {
+                    handleRetryAudio(activeAudioTracks[0].url);
+                  } else {
+                    toggleAudio(activeAudioTracks[0].url);
+                  }
+                }
+              }}
               style={{
                 width: '40px', height: '40px', borderRadius: '50%',
-                background: isPlayingAudio ? '#16a34a' : '#ffffff', color: isPlayingAudio ? '#ffffff' : '#16a34a',
-                border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 6px rgba(22, 163, 74, 0.15)', transition: 'all 0.15s ease'
+                background: hasAudioError ? '#fee2e2' : (isPlayingAudio ? '#16a34a' : '#ffffff'),
+                color: hasAudioError ? '#ef4444' : (isPlayingAudio ? '#ffffff' : '#16a34a'),
+                border: hasAudioError ? '1.5px solid #fca5a5' : '1.5px solid #bbf7d0',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0, boxShadow: 'none', transition: 'all 0.15s ease'
               }}
               className="hover-scale-mini"
+              title={hasAudioError ? "Erneut versuchen zu laden" : (isPlayingAudio ? "Pausieren" : "Abspielen")}
             >
-              {isPlayingAudio ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" style={{ marginLeft: '2px' }} />}
+              {isResolvingAudio ? (
+                <Loader2 size={17} className="animate-spin" />
+              ) : hasAudioError ? (
+                <RotateCw size={17} strokeWidth={2.5} />
+              ) : isPlayingAudio ? (
+                <Pause size={17} fill="currentColor" />
+              ) : (
+                <Play size={17} fill="currentColor" style={{ marginLeft: '2px' }} />
+              )}
             </button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <Headphones size={12} color="#16a34a" />
-                  <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {isPlayingAudio ? 'Wird abgespielt' : 'Aufnahme anhören'}
+                  <Headphones size={12} color={hasAudioError ? '#dc2626' : '#16a34a'} />
+                  <span style={{ fontSize: '0.70rem', fontWeight: 900, color: hasAudioError ? '#dc2626' : '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {hasAudioError ? 'Nicht verfügbar' : (isPlayingAudio ? 'Wird abgespielt' : 'Aufnahme anhören')}
                   </span>
                 </div>
-                {audioTracks.length > 1 && onOpenRecordings && (
+                {activeAudioTracks.length > 1 && onOpenRecordings && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenRecordings(); }}
@@ -577,15 +779,15 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                       display: 'inline-flex', alignItems: 'center', gap: '2px', transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"
-                    title={`${audioTracks.length} Aufnahmen vorhanden - alle im Hausaufgabenheft anzeigen`}
-                    aria-label={`${audioTracks.length} Aufnahmen vorhanden`}
+                    title={`${activeAudioTracks.length} Aufnahmen vorhanden - alle im Hausaufgabenheft anzeigen`}
+                    aria-label={`${activeAudioTracks.length} Aufnahmen vorhanden`}
                   >
-                    +{audioTracks.length - 1} weitere
+                    +{activeAudioTracks.length - 1} weitere
                   </button>
                 )}
               </div>
-              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {audioTracks[0].label || 'Aufnahme deiner Lehrkraft'}
+              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: hasAudioError ? '#991b1b' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {hasAudioError ? 'Aufnahme nicht abspielbar' : (activeAudioTracks[0].label || 'Aufnahme deiner Lehrkraft')}
               </span>
             </div>
           </div>
@@ -597,11 +799,50 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                 <span style={{ width: '3px', height: '10px', background: '#16a34a', borderRadius: '4px' }} />
               </div>
             )}
-            <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-              {isPlayingAudio && audioCurrentTime > 0
-                ? `${formatSeconds(audioCurrentTime)} / ${formatSeconds(audioDuration || audioTracks[0].duration)}`
-                : formatSeconds(audioTracks[0].duration)}
-            </span>
+            {hasAudioError ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => handleRetryAudio(activeAudioTracks[0].url, e)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    fontSize: '0.72rem', fontWeight: 800, color: '#475569',
+                    background: '#f8fafc', border: '1px solid #cbd5e1',
+                    borderRadius: '8px', padding: '4px 8px', cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                  title="Erneut versuchen zu laden"
+                  aria-label="Aufnahme erneut laden"
+                >
+                  <RotateCw size={13} strokeWidth={2.4} />
+                  <span>Prüfen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleDismissAudio(activeAudioTracks[0].url, e)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    fontSize: '0.72rem', fontWeight: 800, color: '#ef4444',
+                    background: '#fef2f2', border: '1px solid #fca5a5',
+                    borderRadius: '8px', padding: '4px 8px', cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                  title="Defekte Aufnahme aus Ansicht entfernen"
+                  aria-label="Defekte Aufnahme entfernen"
+                >
+                  <Trash2 size={13} />
+                  <span>Entfernen</span>
+                </button>
+              </div>
+            ) : (
+              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                {isPlayingAudio && audioCurrentTime > 0
+                  ? `${formatSeconds(audioCurrentTime)} / ${formatSeconds(audioDuration || activeAudioTracks[0].duration)}`
+                  : formatSeconds(activeAudioTracks[0].duration)}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -623,7 +864,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                 border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)', color: '#ffffff',
                 fontSize: isMusicStandMode ? '1.02rem' : '0.94rem', fontWeight: 950, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.28)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                boxShadow: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}
               className="hover-scale"
             >
@@ -645,7 +886,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                 background: '#facc15', color: '#0f172a',
                 fontSize: isMusicStandMode ? '1.02rem' : '0.94rem', fontWeight: 950, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                boxShadow: '0 4px 14px rgba(250, 204, 21, 0.35)',
+                boxShadow: 'none',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}
               className="hover-scale"

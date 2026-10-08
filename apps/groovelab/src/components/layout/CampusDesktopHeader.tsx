@@ -328,7 +328,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                   display: 'flex', alignItems: 'center', gap: '8px', 
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
                   padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+                  boxShadow: 'none',
                   color: 'white'
                 }}>
                   <AlertCircle size={14} color="white" />
@@ -347,7 +347,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                     display: 'flex', alignItems: 'center', gap: '8px', 
                     background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
                     padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
+                    boxShadow: 'none',
                     color: 'white',
                     border: 'none',
                     cursor: 'pointer',
@@ -731,7 +731,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                   fontSize: '0.8rem', 
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 12px rgba(234, 67, 53, 0.12)',
+                  boxShadow: 'none',
                   flexShrink: 0
                 }}
                 className="hover-scale"
@@ -764,7 +764,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                   fontSize: '0.8rem', 
                   cursor: 'pointer', 
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
-                  boxShadow: '0 2px 10px rgba(225, 29, 72, 0.08)', 
+                  boxShadow: 'none', 
                   flexShrink: 0 
                 }}
                 className="hover-scale"

@@ -235,8 +235,8 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
       >
         <style dangerouslySetInnerHTML={{__html: `
           @keyframes pulse-orange {
-            0%, 100% { border-color: #f97316; box-shadow: 0 0 0 0px rgba(249, 115, 22, 0.4); }
-            50% { border-color: #ffedd5; box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
+            0%, 100% { border-color: #f97316; box-shadow: none; }
+            50% { border-color: #ffedd5; box-shadow: none; }
           }
         `}} />
         <div style={{ background: '#ffffff', width: '100%', maxWidth: '100%', borderRadius: '32px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
@@ -482,7 +482,7 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                     justifyContent: 'center', 
                     gap: '6px', 
                     transition: 'all 0.2s',
-                    boxShadow: gridAppliedFeedback ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
+                    boxShadow: 'none'
                   }}
                 >
                   {gridAppliedFeedback ? (

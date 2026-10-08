@@ -347,7 +347,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            boxShadow: '0 4px 16px rgba(124, 58, 237, 0.12)',
+            boxShadow: 'none',
             animation: 'popIn 0.3s ease-out'
           }}>
             <div style={{
@@ -359,7 +359,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 3px 10px rgba(124, 58, 237, 0.35)'
+              boxShadow: 'none'
             }}>
               <Shield size={18} color="#ffffff" fill="#ffffff" />
             </div>

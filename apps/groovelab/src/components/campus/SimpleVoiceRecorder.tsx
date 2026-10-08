@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
+import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -128,9 +129,14 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       timerRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error accessing microphone:', err);
-      alert('Mikrofon-Zugriff nicht möglich. Bitte erlaube den Mikrofon-Zugriff in den Browser-Einstellungen.');
+      const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+      if (isDenied) {
+        alert('Mikrofon-Zugriff nicht möglich. Bitte erlaube den Mikrofon-Zugriff in den Einstellungen deines Geräts oder Browsers.');
+      } else {
+        alert('Mikrofon konnte nicht initialisiert werden. Bitte prüfe deine Audio-Eingabeeinstellungen oder lade die Seite neu.');
+      }
     }
   };
 
@@ -225,18 +231,14 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
 
         if (error) throw error;
 
-        const { data: publicUrlData } = supabase.storage
-          .from('campus-assets')
-          .getPublicUrl(fileName);
-
-        const publicUrl = publicUrlData?.publicUrl || '';
+        const secureAudioUrl = await getSecureAudioUrl(fileName, 'campus-assets', 1800);
         setUploadSuccess(true);
         setIsOfflineSaved(false);
         if (onRecordingComplete) {
-          onRecordingComplete(publicUrl);
+          onRecordingComplete(secureAudioUrl);
         }
         if (onAudioSaved) {
-          onAudioSaved(publicUrl);
+          onAudioSaved(secureAudioUrl);
         }
       } catch (uploadErr) {
         // Ausweichpfad bei Netzwerkabbruch während des Uploads: Verlustfreies Sichern im Tresor
@@ -416,7 +418,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
                 fontWeight: 900,
                 fontSize: '0.90rem',
                 cursor: (isUploading || uploadSuccess) ? 'default' : 'pointer',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)'
+                boxShadow: 'none'
               }}
             >
               {isUploading ? (
