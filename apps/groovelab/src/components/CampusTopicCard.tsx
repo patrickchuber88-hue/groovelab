@@ -301,13 +301,13 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
             onClick={() => onToggleReaction(topic.id, emoji)}
             aria-label={`Reaktion ${emoji} ${data.hasReacted ? 'entfernen' : 'hinzufügen'}`}
             style={{
-              background: data.hasReacted ? '#dcfce7' : '#f8fafc',
-              border: data.hasReacted ? '1px solid #86efac' : '1px solid #e2e8f0',
+              background: data.hasReacted ? '#ecfdf5' : '#f8fafc',
+              border: data.hasReacted ? '1px solid #10b981' : '1px solid #e2e8f0',
               borderRadius: '100px',
               padding: '2px 8px',
               fontSize: '0.74rem',
               fontWeight: 800,
-              color: data.hasReacted ? '#166534' : '#475569',
+              color: data.hasReacted ? '#059669' : '#475569',
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
@@ -528,13 +528,13 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
                         type="button"
                         onClick={() => onToggleReaction(reply.id, emoji)}
                         style={{
-                          background: data.hasReacted ? '#dcfce7' : '#ffffff',
-                          border: data.hasReacted ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          background: data.hasReacted ? '#ecfdf5' : '#ffffff',
+                          border: data.hasReacted ? '1px solid #10b981' : '1px solid #e2e8f0',
                           borderRadius: '100px',
                           padding: '1px 6px',
                           fontSize: '0.70rem',
                           fontWeight: 800,
-                          color: data.hasReacted ? '#166534' : '#475569',
+                          color: data.hasReacted ? '#059669' : '#475569',
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',

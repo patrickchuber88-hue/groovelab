@@ -63,11 +63,11 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
       {/* 🏛️ 1. Zero-Photo & Privacy-by-Design Sicherheits-Zertifikat */}
       <div style={{
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+        background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
         borderRadius: '24px',
         padding: '24px',
-        border: '1.5px solid #86efac',
-        boxShadow: '0 8px 24px -4px rgba(22, 163, 74, 0.12)',
+        border: '1.5px solid #10b981',
+        boxShadow: '0 8px 24px -4px rgba(16, 185, 129, 0.16)',
         textAlign: 'left',
         position: 'relative',
         overflow: 'hidden'
@@ -77,12 +77,12 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
             width: '54px',
             height: '54px',
             borderRadius: '16px',
-            background: '#ffffff',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#15803d',
-            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.16)',
+            color: '#ffffff',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
             flexShrink: 0
           }}>
             <ShieldCheck size={32} strokeWidth={2.4} />
@@ -93,7 +93,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 Zero-Photo &amp; Privacy-by-Design Garantie
               </h3>
               <span style={{
-                background: '#15803d',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: '#ffffff',
                 fontSize: '0.68rem',
                 fontWeight: 850,
@@ -101,7 +101,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 borderRadius: '999px',
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
-                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
+                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
               }}>
                 100% BIOMETRIEFREI
               </span>
@@ -121,13 +121,13 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 background: '#ffffff',
                 padding: '12px 14px',
                 borderRadius: '16px',
-                border: '1px solid #bbf7d0',
+                border: '1px solid #10b981',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
-                <Check size={18} color="#16a34a" strokeWidth={3} />
+                <Check size={18} color="#10b981" strokeWidth={3} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   Ausschließliche Musiker- &amp; Instrumenten-Avatare
                 </span>
@@ -137,13 +137,13 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 background: '#ffffff',
                 padding: '12px 14px',
                 borderRadius: '16px',
-                border: '1px solid #bbf7d0',
+                border: '1px solid #10b981',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
-                <Check size={18} color="#16a34a" strokeWidth={3} />
+                <Check size={18} color="#10b981" strokeWidth={3} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   Schutz vor Deepfakes, Cyber-Mobbing &amp; Tracking
                 </span>
@@ -153,13 +153,13 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 background: '#ffffff',
                 padding: '12px 14px',
                 borderRadius: '16px',
-                border: '1px solid #bbf7d0',
+                border: '1px solid #10b981',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
-                <Check size={18} color="#16a34a" strokeWidth={3} />
+                <Check size={18} color="#10b981" strokeWidth={3} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   Keine Weitergabe an Social Media oder Werbenetzwerke
                 </span>
@@ -169,13 +169,13 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 background: '#ffffff',
                 padding: '12px 14px',
                 borderRadius: '16px',
-                border: '1px solid #bbf7d0',
+                border: '1px solid #10b981',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}>
-                <Check size={18} color="#16a34a" strokeWidth={3} />
+                <Check size={18} color="#10b981" strokeWidth={3} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
                   100% BSI TR-03116 &amp; Art. 25 DSGVO konform
                 </span>
@@ -243,18 +243,19 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         {/* Global Feedback Banners */}
         {audioPurgeSuccess && (
           <div style={{
-            background: '#ecfdf5',
-            border: '1px solid #a7f3d0',
-            color: '#166534',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            border: 'none',
+            color: '#ffffff',
             padding: '12px 16px',
             borderRadius: '14px',
             fontSize: '0.80rem',
-            fontWeight: 750,
+            fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
-            gap: '10px'
+            gap: '10px',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
           }}>
-            <Check size={18} color="#16a34a" />
+            <Check size={18} color="#ffffff" strokeWidth={2.5} />
             <span>{audioPurgeSuccess}</span>
           </div>
         )}
@@ -279,18 +280,19 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
 
         {deletionRequested && (
           <div style={{
-            background: '#ecfdf5',
-            border: '1px solid #a7f3d0',
-            color: '#166534',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            border: 'none',
+            color: '#ffffff',
             padding: '12px 16px',
             borderRadius: '14px',
             fontSize: '0.80rem',
-            fontWeight: 750,
+            fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
-            gap: '10px'
+            gap: '10px',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
           }}>
-            <Check size={18} color="#16a34a" />
+            <Check size={18} color="#ffffff" strokeWidth={2.5} />
             <span>✓ Dein Löschantrag wurde erfasst und wird vom Sekretariat fristgerecht bearbeitet.</span>
           </div>
         )}

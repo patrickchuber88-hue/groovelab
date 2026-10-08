@@ -284,9 +284,10 @@ export const PlaylistsGridView: React.FC<PlaylistsGridViewProps> = ({
               style={{
                 fontSize: '0.68rem',
                 fontWeight: 900,
-                color: isLight ? '#15803d' : '#86efac',
-                background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.25)',
-                border: `1px solid ${isLight ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.5)'}`,
+                color: '#ffffff',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
                 padding: '3px 10px',
                 borderRadius: '100px',
                 display: 'inline-flex',
@@ -294,7 +295,7 @@ export const PlaylistsGridView: React.FC<PlaylistsGridViewProps> = ({
                 gap: '4px'
               }}
             >
-              <Sparkles size={11} />
+              <Sparkles size={11} color="#ffffff" />
               <span>Studio-Master</span>
             </span>
           </div>

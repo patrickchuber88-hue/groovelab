@@ -815,8 +815,8 @@ Deine Vorteile auf einen Blick:
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            background: '#dcfce7',
-            color: '#15803d',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: '#ffffff',
             fontSize: '0.78rem',
             fontWeight: 800,
             padding: '4px 12px',
@@ -962,14 +962,14 @@ Deine Vorteile auf einen Blick:
 
         {/* 0. Tier-1 SaaS Parental Onboarding Card (Apple Family Standard) */}
         <div style={{
-          background: consentSaved ? '#f0fdf4' : 'transparent',
-          border: consentSaved ? '1.5px solid #bbf7d0' : 'none',
+          background: consentSaved ? '#ecfdf5' : 'transparent',
+          border: consentSaved ? '1.5px solid #10b981' : 'none',
           borderRadius: consentSaved ? '24px' : '0',
           padding: consentSaved ? '20px' : '0',
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
-          boxShadow: consentSaved ? '0 4px 20px rgba(34, 197, 94, 0.08)' : 'none'
+          boxShadow: consentSaved ? '0 4px 20px rgba(16, 185, 129, 0.12)' : 'none'
         }}>
           {/* Card Header */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -978,8 +978,8 @@ Deine Vorteile auf einen Blick:
                 width: '42px',
                 height: '42px',
                 borderRadius: '14px',
-                background: consentSaved ? '#dcfce7' : '#f0fdf4',
-                color: consentSaved ? '#166534' : '#15803d',
+                background: consentSaved ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ecfdf5',
+                color: consentSaved ? '#ffffff' : '#059669',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1040,16 +1040,16 @@ Deine Vorteile auf einen Blick:
                       style={{
                         padding: '16px 12px',
                         borderRadius: '16px',
-                        border: `2px solid ${campusUsageMode === 'selbstnutzer' ? '#15803d' : '#e2e8f0'}`,
-                        background: campusUsageMode === 'selbstnutzer' ? '#f0fdf4' : '#ffffff',
-                        color: campusUsageMode === 'selbstnutzer' ? '#14532d' : '#475569',
+                        border: `2px solid ${campusUsageMode === 'selbstnutzer' ? '#10b981' : '#e2e8f0'}`,
+                        background: campusUsageMode === 'selbstnutzer' ? '#ecfdf5' : '#ffffff',
+                        color: campusUsageMode === 'selbstnutzer' ? '#065f46' : '#475569',
                         cursor: 'pointer',
                         textAlign: 'center',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: campusUsageMode === 'selbstnutzer' ? '0 4px 14px rgba(21, 128, 61, 0.12)' : 'none',
+                        boxShadow: campusUsageMode === 'selbstnutzer' ? '0 4px 14px rgba(16, 185, 129, 0.16)' : 'none',
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
                     >
@@ -1057,8 +1057,8 @@ Deine Vorteile auf einen Blick:
                         width: '38px',
                         height: '38px',
                         borderRadius: '12px',
-                        background: campusUsageMode === 'selbstnutzer' ? '#dcfce7' : '#f1f5f9',
-                        color: campusUsageMode === 'selbstnutzer' ? '#15803d' : '#64748b',
+                        background: campusUsageMode === 'selbstnutzer' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                        color: campusUsageMode === 'selbstnutzer' ? '#ffffff' : '#64748b',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
@@ -1067,7 +1067,7 @@ Deine Vorteile auf einen Blick:
                       </div>
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 900 }}>Selbstnutzer</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 600, color: campusUsageMode === 'selbstnutzer' ? '#166534' : '#64748b', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 600, color: campusUsageMode === 'selbstnutzer' ? '#059669' : '#64748b', marginTop: '2px' }}>
                           Eigenständig am Smartphone
                         </div>
                       </div>
@@ -1079,16 +1079,16 @@ Deine Vorteile auf einen Blick:
                       style={{
                         padding: '16px 12px',
                         borderRadius: '16px',
-                        border: `2px solid ${campusUsageMode === 'eltern_geführt' ? '#15803d' : '#e2e8f0'}`,
-                        background: campusUsageMode === 'eltern_geführt' ? '#f0fdf4' : '#ffffff',
-                        color: campusUsageMode === 'eltern_geführt' ? '#14532d' : '#475569',
+                        border: `2px solid ${campusUsageMode === 'eltern_geführt' ? '#10b981' : '#e2e8f0'}`,
+                        background: campusUsageMode === 'eltern_geführt' ? '#ecfdf5' : '#ffffff',
+                        color: campusUsageMode === 'eltern_geführt' ? '#065f46' : '#475569',
                         cursor: 'pointer',
                         textAlign: 'center',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: campusUsageMode === 'eltern_geführt' ? '0 4px 14px rgba(21, 128, 61, 0.12)' : 'none',
+                        boxShadow: campusUsageMode === 'eltern_geführt' ? '0 4px 14px rgba(16, 185, 129, 0.16)' : 'none',
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
                     >
@@ -1096,8 +1096,8 @@ Deine Vorteile auf einen Blick:
                         width: '38px',
                         height: '38px',
                         borderRadius: '12px',
-                        background: campusUsageMode === 'eltern_geführt' ? '#dcfce7' : '#f1f5f9',
-                        color: campusUsageMode === 'eltern_geführt' ? '#15803d' : '#64748b',
+                        background: campusUsageMode === 'eltern_geführt' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                        color: campusUsageMode === 'eltern_geführt' ? '#ffffff' : '#64748b',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
@@ -1106,7 +1106,7 @@ Deine Vorteile auf einen Blick:
                       </div>
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 900 }}>Mit Eltern</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 600, color: campusUsageMode === 'eltern_geführt' ? '#166534' : '#64748b', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 600, color: campusUsageMode === 'eltern_geführt' ? '#059669' : '#64748b', marginTop: '2px' }}>
                           Für Grundschulkinder
                         </div>
                       </div>
@@ -1248,8 +1248,8 @@ Deine Vorteile auf einen Blick:
                   {/* Optionaler Eltern-Passkey (Face ID / Fingerabdruck) */}
                   {parentPin6.length === 6 && (
                     <div style={{
-                      background: biometricsRegistered ? '#f0fdf4' : '#f8fafc',
-                      border: `1.5px solid ${biometricsRegistered ? '#bbf7d0' : '#e2e8f0'}`,
+                      background: biometricsRegistered ? '#ecfdf5' : '#f8fafc',
+                      border: `1.5px solid ${biometricsRegistered ? '#10b981' : '#e2e8f0'}`,
                       borderRadius: '18px',
                       padding: '14px',
                       display: 'flex',
@@ -1262,9 +1262,9 @@ Deine Vorteile auf einen Blick:
                           width: '36px',
                           height: '36px',
                           borderRadius: '10px',
-                          background: biometricsRegistered ? '#dcfce7' : '#ffffff',
-                          color: biometricsRegistered ? '#15803d' : '#475569',
-                          border: '1px solid #e2e8f0',
+                          background: biometricsRegistered ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                          color: biometricsRegistered ? '#ffffff' : '#475569',
+                          border: biometricsRegistered ? 'none' : '1px solid #e2e8f0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1352,8 +1352,8 @@ Deine Vorteile auf einen Blick:
                           width: '28px',
                           height: '28px',
                           borderRadius: '8px',
-                          background: '#f0fdf4',
-                          color: '#15803d',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center'
@@ -1372,8 +1372,8 @@ Deine Vorteile auf einen Blick:
                       <span style={{
                         fontSize: '0.65rem',
                         fontWeight: 800,
-                        color: '#166534',
-                        background: '#dcfce7',
+                        color: '#ffffff',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         padding: '3px 8px',
                         borderRadius: '100px'
                       }}>
@@ -1390,13 +1390,13 @@ Deine Vorteile auf einen Blick:
                         gap: '12px',
                         padding: '10px 12px',
                         borderRadius: '14px',
-                        background: parentAllowAbsences ? '#f0fdf4' : '#f8fafc',
-                        border: `1.5px solid ${parentAllowAbsences ? '#86efac' : '#f1f5f9'}`,
+                        background: parentAllowAbsences ? '#ecfdf5' : '#f8fafc',
+                        border: `1.5px solid ${parentAllowAbsences ? '#10b981' : '#f1f5f9'}`,
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                          <div style={{ marginTop: '2px', color: parentAllowAbsences ? '#15803d' : '#64748b' }}>
+                          <div style={{ marginTop: '2px', color: parentAllowAbsences ? '#059669' : '#64748b' }}>
                             <Calendar size={16} />
                           </div>
                           <div>
@@ -1414,7 +1414,7 @@ Deine Vorteile auf einen Blick:
                           type="checkbox"
                           checked={parentAllowAbsences}
                           onChange={(e) => setParentAllowAbsences(e.target.checked)}
-                          style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                          style={{ accentColor: '#10b981', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
                         />
                       </label>
 
@@ -1426,13 +1426,13 @@ Deine Vorteile auf einen Blick:
                         gap: '12px',
                         padding: '10px 12px',
                         borderRadius: '14px',
-                        background: parentAllowReschedule ? '#f0fdf4' : '#f8fafc',
-                        border: `1.5px solid ${parentAllowReschedule ? '#86efac' : '#f1f5f9'}`,
+                        background: parentAllowReschedule ? '#ecfdf5' : '#f8fafc',
+                        border: `1.5px solid ${parentAllowReschedule ? '#10b981' : '#f1f5f9'}`,
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                          <div style={{ marginTop: '2px', color: parentAllowReschedule ? '#15803d' : '#64748b' }}>
+                          <div style={{ marginTop: '2px', color: parentAllowReschedule ? '#059669' : '#64748b' }}>
                             <RotateCcw size={16} />
                           </div>
                           <div>
@@ -1450,7 +1450,7 @@ Deine Vorteile auf einen Blick:
                           type="checkbox"
                           checked={parentAllowReschedule}
                           onChange={(e) => setParentAllowReschedule(e.target.checked)}
-                          style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                          style={{ accentColor: '#10b981', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
                         />
                       </label>
 
@@ -1462,13 +1462,13 @@ Deine Vorteile auf einen Blick:
                         gap: '12px',
                         padding: '10px 12px',
                         borderRadius: '14px',
-                        background: parentAllowChat ? '#f0fdf4' : '#f8fafc',
-                        border: `1.5px solid ${parentAllowChat ? '#86efac' : '#f1f5f9'}`,
+                        background: parentAllowChat ? '#ecfdf5' : '#f8fafc',
+                        border: `1.5px solid ${parentAllowChat ? '#10b981' : '#f1f5f9'}`,
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                          <div style={{ marginTop: '2px', color: parentAllowChat ? '#15803d' : '#64748b' }}>
+                          <div style={{ marginTop: '2px', color: parentAllowChat ? '#059669' : '#64748b' }}>
                             <MessageSquare size={16} />
                           </div>
                           <div>
@@ -1486,7 +1486,7 @@ Deine Vorteile auf einen Blick:
                           type="checkbox"
                           checked={parentAllowChat}
                           onChange={(e) => setParentAllowChat(e.target.checked)}
-                          style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                          style={{ accentColor: '#10b981', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
                         />
                       </label>
                     </div>
@@ -1658,10 +1658,10 @@ Deine Vorteile auf einen Blick:
                     alignItems: 'flex-start',
                     gap: '12px',
                     cursor: 'pointer',
-                    background: '#f0fdf4',
+                    background: '#ecfdf5',
                     padding: '14px 16px',
                     borderRadius: '16px',
-                    border: '1.5px solid #bbf7d0',
+                    border: '1.5px solid #10b981',
                     transition: 'border-color 0.2s ease'
                   }}>
                     <input
@@ -1792,23 +1792,23 @@ Deine Vorteile auf einen Blick:
           ) : (
             <div style={{
               fontSize: '0.82rem',
-              color: '#15803d',
+              color: '#059669',
               fontWeight: 700,
               lineHeight: 1.5,
               textAlign: 'center',
-              background: '#f0fdf4',
+              background: '#ecfdf5',
               padding: '16px',
               borderRadius: '16px',
-              border: '1px solid #bbf7d0',
+              border: '1px solid #10b981',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               gap: '6px'
             }}>
-              <CheckCircle2 size={24} color="#15803d" />
+              <CheckCircle2 size={24} color="#10b981" />
               <div>
                 <strong>Zugang erfolgreich freigeschaltet!</strong><br />
-                <span style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600 }}>
                   Der Schülerausweis und alle App-Zugänge sind ab sofort aktiv. Deine 6-stellige Eltern-PIN ist sicher hinterlegt.
                 </span>
               </div>

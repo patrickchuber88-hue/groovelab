@@ -34,9 +34,9 @@ BEGIN
       SELECT COALESCE(first_name, 'Dein Schüler') INTO v_student_name 
       FROM public.users WHERE id = NEW.student_id;
 
-      -- Format date and time
+      -- Format date and time safely
       v_date_formatted := to_char(NEW.date, 'DD.MM.YYYY');
-      v_time_formatted := substring(COALESCE(NEW.start_time, '12:00') from 1 for 5);
+      v_time_formatted := to_char(COALESCE(NEW.start_time, '12:00'::time), 'HH24:MI');
 
       v_title := 'Termin bestätigt! 📅';
       v_body := COALESCE(v_student_name, 'Dein Schüler') || ' hat den Termin am ' || v_date_formatted || ' um ' || v_time_formatted || ' Uhr bestätigt.';

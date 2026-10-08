@@ -43,14 +43,21 @@ export function useStudentPracticeSession({
     isSessionPausedRef.current = isSessionPaused;
   }, [isSessionPaused]);
 
-  // Gyro Detox & flat orientation states
-  const [isPhoneFlat, setIsPhoneFlat] = useState(false);
+  // Gyro Detox, sensor & flat orientation states
+  const [isPhoneFlat, setIsPhoneFlat] = useState(true);
   const isPhoneFlatRef = useRef(isPhoneFlat);
   useEffect(() => {
     isPhoneFlatRef.current = isPhoneFlat;
   }, [isPhoneFlat]);
   const [flatType, setFlatType] = useState<'face-up' | 'face-down' | 'none'>('none');
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
+  const [sessionAbortedNotice, setSessionAbortedNotice] = useState<string | null>(null);
+
+  // Device & Sensor detection
+  const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isDeviceMovingRef = useRef(false);
+  const motionTimeoutRef = useRef<any>(null);
+  const notFlatGraceRef = useRef(0);
 
   // Focus logs state
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
@@ -89,11 +96,106 @@ export function useStudentPracticeSession({
     }
   }, []);
 
-  // Active Timer Loop (Stoppt zuverlässig, wenn pausiert)
+  // 🛡️ iOS Safari Sensor Permission Handler (muss im User-Gesture aufgerufen werden)
+  const requestOrientationPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return true;
+    if (typeof (DeviceOrientationEvent as any)?.requestPermission === 'function') {
+      try {
+        const state = await (DeviceOrientationEvent as any).requestPermission();
+        return state === 'granted';
+      } catch (err) {
+        console.warn('[OrientationPermission] iOS permission prompt error:', err);
+        return false;
+      }
+    }
+    return true;
+  }, []);
+
+  // 📱 Sensor-Listener Engine: Gyroscope & Accelerometer
+  useEffect(() => {
+    if (!sessionActive || typeof window === 'undefined') {
+      setIsPhoneFlat(true);
+      setFlatType('none');
+      notFlatGraceRef.current = 0;
+      return;
+    }
+
+    if (!isMobile || !('DeviceOrientationEvent' in window)) {
+      // Desktop / Laptop ohne Lagesensoren: Standardmäßig aktiv
+      setIsPhoneFlat(true);
+      setFlatType('face-up');
+      return;
+    }
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      const beta = e.beta;
+      const gamma = e.gamma;
+      if (beta === null || gamma === null) {
+        setIsPhoneFlat(true);
+        setFlatType('face-up');
+        return;
+      }
+
+      // Flat Face-Up: Display zeigt nach oben, Neigung beta & gamma < 22 Grad
+      const faceUp = Math.abs(beta) < 22 && Math.abs(gamma) < 22;
+      // Flat Face-Down: Display liegt flach auf dem Tisch (beta nahe 180/-180, gamma < 22)
+      const faceDown = Math.abs(Math.abs(beta) - 180) < 22 && Math.abs(gamma) < 22;
+
+      const isOrientedFlat = faceUp || faceDown;
+      setFlatType(faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none'));
+
+      const isStill = !isDeviceMovingRef.current;
+      const isTrulyFlat = isOrientedFlat && isStill;
+
+      setIsPhoneFlat(isTrulyFlat);
+    };
+
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const acc = e.acceleration || e.accelerationIncludingGravity;
+      if (!acc) return;
+      const x = acc.x || 0;
+      const y = acc.y || 0;
+      const z = (e.acceleration ? acc.z : 0) || 0;
+      const magnitude = Math.sqrt(x * x + y * y + z * z);
+
+      // Schwellenwert > 2.0 m/s^2: Handy wird in der Hand gehalten / bewegt
+      if (magnitude > 2.0) {
+        isDeviceMovingRef.current = true;
+        setIsPhoneFlat(false);
+
+        if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
+        motionTimeoutRef.current = setTimeout(() => {
+          isDeviceMovingRef.current = false;
+        }, 1500);
+      }
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation);
+    window.addEventListener('devicemotion', handleMotion);
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation);
+      window.removeEventListener('devicemotion', handleMotion);
+      if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
+    };
+  }, [sessionActive, isMobile]);
+
+  // Active Timer Loop (Pausiert nach 5s Nicht-Flachlage; stoppt zuverlässig bei Pause)
   useEffect(() => {
     let timer: any = null;
     if (sessionActive && !isSessionPaused) {
       timer = setInterval(() => {
+        // Anti-Cheat: Wenn Handy auf Mobile nicht flach auf dem Tisch liegt
+        if (isMobile && !isPhoneFlatRef.current) {
+          notFlatGraceRef.current += 1;
+          // Die ersten 5s sind Gnadenfrist (zum Ablegen). Danach zählt der Timer NICHT weiter!
+          if (notFlatGraceRef.current > 5) {
+            return;
+          }
+        } else {
+          notFlatGraceRef.current = 0;
+        }
+
         setSecondsElapsed(prev => prev + 1);
       }, 1000);
 
@@ -105,18 +207,29 @@ export function useStudentPracticeSession({
       if (timer) clearInterval(timer);
       releaseScreenWakeLock();
     };
-  }, [sessionActive, isSessionPaused, requestScreenWakeLock, releaseScreenWakeLock]);
+  }, [sessionActive, isSessionPaused, isMobile, requestScreenWakeLock, releaseScreenWakeLock]);
 
-  // 🛡️ Automatic WakeLock Release on Tab-Switch / VisibilityChange (TDDDG § 25 Compliance)
+  // 🛡️ 0,1% Goldstandard Anti-Cheat: Sofort-Abbruch bei Tab-Wechsel / App-Verlassen
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Tab im Hintergrund: Sofortige Akku- & Display-Entlastung
         releaseScreenWakeLock();
+        if (sessionActive) {
+          console.warn('[Anti-Cheat] Focus session immediately aborted due to tab switch/backgrounding.');
+          setSessionActive(false);
+          setSecondsElapsed(0);
+          setIsSessionPaused(false);
+          const notice = 'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt GrooveLab geöffnet! 🛑';
+          setSessionAbortedNotice(notice);
+          try {
+            window.dispatchEvent(new CustomEvent('campus_focus_session_aborted', {
+              detail: { reason: 'tab_switch', message: notice }
+            }));
+          } catch {}
+        }
       } else if (sessionActive && !isSessionPausedRef.current) {
-        // Tab wieder im Vordergrund: Nahtlose Wiederaufnahme des WakeLocks
         requestScreenWakeLock();
       }
     };
@@ -125,7 +238,7 @@ export function useStudentPracticeSession({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [sessionActive, requestScreenWakeLock, releaseScreenWakeLock]);
+  }, [sessionActive, releaseScreenWakeLock]);
 
   // Fetch Fokus Logs
   const fetchFokusLogs = useCallback(async () => {
@@ -133,7 +246,7 @@ export function useStudentPracticeSession({
     try {
       const { data, error } = await supabase
         .from('fokus_logs')
-        .select('id, user_id, duration_seconds, duration_minutes, is_extra, flame_level, created_at')
+        .select('id, user_id, duration_seconds, duration_minutes, is_extra, flame_level, xp_earned, created_at')
         .eq('user_id', studentId)
         .order('created_at', { ascending: false });
 
@@ -175,21 +288,51 @@ export function useStudentPracticeSession({
 
     try {
       const simNow = getSimulatedNow();
-      const { data: logData, error: logErr } = await supabase
-        .from('fokus_logs')
-        .insert({
-          user_id: studentId,
-          duration_seconds: elapsed,
-          duration_minutes: durationMinutes,
-          is_extra: false,
-          flame_level: 'Kleine Flamme',
-          created_at: simNow.toISOString()
-        })
-        .select()
-        .single();
+      let logData: any = null;
 
-      if (!logErr && logData) {
+      // 1. Primär: Autoritativer Server-RPC complete_focus_session (Migration 531)
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('complete_focus_session', {
+          p_student_id: studentId,
+          p_duration_seconds: elapsed,
+          p_metadata: {
+            device: isMobile ? 'mobile' : 'desktop',
+            completed_at: simNow.toISOString()
+          }
+        });
+        if (!rpcErr && rpcRes?.success && rpcRes?.log) {
+          logData = rpcRes.log;
+        }
+      } catch (_) {}
+
+      // 2. Fallback: Direkter Insert (durch Trigger trg_validate_fokus_log abgesichert)
+      if (!logData) {
+        const { data: insData, error: logErr } = await supabase
+          .from('fokus_logs')
+          .insert({
+            user_id: studentId,
+            duration_seconds: elapsed,
+            duration_minutes: durationMinutes,
+            is_extra: false,
+            flame_level: durationMinutes >= 30 ? 'Große Flamme' : durationMinutes >= 15 ? 'Mittlere Flamme' : 'Kleine Flamme',
+            xp_earned: xpGained,
+            created_at: simNow.toISOString()
+          })
+          .select()
+          .single();
+
+        if (!logErr && insData) {
+          logData = insData;
+        }
+      }
+
+      if (logData) {
         setFokusLogs(prev => [logData, ...prev]);
+        if (typeof window !== 'undefined' && xpGained > 0) {
+          window.dispatchEvent(new CustomEvent('campus-xp-awarded', {
+            detail: { studentId, amount: xpGained }
+          }));
+        }
       }
 
       const currentStreak = avatar?.streak_flame || 0;
@@ -457,6 +600,9 @@ export function useStudentPracticeSession({
     isPhoneFlat,
     flatType,
     graceSecondsLeft,
+    sessionAbortedNotice,
+    setSessionAbortedNotice,
+    requestOrientationPermission,
     fokusLogs,
     setFokusLogs,
     monthlyFocusMinutes,

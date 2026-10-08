@@ -289,14 +289,14 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     }
                   }}
                   style={{
-                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                    border: '1.5px solid #86efac',
+                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                    border: '1.5px solid #10b981',
                     borderRadius: '24px',
                     padding: isMobile ? '12px 14px' : '16px 18px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '14px',
-                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.14)',
+                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.20)',
                     cursor: 'pointer',
                     position: 'relative',
                     overflow: 'hidden',
@@ -312,8 +312,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     height: isMobile ? '60px' : '68px',
                     borderRadius: '18px',
                     background: '#0a0e1a',
-                    border: '2px solid #34a853',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)',
+                    border: '2px solid #10b981',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -358,17 +358,18 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <span style={{
-                        background: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         color: '#ffffff',
                         fontSize: '0.62rem',
                         fontWeight: 950,
                         padding: '2px 8px',
                         borderRadius: '100px',
-                        letterSpacing: '0.04em'
+                        letterSpacing: '0.04em',
+                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                       }}>
                         CAMPUS-RANG 🎒
                       </span>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#15803d' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#059669' }}>
                         ★ Im Album
                       </span>
                     </div>
@@ -403,9 +404,9 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         setJuniorStickerCategory('schuljahr');
                       }}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.85)',
-                        border: '1px solid #86efac',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: '#ffffff',
                         borderRadius: '100px',
                         padding: '4px 10px',
                         fontSize: '0.68rem',
@@ -413,12 +414,13 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                       }}
                       className="hover-scale"
                     >
                       <span>Chronik aller 15 Jahre</span>
-                      <ChevronRight size={12} strokeWidth={3} />
+                      <ChevronRight size={12} strokeWidth={3} color="#ffffff" />
                     </button>
                   </div>
                 </div>
@@ -524,7 +526,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                       alignItems: 'center',
                       justifyContent: 'center',
                       boxShadow: '0 2px 6px rgba(217, 119, 6, 0.4)',
-                      border: '1.5px solid #ffffff'
+                      border: 'none'
                     }}>
                       <Lock size={10} color="#ffffff" strokeWidth={2.8} />
                     </div>
@@ -711,7 +713,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         border: isCurrent
                           ? '2.5px solid #10b981'
                           : isUnlocked 
-                          ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #86efac') 
+                          ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #10b981') 
                           : '1.5px dashed #cbd5e1',
                         borderRadius: '20px',
                         padding: isMobile ? '10px 8px' : '12px 10px',
@@ -841,7 +843,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: '0 2px 6px rgba(217, 119, 6, 0.4)',
-                            border: '1.5px solid #ffffff'
+                            border: 'none'
                           }}>
                             <Lock size={10} color="#ffffff" strokeWidth={2.8} />
                           </div>
@@ -859,7 +861,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: '0 2px 6px rgba(16, 185, 129, 0.45)',
-                            border: '1.5px solid #ffffff'
+                            border: 'none'
                           }}>
                             <Check size={11} strokeWidth={3} color="#ffffff" />
                           </div>
@@ -886,13 +888,14 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '3px',
-                            background: '#dcfce7',
-                            color: '#15803d',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: '#ffffff',
                             fontSize: '0.62rem',
                             fontWeight: 950,
                             padding: '2px 8px',
                             borderRadius: '100px',
-                            border: '1px solid #bbf7d0'
+                            border: 'none',
+                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                           }}>
                             ✓ Gemeistert
                           </span>
@@ -957,13 +960,14 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         </div>
 
                         <span style={{
-                          background: isCatComplete ? '#dcfce7' : '#f1f5f9',
-                          border: isCatComplete ? '1px solid #86efac' : '1px solid #e2e8f0',
-                          color: isCatComplete ? '#15803d' : '#64748b',
+                          background: isCatComplete ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                          border: isCatComplete ? 'none' : '1px solid #e2e8f0',
+                          color: isCatComplete ? '#ffffff' : '#64748b',
                           fontSize: '0.66rem',
                           fontWeight: 900,
                           padding: '2px 8px',
-                          borderRadius: '10px'
+                          borderRadius: '10px',
+                          boxShadow: isCatComplete ? '0 2px 6px rgba(16, 185, 129, 0.25)' : 'none'
                         }}>
                           {catUnlockedCount} / {categoryStickers.length} {isCatComplete ? '✓' : ''}
                         </span>
@@ -991,7 +995,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             ? 'rgba(192, 132, 252, 0.4)' 
                             : isRare 
                             ? 'rgba(96, 165, 250, 0.35)' 
-                            : 'rgba(52, 168, 83, 0.35)';
+                            : 'rgba(16, 185, 129, 0.35)';
 
                           return (
                             <div
@@ -1008,7 +1012,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                               style={{
                                 background: isUnlocked ? '#ffffff' : '#f8fafc',
                                 border: isUnlocked 
-                                  ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #86efac') 
+                                  ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #10b981') 
                                   : '1.5px dashed #cbd5e1',
                                 borderRadius: '20px',
                                 padding: isMobile ? '10px 8px' : '12px 10px',
@@ -1116,7 +1120,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     boxShadow: '0 2px 6px rgba(217, 119, 6, 0.4)',
-                                    border: '1.5px solid #ffffff'
+                                    border: 'none'
                                   }}>
                                     <Lock size={10} color="#ffffff" strokeWidth={2.8} />
                                   </div>
@@ -1134,7 +1138,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     boxShadow: '0 2px 6px rgba(16, 185, 129, 0.45)',
-                                    border: '1.5px solid #ffffff'
+                                    border: 'none'
                                   }}>
                                     <Check size={11} strokeWidth={3} color="#ffffff" />
                                   </div>
@@ -1161,13 +1165,14 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '3px',
-                                    background: '#dcfce7',
-                                    color: '#15803d',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: '#ffffff',
                                     fontSize: '0.62rem',
                                     fontWeight: 950,
                                     padding: '2px 8px',
                                     borderRadius: '100px',
-                                    border: '1px solid #bbf7d0'
+                                    border: 'none',
+                                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                                   }}>
                                     ★ Im Album!
                                   </span>

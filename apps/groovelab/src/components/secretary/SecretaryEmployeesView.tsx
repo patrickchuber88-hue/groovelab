@@ -150,7 +150,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                           fontWeight: 800,
                           background: '#ecfdf5',
                           color: '#065f46',
-                          border: '1.5px solid #86efac',
+                          border: '1.5px solid #10b981',
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
                           boxShadow: '0 2px 6px rgba(16,185,129,0.08)',

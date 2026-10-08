@@ -1170,9 +1170,9 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             {isListening && detectedPitch !== null ? (
               isInTune ? (
                 <div style={{
-                  background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                  border: '1.5px solid #86efac',
-                  color: '#15803d',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  color: '#ffffff',
                   padding: '7px 20px',
                   borderRadius: '99px',
                   fontSize: '0.92rem',
@@ -1180,7 +1180,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 16px rgba(34, 197, 94, 0.25)'
+                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
                 }}>
                   <Check size={18} strokeWidth={3} />
                   <span>Perfekt gestimmt! (±0 ct)</span>

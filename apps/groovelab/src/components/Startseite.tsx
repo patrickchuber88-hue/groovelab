@@ -802,7 +802,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
         .footer-link-b2b:hover {
           background: rgba(52, 168, 83, 0.22);
           border-color: rgba(52, 168, 83, 0.55);
-          color: #86efac;
+          color: #34d399;
           transform: translateY(-1px);
           box-shadow: 0 4px 14px rgba(52, 168, 83, 0.25);
         }

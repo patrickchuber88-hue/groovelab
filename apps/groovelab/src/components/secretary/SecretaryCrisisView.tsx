@@ -292,9 +292,9 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                 <span style={{
                   fontSize: '0.72rem',
                   fontWeight: 800,
-                  background: matchingToken.status === 'FULLY_REDEEMED' ? '#dcfce7' : '#eff6ff',
-                  color: matchingToken.status === 'FULLY_REDEEMED' ? '#15803d' : '#1d4ed8',
-                  border: matchingToken.status === 'FULLY_REDEEMED' ? '1px solid #86efac' : '1px solid #bfdbfe',
+                  background: matchingToken.status === 'FULLY_REDEEMED' ? '#ecfdf5' : '#eff6ff',
+                  color: matchingToken.status === 'FULLY_REDEEMED' ? '#059669' : '#1d4ed8',
+                  border: matchingToken.status === 'FULLY_REDEEMED' ? '1px solid #10b981' : '1px solid #bfdbfe',
                   padding: '2px 8px',
                   borderRadius: '100px',
                   display: 'flex',

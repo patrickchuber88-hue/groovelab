@@ -167,8 +167,8 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             />
             <defs>
               <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={studentUiLevel === 'pro' ? "#16a34a" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
-                <stop offset="100%" stopColor={studentUiLevel === 'pro' ? "#22c55e" : studentUiLevel === 'teen' ? "#f59e0b" : "#22c55e"} />
+                <stop offset="0%" stopColor={studentUiLevel === 'pro' ? "#10b981" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
+                <stop offset="100%" stopColor={studentUiLevel === 'pro' ? "#059669" : studentUiLevel === 'teen' ? "#f59e0b" : "#22c55e"} />
               </linearGradient>
             </defs>
           </svg>
@@ -186,9 +186,9 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             {studentUiLevel === 'pro' ? (
               <CheckCircle
                 size={32}
-                color="#16a34a"
+                color="#10b981"
                 style={{
-                  filter: 'drop-shadow(0 2px 8px rgba(22, 163, 74, 0.35))'
+                  filter: 'drop-shadow(0 2px 8px rgba(16, 185, 129, 0.35))'
                 }}
               />
             ) : (
@@ -211,7 +211,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             <span style={{ 
               fontSize: '0.72rem', 
               fontWeight: 900, 
-              color: studentUiLevel === 'pro' ? '#16a34a' : studentUiLevel === 'teen' ? '#f59e0b' : '#ea580c', 
+              color: studentUiLevel === 'pro' ? '#10b981' : studentUiLevel === 'teen' ? '#f59e0b' : '#ea580c', 
               textTransform: 'uppercase', 
               letterSpacing: '0.06em', 
               marginTop: '2px' 
@@ -258,7 +258,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             gap: '4px',
             boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
           }}>
-            <Timer size={18} color={studentUiLevel === 'pro' ? "#16a34a" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
+            <Timer size={18} color={studentUiLevel === 'pro' ? "#10b981" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
             <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1 }}>
               {formatSecs(exactSecs)}
             </span>
@@ -270,12 +270,12 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
           {/* Pill 2: XP / Erfahrung */}
           <div style={{
             background: studentUiLevel === 'pro'
-              ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
+              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
               : studentUiLevel === 'teen'
               ? 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)'
               : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
             border: studentUiLevel === 'pro'
-              ? '1px solid #86efac'
+              ? 'none'
               : studentUiLevel === 'teen'
               ? '1px solid #99f6e4'
               : '1px solid #bae6fd',
@@ -286,13 +286,13 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             alignItems: 'center',
             justifyContent: 'center',
             gap: '4px',
-            boxShadow: studentUiLevel === 'pro' ? '0 2px 6px rgba(22, 163, 74, 0.08)' : '0 2px 6px rgba(2, 132, 199, 0.06)'
+            boxShadow: studentUiLevel === 'pro' ? '0 4px 14px rgba(16, 185, 129, 0.28)' : '0 2px 6px rgba(2, 132, 199, 0.06)'
           }}>
-            <Zap size={18} color={studentUiLevel === 'pro' ? "#16a34a" : studentUiLevel === 'teen' ? "#0d9488" : "#0284c7"} />
+            <Zap size={18} color={studentUiLevel === 'pro' ? "#ffffff" : studentUiLevel === 'teen' ? "#0d9488" : "#0284c7"} />
             <span style={{ 
               fontSize: '0.88rem', 
               fontWeight: 900, 
-              color: studentUiLevel === 'pro' ? '#15803d' : studentUiLevel === 'teen' ? '#0d9488' : '#0284c7', 
+              color: studentUiLevel === 'pro' ? '#ffffff' : studentUiLevel === 'teen' ? '#0d9488' : '#0284c7', 
               lineHeight: 1.1 
             }}>
               {exactSecs < 60 
@@ -302,7 +302,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             <span style={{ 
               fontSize: '0.72rem', 
               fontWeight: 800, 
-              color: studentUiLevel === 'pro' ? '#16a34a' : studentUiLevel === 'teen' ? '#0f766e' : '#0369a1', 
+              color: studentUiLevel === 'pro' ? 'rgba(255, 255, 255, 0.90)' : studentUiLevel === 'teen' ? '#0f766e' : '#0369a1', 
               textTransform: 'uppercase', 
               letterSpacing: '0.04em' 
             }}>
@@ -314,8 +314,8 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
 
           {/* Pill 3: Ziel & Ø-Schnitt */}
           <div style={{
-            background: isGoalReached ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-            border: isGoalReached ? '1px solid #86efac' : '1px solid #fde047',
+            background: isGoalReached ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+            border: isGoalReached ? 'none' : '1px solid #fde047',
             borderRadius: '20px',
             padding: '13px 6px',
             display: 'flex',
@@ -323,13 +323,13 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             alignItems: 'center',
             justifyContent: 'center',
             gap: '4px',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+            boxShadow: isGoalReached ? '0 4px 14px rgba(16, 185, 129, 0.28)' : '0 2px 6px rgba(0, 0, 0, 0.02)'
           }}>
-            <Target size={18} color={isGoalReached ? "#15803d" : "#ca8a04"} />
-            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: isGoalReached ? '#15803d' : '#854d0e', lineHeight: 1.1 }}>
+            <Target size={18} color={isGoalReached ? "#ffffff" : "#ca8a04"} />
+            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: isGoalReached ? '#ffffff' : '#854d0e', lineHeight: 1.1 }}>
               {isGoalReached ? 'Ziel erreicht!' : `Noch ${formatSecs(remainingSecs)}`}
             </span>
-            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isGoalReached ? '#166534' : '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isGoalReached ? 'rgba(255, 255, 255, 0.90)' : '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
               Ø {personalAverageMinutes}m • {targetMins}m Ziel
             </span>
           </div>
@@ -384,7 +384,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
           style={{
             width: '100%',
             background: studentUiLevel === 'pro'
-              ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
               : studentUiLevel === 'teen'
               ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)'
               : 'linear-gradient(135deg, #34a853 0%, #22c55e 100%)',
@@ -397,7 +397,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             letterSpacing: '-0.01em',
             cursor: 'pointer',
             boxShadow: studentUiLevel === 'pro'
-              ? 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(22, 163, 74, 0.4)'
+              ? 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(16, 185, 129, 0.4)'
               : studentUiLevel === 'teen'
               ? 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(13, 148, 136, 0.4)'
               : 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(52, 168, 83, 0.4)',

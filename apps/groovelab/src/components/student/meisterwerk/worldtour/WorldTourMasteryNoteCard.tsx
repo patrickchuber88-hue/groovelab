@@ -103,11 +103,12 @@ export const WorldTourMasteryNoteCard: React.FC<WorldTourMasteryNoteCardProps> =
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '3px',
-                    background: '#dcfce7',
-                    color: '#15803d',
-                    border: '1px solid #86efac',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.28)',
                     borderRadius: '6px',
-                    padding: '1px 6px',
+                    padding: '2px 8px',
                     fontWeight: 800
                   }}
                 >

@@ -18,8 +18,8 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
     return (
       <section
         style={{
-          background: hasConsent ? '#f0fdf4' : '#f8fafc',
-          border: hasConsent ? '1.5px solid #bbf7d0' : '1.5px solid #e2e8f0',
+          background: hasConsent ? '#ecfdf5' : '#f8fafc',
+          border: hasConsent ? '1.5px solid #10b981' : '1.5px solid #e2e8f0',
           borderRadius: '18px',
           padding: '16px 20px',
           display: 'flex',
@@ -32,17 +32,17 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
             width: '36px',
             height: '36px',
             borderRadius: '12px',
-            background: hasConsent ? '#dcfce7' : '#f1f5f9',
+            background: hasConsent ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0
           }}
         >
-          <ShieldCheck size={20} color={hasConsent ? '#16a34a' : '#64748b'} />
+          <ShieldCheck size={20} color={hasConsent ? '#ffffff' : '#64748b'} />
         </div>
         <div>
-          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: hasConsent ? '#15803d' : '#334155' }}>
+          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: hasConsent ? '#059669' : '#334155' }}>
             {hasConsent
               ? 'Eltern-Einwilligung (DSGVO Art. 8) verifiziert'
               : 'Schulvertragliche Basis-Erfassung aktiv'}
@@ -86,8 +86,8 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div
             style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              background: '#ecfdf5',
+              border: '1px solid #10b981',
               padding: '14px 16px',
               borderRadius: '16px',
               display: 'flex',
@@ -98,8 +98,8 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
             }}
           >
             <div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#059669', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
                 Eltern-Einwilligung Erteilt &amp; Verifiziert
               </div>
               <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '4px', fontWeight: 600 }}>
@@ -109,8 +109,8 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
             <span
               style={{
                 background: '#ffffff',
-                color: '#15803d',
-                border: '1px solid #86efac',
+                color: '#059669',
+                border: '1px solid #10b981',
                 padding: '4px 12px',
                 borderRadius: '12px',
                 fontSize: '0.7rem',
@@ -127,13 +127,13 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
               🔒 Elterliche Rechte-Konfiguration (DSGVO Art. 8 - Campus-Modul):
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-              <div style={{ fontSize: '0.72rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                <span style={{ color: '#22c55e', fontWeight: 800 }}>✓</span>
+              <div style={{ fontSize: '0.72rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', padding: '4px 8px', borderRadius: '8px', border: '1px solid #10b981' }}>
+                <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span>
                 <span>Direktnachrichten &amp; Lehrer-Chat <strong>(Inklusive)</strong></span>
               </div>
 
-              <div style={{ fontSize: '0.72rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                <span style={{ color: '#22c55e', fontWeight: 800 }}>✓</span>
+              <div style={{ fontSize: '0.72rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', padding: '4px 8px', borderRadius: '8px', border: '1px solid #10b981' }}>
+                <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span>
                 <span>Digitales Hausaufgabenheft <strong>(Inklusive)</strong></span>
               </div>
 

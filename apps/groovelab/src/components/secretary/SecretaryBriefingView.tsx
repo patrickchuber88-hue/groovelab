@@ -394,25 +394,25 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                     return (
                       <div style={{
-                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                        border: '1.5px solid #86efac',
+                        background: '#ecfdf5',
+                        border: '1.5px solid #10b981',
                         borderRadius: '24px',
                         padding: '20px 24px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: '16px',
-                        boxShadow: '0 10px 25px -5px rgba(34, 197, 94, 0.12)'
+                        boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.12)'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                           <div style={{
-                            background: '#dcfce7',
+                            background: '#ffffff',
                             borderRadius: '16px',
                             padding: '12px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            border: '1px solid #86efac'
+                            border: '1px solid #10b981'
                           }}>
                             <span style={{ fontSize: '1.5rem' }}>⏳</span>
                           </div>
@@ -821,7 +821,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
                       padding: '16px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
@@ -845,7 +845,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
                       padding: '16px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
@@ -867,7 +867,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
                       padding: '16px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(0, 0, 0, 0.08)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
@@ -893,7 +893,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
                       padding: '16px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle Heute</span>
@@ -1626,9 +1626,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                                         {isResolved && (
                                           <span style={{
-                                            background: '#dcfce7',
-                                            color: '#15803d',
-                                            border: '1px solid #86efac',
+                                            background: '#ecfdf5',
+                                            color: '#059669',
+                                            border: '1px solid #10b981',
                                             borderRadius: '5px',
                                             padding: '1px 6px',
                                             fontSize: '0.66rem',
@@ -1750,7 +1750,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
                             System-Kollisionsprüfer
                           </h3>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             Automatisierte Überschneidungskontrolle
                           </span>
                         </div>
@@ -2021,7 +2021,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                             Stundenplaneinreichungen
                           </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                             Zu prüfende Stundenpläne ({pendingSchedules.length})
                           </span>
                         </div>

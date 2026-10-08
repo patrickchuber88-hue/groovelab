@@ -411,9 +411,9 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
             onClick={onQuickQr}
             aria-label="Ausweis-QR für Schüler-Handy anzeigen"
             style={{
-              background: '#f0fdf4',
-              color: '#15803d',
-              border: '1.5px solid #86efac',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: 'none',
               borderRadius: '14px',
               padding: '8px 14px',
               fontSize: '0.78rem',
@@ -423,7 +423,7 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.15s',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)'
             }}
             className="hover-scale"
             title="Ausweis-QR für Schüler-Handy vorzeigen"

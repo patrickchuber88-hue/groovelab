@@ -40,6 +40,9 @@ async function runForensicScrubberDrill() {
     // Ephemeral Student Data (MUST BE PURGED)
     'campus_junior_recordings_student_1': 'base64audioblob...',
     'campus_homework_notes_student_1': '{"notes":"Practiced Etude No. 2"}',
+    'campus_student_question_student_1': '{"question":"Wie greife ich F-Dur?"}',
+    'campus_student_question_draft_student_1': 'Entwurf für Frage...',
+    'unwhitelisted_future_plugin_cache': 'sensitive-plugin-token',
     'groovelab_student_active_loop': 'loop-track-4',
     'cg_mediathek_cache_song_45': '{"audio":"cached-bytes"}',
     'campus_schedule_cache_weekly': '{"schedule":"all-lessons"}',

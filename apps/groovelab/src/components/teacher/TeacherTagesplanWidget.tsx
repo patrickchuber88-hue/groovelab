@@ -157,9 +157,9 @@ export const TeacherTourDemoSchedule: React.FC<TeacherTourDemoScheduleProps> = (
           <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '3px solid #34a853', background: '#ffffff', margin: '0 3px', flexShrink: 0, boxShadow: '0 0 0 3px #ffffff' }} />
           <div style={{
             flex: 1,
-            background: '#f0fdf4',
-            border: '1.5px solid #bbf7d0',
-            borderLeft: '5px solid #34a853',
+            background: '#ecfdf5',
+            border: '1.5px solid #10b981',
+            borderLeft: '5px solid #10b981',
             borderRadius: '16px',
             padding: windowWidth < 768 ? '10px 14px' : '12px 18px',
             display: 'flex',
@@ -834,9 +834,9 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 fontWeight: 800,
                 padding: '4px 12px',
                 borderRadius: '100px',
-                background: isWeekend ? '#ede9fe' : isFreeDay ? '#dcfce7' : '#e8f0fe',
-                color: isWeekend ? '#6d28d9' : isFreeDay ? '#15803d' : '#0b57d0',
-                border: isWeekend ? '1px solid #ddd6fe' : isFreeDay ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(11, 87, 208, 0.15)',
+                background: isWeekend ? '#ede9fe' : isFreeDay ? '#ecfdf5' : '#e8f0fe',
+                color: isWeekend ? '#6d28d9' : isFreeDay ? '#059669' : '#0b57d0',
+                border: isWeekend ? '1px solid #ddd6fe' : isFreeDay ? '1px solid #10b981' : '1px solid rgba(11, 87, 208, 0.15)',
                 fontFamily: 'Inter',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1085,7 +1085,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                        s.status === 'pending_reschedule' || 
                        s.isRescheduledPending === true
                      );
-                    const isRescheduledConfirmed = !isRescheduledPending && activeSlots.every((s: any) => s.status === 'rescheduled_confirmed');
+                    const isRescheduledConfirmed = !isRescheduledPending && activeSlots.some((s: any) => 
+                      s.status === 'rescheduled_confirmed' || 
+                      (s.student_acknowledged === true && Boolean(s.original_date || s.original_start_time || s.is_moved))
+                    );
                     const isResetPending = activeSlots.some((s: any) => s.status === 'scheduled' && s.original_date && s.date && String(s.original_date) !== String(s.date) && s.student_acknowledged === false);
                     const isResetAcknowledged = !isResetPending && activeSlots.every((s: any) => s.status === 'scheduled' && s.original_date && s.date && String(s.original_date) !== String(s.date) && s.student_acknowledged === true);
                     const isBirthday = !slot.isGroup && slot.student && isStudentBirthdayToday(slot.student);
@@ -1209,38 +1212,27 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                       );
                     } else if (isRescheduledPending) {
                       slotBg = '#ffffff';
-                      slotBorder = '1.5px solid #fef3c7';
-                      slotBorderLeft = '5px solid #fbbc05';
+                      slotBorder = '1.5px dashed #f59e0b';
+                      slotBorderLeft = '5px solid #f59e0b';
                       titleColor = '#8e8e93';
                       dotComponent = isCurrentSlot ? (
-                        <div style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          border: '3px solid #fbbc05',
-                          background: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxSizing: 'border-box',
-                          animation: 'pulse 1.5s infinite'
-                        }}>
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: '#fbbc05'
-                          }} />
+                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '3px solid #f59e0b', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', animation: 'pulse 1.5s infinite' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }} />
                         </div>
                       ) : (
-                        <div style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          border: '3px solid #fbbc05',
-                          background: isFinished ? '#fbbc05' : '#ffffff',
-                          boxSizing: 'border-box'
-                        }} />
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '3px solid #f59e0b', background: isFinished ? '#f59e0b' : '#ffffff', boxSizing: 'border-box' }} />
+                      );
+                    } else if (isRescheduledConfirmed) {
+                      slotBg = '#fffbeb';
+                      slotBorder = '1.5px solid #fde68a';
+                      slotBorderLeft = '5px solid #eab308';
+                      titleColor = '#854d0e';
+                      dotComponent = isCurrentSlot ? (
+                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '3px solid #eab308', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', animation: 'pulse 1.5s infinite' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} />
+                        </div>
+                      ) : (
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '3px solid #eab308', background: isFinished ? '#eab308' : '#ffffff', boxSizing: 'border-box' }} />
                       );
                     } else {
                       slotBg = '#ffffff';
@@ -1534,7 +1526,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                               fontWeight: 850, 
                                               fontSize: '0.68rem', 
                                               background: '#facc15', 
-                                              border: '1px solid #000000',
+                                              border: 'none',
                                               padding: '2px 8px', 
                                               borderRadius: '6px', 
                                               fontFamily: 'Inter',
@@ -1547,11 +1539,11 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                             </span>
                                           ) : urgentItem?.teacher_contact_status === 'reached' ? (
                                             <span style={{ 
-                                              color: '#15803d', 
+                                              color: '#ffffff', 
                                               fontWeight: 800, 
                                               fontSize: '0.68rem', 
-                                              background: '#dcfce7', 
-                                              border: '1px solid #bbf7d0',
+                                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                                              border: 'none',
                                               padding: '2px 8px', 
                                               borderRadius: '6px', 
                                               fontFamily: 'Inter',
@@ -1646,11 +1638,11 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                                 }}
                                                 title="Gutschrift / Nachhol-Kontingent für diesen Termin einlösen"
                                                 style={{
-                                                  color: '#15803d',
+                                                  color: '#ffffff',
                                                   fontWeight: 850,
                                                   fontSize: '0.68rem',
-                                                  background: '#dcfce7',
-                                                  border: '1px solid #86efac',
+                                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                                  border: 'none',
                                                   padding: '2px 8px',
                                                   borderRadius: '6px',
                                                   fontFamily: 'Inter',
@@ -1701,9 +1693,9 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                           <span 
                                             title={`Dieser Termin wurde um +${slot.makeup_extension_minutes} Min. aus einem Nachhol-Kontingent verlängert`}
                                             style={{
-                                              color: '#15803d',
-                                              background: '#dcfce7',
-                                              border: '1px solid #86efac',
+                                              color: '#059669',
+                                              background: '#ecfdf5',
+                                              border: '1px solid #10b981',
                                               padding: '2px 8px',
                                               borderRadius: '6px',
                                               fontSize: '0.68rem',
@@ -1905,7 +1897,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                               height: '7px',
                                               borderRadius: '50%',
                                               background: '#eab308',
-                                              border: '1.5px solid #ffffff',
+                                              border: 'none',
                                               animation: 'pulse 1.5s infinite',
                                               boxShadow: '0 0 6px rgba(234, 179, 8, 0.6)'
                                             }} 
@@ -1971,7 +1963,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                           fontWeight: 850, 
                                           fontSize: '0.68rem', 
                                           background: '#facc15', 
-                                          border: '1px solid #000000',
+                                          border: 'none',
                                           padding: '2px 8px', 
                                           borderRadius: '6px', 
                                           fontFamily: 'Inter',
@@ -1984,11 +1976,11 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                         </span>
                                       ) : urgentItem?.teacher_contact_status === 'reached' ? (
                                         <span style={{ 
-                                          color: '#15803d', 
+                                          color: '#ffffff', 
                                           fontWeight: 800, 
                                           fontSize: '0.68rem', 
-                                          background: '#dcfce7', 
-                                          border: '1px solid #bbf7d0',
+                                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                                          border: 'none',
                                           padding: '2px 8px', 
                                           borderRadius: '6px', 
                                           fontFamily: 'Inter',
@@ -2083,11 +2075,11 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                             }}
                                             title="Gutschrift / Nachhol-Kontingent für diesen Termin einlösen"
                                             style={{
-                                              color: '#15803d',
+                                              color: '#ffffff',
                                               fontWeight: 850,
                                               fontSize: '0.68rem',
-                                              background: '#dcfce7',
-                                              border: '1px solid #86efac',
+                                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                              border: 'none',
                                               padding: '2px 8px',
                                               borderRadius: '6px',
                                               fontFamily: 'Inter',
@@ -2138,9 +2130,9 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                       <span 
                                         title={`Dieser Termin wurde um +${slot.makeup_extension_minutes} Min. aus einem Nachhol-Kontingent verlängert`}
                                         style={{
-                                          color: '#15803d',
-                                          background: '#dcfce7',
-                                          border: '1px solid #86efac',
+                                          color: '#059669',
+                                          background: '#ecfdf5',
+                                          border: '1px solid #10b981',
                                           padding: '2px 8px',
                                           borderRadius: '6px',
                                           fontSize: '0.68rem',
@@ -2179,25 +2171,19 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                 {!slot.isGroup && isRescheduledPending && (
                                   <span 
                                     title="Terminverschiebung ausstehend (noch nicht bestätigt)"
-                                    style={{
-                                      background: '#fef3c7',
-                                      color: '#b45309',
-                                      border: '1px solid #fde68a',
-                                      padding: '2px 8px',
-                                      borderRadius: '100px',
-                                      fontSize: '0.68rem',
-                                      fontWeight: 750,
-                                      fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      marginLeft: 'auto',
-                                      boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)',
-                                      letterSpacing: '0.01em'
-                                    }}
+                                    style={{ background: '#fef3c7', color: '#b45309', border: '1px dashed #f59e0b', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 750, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)', letterSpacing: '0.01em' }}
                                   >
                                     <Clock size={11} strokeWidth={2.5} color="#b45309" />
                                     <span>Unbestätigt</span>
+                                  </span>
+                                )}
+                                {!slot.isGroup && isRescheduledConfirmed && (
+                                  <span 
+                                    title="Terminverschiebung vom Schüler bestätigt"
+                                    style={{ background: '#fef3c7', color: '#854d0e', border: '1.5px solid #eab308', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)', letterSpacing: '0.01em' }}
+                                  >
+                                    <Check size={11} strokeWidth={2.8} color="#854d0e" />
+                                    <span>Bestätigt</span>
                                   </span>
                                 )}
                               </div>

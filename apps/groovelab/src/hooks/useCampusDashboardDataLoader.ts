@@ -221,24 +221,27 @@ export function useCampusDashboardDataLoader({
             avatar_url: '/campus_login_hero.png',
             schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
           };
-        } else if (userId === '15102f5e-c504-4c33-93ab-436285197c8c' || userId === '44444444-4444-4444-4444-444444444444' || (sessionStorage.getItem('groovelab_active_workspace') === 'student' && (!userId || userId.startsWith('15102f5e') || userId.startsWith('4444')))) {
+        } else if (sessionStorage.getItem('groovelab_active_workspace') === 'student' || userId === '15102f5e-c504-4c33-93ab-436285197c8c' || userId === '44444444-4444-4444-4444-444444444444') {
+          const famRaw = typeof window !== 'undefined' ? (localStorage.getItem('campus_family_profiles') || '[]') : '[]';
+          let sib: any = null;
+          try { sib = JSON.parse(famRaw).find((p: any) => p.id === userId); } catch {}
           const storedLevel = typeof window !== 'undefined'
-            ? (localStorage.getItem(`campus_student_ui_level_${userId || '15102f5e-c504-4c33-93ab-436285197c8c'}`) || localStorage.getItem('campus_student_ui_level') || 'junior')
-            : 'junior';
+            ? (localStorage.getItem(`campus_student_ui_level_${userId || '15102f5e-c504-4c33-93ab-436285197c8c'}`) || localStorage.getItem('campus_student_ui_level') || sib?.campus_ui_level || 'junior')
+            : (sib?.campus_ui_level || 'junior');
           userData = {
-            id: userId || '15102f5e-c504-4c33-93ab-436285197c8c',
-            first_name: 'Linus',
-            last_name: 'K.',
+            id: userId || sib?.id || '15102f5e-c504-4c33-93ab-436285197c8c',
+            first_name: sib?.first_name || 'Linus',
+            last_name: sib?.last_name || 'K.',
             role: 'student',
             roles: ['student'],
-            school_id: targetSchoolId,
+            school_id: sib?.school_id || targetSchoolId,
             is_campus_active: true,
             is_groovelab_active: true,
             campus_ui_level: storedLevel,
-            photo_url: '/campus_login_hero.png',
-            avatar_url: '/campus_login_hero.png',
-            instrument: 'Gitarre',
-            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
+            photo_url: sib?.photo_url || '/campus_login_hero.png',
+            avatar_url: sib?.photo_url || '/campus_login_hero.png',
+            instrument: sib?.instrument || 'Gitarre',
+            schools: sib?.schools || { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
           };
         } else if (userId === '11079eae-664a-49a4-8692-771d83a3193c' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '99999999-9999-9999-9999-999999999999' || (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' && (!userId || userId.startsWith('11079eae') || userId.startsWith('98b6a599') || userId.startsWith('9999')))) {
           userData = {

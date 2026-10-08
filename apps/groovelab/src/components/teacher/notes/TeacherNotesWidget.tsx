@@ -19,8 +19,7 @@ import {
   Zap
 } from 'lucide-react';
 import { UserNote, maskStudentName } from '../../../services/notesService';
-import { useVoiceToText } from '../../../hooks/useVoiceToText';
-import { capitalizeFirstLetter } from '../../../utils/nameHelper';
+import { useDictationInput } from '../../../hooks/useVoiceToText';
 
 export interface TeacherNotesWidgetProps {
   user: any;
@@ -110,32 +109,18 @@ export const TeacherNotesWidget: React.FC<TeacherNotesWidgetProps> = ({
   const [isSubmittingNote, setIsSubmittingNote] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Dictation for main note input
+  // 🎙️ 0.1% Goldstandard Dictation for main note input (Silence Auto-Stop & Zero Duplication)
   const {
     isListening: isNoteListening,
-    transcript: noteTranscript,
-    startListening: startNoteListening,
+    toggleListening: toggleNoteDictation,
     stopListening: stopNoteListening,
     isSupported: isSpeechSupported
-  } = useVoiceToText();
-
-  useEffect(() => {
-    if (noteTranscript) {
-      setInputText(prev => {
-        const clean = prev.trim();
-        const addition = capitalizeFirstLetter(noteTranscript);
-        return clean ? `${clean} ${addition}` : addition;
-      });
-    }
-  }, [noteTranscript]);
-
-  const toggleNoteDictation = () => {
-    if (isNoteListening) {
-      stopNoteListening();
-    } else {
-      startNoteListening();
-    }
-  };
+  } = useDictationInput({
+    value: inputText,
+    onChange: setInputText,
+    autoStopOnSilence: true,
+    silenceTimeoutMs: 2000
+  });
 
   // Student display info
   const studentFirstName = selectedStudent?.first_name || selectedStudent?.name?.split(' ')[0] || 'Schüler';
@@ -937,9 +922,9 @@ export const TeacherNotesWidget: React.FC<TeacherNotesWidgetProps> = ({
                 <div style={{
                   padding: '10px',
                   borderRadius: '10px',
-                  background: '#f0fdf4',
-                  border: '1px solid #86efac',
-                  color: '#15803d',
+                  background: '#ecfdf5',
+                  border: '1px solid #10b981',
+                  color: '#059669',
                   fontSize: '0.80rem',
                   fontWeight: 800,
                   textAlign: 'center',

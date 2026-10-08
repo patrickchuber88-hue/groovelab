@@ -467,7 +467,7 @@ export function StudentBandMatchingSuite({
                                                             alt={member.first_name || 'Bandmitglied'} 
                                                           />
                                                           {member.isMastered && (
-                                                            <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: '#34a853', color: 'white', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                            <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: '#34a853', color: 'white', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', zIndex: 10 }}>
                                                               <CheckCircle size={12} strokeWidth={4} />
                                                             </div>
                                                           )}

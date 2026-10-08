@@ -1,6 +1,185 @@
 import React from 'react';
 import { Music } from 'lucide-react';
 
+export interface BrandIconProps {
+  size?: number | string;
+  color?: string;
+  strokeWidth?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+/**
+ * 🎵 CampusRibbonNoteIcon
+ * Das neue Campus-Markensignet: Elegante, flache Doppel-Achtelnote
+ * Symbol für Melodie, Notenlehre, Musikschule und didaktischen Fluss.
+ */
+export const CampusRibbonNoteIcon: React.FC<BrandIconProps> = ({
+  size = 20,
+  color = 'currentColor',
+  strokeWidth = 2.4,
+  className,
+  style
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    className={className}
+    style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
+  >
+    {/* Schräger oberer Notenbalken (Solid Slanted Beam) */}
+    <path
+      d="M7 6.8L18 3.8V6.6L7 9.6Z"
+      fill={color}
+    />
+    {/* Linker Schaft */}
+    <line
+      x1="7"
+      y1="7"
+      x2="7"
+      y2="16.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+    />
+    {/* Rechter Schaft */}
+    <line
+      x1="18"
+      y1="4"
+      x2="18"
+      y2="13.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+    />
+    {/* Linker Notenkopf (Organisch rotierte Ellipse) */}
+    <ellipse
+      cx="5"
+      cy="17"
+      rx="3.2"
+      ry="2.4"
+      transform="rotate(-24 5 17)"
+      fill={color}
+    />
+    {/* Rechter Notenkopf (Organisch rotierte Ellipse) */}
+    <ellipse
+      cx="16"
+      cy="14"
+      rx="3.2"
+      ry="2.4"
+      transform="rotate(-24 16 14)"
+      fill={color}
+    />
+  </svg>
+);
+
+/**
+ * 🥁 GrooveLabSnareIcon
+ * Das neue GrooveLab-Markensignet: Flache, moderne Snare-Drum mit gekreuzten Sticks
+ * Symbol für Beat-Making, Rhythmus, Groove und Band-Praxis.
+ */
+export const GrooveLabSnareIcon: React.FC<BrandIconProps> = ({
+  size = 20,
+  color = 'currentColor',
+  strokeWidth = 2,
+  className,
+  style
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    className={className}
+    style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
+  >
+    {/* Gekreuzte Drumsticks oben */}
+    <line
+      x1="4"
+      y1="4"
+      x2="14"
+      y2="9.5"
+      stroke={color}
+      strokeWidth={strokeWidth * 0.9}
+      strokeLinecap="round"
+    />
+    <circle cx="4" cy="4" r="1.1" fill={color} />
+    <line
+      x1="20"
+      y1="4"
+      x2="10"
+      y2="9.5"
+      stroke={color}
+      strokeWidth={strokeWidth * 0.9}
+      strokeLinecap="round"
+    />
+    <circle cx="20" cy="4" r="1.1" fill={color} />
+
+    {/* Oberer Spannreifen (Top Rim) */}
+    <rect
+      x="3.5"
+      y="9"
+      width="17"
+      height="2.2"
+      rx="1.1"
+      fill={color}
+    />
+
+    {/* Flacher Snare-Kessel (Shallow Shell - 14"x5.5" Proportion) */}
+    <rect
+      x="4"
+      y="10.5"
+      width="16"
+      height="6.5"
+      rx="0.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      fill="none"
+    />
+
+    {/* Unterer Spannreifen (Bottom Rim) */}
+    <rect
+      x="3.5"
+      y="16.5"
+      width="17"
+      height="2.2"
+      rx="1.1"
+      fill={color}
+    />
+
+    {/* Vertikale Spannböckchen (Tension Lugs) */}
+    <line
+      x1="8"
+      y1="10.5"
+      x2="8"
+      y2="16.5"
+      stroke={color}
+      strokeWidth={strokeWidth * 0.75}
+      strokeLinecap="round"
+    />
+    <line
+      x1="12"
+      y1="10.5"
+      x2="12"
+      y2="16.5"
+      stroke={color}
+      strokeWidth={strokeWidth * 0.75}
+      strokeLinecap="round"
+    />
+    <line
+      x1="16"
+      y1="10.5"
+      x2="16"
+      y2="16.5"
+      stroke={color}
+      strokeWidth={strokeWidth * 0.75}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export interface CampusGroovelabBrandProps {
   size?: number | string;
   fontSize?: string;
@@ -51,14 +230,10 @@ export const CampusGroovelabBrand: React.FC<CampusGroovelabBrandProps> = ({
       }}
     >
       {withIcon && (
-        <Music 
+        <CampusRibbonNoteIcon 
           size={calculatedIconSize} 
+          color={iconColor}
           style={{ 
-            color: iconColor, 
-            strokeWidth: 2.5,
-            flexShrink: 0,
-            display: 'inline-block',
-            verticalAlign: 'middle',
             marginRight: '2px'
           }} 
         />

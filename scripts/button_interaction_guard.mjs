@@ -9,6 +9,7 @@
 //            5. BFSG 2025 / WCAG 2.2 AA Contrast Guard on Yellow Brand Surfaces
 //            6. Zero Dead Buttons & Explicit Action Contract (3,700+ UI Buttons Scanned)
 //            7. Anti-Freeze Finally & State Lockup Defense (Zero Permanent Spinlocks)
+//            8. Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)
 // Runtime:   Native Node.js ESM — 100% in-memory (< 1s)
 // =============================================================================
 
@@ -356,6 +357,61 @@ recordCheck(
   failedAntiFreeze.length === 0
     ? 'All critical mutation, activation, and scheduling workflows enforce finally-block state unlocks against UI freezes.'
     : `Missing anti-freeze finally protection in: ${failedAntiFreeze.join(', ')}`
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 8: Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)
+// Standard: Axiom 9 — Colored buttons/widgets must be unicolor (zero conflicting border).
+//           White/transparent with colored border (outline/ghost) is 100% valid.
+//           Der rahmen darf keine andere farbe als der inhalt einer box, widget, button haben.
+// -----------------------------------------------------------------------------
+let colorClashElements = [];
+
+for (const file of tsxFiles) {
+  if (file.includes('/tests/') || file.includes('__tests__')) continue;
+  const content = fs.readFileSync(file, 'utf-8');
+  
+  // Audit inline styles across interactive elements, widgets, and buttons
+  const styleRegex = /style=\{\{([\s\S]*?)\}\}/g;
+  let sMatch;
+  while ((sMatch = styleRegex.exec(content)) !== null) {
+    const styleStr = sMatch[1];
+    const bgMatch = styleStr.match(/background(?:Color)?\s*:\s*['"]([^'"]+)['"]/i);
+    const borderMatch = styleStr.match(/border(?:Color)?\s*:\s*['"]([^'"]+)['"]/i);
+    if (!bgMatch || !borderMatch) continue;
+
+    const bg = bgMatch[1].trim().toLowerCase();
+    const bd = borderMatch[1].trim().toLowerCase();
+
+    const isNeutralBg = /^(#fff|#ffffff|white|transparent|none|#f8fafc|#f1f5f9|#f8f9fa|rgba\(255,\s*255,\s*255|rgba\(0,\s*0,\s*0,\s*0\))/i.test(bg);
+    const isBorderNone = /^(none|0|0px|transparent)$/i.test(bd) || bd.includes('none');
+
+    if (!isNeutralBg && !isBorderNone) {
+      // 1. Yellow/amber background with dark/black/slate border
+      const isYellowBg = bg.includes('#facc15') || bg.includes('#eab308') || bg.includes('#ca8a04') || bg.includes('rgb(250, 204, 21)') || bg.includes('rgba(234, 179, 8');
+      const isDarkOrGrayBorder = bd.includes('#0f172a') || bd.includes('#000000') || bd.includes('#1e293b') || bd.includes('#334155') || bd.includes('black') || bd.includes('#000') || bd.includes('#e2e8f0');
+      
+      // 2. Chromatic background with clashing dark/black border
+      const isChromaticBg = isYellowBg || bg.includes('#ef4444') || bg.includes('#dc2626') || bg.includes('#10b981') || bg.includes('#16a34a') || bg.includes('#22c55e') || bg.includes('#3b82f6') || bg.includes('#0284c7');
+      const isBlackBorder = bd.includes('solid #000') || bd.includes('solid black') || bd.includes('2px solid #000') || bd.includes('1px solid #000');
+
+      if ((isYellowBg && isDarkOrGrayBorder) || (isChromaticBg && isBlackBorder)) {
+        colorClashElements.push({
+          file: path.relative(ROOT_DIR, file),
+          bg,
+          bd
+        });
+      }
+    }
+  }
+}
+
+recordCheck(
+  'Check 8: Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)',
+  colorClashElements.length === 0,
+  colorClashElements.length === 0
+    ? `All UI surfaces strictly enforce the Unicolor Surface Axiom (0 conflicting border/surface clashes, 100% tone-in-tone & pure outlines).`
+    : `Found ${colorClashElements.length} color-clash border violation(s) in: ${colorClashElements.map(c => c.file).join(', ')}`
 );
 
 // -----------------------------------------------------------------------------

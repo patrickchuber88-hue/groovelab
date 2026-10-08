@@ -557,15 +557,15 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
-                          background: '#dcfce7',
+                          background: '#ecfdf5',
                           borderRadius: '12px',
                           padding: '8px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          border: '1px solid #86efac'
+                          border: '1px solid #10b981'
                         }}>
-                          <ShieldAlert size={20} style={{ color: '#34a853' }} />
+                          <ShieldAlert size={20} style={{ color: '#10b981' }} />
                         </div>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.84rem', color: '#14532d', marginBottom: '2px' }}>

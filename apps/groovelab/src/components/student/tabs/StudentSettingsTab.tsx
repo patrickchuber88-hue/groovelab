@@ -2,17 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { unsubscribeUserFromPush } from '../../../utils/webPush';
 import {
-  Lock, Trophy, Sparkles, Star, Coffee, Clock, Timer, BookOpen, Play, Pause, Square,
-  RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School,
-  Calendar, CalendarX, Check, CheckCircle, Target, Pencil, User, Mail, Phone, Users,
-  Shield, Settings, Bell, FileText, AlertTriangle, ShieldCheck, CheckCheck, Mic, Download,
-  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft, ChevronRight, Camera
+  Lock, Trophy, Sparkles, Star, Coffee, Clock, Timer, BookOpen, Play, Pause, Square, RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, CalendarX, Check, CheckCircle, Target, Pencil, User, Mail, Phone, Users, Shield, Settings, Bell, FileText, AlertTriangle, ShieldCheck, CheckCheck, Mic, Download, Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft, ChevronRight, Camera
 } from 'lucide-react';
+import { useModalA11y } from '../../../hooks/useModalA11y';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { CampusGroovelabText } from '../../CampusGroovelabBrand';
 import { validateNewPin } from '../../../utils/pinValidation';
 import { secureVault } from '../../../utils/secureVault';
-import { AddSiblingModal } from '../../campus/AddSiblingModal';
 import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar, STUDENT_AVATARS } from '../studentAvatars.constants';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
 import { StudentBillingInvoicesSection } from '../StudentBillingInvoicesSection';
@@ -308,6 +304,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
   const [downloadingSection, setDownloadingSection] = React.useState<string | null>(null);
   const [downloadProgressMsg, setDownloadProgressMsg] = React.useState<string>('');
   const [downloadFeedback, setDownloadFeedback] = React.useState<string | null>(null);
+  const settingsModalRef = useModalA11y(Boolean(activeStudentSettingsModal), handleCloseSettingsModal);
 
   // 🛡️ Passkey (FaceID / TouchID) State
   const [hasDevicePasskey, setHasDevicePasskey] = React.useState<boolean>(() => {
@@ -762,10 +759,10 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       style={{
                         width: '100%',
                         padding: '13px 20px',
-                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                        border: '1.5px solid #86efac',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
                         borderRadius: '18px',
-                        color: '#15803d',
+                        color: '#ffffff',
                         fontSize: '0.88rem',
                         fontWeight: 850,
                         cursor: (isVerifyingParentGate || parentGateCooldownSeconds > 0) ? 'not-allowed' : 'pointer',
@@ -773,7 +770,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '10px',
-                        boxShadow: '0 4px 14px rgba(34, 197, 94, 0.16)',
+                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
                         transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
@@ -1053,7 +1050,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
               {currentPlatform === 'campus' && !studentUser?.is_campus_active && (
                 <div style={{
                   background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
-                  border: '1.5px solid #86efac',
+                  border: '1.5px solid #10b981',
                   borderRadius: '24px',
                   padding: '24px',
                   boxShadow: '0 8px 24px -4px rgba(34, 197, 94, 0.12)',
@@ -1092,14 +1089,15 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       fontWeight: 800,
                       padding: '4px 12px',
                       borderRadius: '100px',
-                      background: '#dcfce7',
-                      color: '#15803d',
-                      border: '1px solid #86efac',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#ffffff',
+                      border: 'none',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
                     }}>
-                      <Sparkles size={12} color="#15803d" />
+                      <Sparkles size={12} color="#ffffff" />
                       <span>1 Monat gratis schnuppern</span>
                     </span>
                   </div>
@@ -1833,6 +1831,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="student-settings-modal-title"
+                  ref={settingsModalRef}
                   style={{
                     background: '#ffffff',
                     borderRadius: isMobile ? 0 : '24px',
@@ -2719,12 +2718,13 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     width: '42px',
                                     height: '42px',
                                     borderRadius: '14px',
-                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                    border: '1.5px solid #86efac',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    border: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#15803d',
+                                    color: '#ffffff',
+                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
                                     flexShrink: 0
                                   }}>
                                     <Fingerprint size={22} />
@@ -2737,9 +2737,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                         fontWeight: 800,
                                         padding: '2px 8px',
                                         borderRadius: '100px',
-                                        background: hasDevicePasskey ? '#dcfce7' : '#f1f5f9',
-                                        color: hasDevicePasskey ? '#15803d' : '#64748b',
-                                        border: hasDevicePasskey ? '1px solid #86efac' : '1px solid #e2e8f0'
+                                        background: hasDevicePasskey ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                                        color: hasDevicePasskey ? '#ffffff' : '#64748b',
+                                        border: hasDevicePasskey ? 'none' : '1px solid #e2e8f0'
                                       }}>
                                         {hasDevicePasskey ? 'Aktiv auf diesem Gerät' : 'Optional'}
                                       </span>
@@ -2757,9 +2757,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                   borderRadius: '12px',
                                   fontSize: '0.78rem',
                                   fontWeight: 700,
-                                  background: passkeyActionStatus === 'success' ? '#f0fdf4' : '#fee2e2',
-                                  border: passkeyActionStatus === 'success' ? '1px solid #86efac' : '1px solid #fca5a5',
-                                  color: passkeyActionStatus === 'success' ? '#15803d' : '#dc2626'
+                                  background: passkeyActionStatus === 'success' ? '#ecfdf5' : '#fee2e2',
+                                  border: passkeyActionStatus === 'success' ? '1px solid #10b981' : '1px solid #fca5a5',
+                                  color: passkeyActionStatus === 'success' ? '#047857' : '#dc2626'
                                 }}>
                                   {passkeyActionMessage}
                                 </div>
@@ -3104,8 +3104,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   {/* Monospace Key Display */}
                   <div style={{
                     width: '100%',
-                    background: '#f0fdf4',
-                    border: '2px dashed #86efac',
+                    background: '#ecfdf5',
+                    border: '2px dashed #10b981',
                     borderRadius: '18px',
                     padding: '16px 20px',
                     display: 'flex',
@@ -3220,28 +3220,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
             {/* SECURE RECOVERY KEY MODAL */}
             {renderRecoveryKeyModal()}
 
-            {/* 🛡️ In-App Geschwisterkind hinzufügen Modal (Goldstandard: QR-Scan + PIN) */}
-            <AddSiblingModal
-              isOpen={isAddSiblingModalOpen}
-              onClose={() => setIsAddSiblingModalOpen(false)}
-              currentStudentId={studentId || (studentUser as any)?.id || ''}
-              schoolId={(studentUser as any)?.school_id}
-              existingFamilyProfiles={familyProfiles}
-              onProfileAdded={(newProfile) => {
-                setFamilyProfiles((prev: any[]) => {
-                  const filtered = prev.filter((p: any) => p.id !== newProfile.id);
-                  const updated = [...filtered, newProfile];
-                  try {
-                    localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
-                    const localProfs = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
-                    const updatedLocal = [...localProfs.filter((p: any) => p.id !== newProfile.id), newProfile];
-                    localStorage.setItem('groovelab_local_profiles', JSON.stringify(updatedLocal));
-                  } catch (e) {}
-                  return updated;
-                });
-              }}
-            />
-
             {/* ⏳ 10-Sekunden Inaktivitäts-Warnungs-Toast für Elternbereich */}
             {isParentLockWarning && isParentUnlocked && (
               <div style={{
@@ -3250,7 +3228,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 right: '24px',
                 zIndex: 99999,
                 background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                border: '1.5px solid #f59e0b',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '18px',
                 padding: '14px 20px',
                 boxShadow: '0 20px 40px -10px rgba(0,0,0,0.4)',

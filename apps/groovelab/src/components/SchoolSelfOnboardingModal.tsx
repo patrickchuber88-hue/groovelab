@@ -689,10 +689,10 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 fontSize: '0.74rem',
                 lineHeight: 1.45,
                 color: '#334155',
-                background: '#f8fafc',
+                background: isB2BConfirmed ? '#ecfdf5' : '#f8fafc',
                 padding: '10px 12px',
                 borderRadius: '12px',
-                border: isB2BConfirmed ? '1px solid #86efac' : '1px solid #cbd5e1',
+                border: isB2BConfirmed ? '1.5px solid #10b981' : '1px solid #cbd5e1',
                 marginTop: '4px',
                 textAlign: 'left'
               }}>
@@ -700,10 +700,10 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   type="checkbox"
                   checked={isB2BConfirmed}
                   onChange={(e) => setIsB2BConfirmed(e.target.checked)}
-                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#15803d', flexShrink: 0 }}
+                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#10b981', flexShrink: 0 }}
                 />
                 <span>
-                  Ich handele im Namen einer Musikschule, Bildungsinstitution, Gebietskörperschaft oder als selbständiges Unternehmen. Mir ist bekannt, dass das Angebot von Teil A der AGB ausschließlich für Geschäftskunden (B2B) gilt.
+                  Ich handele im Namen oder im Auftrag einer Musikschule, Bildungsinstitution, Gebietskörperschaft oder als selbständiges Unternehmen und bin zur Vertretung befugt. Mir ist bekannt, dass das Angebot von Teil A der AGB ausschließlich für Geschäftskunden (B2B) gilt.
                 </span>
               </label>
 
@@ -715,10 +715,10 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 fontSize: '0.72rem',
                 lineHeight: 1.45,
                 color: '#334155',
-                background: '#f8fafc',
+                background: isAgbAvvConfirmed ? '#ecfdf5' : '#f8fafc',
                 padding: '10px 12px',
                 borderRadius: '12px',
-                border: isAgbAvvConfirmed ? '1px solid #86efac' : '1px solid #cbd5e1',
+                border: isAgbAvvConfirmed ? '1.5px solid #10b981' : '1px solid #cbd5e1',
                 marginTop: '2px',
                 textAlign: 'left'
               }}>
@@ -726,7 +726,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   type="checkbox"
                   checked={isAgbAvvConfirmed}
                   onChange={(e) => setIsAgbAvvConfirmed(e.target.checked)}
-                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#15803d', flexShrink: 0 }}
+                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#10b981', flexShrink: 0 }}
                 />
                 <span>
                   Ich habe die{' '}

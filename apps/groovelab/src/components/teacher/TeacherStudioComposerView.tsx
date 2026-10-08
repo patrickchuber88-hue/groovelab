@@ -933,13 +933,13 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         type="button"
                         onClick={() => toggleTag(tag)}
                         style={{
-                          background: isSelected ? '#dcfce7' : '#f1f5f9',
-                          border: isSelected ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          background: isSelected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                          border: isSelected ? 'none' : '1px solid #e2e8f0',
                           borderRadius: '100px',
-                          padding: '3px 10px',
+                          padding: isSelected ? '4px 11px' : '3px 10px',
                           fontSize: '0.70rem',
                           fontWeight: 800,
-                          color: isSelected ? '#166534' : '#64748b',
+                          color: isSelected ? '#ffffff' : '#64748b',
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1378,9 +1378,9 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     type="button"
                     onClick={() => handleOpenMediaPicker('audios')}
                     style={{
-                      background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
-                      color: '#16a34a',
+                      background: '#ecfdf5',
+                      border: '1px solid #10b981',
+                      color: '#059669',
                       borderRadius: '8px',
                       padding: '4px 10px',
                       fontSize: '0.74rem',
@@ -1419,8 +1419,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                       <div
                         key={audio.id}
                         style={{
-                          background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
+                          background: '#ecfdf5',
+                          border: '1px solid #10b981',
                           borderRadius: '12px',
                           padding: '10px 14px',
                           display: 'flex',
@@ -1556,9 +1556,9 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     type="button"
                     onClick={() => setShowParentMemo(!showParentMemo)}
                     style={{
-                      background: showParentMemo ? '#dcfce7' : '#f1f5f9',
-                      border: showParentMemo ? '1px solid #86efac' : '1px solid #e2e8f0',
-                      color: showParentMemo ? '#166534' : '#475569',
+                      background: showParentMemo ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                      border: showParentMemo ? 'none' : '1px solid #e2e8f0',
+                      color: showParentMemo ? '#ffffff' : '#475569',
                       borderRadius: '100px',
                       padding: '6px 14px',
                       fontSize: '0.76rem',
@@ -1817,7 +1817,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                           )}
                         </div>
                         {isToday && (
-                          <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '2px 8px', borderRadius: '4px' }}>
                             Heute
                           </span>
                         )}
@@ -1942,7 +1942,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                   </span>
                 </div>
                 {selectedTags.length > 0 && (
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '100px' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '2px 8px', borderRadius: '100px' }}>
                     {selectedTags[0]}
                   </span>
                 )}
@@ -2054,12 +2054,12 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Mic size={13} color="#16a34a" />
+                        <Mic size={13} color="#10b981" />
                         <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
                           {audio.title}
                         </span>
                       </div>
-                      <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '1px 6px', borderRadius: '4px' }}>
                         {audio.duration || 30}s
                       </span>
                     </div>

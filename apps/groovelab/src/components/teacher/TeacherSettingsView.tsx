@@ -1367,8 +1367,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          background: isEnabled ? '#f0fdf4' : '#f8fafc',
-                          border: `1.5px solid ${isEnabled ? '#86efac' : '#e2e8f0'}`,
+                          background: isEnabled ? '#ecfdf5' : '#f8fafc',
+                          border: `1.5px solid ${isEnabled ? '#10b981' : '#e2e8f0'}`,
                           borderRadius: '16px',
                           padding: '16px 18px'
                         }}>
@@ -1377,11 +1377,11 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                               width: '38px',
                               height: '38px',
                               borderRadius: '10px',
-                              background: isEnabled ? '#dcfce7' : '#e2e8f0',
+                              background: isEnabled ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e2e8f0',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: isEnabled ? '#16a34a' : '#64748b'
+                              color: isEnabled ? '#ffffff' : '#64748b'
                             }}>
                               <Moon size={20} strokeWidth={2.4} />
                             </div>

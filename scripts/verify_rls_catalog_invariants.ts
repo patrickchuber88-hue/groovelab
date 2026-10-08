@@ -680,8 +680,8 @@ function verifyInvariant22(): InvariantCheckResult {
     ? Math.max(...post470Migrations.map(m => m.num))
     : 0;
 
-  if (maxMigration < 519) {
-    findings.push(`Expected latest migration to reach at least 519, but highest detected was ${maxMigration}`);
+  if (maxMigration < 535) {
+    findings.push(`Expected latest migration to reach at least 535, but highest detected was ${maxMigration}`);
   }
 
   for (const m of post470Migrations) {
@@ -702,7 +702,7 @@ function verifyInvariant22(): InvariantCheckResult {
     }
   }
 
-  // 3. Verify core milestone invariants in migrations 471-519
+  // 3. Verify core milestone invariants in migrations 471-535
   const m473 = post470Migrations.find(m => m.num === 473);
   if (!m473 || !m473.content.includes('campus_ui_level') || !m473.content.includes('save_parent_controls')) {
     findings.push('Migration 473 missing authoritative campus_ui_level / save_parent_controls governance');
@@ -738,13 +738,43 @@ function verifyInvariant22(): InvariantCheckResult {
     findings.push('Migration 519 missing WORM progress_matrix audit logging');
   }
 
+  const m520 = post470Migrations.find(m => m.num === 520);
+  if (!m520 || !m520.content.includes('quiet_hours') || !m520.content.includes('mfa_enforced_for_admins')) {
+    findings.push('Migration 520 missing ArbZG § 5 quiet_hours or MFA admin enforcement');
+  }
+
+  const m530 = post470Migrations.find(m => m.num === 530);
+  if (!m530 || !m530.content.includes('handle_fokus_log_changes') || !m530.content.includes('trg_fokus_logs_stats_sync')) {
+    findings.push('Migration 530 missing SSOT handle_fokus_log_changes or trg_fokus_logs_stats_sync');
+  }
+
+  const m531 = post470Migrations.find(m => m.num === 531);
+  if (!m531 || !m531.content.includes('check_fokus_logs_anti_cheat') || !m531.content.includes('complete_focus_session')) {
+    findings.push('Migration 531 missing check_fokus_logs_anti_cheat or complete_focus_session');
+  }
+
+  const m533 = post470Migrations.find(m => m.num === 533);
+  if (!m533 || !m533.content.includes('respond_to_reschedule_authoritative')) {
+    findings.push('Migration 533 missing respond_to_reschedule_authoritative authoritative RPC');
+  }
+
+  const m534 = post470Migrations.find(m => m.num === 534);
+  if (!m534 || !m534.content.includes('decrypt_message_content') || !m534.content.includes('decrypt_message_batch')) {
+    findings.push('Migration 534 missing decrypt_message_content / decrypt_message_batch fail-closed resilience');
+  }
+
+  const m535 = post470Migrations.find(m => m.num === 535);
+  if (!m535 || !m535.content.includes('trg_prevent_b2c_billing_on_sammelzahler') || !m535.content.includes('check_school_billing_invariants')) {
+    findings.push('Migration 535 missing trg_prevent_b2c_billing_on_sammelzahler or check_school_billing_invariants');
+  }
+
   const passed = findings.length === 0;
   return {
     id: 22,
     name: `Dynamic Post-470 Migration Inspection (Migrations 471 to ${maxMigration})`,
     passed,
     details: passed
-      ? `Dynamically inspected ${post470Migrations.length} migrations (471 to ${maxMigration}): 100% tables enforce RLS, SECURITY DEFINER functions pin search_path, and milestones 473-519 sealed.`
+      ? `Dynamically inspected ${post470Migrations.length} migrations (471 to ${maxMigration}): 100% tables enforce RLS, SECURITY DEFINER functions pin search_path, and milestones 473-535 sealed.`
       : `Failed: ${findings.join('; ')}`,
     findings
   };

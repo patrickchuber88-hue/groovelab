@@ -3,6 +3,7 @@ import { Check, ExternalLink, Tablet, X } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
 import { getStationColor } from '../../../utils/adminColorHelpers';
+import { IpadColorWheelPickerModal } from '../color/IpadColorWheelPickerModal';
 export { getStationColor };
 
 export interface AdminRoomLayoutModalProps {
@@ -43,6 +44,7 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
   const [copiedStationKioskId, setCopiedStationKioskId] = useState<string | null>(null);
   const [copiedRoomKiosk, setCopiedRoomKiosk] = useState(false);
   const [gridAppliedFeedback, setGridAppliedFeedback] = useState(false);
+  const [showColorWheelModal, setShowColorWheelModal] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -467,9 +469,9 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                   onClick={handleApplyDefaultGrid}
                   style={{ 
                     width: '100%', 
-                    background: gridAppliedFeedback ? '#f0fdf4' : '#ffffff', 
-                    color: gridAppliedFeedback ? '#16a34a' : '#1e293b', 
-                    border: gridAppliedFeedback ? '1.5px solid #86efac' : '1.5px solid #cbd5e1', 
+                    background: gridAppliedFeedback ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff', 
+                    color: gridAppliedFeedback ? '#ffffff' : '#1e293b', 
+                    border: gridAppliedFeedback ? 'none' : '1.5px solid #cbd5e1', 
                     padding: '12px', 
                     borderRadius: '12px', 
                     fontWeight: 800, 
@@ -479,7 +481,8 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                     alignItems: 'center', 
                     justifyContent: 'center', 
                     gap: '6px', 
-                    transition: 'all 0.2s' 
+                    transition: 'all 0.2s',
+                    boxShadow: gridAppliedFeedback ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
                   }}
                 >
                   {gridAppliedFeedback ? (
@@ -576,6 +579,29 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                           />
                         );
                       })}
+                      <button
+                        type="button"
+                        onClick={() => setShowColorWheelModal(true)}
+                        title="Erweiterten Farbkreis öffnen"
+                        aria-label="Erweiterten Farbkreis öffnen"
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: 'conic-gradient(from 0deg, red, yellow, lime, aqua, blue, magenta, red)',
+                          border: '2px solid #cbd5e1',
+                          cursor: 'pointer',
+                          padding: 0,
+                          outline: 'none',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
+                      </button>
                     </div>
                   </div>
 
@@ -607,9 +633,9 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                         width: '100%', 
                         padding: '10px', 
                         borderRadius: '10px', 
-                        border: copiedStationKioskId === activeStation.id ? '1px solid #86efac' : '1px solid #e2e8f0', 
-                        background: copiedStationKioskId === activeStation.id ? '#f0fdf4' : '#f8fafc', 
-                        color: copiedStationKioskId === activeStation.id ? '#16a34a' : '#475569', 
+                        border: copiedStationKioskId === activeStation.id ? 'none' : '1px solid #e2e8f0', 
+                        background: copiedStationKioskId === activeStation.id ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f8fafc', 
+                        color: copiedStationKioskId === activeStation.id ? '#ffffff' : '#475569', 
                         fontSize: '0.75rem', 
                         fontWeight: 800, 
                         cursor: 'pointer', 
@@ -617,12 +643,13 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                         alignItems: 'center', 
                         justifyContent: 'center', 
                         gap: '6px',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        boxShadow: copiedStationKioskId === activeStation.id ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
                       }}
                     >
                       {copiedStationKioskId === activeStation.id ? (
                         <>
-                          <Check size={14} color="#16a34a" /> Setup-Link kopiert!
+                          <Check size={14} color="#ffffff" /> Setup-Link kopiert!
                         </>
                       ) : (
                         <>
@@ -654,19 +681,20 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                     setTimeout(() => setCopiedRoomKiosk(false), 2500);
                   }}
                   style={{ 
-                    background: copiedRoomKiosk ? '#f0fdf4' : '#ffffff', 
-                    border: copiedRoomKiosk ? '1px solid #86efac' : '1px solid #e2e8f0', 
+                    background: copiedRoomKiosk ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff', 
+                    border: copiedRoomKiosk ? 'none' : '1px solid #e2e8f0', 
                     padding: '10px', 
                     borderRadius: '10px', 
                     fontSize: '0.75rem', 
                     fontWeight: 800, 
                     cursor: 'pointer', 
-                    color: copiedRoomKiosk ? '#16a34a' : '#475569',
+                    color: copiedRoomKiosk ? '#ffffff' : '#475569',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    boxShadow: copiedRoomKiosk ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
                   }}
                 >
                   {copiedRoomKiosk ? (
@@ -704,6 +732,18 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
           </div>
 
         </div>
+
+        {showColorWheelModal && activeStation && (
+          <IpadColorWheelPickerModal
+            station={activeStation}
+            onClose={() => setShowColorWheelModal(false)}
+            onColorChange={async (_stationId, newColor) => {
+              handleUpdateColor(newColor);
+            }}
+            supabase={supabase}
+            brandColor={brandColor}
+          />
+        )}
       </div>
     );
 };

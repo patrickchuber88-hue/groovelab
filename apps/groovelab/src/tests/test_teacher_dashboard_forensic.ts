@@ -268,6 +268,16 @@ function testStudentPrepParsing() {
     'Didactic Snapshot Parsing',
     'parseHomeworkNotesPayload returns clean empty structure on empty input'
   );
+
+  // MicroScore token parsing
+  const rawWithScore = 'Notiz.\n\nMICROSCORE:{"id":"snip-1","title":"G-Dur Drill","notes":[]}';
+  const parsedScore = parseHomeworkNotesPayload(rawWithScore);
+  assert(
+    Array.isArray(parsedScore.microScores) && parsedScore.microScores.length === 1 && parsedScore.microScores[0].title === 'G-Dur Drill',
+    'Didactic Snapshot Parsing',
+    'parseHomeworkNotesPayload extracts MICROSCORE entries',
+    `Got: ${JSON.stringify(parsedScore.microScores)}`
+  );
 }
 
 // ------------------------------------------------------------------------------

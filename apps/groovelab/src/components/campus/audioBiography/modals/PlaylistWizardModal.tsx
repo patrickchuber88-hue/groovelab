@@ -416,7 +416,7 @@ export const PlaylistWizardModal: React.FC<PlaylistWizardModalProps> = ({
                             height: '22px',
                             borderRadius: '50%',
                             background: '#10b981',
-                            border: '2px solid #ffffff',
+                            border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

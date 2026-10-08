@@ -87,7 +87,7 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
               width: '42px',
               height: '42px',
               borderRadius: '12px',
-              border: cardBorder,
+              border: 'none',
               background: badgeBg,
               color: badgeColor,
               display: 'flex',
@@ -229,8 +229,8 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
           }}
           className="hover-scale"
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = isGreenTheme ? '#f0fdf4' : '#fefce8';
-            e.currentTarget.style.borderColor = isGreenTheme ? '#86efac' : '#fde047';
+            e.currentTarget.style.background = isGreenTheme ? '#ecfdf5' : '#fefce8';
+            e.currentTarget.style.borderColor = isGreenTheme ? '#10b981' : '#fde047';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.04)';
           }}
           onMouseLeave={(e) => {
@@ -253,7 +253,7 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-              border: isGreenTheme ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(234, 179, 8, 0.2)',
+              border: 'none',
               flexShrink: 0
             }}>
               <QrCode size={19} strokeWidth={2.4} />

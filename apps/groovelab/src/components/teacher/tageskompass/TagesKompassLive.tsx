@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Clock, 
   Play, 
@@ -8,6 +8,8 @@ import {
   Coffee,
   Volume2,
   Edit2,
+  Trash2,
+  Loader2,
   Zap
 } from 'lucide-react';
 import { 
@@ -28,6 +30,8 @@ import {
   extractActiveDidacticTags
 } from './wochenfahrplan';
 import { resolveStudentInstrument } from '../utils/teacherDashboardUtils';
+import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
+import { TagesKompassScoreSnippetPill } from './TagesKompassScoreSnippetPill';
 
 interface TagesKompassLiveProps {
   isPause?: boolean;
@@ -45,6 +49,8 @@ interface TagesKompassLiveProps {
   playingAudioUrl?: string | null;
   onTogglePlayAudio?: (url: string) => void;
   onSaveQuickHomework: (prep: TagesKompassPrep, customNote?: string) => Promise<void>;
+  onDeleteHomework?: (prep: TagesKompassPrep) => Promise<void>;
+  onDeleteAudioTrack?: (prep: TagesKompassPrep, url: string) => Promise<void>;
   onOpenStudio?: () => void;
   onOpenToolbox?: () => void;
   onOpenNotes?: () => void;
@@ -69,6 +75,8 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
   playingAudioUrl,
   onTogglePlayAudio,
   onSaveQuickHomework,
+  onDeleteHomework,
+  onDeleteAudioTrack,
   onOpenStudio,
   onOpenToolbox,
   onOpenNotes,
@@ -78,22 +86,81 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
 }) => {
   const [isEditingCurrentHomework, setIsEditingCurrentHomework] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingHomework, setIsDeletingHomework] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const deleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    };
+  }, []);
+
+  const handleTriggerDelete = () => {
+    setShowDeleteConfirm(true);
+    if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    deleteTimeoutRef.current = setTimeout(() => {
+      setShowDeleteConfirm(false);
+    }, 5000);
+  };
+
+  const handleCancelDelete = () => {
+    if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!prep || !onDeleteHomework || isDeletingHomework) return;
+    if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    setIsDeletingHomework(true);
+    try {
+      await onDeleteHomework(prep);
+      setShowDeleteConfirm(false);
+      setIsEditingCurrentHomework(false);
+    } finally {
+      setIsDeletingHomework(false);
+    }
+  };
 
   // Daten der Vorwoche (Wochen-Fahrplan)
   const prevNotes = prep?.prevWeekNotes || [];
-  const prevTextNote = prevNotes.find(n => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('LEHRWERK:') && !n.startsWith('LOOP:') && !n.startsWith('STICKER:')) || '';
+  const prevTextNote = prevNotes.find(n => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('LEHRWERK:') && !n.startsWith('LOOP:') && !n.startsWith('STICKER:') && !n.startsWith('MICROSCORE:')) || '';
+  const prevMicroScores = useMemo(() => {
+    return prevNotes
+      .filter(n => typeof n === 'string' && n.startsWith('MICROSCORE:'))
+      .map(n => {
+        try {
+          return JSON.parse(n.substring('MICROSCORE:'.length).trim()) as MicroScoreSnippet;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as MicroScoreSnippet[];
+  }, [prevNotes]);
   const prevAudioTracks = useMemo(() => parseHomeworkAudioNotes(prevNotes), [prevNotes]);
   const prevLehrwerke = useMemo(() => parseHomeworkLehrwerke(prevNotes), [prevNotes]);
   const activePrevTags = useMemo(() => extractActiveDidacticTags(prevTextNote), [prevTextNote]);
-  const hasPrevHomework = Boolean(prevTextNote || prevAudioTracks.length > 0 || prevLehrwerke.length > 0 || (prep?.prevWeekItems && prep.prevWeekItems.length > 0));
+  const hasPrevHomework = Boolean(prevTextNote || prevMicroScores.length > 0 || prevAudioTracks.length > 0 || prevLehrwerke.length > 0 || (prep?.prevWeekItems && prep.prevWeekItems.length > 0));
 
   // Daten dieser Woche (Wochen-Fahrplan)
   const currentNotes = prep?.currentWeekNotes || [];
-  const currentTextNote = currentNotes.find(n => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('LEHRWERK:') && !n.startsWith('LOOP:') && !n.startsWith('STICKER:')) || '';
+  const currentTextNote = currentNotes.find(n => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('LEHRWERK:') && !n.startsWith('LOOP:') && !n.startsWith('STICKER:') && !n.startsWith('MICROSCORE:')) || '';
+  const currentMicroScores = useMemo(() => {
+    return currentNotes
+      .filter(n => typeof n === 'string' && n.startsWith('MICROSCORE:'))
+      .map(n => {
+        try {
+          return JSON.parse(n.substring('MICROSCORE:'.length).trim()) as MicroScoreSnippet;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as MicroScoreSnippet[];
+  }, [currentNotes]);
   const currentAudioTracks = useMemo(() => parseHomeworkAudioNotes(currentNotes), [currentNotes]);
   const currentLehrwerke = useMemo(() => parseHomeworkLehrwerke(currentNotes), [currentNotes]);
   const activeCurrentTags = useMemo(() => extractActiveDidacticTags(currentTextNote), [currentTextNote]);
-  const hasCurrentHomework = Boolean(currentTextNote || currentAudioTracks.length > 0 || currentLehrwerke.length > 0 || (prep?.currentWeekItems && prep.currentWeekItems.length > 0));
+  const hasCurrentHomework = Boolean(currentTextNote || currentMicroScores.length > 0 || currentAudioTracks.length > 0 || currentLehrwerke.length > 0 || (prep?.currentWeekItems && prep.currentWeekItems.length > 0));
 
   // 1. Pausen-Modus (Relax & Prep)
   if (isPause) {
@@ -297,45 +364,161 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
       {/* 2. Didaktischer Fokus (Hausaufgabe Vorwoche vs. Heute) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {hasCurrentHomework && !isEditingCurrentHomework ? (
-          // Zustand A: Für heute ist bereits eine Hausaufgabe zugewiesen
+          // Zustand A: Für heute ist bereits eine Hausaufgabe zugewiesen (0,1% Studio Pure White)
           <div 
             style={{
-              background: '#f0fdf4',
-              border: '1.5px solid #bbf7d0',
-              borderRadius: '16px',
-              padding: '12px 14px',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '14px 16px',
+              boxShadow: '0 2px 8px -2px rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.02)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px'
+              gap: '10px'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Hausaufgabe für heute zugewiesen ✓
-              </span>
-              <button
-                type="button"
-                onClick={() => onOpenQuickModal ? onOpenQuickModal(activeStudent) : setIsEditingCurrentHomework(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#15803d',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+              <div 
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: '#ecfdf5', 
+                  color: '#059669', 
+                  padding: '4px 10px', 
+                  borderRadius: '100px', 
+                  fontSize: '0.68rem', 
+                  fontWeight: 800, 
+                  letterSpacing: '0.04em', 
+                  textTransform: 'uppercase' 
                 }}
               >
-                <Edit2 size={12} />
-                <span>Bearbeiten</span>
-              </button>
+                <Check size={11} strokeWidth={3} />
+                <span>Hausaufgabe für heute zugewiesen</span>
+              </div>
+
+              {showDeleteConfirm ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#b91c1c' }}>
+                    Wirklich löschen?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDelete}
+                    disabled={isDeletingHomework}
+                    aria-label="Hausaufgabe für heute endgültig löschen"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: '#ef4444',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: isDeletingHomework ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isDeletingHomework ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                    <span>Ja, löschen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelDelete}
+                    disabled={isDeletingHomework}
+                    aria-label="Löschvorgang abbrechen"
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      color: '#64748b',
+                      padding: '3px 8px',
+                      fontSize: '0.70rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenQuickModal ? onOpenQuickModal(activeStudent) : setIsEditingCurrentHomework(true)}
+                    aria-label="Hausaufgabe für heute bearbeiten"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#475569',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
+                  >
+                    <Edit2 size={11} />
+                    <span>Bearbeiten</span>
+                  </button>
+
+                  {onDeleteHomework && (
+                    <button
+                      type="button"
+                      onClick={handleTriggerDelete}
+                      aria-label="Hausaufgabe für heute löschen"
+                      title="Hausaufgabe für heute löschen"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        color: '#64748b',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#fca5a5'; e.currentTarget.style.background = '#fef2f2'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+                    >
+                      <Trash2 size={11} />
+                      <span>Löschen</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {currentTextNote && (
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#14532d', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '0.90rem', fontWeight: 600, color: '#0f172a', lineHeight: 1.45 }}>
                 {currentTextNote}
+              </div>
+            )}
+
+            {/* Zugewiesene Notenschnipsel dieser Woche (0,1% Goldstandard) */}
+            {currentMicroScores.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {currentMicroScores.map((ms, idx) => (
+                  <TagesKompassScoreSnippetPill
+                    key={ms.id || `curr-ms-${idx}`}
+                    snippet={ms}
+                    studentId={prep?.studentId}
+                    studentName={studentDisplayName}
+                  />
+                ))}
               </div>
             )}
 
@@ -357,7 +540,11 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
               <div style={{ marginTop: '2px' }}>
                 <WochenFahrplanAudioPlayer
                   tracks={currentAudioTracks}
-                  readOnly={true}
+                  readOnly={!onDeleteAudioTrack}
+                  onDelete={onDeleteAudioTrack ? (idx, url) => {
+                    const targetUrl = url || currentAudioTracks[idx]?.url;
+                    if (targetUrl && prep) onDeleteAudioTrack(prep, targetUrl);
+                  } : undefined}
                   topicName="Wochen-Fahrplan"
                 />
               </div>
@@ -393,9 +580,23 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
 
             <div style={{ fontSize: '0.86rem', fontWeight: 700, color: hasPrevHomework ? '#1e293b' : '#94a3b8', lineHeight: 1.4 }}>
               {hasPrevHomework 
-                ? (prevTextNote || (prevAudioTracks.length > 0 ? 'Sprachmemo aus Vorwoche' : 'Aufgabe hinterlegt'))
+                ? (prevTextNote || (prevMicroScores.length > 0 ? '' : (prevAudioTracks.length > 0 ? 'Sprachmemo aus Vorwoche' : 'Aufgabe hinterlegt')))
                 : 'Keine Hausaufgabe aus der Vorwoche erfasst.'}
             </div>
+
+            {/* Zugewiesene Notenschnipsel aus der Vorwoche (0,1% Goldstandard) */}
+            {prevMicroScores.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {prevMicroScores.map((ms, idx) => (
+                  <TagesKompassScoreSnippetPill
+                    key={ms.id || `prev-ms-${idx}`}
+                    snippet={ms}
+                    studentId={prep?.studentId}
+                    studentName={studentDisplayName}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Didaktische Fokus-Badges Vorwoche */}
             {activePrevTags.length > 0 && (
@@ -429,6 +630,8 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
             <TagesKompassSmartInput
               studentId={prep.studentId}
               studentName={studentDisplayName}
+              studentInstrument={studentInstrument}
+              schoolId={teacher?.school_id}
               isSaving={isSaving}
               onSaveText={handleSaveText}
               onSaveAudio={handleSaveAudio}

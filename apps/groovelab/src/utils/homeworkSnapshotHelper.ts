@@ -6,6 +6,8 @@
  * Used by TeacherDashboard, TeacherHausaufgabenWidget, and StudentBriefing components.
  */
 
+import { supabase } from '../lib/supabase';
+
 export interface LehrwerkCoverColor {
   from: string;
   to: string;
@@ -28,6 +30,7 @@ export interface ParsedLehrwerkItem {
 
 export interface ParsedSongItem {
   id?: string;
+  song_id?: string;
   title: string;
   topic_name: string;
   status: string;
@@ -66,11 +69,19 @@ export interface ParsedStudentQuestionItem {
   rawToken: string;
 }
 
+export interface ParsedMicroScoreItem {
+  id: string;
+  title: string;
+  snippet: any;
+  rawToken: string;
+}
+
 export interface ExtractedHomeworkPayload {
   lehrwerke: ParsedLehrwerkItem[];
   songs: ParsedSongItem[];
   audioItems: ParsedAudioItem[];
   loopItems: ParsedLoopItem[];
+  microScores: ParsedMicroScoreItem[];
   didacticNotes: string[];
   studentQuestions: ParsedStudentQuestionItem[];
   rawSnapshotLwToken?: string;
@@ -112,6 +123,9 @@ export function formatPageRangeString(pages: number[]): string {
 export function cleanHomeworkTitle(title: string): string {
   if (!title) return '';
   return title
+    .replace(/^campus[- ]song\s*[-–:]\s*/i, '')
+    .replace(/^campus[- ]song\s+/i, '')
+    .replace(/linken park/gi, 'Linkin Park')
     .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
     .trim();
 }
@@ -129,6 +143,7 @@ export function isPureDidacticNote(entry: unknown): entry is string {
     'SNAPSHOT_',
     'AUDIO:',
     'LOOP:',
+    'MICROSCORE:',
     'STICKER:',
     'LATENCY:',
     'LATENCY_CALIBRATION:',
@@ -187,6 +202,7 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
     songs: [],
     audioItems: [],
     loopItems: [],
+    microScores: [],
     didacticNotes: [],
     studentQuestions: []
   };
@@ -299,16 +315,28 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
     // 3. AUDIO Tokens (AUDIO:url|duration|date|label|author|visibility|songTag)
     if (str.startsWith('AUDIO:')) {
       const parts = str.substring(6).split('|');
-      result.audioItems.push({
-        url: parts[0] || '',
-        duration: parseFloat(parts[1]) || 60,
-        date: parts[2],
-        label: parts[3] || 'Aufnahme',
-        author: parts[4] === 'student' ? 'student' : 'teacher',
-        visibility: parts[5] || 'shared_with_teacher',
-        songTag: parts[7] || undefined,
-        rawToken: str
-      });
+      const cleanUrl = parts[0]?.replace(/^["']|["']$/g, '').trim() || '';
+      if (cleanUrl) {
+        const existingIdx = result.audioItems.findIndex(a => a.url === cleanUrl);
+        const newItem = {
+          url: cleanUrl,
+          duration: parseFloat(parts[1]) || 60,
+          date: parts[2],
+          label: parts[3] || 'Aufnahme',
+          author: (parts[4] === 'student' ? 'student' : 'teacher') as 'student' | 'teacher',
+          visibility: parts[5] || 'shared_with_teacher',
+          songTag: parts[7] || undefined,
+          rawToken: str
+        };
+        if (existingIdx >= 0) {
+          // If duplicate URL found, prefer the richer token with metadata
+          if (str.includes('|') && !result.audioItems[existingIdx].rawToken.includes('|')) {
+            result.audioItems[existingIdx] = newItem;
+          }
+        } else {
+          result.audioItems.push(newItem);
+        }
+      }
       return;
     }
 
@@ -327,7 +355,26 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
       return;
     }
 
-    // 5. STUDENT_QUESTION Tokens (STUDENT_QUESTION:timestamp|question or ❓ Frage für den Unterricht: ...)
+    // 5. MICROSCORE Tokens (MICROSCORE:{...})
+    if (str.startsWith('MICROSCORE:')) {
+      try {
+        const jsonStr = str.substring('MICROSCORE:'.length).trim();
+        const snippet = JSON.parse(jsonStr);
+        if (snippet && typeof snippet === 'object') {
+          result.microScores.push({
+            id: snippet.id || `snippet-${Date.now()}`,
+            title: snippet.title || 'Übungs-Schnipsel',
+            snippet,
+            rawToken: str
+          });
+        }
+      } catch (err) {
+        console.warn('[homeworkSnapshotHelper] Error parsing MICROSCORE token:', err);
+      }
+      return;
+    }
+
+    // 6. STUDENT_QUESTION Tokens (STUDENT_QUESTION:timestamp|question or ❓ Frage für den Unterricht: ...)
     if (str.startsWith('STUDENT_QUESTION:') || str.startsWith('❓ Frage für den Unterricht:')) {
       let timestamp: string | undefined = undefined;
       let question = '';
@@ -354,7 +401,7 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
       return;
     }
 
-    // 6. Pure Didactic Notes
+    // 7. Pure Didactic Notes
     if (isPureDidacticNote(str)) {
       const sanitized = sanitizeDidacticText(str);
       if (sanitized && !result.didacticNotes.includes(sanitized)) {
@@ -378,6 +425,7 @@ export function buildHomeworkNotesPayload(params: {
   rawSnapshotSongsToken?: string;
   audioTokens?: string[];
   loopTokens?: string[];
+  microScores?: Array<any | string>;
   studentQuestions?: Array<{ question: string; timestamp?: string } | string>;
 }): string {
   const finalNotesList: string[] = [];
@@ -394,8 +442,17 @@ export function buildHomeworkNotesPayload(params: {
 
   // 2. Audio & Loop tokens
   if (params.audioTokens) {
+    const seenAudioUrls = new Set<string>();
     params.audioTokens.forEach(tok => {
-      if (tok && !finalNotesList.includes(tok)) finalNotesList.push(tok);
+      if (!tok) return;
+      if (tok.startsWith('AUDIO:')) {
+        const cleanUrl = tok.substring(6).split('|')[0]?.replace(/^["']|["']$/g, '').trim();
+        if (cleanUrl) {
+          if (seenAudioUrls.has(cleanUrl)) return;
+          seenAudioUrls.add(cleanUrl);
+        }
+      }
+      if (!finalNotesList.includes(tok)) finalNotesList.push(tok);
     });
   }
   if (params.loopTokens) {
@@ -404,21 +461,33 @@ export function buildHomeworkNotesPayload(params: {
     });
   }
 
-  // 3. Lehrwerke Snapshot
+  // 3. MicroScore tokens
+  if (params.microScores) {
+    params.microScores.forEach(ms => {
+      if (typeof ms === 'string') {
+        if (ms && !finalNotesList.includes(ms)) finalNotesList.push(ms);
+      } else if (ms && typeof ms === 'object') {
+        const rawTok = ms.rawToken || `MICROSCORE:${JSON.stringify(ms.snippet || ms)}`;
+        if (!finalNotesList.includes(rawTok)) finalNotesList.push(rawTok);
+      }
+    });
+  }
+
+  // 4. Lehrwerke Snapshot
   if (params.lehrwerke && params.lehrwerke.length > 0) {
     finalNotesList.push(`SNAPSHOT_LEHRWERKE:${JSON.stringify(params.lehrwerke)}`);
   } else if (params.rawSnapshotLwToken) {
     finalNotesList.push(params.rawSnapshotLwToken);
   }
 
-  // 4. Songs Snapshot
+  // 5. Songs Snapshot
   if (params.songs && params.songs.length > 0) {
     finalNotesList.push(`SNAPSHOT_SONGS:${JSON.stringify(params.songs)}`);
   } else if (params.rawSnapshotSongsToken) {
     finalNotesList.push(params.rawSnapshotSongsToken);
   }
 
-  // 5. Student Questions (Archived with timestamp)
+  // 6. Student Questions (Archived with timestamp)
   if (params.studentQuestions && params.studentQuestions.length > 0) {
     params.studentQuestions.forEach(q => {
       if (typeof q === 'string') {
@@ -432,4 +501,62 @@ export function buildHomeworkNotesPayload(params: {
   }
 
   return JSON.stringify(finalNotesList);
+}
+
+/**
+ * 🏛️ SSOT: Autoritatives Löschen der laufenden Hausaufgabe
+ * Bereinigt progress_matrix, deaktiviert Standalone-Hausaufgaben,
+ * leert L1/L2 Caches und sendet Realtime-Broadcasts.
+ */
+export async function deleteCurrentHomeworkAuthoritative(
+  studentId: string, 
+  currentWeekNum?: string | number
+): Promise<void> {
+  if (!studentId) return;
+
+  // 1. progress_matrix der aktuellen Woche bereinigen
+  if (currentWeekNum) {
+    await supabase
+      .from('progress_matrix')
+      .update({
+        is_current_homework: false,
+        homework_notes: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('student_id', studentId)
+      .ilike('topic_name', `Hausaufgabe KW ${currentWeekNum}`);
+  }
+
+  // 2. Alle aktuell aktiven Hausaufgabenzeilen des Schülers deaktivieren
+  await supabase
+    .from('progress_matrix')
+    .update({
+      is_current_homework: false,
+      updated_at: new Date().toISOString()
+    })
+    .eq('student_id', studentId)
+    .eq('is_current_homework', true);
+
+  // 3. L1/L2 Caches bereinigen
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem(`campus_homework_notes_${studentId}`);
+      localStorage.removeItem(`campus_homework_week_${studentId}`);
+      const latestKey = `groovelab_student_prep_${studentId}_latest`;
+      const latestRaw = localStorage.getItem(latestKey);
+      if (latestRaw) {
+        const parsed = JSON.parse(latestRaw);
+        parsed.currentWeekNotes = [];
+        parsed.currentWeekItems = [];
+        parsed.parsedCurrentLehrwerke = [];
+        parsed.parsedCurrentSongs = [];
+        localStorage.setItem(latestKey, JSON.stringify(parsed));
+      }
+    } catch {}
+
+    window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId } }));
+    window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', { detail: { studentId } }));
+    window.dispatchEvent(new CustomEvent('groovelab_student_prep_updated', { detail: { studentId } }));
+    window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId } }));
+  }
 }

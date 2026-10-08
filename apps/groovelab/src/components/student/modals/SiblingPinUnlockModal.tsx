@@ -205,7 +205,7 @@ export const SiblingPinUnlockModal: React.FC<SiblingPinUnlockModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 2px 6px rgba(2, 132, 199, 0.4)',
-              border: '2px solid #ffffff'
+              border: 'none'
             }}
           >
             <Lock size={14} strokeWidth={2.5} />

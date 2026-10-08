@@ -484,7 +484,7 @@ function test360UiParity() {
     'LegalTextModal', 'LegalConsentGate', 'DpoAuditPortal', 'InvoicePreviewModal',
     'licenseUtils', 'AVVModal', 'FeedbackHubModal', 'TrustSafetyTab',
     'ParentCampusActivationModal', 'LoginScreen', 'QRLandingPage',
-    'CourtProofExportModal', 'PublicContractVerificationView'
+    'CourtProofExportModal', 'PublicContractVerificationView', 'HerrenbergComplianceModal'
   ];
 
   function stripComments(code: string): string {

@@ -655,9 +655,9 @@ export const SecretaryFacilityLogModal: React.FC<SecretaryFacilityLogModalProps>
                         {/* Status Badge */}
                         {isResolved ? (
                           <span style={{
-                            background: '#dcfce7',
-                            color: '#15803d',
-                            border: '1px solid #86efac',
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            border: '1px solid #10b981',
                             borderRadius: '6px',
                             padding: '1px 7px',
                             fontSize: '0.68rem',

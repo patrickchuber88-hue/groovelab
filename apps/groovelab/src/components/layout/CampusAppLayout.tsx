@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { CampusDesktopSidebar } from './CampusDesktopSidebar';
 import { CampusDesktopHeader } from './CampusDesktopHeader';
@@ -6,6 +6,8 @@ import { CampusMainContentRouter, CampusMainContentRouterProps } from './CampusM
 import { GeminiMobileShell } from '../navigation/GeminiMobileShell';
 import { PwaInstallationModals } from '../ui/PwaInstallationModals';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
+import { updatePwaAppBadge } from '../../services/pwa/pwaBadgeManager';
+import { GlobalCommandPaletteModal } from '../navigation/GlobalCommandPaletteModal';
 
 export interface CampusAppLayoutProps extends CampusMainContentRouterProps {
   // Toast
@@ -203,6 +205,25 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
       setIsSidebarRailCollapsed(false);
     }
   }, [parentUnlocked, isSidebarRailCollapsed, setIsSidebarRailCollapsed]);
+
+  // 🏛️ 0,1% PWA App Badging: Spiegelt unbestätigte Nachrichten & Aufgaben auf dem Homescreen wider
+  useEffect(() => {
+    updatePwaAppBadge(campusUnreadCount ?? 0).catch(() => {});
+  }, [campusUnreadCount]);
+
+  // 🏛️ 0,1% Universal Command Palette (Cmd + K / Ctrl + K)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div className={`app-layout ${isSidebarRailCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -539,6 +560,20 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         )}
 
         {children}
+
+        {/* 🏛️ 0,1% Universal Command Palette (Cmd + K / Ctrl + K) */}
+        <GlobalCommandPaletteModal
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          activePlatform={activePlatform}
+          setActivePlatform={setActivePlatform}
+          activeStudentTab={activeStudentTab}
+          setActiveStudentTab={setActiveStudentTab}
+          userRole={user?.role}
+          toggleMusicStandMode={toggleMusicStandMode}
+          isMusicStandMode={isMusicStandMode}
+          handleHelpRequest={handleHelpRequest}
+        />
       </div>
     );
   })()}

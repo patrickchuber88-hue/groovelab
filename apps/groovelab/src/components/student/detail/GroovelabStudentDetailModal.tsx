@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  X, Flame, Zap, Music, Radio, LogOut, Check, Sliders, 
+  X, Zap, Music, Radio, LogOut, Check, Sliders, 
   Award, Sparkles, AlertCircle, RefreshCw, Disc
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
-import { resolveCampusStudentAvatar } from '../../../utils/avatarHelper';
-import { SkillRadarPentagon } from '../../common/SkillRadarPentagon';
+import { resolveGrooveLabStudentAvatar } from '../../../utils/avatarHelper';
+import StudentRadarChart from '../../StudentRadarChart';
 
 export interface GroovelabStudentDetailModalProps {
   student: any;
@@ -54,39 +54,44 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
   const [activeSession, setActiveSession] = useState<any>(student?.session || null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 3. 5-Säulen Skill-Radar State
-  const [pillarLevels, setPillarLevels] = useState<Record<string, number>>(() => {
-    try {
-      const dbLevels = student?.skill_radar_levels;
-      if (dbLevels && typeof dbLevels === 'object') {
-        return {
-          rhythmus: Number(dbLevels.rhythmus || 1),
-          technik: Number(dbLevels.technik || 1),
-          klang: Number(dbLevels.klang || dbLevels.intonation || 1),
-          ausdruck: Number(dbLevels.ausdruck || 1),
-          repertoire: Number(dbLevels.repertoire || 1)
-        };
-      }
-      const savedOverride = typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_skill_overrides_${studentId}`) : null;
-      if (savedOverride) {
-        const parsed = JSON.parse(savedOverride);
-        return {
-          rhythmus: Number(parsed.rhythmus || 1),
-          technik: Number(parsed.technik || 1),
-          klang: Number(parsed.klang || 1),
-          ausdruck: Number(parsed.ausdruck || 1),
-          repertoire: Number(parsed.repertoire || 1)
-        };
-      }
-    } catch (e) {
-      // Fallback
-    }
-    return { rhythmus: 1, technik: 1, klang: 1, ausdruck: 1, repertoire: 1 };
-  });
+  // 3. GrooveLab 5-Instrumenten-Radar State (Gitarre, Bass, Drums, Piano, Gesang)
+  const studentRadarData = useMemo(() => {
+    const instruments = [
+      { key: 'Gitarre', match: ['git'] },
+      { key: 'Bass', match: ['bass'] },
+      { key: 'Drums', match: ['drum', 'schlag'] },
+      { key: 'Piano', match: ['piano', 'key'] },
+      { key: 'Gesang', match: ['vocal', 'gesang'] }
+    ];
 
-  const [activeWeeklyFocus, setActiveWeeklyFocus] = useState<string>(() => {
-    return student?.weekly_focus_tag || 'ausgeglichen';
-  });
+    const studentSongsList = activeSongs || [];
+    const mainInst = String(student?.instrument || '').toLowerCase();
+
+    return instruments.map(({ key, match }) => {
+      const matching = studentSongsList.filter((s: any) => {
+        const sInst = String(s.instrument || s.songs?.instrument || '').toLowerCase();
+        return match.some(m => sInst.includes(m));
+      });
+
+      let maxProgress = matching.length > 0
+        ? Math.max(0, ...matching.map((s: any) => s.progress || (s.is_stage_ready ? 100 : 0)))
+        : 0;
+
+      // Wenn der Schüler dieses Instrument als Hauptfach hat, mind. 30% Basislevel garantieren
+      if (maxProgress === 0 && match.some(m => mainInst.includes(m))) {
+        maxProgress = 30;
+      }
+
+      // Didaktische 15%-Starter-Baseline: Garantiert, dass das Polygon niemals zu einer 0-Fläche kollabiert
+      const xp = Math.max(15, maxProgress);
+
+      return {
+        instrument: key,
+        xp,
+        realProgress: maxProgress
+      };
+    });
+  }, [activeSongs, student?.instrument]);
 
   // ♿ BFSG 2025 / WCAG 2.2 AA: Escape-Taste schließt Modal
   useEffect(() => {
@@ -148,10 +153,10 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
       // 4. GrooveLab Song-Fortschritt
       const { data: progData } = await supabase
         .from('progress_matrix')
-        .select('*, songs(id, title, artist, tempo_bpm, genre)')
+        .select('*, songs(id, title, artist, tempo_bpm, genre, instrumentation)')
         .eq('user_id', studentId)
         .order('updated_at', { ascending: false })
-        .limit(5);
+        .limit(30);
 
       if (progData) {
         setActiveSongs(progData);
@@ -166,18 +171,6 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
   useEffect(() => {
     loadGroovelabData();
   }, [loadGroovelabData]);
-
-  // Wochenfokus ändern (Lehrer-Aktion)
-  const handleSetWeeklyFocus = async (focusKey: string) => {
-    setActiveWeeklyFocus(focusKey);
-    try {
-      await supabase.from('users').update({ weekly_focus_tag: focusKey }).eq('id', studentId);
-      setToastMessage(`Wochenfokus auf "${focusKey}" gesetzt`);
-      setTimeout(() => setToastMessage(null), 2500);
-    } catch (err) {
-      console.error('Failed to update weekly focus:', err);
-    }
-  };
 
   // Station umsetzen (Lehrer-Aktion)
   const handleSwitchStation = async () => {
@@ -244,7 +237,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
   };
 
   const avatarSrc = useMemo(() => {
-    return resolveCampusStudentAvatar(student);
+    return resolveGrooveLabStudentAvatar(student);
   }, [student]);
 
   return (
@@ -418,20 +411,20 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
             </div>
           </div>
 
-          {/* Quick Metrics (XP & Flames) */}
+          {/* Quick Metrics (Songs & XP) - Zero-Streak Invariant im GrooveLab */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              background: 'rgba(234, 179, 8, 0.15)',
+              border: '1px solid rgba(234, 179, 8, 0.3)',
               borderRadius: '14px',
               padding: '8px 14px',
               textAlign: 'center'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#f87171' }}>
-                <Flame size={16} fill="#f87171" />
-                <span style={{ fontSize: '16px', fontWeight: 900 }}>{stats?.current_streak_weeks || stats?.streak_weeks || 1}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#facc15' }}>
+                <Music size={16} />
+                <span style={{ fontSize: '16px', fontWeight: 900 }}>{activeSongs.length}</span>
               </div>
-              <span style={{ fontSize: '10px', fontWeight: 700, color: '#fca5a5', textTransform: 'uppercase' }}>Streak</span>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#fde047', textTransform: 'uppercase' }}>Songs</span>
             </div>
 
             <div style={{
@@ -478,7 +471,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
             </div>
           )}
 
-          {/* Section 1: Skill-Radar Pentagramm (5 Säulen) */}
+          {/* Section 1: GrooveLab Instrumenten-Radar (Die 5 Band-Instrumente) */}
           <div style={{
             background: '#ffffff',
             borderRadius: '20px',
@@ -486,42 +479,30 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
             border: '1px solid #e2e8f0',
             boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
-                  GrooveLab Kompetenz-Radar
+                  GrooveLab Instrumenten-Radar
                 </h3>
                 <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-                  5 didaktische Säulen – Klicke eine Säule, um den Wochenschwerpunkt zu setzen.
+                  Band-Vielseitigkeit auf den 5 Kern-Instrumenten (Gitarre, Bass, Drums, Piano, Gesang)
                 </p>
               </div>
-              {activeWeeklyFocus && activeWeeklyFocus !== 'ausgeglichen' && (
-                <span style={{
-                  background: 'rgba(250, 204, 21, 0.15)',
-                  color: '#854d0e',
-                  border: '1px solid #facc15',
-                  padding: '4px 10px',
-                  borderRadius: '10px',
-                  fontSize: '11px',
-                  fontWeight: 800
-                }}>
-                  🎯 Fokus: {activeWeeklyFocus}
-                </span>
-              )}
+              <span style={{
+                background: 'rgba(250, 204, 21, 0.15)',
+                color: '#854d0e',
+                border: '1px solid #facc15',
+                padding: '4px 10px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 800
+              }}>
+                🎸 Multi-Instrumentalist
+              </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <SkillRadarPentagon
-                levels={pillarLevels}
-                activeFocusTags={activeWeeklyFocus !== 'ausgeglichen' ? [activeWeeklyFocus] : []}
-                size="compact"
-                uiLevel={studentUiLevel}
-                studentName={firstName || 'Schüler'}
-                instrumentName={student?.instrument || 'Schlagzeug'}
-                onSkillClick={(tagKey) => {
-                  handleSetWeeklyFocus(activeWeeklyFocus === tagKey ? 'ausgeglichen' : tagKey);
-                }}
-              />
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', minHeight: '340px' }}>
+              <StudentRadarChart studentRadarData={studentRadarData} />
             </div>
           </div>
 

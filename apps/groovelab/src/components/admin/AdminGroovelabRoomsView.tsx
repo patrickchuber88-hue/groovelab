@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, GripVertical, MapPin, Plus, Tablet, Trash2 } from 'lucide-react';
 import { getStationColor } from '../../utils/adminColorHelpers';
+import { IpadColorWheelPickerModal } from './color/IpadColorWheelPickerModal';
 
 export interface AdminGroovelabRoomsViewProps {
   rooms: any[];
@@ -17,6 +18,8 @@ export interface AdminGroovelabRoomsViewProps {
   triggerBatchAddStations: (roomId: string) => void;
   handleDeleteRoom: (roomId: string) => void;
   handleDeleteStation: (stationId: string) => void;
+  onUpdateStationColor?: (stationId: string, newColor: string) => Promise<void> | void;
+  supabase?: any;
   brandColor?: string;
 }
 
@@ -35,8 +38,12 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
   triggerBatchAddStations,
   handleDeleteRoom,
   handleDeleteStation,
+  onUpdateStationColor,
+  supabase,
   brandColor = '#eab308'
 }) => {
+  const [editingColorStation, setEditingColorStation] = useState<any | null>(null);
+
   const groovelabRooms = React.useMemo(() => {
     return (rooms || []).filter(r => Boolean(r.is_groovelab_active));
   }, [rooms]);
@@ -229,25 +236,67 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
                     if (!aIsLehrer && bIsLehrer) return 1;
                     return 0;
                   })
-                  .map(station => (
-                    <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, color: '#475569' }}>
-                        <Tablet size={16} color={getStationColor(station.name, station.color)} /> {station.name}
-                      </div>
-                      {station.name.toLowerCase() !== 'lehrer ipad' && (
-                        <button 
-                          onClick={() => handleDeleteStation(station.id)} 
-                          aria-label={`Übeplatz ${station.name} löschen`}
-                          title={`Übeplatz ${station.name} löschen`}
-                          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} 
-                          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} 
-                          onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                  .map(station => {
+                    const stColor = getStationColor(station.name, station.color);
+                    return (
+                      <div key={station.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}>
+                        <button
+                          type="button"
+                          onClick={() => setEditingColorStation(station)}
+                          title={`Klicken, um Farbe von ${station.name} im Farbkreis anzupassen`}
+                          aria-label={`Farbe von ${station.name} im Farbkreis anpassen`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            fontWeight: 700,
+                            color: '#334155',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '10px',
+                            textAlign: 'left',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.color = '#0f172a';
+                            e.currentTarget.style.backgroundColor = '#f1f5f9';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.color = '#334155';
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                         >
-                          <Trash2 size={14} />
+                          <div style={{
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '9px',
+                            background: `${stColor}18`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'transform 0.15s ease'
+                          }}>
+                            <Tablet size={16} color={stColor} />
+                          </div>
+                          <span>{station.name}</span>
                         </button>
-                      )}
-                    </div>
-                  ))}
+                        {station.name.toLowerCase() !== 'lehrer ipad' && (
+                          <button 
+                            onClick={() => handleDeleteStation(station.id)} 
+                            aria-label={`Übeplatz ${station.name} löschen`}
+                            title={`Übeplatz ${station.name} löschen`}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} 
+                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} 
+                            onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 {stations.filter(s => s.room_id === room.id).length === 0 && (
                   <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8125rem', border: '1px dashed #e2e8f0', borderRadius: '14px' }}>Keine Übeplätze definiert.</div>
                 )}
@@ -257,6 +306,20 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
         </div>
         )}
       </div>
+
+      {editingColorStation && (
+        <IpadColorWheelPickerModal
+          station={editingColorStation}
+          onClose={() => setEditingColorStation(null)}
+          onColorChange={async (stationId, newColor) => {
+            if (onUpdateStationColor) {
+              await onUpdateStationColor(stationId, newColor);
+            }
+          }}
+          supabase={supabase}
+          brandColor={brandColor}
+        />
+      )}
     </div>
   );
 };

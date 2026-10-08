@@ -3,6 +3,9 @@
  * Isolated pure functions to eliminate cyclic dependencies and ensure 100% Vite Fast Refresh compliance.
  */
 
+import { isWeeklySnapshotContainer } from '../../tabs/briefing/homeworkSummaryHelper';
+export { isWeeklySnapshotContainer };
+
 // 🛡️ Enterprise+ Song Deduplication & Fuzzy Matcher Goldstandard
 export const levenshteinDistance = (s1: string, s2: string): number => {
   if (s1 === s2) return 0;
@@ -40,9 +43,21 @@ export const normalizeSongStr = (str: string | undefined | null): string => {
     .trim();
 };
 
+export const stripInstrumentFromTitle = (str: string | undefined | null): string => {
+  if (!str) return '';
+  return str
+    .replace(/^campus[- ]song\s*[-–:]\s*/i, '')
+    .replace(/^campus[- ]song\s+/i, '')
+    .replace(/[\u2010-\u2015\u2212\uFF0D]/g, '-')
+    .replace(/\s*\([^)]*\)\s*$/g, '')
+    .trim();
+};
+
 export const formatDisplayTitle = (str: string | undefined | null): string => {
   if (!str) return '';
   const cleaned = str
+    .replace(/^campus[- ]song\s*[-–:]\s*/i, '')
+    .replace(/^campus[- ]song\s+/i, '')
     .replace(/[\u2010-\u2015\u2212\uFF0D]/g, '-')
     .replace(/\s*\([^)]*\)\s*$/g, '')
     .trim();
@@ -71,8 +86,13 @@ export const extractSongArtistAndTitle = (songOrItem: any): {
   let rawArtist = (songOrItem.songs?.artist || songOrItem.artist || '').trim();
   let rawTitle = (songOrItem.songs?.title || songOrItem.song_title || songOrItem.title || '').trim();
 
-  const rawTopic = songOrItem.topic_name || '';
-  if (rawTopic && !rawTopic.includes(' - Seite ') && !rawTopic.startsWith('Hausaufgabe KW ')) {
+  if (/^campus[- ]song$/i.test(rawArtist)) {
+    rawArtist = '';
+  }
+  rawTitle = rawTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+
+  const rawTopic = (songOrItem.topic_name || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+  if (rawTopic && !rawTopic.includes(' - Seite ') && !rawTopic.startsWith('Hausaufgabe KW ') && !/^hausaufgabe kw\s*\d+/i.test(rawTopic)) {
     const normTopic = rawTopic.replace(/[\u2010-\u2015\u2212\uFF0D]/g, '-');
     if (normTopic.includes(' - ')) {
       const parts = normTopic.split(' - ');
@@ -127,3 +147,151 @@ export const areSongsIdentical = (a: any, b: any): boolean => {
 
   return false;
 };
+
+/**
+ * 🛡️ 0.1% Goldstandard Sanitizer: Filtert Test-, Dummy- und Container-Artefakte heraus.
+ */
+export const isDummyOrTestSong = (songOrTitle?: any): boolean => {
+  if (!songOrTitle) return false;
+  const rawTitle = typeof songOrTitle === 'string'
+    ? songOrTitle
+    : (songOrTitle.title || songOrTitle.topic_name || songOrTitle.song_title || '');
+  if (isWeeklySnapshotContainer(rawTitle)) return true;
+  const t = rawTitle.trim().toLowerCase();
+  const a = (typeof songOrTitle === 'object' ? (songOrTitle.artist || songOrTitle.songs?.artist || '') : '').trim().toLowerCase();
+  if (isWeeklySnapshotContainer(a)) return true;
+  if (t === 'test' || t === 'test - test' || t === 'test-test' || t === 'unbenannter song' || t === 'song') return true;
+  if (a === 'test' && t === 'test') return true;
+  if (t === 'campus-song' || t === 'campus song') return true;
+  return false;
+};
+
+export const collectHomeworkSongsFromSources = ({
+  rawItems,
+  activeSongSkills,
+  assignedCampusSongs,
+  studentId,
+  getCleanPageNotes
+}: {
+  rawItems: any[];
+  activeSongSkills: any[];
+  assignedCampusSongs: any[];
+  studentId?: string;
+  getCleanPageNotes: (notes: any) => string;
+}): any[] => {
+  const result: any[] = [];
+  const addSong = (candidateSong: any) => {
+    if (!candidateSong || isDummyOrTestSong(candidateSong)) return;
+    if (isWeeklySnapshotContainer(candidateSong.topic_name) || isWeeklySnapshotContainer(candidateSong.title)) return;
+    if (candidateSong.is_campus_active === false || candidateSong.songs?.is_campus_active === false) return;
+    const existingIdx = result.findIndex(existing => areSongsIdentical(existing, candidateSong));
+    if (existingIdx === -1) {
+      result.push(candidateSong);
+    } else {
+      const existing = result[existingIdx];
+      if (!existing.homework_notes && candidateSong.homework_notes) existing.homework_notes = candidateSong.homework_notes;
+      if (!existing.topic_name && candidateSong.topic_name) existing.topic_name = candidateSong.topic_name;
+    }
+  };
+
+  (rawItems || []).forEach(item => {
+    if (item.topic_name && item.topic_name.includes(' - Seite ')) return;
+    if (item.topic_name && isWeeklySnapshotContainer(item.topic_name)) return;
+    if (isDummyOrTestSong(item) || item.is_campus_active === false || item.songs?.is_campus_active === false) return;
+    const sId = studentId || 'default';
+    const localHw = studentId
+      ? (localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+         (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null))
+      : null;
+    if (localHw === 'false') return;
+    const isSongHw = localHw === 'true' || (localHw !== 'false' && (Boolean(item.is_current_homework) || Boolean(item.homework_notes) || Boolean(item.teacher_notes)));
+    if (!isSongHw) return;
+
+    const cachedNote = localStorage.getItem(`song_note_${sId}_${item.id}`) ||
+                       localStorage.getItem(`song_note_${sId}_${item.song_id}`) ||
+                       item.homework_notes || item.teacher_notes || '';
+    addSong({ ...item, is_current_homework: true, homework_notes: cachedNote });
+  });
+
+  (activeSongSkills || []).forEach(skill => {
+    if (isDummyOrTestSong(skill) || isDummyOrTestSong(skill.songs)) return;
+    if (!skill.songs || skill.songs.is_campus_active !== true || skill.is_campus_active === false) return;
+    const sId = studentId || 'default';
+    const localHw = studentId
+      ? (localStorage.getItem(`song_hw_${sId}_${skill.id}`) ??
+         (skill.song_id ? localStorage.getItem(`song_hw_${sId}_${skill.song_id}`) : null) ??
+         (skill.songs?.id ? localStorage.getItem(`song_hw_${sId}_${skill.songs.id}`) : null))
+      : null;
+    if (localHw === 'false') return;
+    const isHwInLs = localHw === 'true' || (localHw !== 'false' && Boolean(skill.is_current_homework));
+    if (isHwInLs) {
+      let songArtist = (skill.songs?.artist || skill.artist || '').trim();
+      let songTitle = (skill.songs?.title || skill.title || skill.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+      if (songTitle.includes(' - Seite ') || isWeeklySnapshotContainer(songTitle)) return;
+      if (isDummyOrTestSong(songTitle) || isDummyOrTestSong(songArtist)) return;
+      const cleanTitle = stripInstrumentFromTitle(songTitle);
+      const fullTitle = songArtist && !cleanTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanTitle}`
+        : `${cleanTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
+      const cachedNote = localStorage.getItem(`song_note_${sId}_${skill.id}`) ||
+                         localStorage.getItem(`song_note_${sId}_${skill.song_id}`) ||
+                         skill.homework_notes || skill.teacher_notes || '';
+      addSong({
+        id: skill.id,
+        song_id: skill.song_id,
+        topic_name: fullTitle,
+        is_current_homework: true,
+        status: 'IN_PROGRESS',
+        homework_notes: cachedNote,
+        songs: skill.songs
+      });
+    }
+  });
+
+  (assignedCampusSongs || []).forEach(cSong => {
+    if (cSong.is_campus_active === false || cSong.songs?.is_campus_active === false) return;
+    const sId = studentId || 'default';
+    const localHw = studentId
+      ? (localStorage.getItem(`song_hw_${sId}_${cSong.id}`) ??
+         (cSong.song_id ? localStorage.getItem(`song_hw_${sId}_${cSong.song_id}`) : null) ??
+         (cSong.songs?.id ? localStorage.getItem(`song_hw_${sId}_${cSong.songs.id}`) : null))
+      : null;
+    if (localHw === 'false') return;
+    const isHwInLs = localHw === 'true' || (localHw !== 'false' && Boolean(cSong.is_current_homework));
+    if (isHwInLs) {
+      let songArtist = (cSong.songs?.artist || cSong.artist || '').trim();
+      let songTitle = (cSong.songs?.title || cSong.title || cSong.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+      if (songTitle.includes(' - Seite ') || isWeeklySnapshotContainer(songTitle)) return;
+      if (isDummyOrTestSong(songTitle) || isDummyOrTestSong(songArtist)) return;
+      const cleanTitle = stripInstrumentFromTitle(songTitle);
+      const fullTitle = songArtist && !cleanTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanTitle}`
+        : `${cleanTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
+      const cachedNote = localStorage.getItem(`song_note_${sId}_${cSong.id}`) ||
+                         (cSong.song_id && localStorage.getItem(`song_note_${sId}_${cSong.song_id}`)) ||
+                         cSong.homework_notes || cSong.teacher_notes || '';
+      addSong({
+        id: cSong.id,
+        song_id: cSong.song_id || cSong.songs?.id,
+        topic_name: fullTitle,
+        is_current_homework: true,
+        status: 'IN_PROGRESS',
+        homework_notes: cachedNote,
+        songs: cSong.songs
+      });
+    }
+  });
+
+  return result;
+};
+

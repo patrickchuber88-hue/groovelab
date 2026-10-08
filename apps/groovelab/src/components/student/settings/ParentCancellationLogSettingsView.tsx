@@ -56,8 +56,8 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
         <div style={{
           padding: '48px 24px',
           borderRadius: '24px',
-          background: '#f0fdf4',
-          border: '1.5px dashed #86efac',
+          background: '#ecfdf5',
+          border: '1.5px dashed #10b981',
           textAlign: 'center',
           display: 'flex',
           flexDirection: 'column',
@@ -68,18 +68,19 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
             width: '56px',
             height: '56px',
             borderRadius: '50%',
-            background: '#dcfce7',
-            color: '#16a34a',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
           }}>
             <CheckCircle size={30} />
           </div>
-          <div style={{ fontSize: '1.08rem', fontWeight: 950, color: '#15803d' }}>
+          <div style={{ fontSize: '1.08rem', fontWeight: 950, color: '#065f46' }}>
             Keine gemeldeten Abwesenheiten
           </div>
-          <div style={{ fontSize: '0.84rem', color: '#166534', maxWidth: '400px', lineHeight: 1.45, fontWeight: 550 }}>
+          <div style={{ fontSize: '0.84rem', color: '#047857', maxWidth: '400px', lineHeight: 1.45, fontWeight: 550 }}>
             In diesem Schuljahr ({schoolYearLabel}) wurden keine Unterrichtsstunden durch den Schüler abgesagt. Alle Termine wurden regulär wahrgenommen.
           </div>
         </div>
@@ -167,17 +168,18 @@ export const ParentCancellationLogSettingsView: React.FC<ParentCancellationLogSe
                         gap: '5px',
                         padding: '6px 12px',
                         borderRadius: '10px',
-                        background: '#f0fdf4',
-                        border: '1.5px solid #86efac',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: '#ffffff',
                         fontSize: '0.74rem',
                         fontWeight: 850,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)'
                       }}
                       className="hover-scale"
                       title="Absage widerrufen und Termin im Stundenplan reaktivieren"
                     >
-                      <RotateCcw size={13} />
+                      <RotateCcw size={13} color="#ffffff" />
                       <span>Absage zurücknehmen</span>
                     </button>
                   )}

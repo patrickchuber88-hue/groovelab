@@ -67,7 +67,7 @@ export const getTrackPedagogicalType = (label?: string, index: number = 0) => {
     l.includes('uebetempo') ||
     l.includes('schnecke')
   ) {
-    return { icon: '🐢', tag: 'Langsam', type: 'slow', color: '#10b981', border: '#86efac' };
+    return { icon: '🐢', tag: 'Langsam', type: 'slow', color: '#10b981', border: '#10b981' };
   }
   if (
     l.includes('schnell') ||
@@ -502,18 +502,18 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                     ? isSel
                       ? '1.5px solid #93c5fd'
                       : hasListened
-                      ? '1px solid #86efac'
+                      ? '1px solid #10b981'
                       : '1px solid #e2e8f0'
                     : isAmber
                     ? isSel
                       ? '1.5px solid #fde047'
                       : hasListened
-                      ? '1px solid rgba(74, 222, 128, 0.5)'
+                      ? '1px solid rgba(16, 185, 129, 0.5)'
                       : '1px solid rgba(255, 255, 255, 0.14)'
                     : isSel
                       ? '1.5px solid rgba(165, 180, 252, 0.85)'
                       : hasListened
-                      ? '1px solid rgba(74, 222, 128, 0.45)'
+                      ? '1px solid rgba(16, 185, 129, 0.45)'
                       : '1px solid rgba(255, 255, 255, 0.14)',
                   borderRadius: '100px',
                   backdropFilter: 'blur(16px)',
@@ -559,10 +559,10 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                     fontSize: '0.82rem',
                     fontWeight: 950,
                     color: isLight
-                      ? isSel ? '#ffffff' : hasListened ? '#15803d' : '#475569'
+                      ? isSel ? '#ffffff' : hasListened ? '#059669' : '#475569'
                       : isAmber
-                      ? isSel ? '#ffffff' : hasListened ? '#86efac' : '#f1f5f9'
-                      : isSel ? '#ffffff' : hasListened ? '#86efac' : '#cbd5e1',
+                      ? isSel ? '#ffffff' : hasListened ? '#a7f3d0' : '#f1f5f9'
+                      : isSel ? '#ffffff' : hasListened ? '#a7f3d0' : '#cbd5e1',
                     fontVariantNumeric: 'tabular-nums'
                   }}
                 >
@@ -762,25 +762,25 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
               : countInStep !== null
                 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
                 : isPlaying
-                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                 : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
             color: '#ffffff',
             border: isLight
               ? countInStep !== null
                 ? '2px solid #fde047'
                 : isPlaying
-                ? '2px solid #86efac'
+                ? 'none'
                 : '2px solid #bfdbfe'
               : isAmber
               ? countInStep !== null
                 ? '2px solid rgba(253, 224, 71, 0.95)'
                 : isPlaying
-                ? '2px solid rgba(134, 239, 172, 0.95)'
+                ? 'none'
                 : '2px solid rgba(253, 224, 71, 0.95)'
               : countInStep !== null
                 ? '2px solid rgba(253, 224, 71, 0.85)'
                 : isPlaying
-                ? '2px solid rgba(134, 239, 172, 0.85)'
+                ? 'none'
                 : '2px solid rgba(165, 180, 252, 0.85)',
             borderRadius: '50%',
             width: isMusicStandMode ? '54px' : '50px',
@@ -966,9 +966,9 @@ export const PreFlightAudioPreviewButton: React.FC<{
       type="button"
       onClick={toggle}
       style={{
-        background: isPlaying ? '#16a34a' : isCompact ? '#f0fdf4' : '#ffffff',
-        color: isPlaying ? '#ffffff' : '#15803d',
-        border: isCompact ? '1.5px solid #86efac' : '1.5px solid #86efac',
+        background: isPlaying ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : isCompact ? '#ecfdf5' : '#ffffff',
+        color: isPlaying ? '#ffffff' : '#059669',
+        border: isPlaying ? 'none' : '1.5px solid #10b981',
         borderRadius: isCompact ? '50%' : '100px',
         width: isCompact ? '24px' : 'auto',
         height: isCompact ? '24px' : 'auto',
@@ -1185,9 +1185,9 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                   type="button"
                   onClick={(e) => toggleTrack(trIdx, e)}
                   style={{
-                    background: isCurrentPlaying ? '#16a34a' : isSelected ? '#dcfce7' : '#f0fdf4',
-                    color: isCurrentPlaying ? '#ffffff' : '#15803d',
-                    border: '1.5px solid #86efac',
+                    background: isCurrentPlaying ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : isSelected ? '#ecfdf5' : '#ffffff',
+                    color: isCurrentPlaying ? '#ffffff' : '#059669',
+                    border: isCurrentPlaying ? 'none' : '1.5px solid #10b981',
                     borderRadius: '50%',
                     width: '24px',
                     height: '24px',
@@ -1196,7 +1196,7 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: isCurrentPlaying ? '0 2px 8px rgba(22, 163, 74, 0.35)' : 'none',
+                    boxShadow: isCurrentPlaying ? '0 2px 8px rgba(16, 185, 129, 0.35)' : 'none',
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"
@@ -1219,19 +1219,19 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
           alignItems: 'center',
           justifyContent: 'space-between',
           background: '#ffffff',
-          border: '1.5px solid #86efac',
+          border: '1.5px solid #10b981',
           borderRadius: '16px',
           padding: '8px 12px',
-          boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
+          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
               onClick={() => toggleTrack(0)}
               style={{
-                background: isPlaying ? '#16a34a' : '#dcfce7',
-                color: isPlaying ? '#ffffff' : '#15803d',
-                border: '1.5px solid #86efac',
+                background: isPlaying ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ecfdf5',
+                color: isPlaying ? '#ffffff' : '#059669',
+                border: isPlaying ? 'none' : '1.5px solid #10b981',
                 borderRadius: '50%',
                 width: '32px',
                 height: '32px',

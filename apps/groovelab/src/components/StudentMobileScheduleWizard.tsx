@@ -557,11 +557,12 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               type="button"
               onClick={() => setShowSaturday(!showSaturday)}
               style={{
-                background: showSaturday ? '#f0fdf4' : '#ffffff',
-                border: `1px solid ${showSaturday ? '#86efac' : '#cbd5e1'}`,
-                padding: '3px 8px',
+                background: showSaturday ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                border: showSaturday ? 'none' : '1px solid #cbd5e1',
+                padding: showSaturday ? '4px 9px' : '3px 8px',
                 borderRadius: '6px',
-                color: showSaturday ? '#166534' : '#475569',
+                color: showSaturday ? '#ffffff' : '#475569',
+                boxShadow: showSaturday ? '0 2px 6px rgba(16, 185, 129, 0.28)' : 'none',
                 fontWeight: 750,
                 fontSize: '0.70rem',
                 cursor: 'pointer',
@@ -745,9 +746,9 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                     let icon = null;
 
                     if (status === 'wunsch') {
-                      bg = '#f0fdf4';
-                      border = '2px solid #16a34a';
-                      icon = <Star size={14} fill="#16a34a" color="#16a34a" />;
+                      bg = '#ecfdf5';
+                      border = '2px solid #10b981';
+                      icon = <Star size={14} fill="#10b981" color="#10b981" />;
                     } else if (status === 'gesperrt') {
                       bg = '#fef2f2';
                       border = '2px solid #dc2626';
@@ -813,8 +814,8 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
 
           {/* Dual Live Hours Counter Badge */}
           <div style={{
-            background: selectedHours >= 2.0 ? '#f0fdf4' : '#fefce8',
-            border: `1px solid ${selectedHours >= 2.0 ? '#bbf7d0' : '#fef08a'}`,
+            background: selectedHours >= 2.0 ? '#ecfdf5' : '#fefce8',
+            border: `1px solid ${selectedHours >= 2.0 ? '#10b981' : '#fef08a'}`,
             borderRadius: '14px',
             padding: '10px 14px',
             fontSize: '0.78rem',
@@ -826,10 +827,10 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             gap: '8px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clock size={16} color={selectedHours >= 2.0 ? '#16a34a' : '#d97706'} />
+              <Clock size={16} color={selectedHours >= 2.0 ? '#10b981' : '#d97706'} />
               <div>
                 <span>
-                  🟢 Wunsch: <strong style={{ color: '#166534' }}>{selectedHours.toFixed(1)} Std.</strong>
+                  🟢 Wunsch: <strong style={{ color: '#059669' }}>{selectedHours.toFixed(1)} Std.</strong>
                 </span>
                 {lockedHours > 0 && (
                   <span style={{ marginLeft: '10px' }}>

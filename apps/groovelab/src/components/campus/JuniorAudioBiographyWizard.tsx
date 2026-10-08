@@ -604,7 +604,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                           <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#10b981', color: 'white', padding: '1px 7px', borderRadius: '100px' }}>
                             MEILENSTEIN
                           </span>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: selectedMilestone?.type === 'first_song' ? '#fef3c7' : '#dcfce7', color: selectedMilestone?.type === 'first_song' ? '#b45309' : '#047857', padding: '1px 7px', borderRadius: '100px' }}>
+                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: selectedMilestone?.type === 'first_song' ? '#fef3c7' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: selectedMilestone?.type === 'first_song' ? '#b45309' : '#ffffff', padding: '1px 7px', borderRadius: '100px' }}>
                             +{selectedMilestone?.type === 'first_song' ? 100 : 50} XP
                           </span>
                           <span style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 800 }}>
@@ -651,9 +651,9 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                               }}
                               style={{
                                 padding: '8px 6px', borderRadius: '12px', textAlign: 'center',
-                                border: isMSelected ? '2px solid #10b981' : '1px solid #cbd5e1',
-                                background: isMSelected ? '#dcfce7' : '#ffffff',
-                                color: isMSelected ? '#047857' : '#334155',
+                                border: isMSelected ? 'none' : '1px solid #cbd5e1',
+                                background: isMSelected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                                color: isMSelected ? '#ffffff' : '#334155',
                                 fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
                                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                               }}
@@ -1061,14 +1061,14 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 width: '90px',
                 height: '90px',
                 borderRadius: '28px',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '2px solid #86efac',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
                 margin: '0 auto',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '3rem',
-                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.2)'
+                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25)'
               }}>
                 {instrumentInfo.emoji}
               </div>
@@ -1348,7 +1348,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   : 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
                 borderRadius: '24px',
                 padding: '18px',
-                border: `1.5px solid ${isGiftFlow ? '#fdba74' : '#86efac'}`,
+                border: `1.5px solid ${isGiftFlow ? '#fdba74' : '#10b981'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',

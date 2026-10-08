@@ -3270,9 +3270,9 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                           borderRadius: '100px',
                           fontSize: '0.80rem',
                           fontWeight: 900,
-                          background: slaUptime >= 99.95 ? '#dcfce7' : slaUptime >= 99.00 ? '#fef3c7' : '#fee2e2',
-                          color: slaUptime >= 99.95 ? '#15803d' : slaUptime >= 99.00 ? '#b45309' : '#b91c1c',
-                          border: `1px solid ${slaUptime >= 99.95 ? '#86efac' : slaUptime >= 99.00 ? '#fde68a' : '#fca5a5'}`
+                          background: slaUptime >= 99.95 ? '#ecfdf5' : slaUptime >= 99.00 ? '#fef3c7' : '#fee2e2',
+                          color: slaUptime >= 99.95 ? '#059669' : slaUptime >= 99.00 ? '#b45309' : '#b91c1c',
+                          border: `1px solid ${slaUptime >= 99.95 ? '#10b981' : slaUptime >= 99.00 ? '#fde68a' : '#fca5a5'}`
                         }}>
                           {slaUptime >= 99.95 ? 'SLA zu 100% erfüllt (0% Credit)' : slaUptime >= 99.00 ? '10% Service-Gutschrift' : slaUptime >= 95.00 ? '25% Service-Gutschrift' : '50% Service-Gutschrift'}
                         </span>

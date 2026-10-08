@@ -65,11 +65,12 @@ export const StudentMatchCelebrationModal: React.FC<StudentMatchCelebrationModal
           fontWeight: 900,
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
-          color: '#86efac',
-          background: 'rgba(34, 197, 94, 0.15)',
+          color: '#ffffff',
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           padding: '4px 14px',
           borderRadius: '99px',
-          border: '1px solid rgba(34, 197, 94, 0.3)'
+          border: 'none',
+          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)'
         }}>
           ✨ Live aus deinem Unterricht
         </div>

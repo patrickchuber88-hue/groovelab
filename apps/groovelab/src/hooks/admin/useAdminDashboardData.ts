@@ -75,20 +75,22 @@ export function useAdminDashboardData({
     }
   };
 
-  const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string, teacherProfile?: any) => {
+  const fetchTeacherStudentsHelper = async (
+    teacherId: string,
+    schoolId: string,
+    platform: string,
+    teacherProfile?: any,
+    cachedSchoolRoster?: any[]
+  ) => {
     let assignedStudentIds: string[] = [];
     if (!teacherId || !isUUID(teacherId)) return assignedStudentIds;
 
-    const [{ data: schedData }, { data: occData }, { data: groupData }, stRes] = await Promise.all([
+    const [{ data: schedData }, { data: groupData }] = await Promise.all([
       supabase.from('schedules').select('student_id').eq('teacher_id', teacherId),
-      supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', teacherId),
-      supabase.from('bands').select('id').eq('coach_id', teacherId),
-      supabase.from('student_teachers').select('student_id').eq('teacher_id', teacherId)
+      supabase.from('bands').select('id').eq('coach_id', teacherId)
     ]);
 
     const schedStudentIds = (schedData || []).map((s: any) => s.student_id).filter(Boolean);
-    const occStudentIds = (occData || []).map((s: any) => s.student_id).filter(Boolean);
-    const stStudentIds = (stRes?.data || []).map((s: any) => s.student_id).filter(Boolean);
 
     let groupStudentIds: string[] = [];
     if (groupData && groupData.length > 0) {
@@ -97,9 +99,11 @@ export function useAdminDashboardData({
       groupStudentIds = (gsData || []).map((gs: any) => gs.user_id).filter(Boolean);
     }
 
-    assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds, ...stStudentIds]));
+    assignedStudentIds = Array.from(new Set([...schedStudentIds, ...groupStudentIds]));
 
-    const schoolRoster = await fetchSchoolRoster(schoolId, supabase);
+    const schoolRoster = (cachedSchoolRoster && cachedSchoolRoster.length > 0)
+      ? cachedSchoolRoster
+      : await fetchSchoolRoster(schoolId, supabase);
     const rawTeacherInst = teacherProfile?.instrument || '';
     const teacherInstruments = rawTeacherInst
       ? rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean)
@@ -108,15 +112,6 @@ export function useAdminDashboardData({
 
     if (platform !== 'campus') {
       teacherStudents = teacherStudents.filter(s => s.is_groovelab_active);
-    }
-
-    if (teacherStudents.length > 0 && platform === 'campus') {
-      const unlinkedStudents = teacherStudents.filter((s: any) => !s.teacher_id && !s.isPendingOnboarding).map((s: any) => s.id);
-      if (unlinkedStudents.length > 0) {
-        supabase.from('users').update({ teacher_id: teacherId }).in('id', unlinkedStudents).then(() => {
-          console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
-        });
-      }
     }
 
     return teacherStudents;
@@ -236,7 +231,7 @@ export function useAdminDashboardData({
               .order('first_name'),
             supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true }),
             supabase.from('stations').select('*, rooms!stations_room_id_fkey(*)').eq('school_id', adminData.school_id).order('name'),
-            fetchSchoolRoster(adminData.school_id, supabase, force),
+            fetchSchoolRoster(adminData.school_id, supabase, force, { includePending: effectiveRole !== 'teacher' }),
             supabase.from('schedules').select('*, rooms(*)').eq('school_id', adminData.school_id)
           ]);
 
@@ -259,7 +254,7 @@ export function useAdminDashboardData({
           }
           if (schoolRoster) {
             if (effectiveRole === 'teacher') {
-              const teacherStudents = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform, adminData);
+              const teacherStudents = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform, adminData, schoolRoster);
               setStudents(teacherStudents);
             } else {
               const activeStudents = activePlatform === 'groovelab' 

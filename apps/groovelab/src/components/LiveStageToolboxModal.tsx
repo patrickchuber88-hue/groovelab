@@ -43,27 +43,41 @@ export const LiveStageToolboxModal: React.FC<LiveStageToolboxModalProps> = ({
     return audioCtxRef.current;
   }, []);
 
-  // Play a single click sound
+  // Play a single click sound (Studio Klopfgeist Standard)
   const playClick = useCallback((isAccent: boolean) => {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const now = ctx.currentTime;
+      const primaryOsc = ctx.createOscillator();
+      const snapOsc = ctx.createOscillator();
+      const clickGain = ctx.createGain();
+      const snapGain = ctx.createGain();
 
-      osc.type = isAccent ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(isAccent ? 1320 : 880, ctx.currentTime);
+      primaryOsc.type = 'sine';
+      primaryOsc.frequency.setValueAtTime(isAccent ? 1760 : 880, now);
 
-      const peakGain = volume * (isAccent ? 0.8 : 0.5);
-      gain.gain.setValueAtTime(peakGain, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.04);
+      snapOsc.type = 'triangle';
+      snapOsc.frequency.setValueAtTime(isAccent ? 3520 : 1760, now);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      const peakGain = volume * (isAccent ? 0.85 : 0.60);
+      clickGain.gain.setValueAtTime(0.0001, now);
+      clickGain.gain.linearRampToValueAtTime(peakGain, now + 0.0008);
+      clickGain.gain.exponentialRampToValueAtTime(0.00001, now + (isAccent ? 0.026 : 0.020));
 
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.045);
+      snapGain.gain.setValueAtTime(isAccent ? 0.45 : 0.28, now);
+      snapGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.012);
+
+      primaryOsc.connect(clickGain);
+      snapOsc.connect(snapGain);
+      snapGain.connect(clickGain);
+      clickGain.connect(ctx.destination);
+
+      primaryOsc.start(now);
+      snapOsc.start(now);
+      primaryOsc.stop(now + 0.035);
+      snapOsc.stop(now + 0.035);
     } catch (e) {
       console.warn('Metronome audio error:', e);
     }

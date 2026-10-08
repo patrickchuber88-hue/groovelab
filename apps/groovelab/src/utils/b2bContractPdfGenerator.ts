@@ -250,7 +250,7 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
 
   const lLines = [
     `(1) Laufzeit: Der Vertrag beginnt mit Aktivierung und läuft synchron zum Schuljahr fest bis zum 31. August (Verlängerung um jeweils 12 Monate, Kündigungsfrist: 3 Monate zum 31. Mai). Das Recht zur fristlosen Kündigung aus wichtigem Grund bleibt unberührt.`,
-    `(2) Haftungsdeckel & Cyber-Police: Haftung für einfache Fahrlässigkeit bei Kardinalpflichten ist auf die 12-Monats-Vergütung (max. 10.000 ${currencySign}) begrenzt. Der Betreiber unterhält eine gewerbliche IT- & Cyber-Police über mindestens 2.000.000,00 ${currencySign}. Verschuldensunabhängige Garantiehaftung gem. § 536a Abs. 1 Alt. 1 BGB ist abbedungen.`,
+    `(2) Haftungsdeckel & Cyber-Police: Haftung für einfache Fahrlässigkeit bei Kardinalpflichten ist auf die 12-Monats-Vergütung (max. 10.000 ${currencySign}) begrenzt. Der Betreiber unterhält eine gewerbliche IT- & Cyber-Police über mindestens 1.000.000,00 ${currencySign} (2-fach maximiert). Verschuldensunabhängige Garantiehaftung gem. § 536a Abs. 1 Alt. 1 BGB ist abbedungen.`,
     `(3) Gerichtsstand: Für alle Streitigkeiten aus diesem Vertrag gilt als Gerichtsstand ${jurisdictionPlace}.`
   ];
 

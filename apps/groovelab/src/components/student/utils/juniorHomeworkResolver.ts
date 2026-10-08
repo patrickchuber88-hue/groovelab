@@ -40,7 +40,7 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
   } = params;
 
   const currentWeekStr = getISOWeek(getSimulatedNow());
-  const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+  const cleanTitle = (t: string) => (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 
   // 1. Gather all active homework books & pages directly from localProgress (assigned Lehrwerke)
   const activeJuniorBooksMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
@@ -160,11 +160,17 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
     const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(skill.is_current_homework) || Boolean(skill.homework_notes) || Boolean(skill.teacher_notes)));
 
     if (isHw) {
-      const songArtist = skill.songs?.artist || skill.artist || '';
-      const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+      let songArtist = (skill.songs?.artist || skill.artist || '').trim();
+      let songTitle = (skill.songs?.title || skill.title || skill.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
       if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-      const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      const cleanSongTitle = cleanTitle(songTitle);
+      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanSongTitle}`
+        : `${cleanSongTitle}`;
       const cleanT = cleanTitle(fullTitle);
 
       if (cleanT && !otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
@@ -206,11 +212,17 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
     const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
 
     if (isHw) {
-      const songArtist = cSong.songs?.artist || cSong.artist || '';
-      const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
+      let songArtist = (cSong.songs?.artist || cSong.artist || '').trim();
+      let songTitle = (cSong.songs?.title || cSong.title || cSong.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
       if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-      const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      const cleanSongTitle = cleanTitle(songTitle);
+      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanSongTitle}`
+        : `${cleanSongTitle}`;
       const cleanT = cleanTitle(fullTitle);
 
       if (cleanT && !otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {

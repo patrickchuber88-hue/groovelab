@@ -226,5 +226,44 @@ assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'Pete
 assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', full_last_name: 'Pan', last_name: 'P.' }), 'Peter Pan');
 console.log('✔ Test 16: formatTeacherFullName guarantees full name Peter Pan for teacher Peter');
 
+// Test 17: GrooveLab Student Musician Avatar Invariant (0,1% Goldstandard)
+import { resolveGrooveLabStudentAvatar, isInstrumentAvatar } from '../utils/avatarResolutionEngine';
+
+const studentAmeliaGuitar = {
+  id: 'student-amelia',
+  first_name: 'Amelia',
+  last_name: 'N.',
+  role: 'student',
+  instrument: 'Gitarre',
+  photo_url: '/avatars/gitarre_avatar_new.png'
+};
+
+// Must strictly resolve to female musician guitarist avatar, NEVER Campus instrument photo
+assert.strictEqual(isInstrumentAvatar('/avatars/gitarre_avatar_new.png'), true);
+assert.strictEqual(resolveGrooveLabStudentAvatar(studentAmeliaGuitar), '/avatars/student_girl_blonde_guitar.png');
+console.log('✔ Test 17: Student Amelia N. in GrooveLab resolves to female musician avatar, filtering out Campus instrument photo');
+
+// Test 18: Male student Justus with Drums resolving to male drummer musician avatar
+const studentJustusDrums = {
+  id: 'student-justus',
+  first_name: 'Justus',
+  last_name: 'G.',
+  role: 'student',
+  instrument: 'Schlagzeug',
+  photo_url: '/avatars/schlagzeug_avatar.png'
+};
+assert.strictEqual(resolveGrooveLabStudentAvatar(studentJustusDrums), '/avatars/student_boy_black_drums.png');
+
+// Explicit selected musician avatar is preserved
+const studentWithCustomMusician = {
+  id: 'student-max',
+  first_name: 'Max',
+  role: 'student',
+  instrument: 'Bass',
+  photo_url: '/avatars/bandstyle_boy_ebass.png'
+};
+assert.strictEqual(resolveGrooveLabStudentAvatar(studentWithCustomMusician), '/avatars/bandstyle_boy_ebass.png');
+console.log('✔ Test 18: GrooveLab students preserve custom musician avatars and default to 3D musician avatars');
+
 console.log('\n🎉 ALL AVATAR RESOLUTION INVARIANT TESTS PASSED WITH 100% SUCCESS!');
 

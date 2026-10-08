@@ -2106,15 +2106,15 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           transform: 'translate(-50%, -50%)',
                           zIndex: 2,
                           background: isSubmitted
-                            ? (isCorrect ? '#dcfce7' : '#fee2e2')
+                            ? (isCorrect ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fee2e2')
                             : '#ffffff',
                           border: isSubmitted
-                            ? (isCorrect ? '1.5px solid #86efac' : '1.5px solid #fca5a5')
+                            ? (isCorrect ? 'none' : '1.5px solid #fca5a5')
                             : playingToneStep > 0
                             ? '1.5px solid #8b5cf6'
                             : '1.5px solid #e2e8f0',
                           color: isSubmitted
-                            ? (isCorrect ? '#15803d' : '#991b1b')
+                            ? (isCorrect ? '#ffffff' : '#991b1b')
                             : playingToneStep > 0
                             ? '#7c3aed'
                             : '#475569',

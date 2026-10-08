@@ -9,6 +9,11 @@ export interface UseStudentSongsDataProps {
 const cleanTitle = (t: string) => 
   (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '').trim();
 
+import {
+  isWeeklySnapshotContainer,
+  isDummyOrTestSong
+} from '../tabs/briefing/homeworkSummaryHelper';
+
 export function useStudentSongsData({
   studentId,
   studentUser
@@ -215,11 +220,21 @@ export function useStudentSongsData({
               }
 
               songList.forEach((song: any) => {
+                // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen NIEMALS in das Campus-Modul gelangen
+                if (song.is_campus_active === false) return;
+                if (isDummyOrTestSong(song) || isDummyOrTestSong(song.title) || isDummyOrTestSong(song.topic_name)) return;
                 const sTitle = (song.title || song.topic_name || '').trim();
-                if (!sTitle) return;
+                if (!sTitle || isDummyOrTestSong(sTitle)) return;
+                // Double Check: Wenn Song in geladenen Campus-Songs existiert, muss er dort ebenfalls is_campus_active sein
+                const isMatchingCampusSong = loadedSongs.length === 0 || loadedSongs.some(
+                  (ls: any) => (ls.title || '').trim().toLowerCase() === sTitle.toLowerCase() && ls.is_campus_active === true
+                );
+                if (!isMatchingCampusSong && song.is_campus_active !== true) return;
+
                 const existing = loadedProgress.find((p: any) => (p.topic_name || p.title || '').trim().toLowerCase() === sTitle.toLowerCase());
                 if (existing) {
                   existing.is_current_homework = true;
+                  existing.is_campus_active = true;
                   if (song.homework_notes || song.notes || song.note) {
                     existing.homework_notes = song.homework_notes || song.notes || song.note;
                   }
@@ -236,6 +251,7 @@ export function useStudentSongsData({
                     topic_name: sTitle,
                     title: sTitle,
                     is_current_homework: true,
+                    is_campus_active: true,
                     status: song.status || 'IN_PROGRESS',
                     homework_notes: song.homework_notes || song.notes || song.note || '',
                     teacher_notes: song.teacher_notes || '',
@@ -250,34 +266,77 @@ export function useStudentSongsData({
           }
         });
 
-        // 🛡️ Fail-Safe: Ensure activeSongSkills also reflects homework songs from loadedProgress
-        if (loadedSkills && loadedSkills.length > 0) {
-          loadedProgress.forEach((p: any) => {
-            if (p.is_current_homework && (p.topic_name || p.title)) {
-              const pNorm = (p.topic_name || p.title || '').trim().toLowerCase();
-              const pClean = cleanTitle(pNorm.replace(/\s*\([^)]*\)\s*$/, ''));
-              const matchSkill = loadedSkills.find((s: any) => {
-                const sTitle = (s.songs?.title || s.title || s.song_title || '').trim().toLowerCase();
-                const sArtist = (s.songs?.artist || s.artist || '').trim().toLowerCase();
-                const sFull = sArtist ? `${sArtist} - ${sTitle}` : sTitle;
-                return sTitle === pNorm || 
-                       sFull === pNorm || 
-                       cleanTitle(sTitle) === pClean || 
-                       cleanTitle(sFull) === pClean ||
-                       pNorm.includes(sTitle) || 
-                       (sArtist && pNorm.includes(sArtist) && pNorm.includes(sTitle));
+        // 🛡️ Fail-Safe & Repertoire Parity: Ensure activeSongSkills also reflects homework songs from loadedProgress
+        const synthesizedSkills = [...(loadedSkills || [])];
+        loadedProgress.forEach((p: any) => {
+          if (p.is_current_homework && (p.topic_name || p.title) && p.is_campus_active !== false) {
+            const pNorm = (p.topic_name || p.title || '').trim().toLowerCase();
+            const pClean = cleanTitle(pNorm.replace(/\s*\([^)]*\)\s*$/, ''));
+            if (isDummyOrTestSong(pClean)) return;
+
+            const matchSkill = synthesizedSkills.find((s: any) => {
+              const sTitle = (s.songs?.title || s.title || s.song_title || '').trim().toLowerCase();
+              const sArtist = (s.songs?.artist || s.artist || '').trim().toLowerCase();
+              const sFull = sArtist ? `${sArtist} - ${sTitle}` : sTitle;
+              return sTitle === pNorm || 
+                     sFull === pNorm || 
+                     cleanTitle(sTitle) === pClean || 
+                     cleanTitle(sFull) === pClean ||
+                     pNorm.includes(sTitle) || 
+                     (sArtist && pNorm.includes(sArtist) && pNorm.includes(sTitle));
+            });
+
+            if (matchSkill) {
+              matchSkill.is_current_homework = true;
+              if (p.homework_notes) matchSkill.homework_notes = p.homework_notes;
+              if (p.teacher_notes) matchSkill.teacher_notes = p.teacher_notes;
+            } else {
+              // Synthesize skill so the song appears in Repertoire & Noten (1% Goldstandard)
+              const matchedSong = loadedSongs.find((ls: any) => {
+                const lsTitle = (ls.title || '').trim().toLowerCase();
+                return lsTitle === pClean || pNorm.includes(lsTitle);
               });
-              if (matchSkill) {
-                matchSkill.is_current_homework = true;
-                if (p.homework_notes) matchSkill.homework_notes = p.homework_notes;
-                if (p.teacher_notes) matchSkill.teacher_notes = p.teacher_notes;
+              let synArtist = (p.artist || '').trim();
+              let synTitle = (p.title || p.topic_name || '').trim();
+              if (!synArtist && synTitle.includes(' - ')) {
+                const parts = synTitle.split(' - ');
+                synArtist = parts[0].trim();
+                synTitle = parts.slice(1).join(' - ').trim();
               }
+              if (/^campus[- ]song$/i.test(synArtist)) {
+                synArtist = '';
+              }
+              synTitle = synTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/\s*\([^)]*\)\s*$/g, '').trim();
+
+              const synthesizedSong = matchedSong || {
+                id: p.song_id || p.id || `song-${pClean}`,
+                title: synTitle || pClean,
+                artist: synArtist,
+                is_campus_active: true
+              };
+              synthesizedSkills.push({
+                id: `hw-skill-${p.id || Date.now()}`,
+                user_id: targetId,
+                song_id: synthesizedSong.id,
+                instrument: studentUser?.instrument || 'Instrument',
+                progress_percent: p.progress_percent || 0,
+                is_stage_ready: false,
+                is_current_homework: true,
+                is_campus_active: true,
+                homework_notes: p.homework_notes || '',
+                teacher_notes: p.teacher_notes || '',
+                songs: synthesizedSong
+              });
             }
-          });
-          setActiveSongSkills([...loadedSkills]);
-        }
+          }
+        });
+        setActiveSongSkills(synthesizedSkills);
 
         setProgressItems(loadedProgress);
+
+        const latestSnapshotItem = loadedProgress
+          .filter((it: any) => it?.topic_name?.startsWith('Hausaufgabe KW ') && ((it.teacher_notes && it.teacher_notes.includes('SNAPSHOT_LEHRWERKE:')) || (it.homework_notes && it.homework_notes.includes('SNAPSHOT_LEHRWERKE:'))))
+          .sort((a: any, b: any) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime())[0];
 
         // 🛡️ Auto-heal localProgress for cold/online cache: merge database Lehrwerke into localProgress
         setLocalProgress((prevLocal: any[]) => {
@@ -353,12 +412,13 @@ export function useStudentSongsData({
                       combined.push(assignment);
                     }
                     if (Array.isArray(lw.pages) && assignment.pageStates) {
+                      const isLatestSnap = !latestSnapshotItem || String(item.id) === String(latestSnapshotItem.id);
                       lw.pages.forEach((p: any) => {
                         const pNum = typeof p === 'object' ? p.page : parseInt(p, 10);
                         if (!isNaN(pNum) && !assignment.pageStates[pNum]) {
                           assignment.pageStates[pNum] = {
-                            status: 'homework',
-                            isCurrentHomework: true,
+                            status: isLatestSnap ? 'homework' : 'locked',
+                            isCurrentHomework: isLatestSnap,
                             notes: (typeof p === 'object' ? p.notes : '') || '',
                             homework_notes: (typeof p === 'object' ? p.notes : '') || ''
                           };
@@ -537,7 +597,7 @@ export function useStudentSongsData({
           if (Array.isArray(parsedSongs)) {
             parsedSongs.forEach((song: any) => {
               const sTitle = song.topic_name || song.title || '';
-              if (!sTitle) return;
+              if (!sTitle || isWeeklySnapshotContainer(sTitle) || isDummyOrTestSong(sTitle) || isDummyOrTestSong(song)) return;
               const normKey = sTitle.toLowerCase().trim();
 
               // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht über Snapshots in Campus gelangen
@@ -557,6 +617,7 @@ export function useStudentSongsData({
                   artist = parts[0].trim();
                   cleanT = parts.slice(1).join(' - ').trim();
                 }
+                if (isWeeklySnapshotContainer(cleanT) || isWeeklySnapshotContainer(artist) || isDummyOrTestSong(cleanT)) return;
                 songsMap.set(normKey, {
                   id: song.id || normKey,
                   title: cleanT,

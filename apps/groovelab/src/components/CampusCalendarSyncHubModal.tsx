@@ -473,10 +473,17 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                 </div>
               )}
 
+              {/* Apple Kalender Hinweis */}
+              {activePlatform === 'apple' && (
+                <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.3, marginTop: '-4px' }}>
+                  Ende-zu-Ende TLS 1.3 verschlüsselt · Tipp: In Apple Kalender „Stündlich“ wählen &amp; in Kalender-Infos (⌘I) „Erinnerungen ignorieren“ deaktivieren für 30-Min-Hinweise.
+                </div>
+              )}
+
               {/* Google Kalender Android-Hinweis */}
               {activePlatform === 'google' && (
                 <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.3, marginTop: '-4px' }}>
-                  Synchronisiert sich mit deinem Google-Konto & erscheint automatisch in der Google Kalender App auf Android.
+                  Synchronisiert sich mit deinem Google-Konto &amp; erscheint automatisch in der Google Kalender App auf Android.
                 </div>
               )}
 
@@ -518,9 +525,9 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                     onClick={handleShareWithFamily}
                     style={{
                       width: '100%',
-                      border: copiedStatus === 'share' ? '1px solid #86efac' : '1px solid #e2e8f0',
-                      background: copiedStatus === 'share' ? '#f0fdf4' : '#f8fafc',
-                      color: copiedStatus === 'share' ? '#16a34a' : '#1e293b',
+                      border: copiedStatus === 'share' ? 'none' : '1px solid #e2e8f0',
+                      background: copiedStatus === 'share' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f8fafc',
+                      color: copiedStatus === 'share' ? '#ffffff' : '#1e293b',
                       padding: '11px 16px',
                       borderRadius: '14px',
                       fontWeight: 750,
@@ -624,14 +631,14 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                 </div>
               )}
 
-              {/* Link kopieren (Sekundäre Aktion) */}
+              {/* Link kopieren (Sekundäre Aktion - Garantiert immer verschlüsselte HTTPS-URL) */}
               <button
-                onClick={() => handleCopyLink('feed', activePlatform === 'apple' ? webcalUrl : httpsUrl)}
+                onClick={() => handleCopyLink('feed', httpsUrl)}
                 style={{
                   width: '100%',
-                  border: copiedStatus === 'feed' ? '1px solid #86efac' : '1px solid #e2e8f0',
-                  background: copiedStatus === 'feed' ? '#f0fdf4' : '#ffffff',
-                  color: copiedStatus === 'feed' ? '#16a34a' : '#334155',
+                  border: copiedStatus === 'feed' ? 'none' : '1px solid #e2e8f0',
+                  background: copiedStatus === 'feed' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                  color: copiedStatus === 'feed' ? '#ffffff' : '#334155',
                   padding: '10px 16px',
                   borderRadius: '14px',
                   fontWeight: 700,
@@ -728,7 +735,7 @@ export const CampusCalendarSyncHubModal: React.FC<CampusCalendarSyncHubModalProp
                           color: '#0f172a'
                         }}
                       >
-                        <option value="30m_morning">30 Min. vorher & morgens 08:00 Uhr</option>
+                        <option value="30m_morning">30 Min. &amp; 2 Std. vorher (Empfohlen)</option>
                         <option value="2h">2 Stunden vorher</option>
                         <option value="1d">1 Tag vorher</option>
                         <option value="none">Kein Standard-Alarm</option>

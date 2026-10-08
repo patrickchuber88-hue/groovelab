@@ -63,14 +63,14 @@ rollback() {
 
 # 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
 echo "📁 Remote-Verzeichnisse & Backup-Ordner vorbereiten..."
-ssh "$SERVER" "mkdir -p $RELEASES_DIR && sudo chown -R deployuser:deployuser $REMOTE_DIR 2>/dev/null && sudo mkdir -p /mnt/supabase_data/backups && sudo chown deployuser:deployuser /mnt/supabase_data/backups 2>/dev/null || true"
+ssh "$SERVER" "mkdir -p $RELEASES_DIR && sudo chown -R deployuser:deployuser $REMOTE_DIR 2>/dev/null && sudo mkdir -p /mnt/cloud-volume/backups && sudo chown deployuser:deployuser /mnt/cloud-volume/backups 2>/dev/null && ([ -d /mnt/cloud-volume ] && [ ! -e /mnt/supabase_data ] && sudo ln -sfn /mnt/cloud-volume /mnt/supabase_data 2>/dev/null || true) || true"
 
 # Falls /var/www/groovelab bisher ein normales Verzeichnis mit Dateien war, initiale Struktur aufbauen
 ssh "$SERVER" "if [ ! -L '$CURRENT_LINK' ] && [ -d '$CURRENT_LINK' ]; then mv '$CURRENT_LINK' '${RELEASES_DIR}/legacy_$(date +%Y%m%d)' && ln -sfn '${RELEASES_DIR}/legacy_$(date +%Y%m%d)' '$CURRENT_LINK'; fi"
 
-# 2. Pre-Deploy Backup der Live-Datenbank auf dem 14 GB Volume erstellen (falls DB-Container existiert)
-echo "🛡️  Erstelle Pre-Deploy Backup auf dem 14 GB Volume (/mnt/supabase_data/backups)..."
-ssh "$SERVER" "if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q 'supabase-db\|postgres'; then CONTAINER=\$(docker ps --format '{{.Names}}' | grep 'supabase-db\|postgres' | head -n 1); docker exec -t \$CONTAINER pg_dump -U postgres postgres 2>/dev/null | gzip > /mnt/supabase_data/backups/pre_deploy_\$(date +%Y%m%d_%H%M%S).sql.gz || true; echo '  ✓ Backup auf 14 GB Volume gespeichert.'; else echo '  ℹ Pre-Deploy Hinweis: Kein lokaler DB-Container aktiv, überspringe DB-Dump.'; fi"
+# 2. Pre-Deploy Backup der Live-Datenbank auf dem Cloud Volume erstellen (falls DB-Container existiert)
+echo "🛡️  Erstelle Pre-Deploy Backup auf dem Cloud Volume (/mnt/cloud-volume/backups)..."
+ssh "$SERVER" "BACKUP_DIR='/mnt/cloud-volume/backups'; [ ! -d '\$BACKUP_DIR' ] && BACKUP_DIR='/mnt/supabase_data/backups'; mkdir -p '\$BACKUP_DIR' 2>/dev/null || true; if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q 'supabase-db\|postgres'; then CONTAINER=\$(docker ps --format '{{.Names}}' | grep 'supabase-db\|postgres' | head -n 1); docker exec -t \$CONTAINER pg_dump -U postgres postgres 2>/dev/null | gzip > \"\$BACKUP_DIR/pre_deploy_\$(date +%Y%m%d_%H%M%S).sql.gz\" || true; echo \"  ✓ Backup auf \$BACKUP_DIR gespeichert.\"; else echo '  ℹ Pre-Deploy Hinweis: Kein lokaler DB-Container aktiv, überspringe DB-Dump.'; fi"
 
 # 3. Dist-Ordner in das neue Release-Verzeichnis übertragen (atomar isoliert)
 echo "📦 Build-Dateien übertragen nach $TARGET_RELEASE..."

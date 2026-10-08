@@ -40,6 +40,46 @@ export interface CampusSponsorIngressBannerProps {
   isReady?: boolean;
 }
 
+/**
+ * 🏛️ 0,1% Goldstandard: Synchroner Session-Preflight Check
+ * Garantiert, dass der Bildungsförderer-Ingress exakt einmal pro Anmeldesitzung
+ * beim Betreten des Briefing Boards gezeigt wird.
+ */
+function isSponsorBannerSuppressedThisSession(effectiveSchoolId?: string, previewMode = false): boolean {
+  if (previewMode) return false;
+  if (typeof window === 'undefined') return false;
+  try {
+    // Optionaler Force-Override für manuelles Testen ohne Login-Reset (z. B. ?force_sponsor=true)
+    if (window.location.search && window.location.search.includes('force_sponsor=true')) return false;
+
+    // 1. Globaler Tab-Session Lock
+    if (sessionStorage.getItem('cg_sponsor_session_shown') === 'true') {
+      return true;
+    }
+    // 2. Mandanten-spezifischer Session Lock
+    if (effectiveSchoolId && sessionStorage.getItem(`cg_sponsor_shown_${effectiveSchoolId}`) === 'true') {
+      return true;
+    }
+    if (sessionStorage.getItem('cg_sponsor_shown_default') === 'true') {
+      return true;
+    }
+  } catch {
+    // Fail-closed
+  }
+  return false;
+}
+
+function markSponsorBannerShownThisSession(effectiveSchoolId?: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem('cg_sponsor_session_shown', 'true');
+    if (effectiveSchoolId) {
+      sessionStorage.setItem(`cg_sponsor_shown_${effectiveSchoolId}`, 'true');
+    }
+    sessionStorage.setItem('cg_sponsor_shown_default', 'true');
+  } catch {}
+}
+
 export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProps> = ({
   schoolId,
   sponsorSettings,
@@ -118,6 +158,11 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
       setIsVisible(true);
       timeLeftRef.current = items.length > 1 ? 8200 : 7500;
       startTimeRef.current = Date.now();
+      return;
+    }
+
+    // 🏛️ 0,1% Goldstandard: Synchroner Preflight - wenn in dieser Session bereits gezeigt, sofort terminieren
+    if (!previewMode && isSponsorBannerSuppressedThisSession(schoolId, previewMode)) {
       return;
     }
 
@@ -252,13 +297,10 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
         );
         if (activeSponsors.length === 0) return;
 
-        // Im Produktivmodus: Einmalige Anzeige pro Session
-        // Im Entwicklungs-/Testmodus (isDev): Kein Blockieren bei Reloads
-        if (!isDev) {
-          const hasShownThisSession = sessionStorage.getItem(`cg_sponsor_shown_${effectiveSchoolId || 'default'}`);
-          if (hasShownThisSession === 'true') {
-            return;
-          }
+        // 🏛️ 0,1% Goldstandard: Einmalige Anzeige pro Session beim Start (Anmeldung)
+        // Gültig in Prod und Dev (Zero-Drift). Für UI-Vorschau existiert previewMode={true}.
+        if (isSponsorBannerSuppressedThisSession(effectiveSchoolId, previewMode)) {
+          return;
         }
 
         // Haupt- und Bildungspartner priorisieren, ansonsten auf alle aktiven Sponsoren zurückgreifen
@@ -339,9 +381,8 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
         }
 
         localStorage.setItem(`cg_sponsor_rotation_counter_${effectiveSchoolId || 'default'}`, String((counter + 1) % 1000));
-        if (!isDev) {
-          sessionStorage.setItem(`cg_sponsor_shown_${effectiveSchoolId || 'default'}`, 'true');
-        }
+        // 🏛️ 0,1% Goldstandard: Atomarer Session-Lock für die gesamte Anmeldesitzung
+        markSponsorBannerShownThisSession(effectiveSchoolId);
 
         if (isMounted && itemsToDisplay.length > 0) {
           setSponsorList(itemsToDisplay);
@@ -367,6 +408,7 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
   const triggerCollapse = () => {
     if (isCollapsing) return;
     setIsCollapsing(true);
+    markSponsorBannerShownThisSession(schoolId);
     setTimeout(() => {
       setIsVisible(false);
       if (onDismiss) onDismiss();
@@ -804,9 +846,9 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
             style={{
               fontSize: '0.68rem',
               fontWeight: 800,
-              background: '#f0fdf4',
-              border: '1px solid #86efac',
-              color: '#15803d',
+              background: '#ecfdf5',
+              border: '1px solid #10b981',
+              color: '#059669',
               padding: '3px 10px',
               borderRadius: '100px',
               letterSpacing: '0.02em'

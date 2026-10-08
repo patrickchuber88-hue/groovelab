@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useRef } from 'react';
 import { CampusLevelSelectModal } from '../../campus/CampusLevelSelectModal';
 import { GlobalParentPinModal } from './GlobalParentPinModal';
 import { SiblingPinUnlockModal } from './SiblingPinUnlockModal';
+import { AddSiblingModal } from '../../campus/AddSiblingModal';
 import { StudentJuniorPreFlightModal } from './StudentJuniorPreFlightModal';
 import { StudentJuniorStickerModal, JuniorStickerCategory } from './StudentJuniorStickerModal';
 import { StudentJuniorStickerDetailModal } from './StudentJuniorStickerDetailModal';
@@ -50,6 +51,12 @@ export interface StudentModalsHubProps {
   pendingSiblingUnlock: any;
   setPendingSiblingUnlock: (s: any) => void;
   executeSwitchFamilyStudent: (id: string) => void;
+
+  // Add Sibling Modal (0,1% Goldstandard: Universal across ProfileTab, Briefing & Settings)
+  isAddSiblingModalOpen?: boolean;
+  setIsAddSiblingModalOpen?: (open: boolean) => void;
+  familyProfiles?: any[];
+  setFamilyProfiles?: React.Dispatch<React.SetStateAction<any[]>>;
 
   // Junior Mission & Stickers
   showJuniorPreFlightModal: boolean;
@@ -198,6 +205,10 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
   pendingSiblingUnlock,
   setPendingSiblingUnlock,
   executeSwitchFamilyStudent,
+  isAddSiblingModalOpen = false,
+  setIsAddSiblingModalOpen,
+  familyProfiles = [],
+  setFamilyProfiles,
   showJuniorPreFlightModal,
   setShowJuniorPreFlightModal,
   juniorMissionDetails,
@@ -336,6 +347,32 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
         />
       )}
 
+      {/* 3b. Add Sibling Modal (0,1% Goldstandard: Universal modal for Profile & Settings tabs) */}
+      {isAddSiblingModalOpen && setIsAddSiblingModalOpen && (
+        <AddSiblingModal
+          isOpen={isAddSiblingModalOpen}
+          onClose={() => setIsAddSiblingModalOpen(false)}
+          currentStudentId={studentId || (studentUser as any)?.id || ''}
+          schoolId={(studentUser as any)?.school_id}
+          existingFamilyProfiles={familyProfiles}
+          onProfileAdded={(newProfile) => {
+            if (setFamilyProfiles) {
+              setFamilyProfiles((prev: any[]) => {
+                const filtered = prev.filter((p: any) => p.id !== newProfile.id);
+                const updated = [...filtered, newProfile];
+                try {
+                  localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
+                  const localProfs = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
+                  const updatedLocal = [...localProfs.filter((p: any) => p.id !== newProfile.id), newProfile];
+                  localStorage.setItem('groovelab_local_profiles', JSON.stringify(updatedLocal));
+                } catch (e) {}
+                return updated;
+              });
+            }
+          }}
+        />
+      )}
+
       {/* 4. Junior Pre-Flight Modal */}
       <StudentJuniorPreFlightModal
         isOpen={showJuniorPreFlightModal}
@@ -451,7 +488,6 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
           }}
           onVerifyParentPin={handleVerifyGlobalParentPinAsync}
           teacherName={formatTeacherFullName(activeRescheduleBottomSheetOcc?.teacher || studentUser?.teacher || studentUser?.teacher_name)}
-          teacherAvatarUrl={activeRescheduleBottomSheetOcc?.teacher?.avatar_url || activeRescheduleBottomSheetOcc?.teacher?.photo_url}
         />
       )}
 

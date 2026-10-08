@@ -94,7 +94,7 @@ Das technische und datenschutzrechtliche Risiko ist nahezu eliminiert.
 Das **einzige verbliebene P1-Risiko** ist die **Rechtsform des Betreibers (Einzelunternehmen)**:
 * Solange Patrick Huber Verträge als natürliche Person schließt, haftet er bei unvorhersehbaren Extremereignissen (z. B. höherer Gewalt, Serverausfall bei Zeugniserstellung oder B2B-Vertragsstreitigkeiten) persönlich.
 * **Abhilfe**: Umsetzung der beschlossenen Roadmap:
-  1. IT-Betriebshaftpflicht- & Cyber-Versicherung (Deckungssumme 2 Mio. €) abschließen.
+  1. IT-Betriebshaftpflicht- & Cyber-Versicherung (Deckungssumme 1 Mio. € je Fall, 2-fach maximiert) abschließen.
   2. Gründung der SaaS-GmbH bei Erreichen von 8–10 zahlenden Schulen.
 
 ---

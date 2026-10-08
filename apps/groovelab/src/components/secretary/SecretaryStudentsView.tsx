@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import {
-  Check, CheckSquare, Eye, EyeOff, FileText, GraduationCap,
-  HeartHandshake, Link as LinkIcon, MoreVertical, Music, Plus,
-  Search, Sparkles, Trash2, Upload, UserCheck, Users, X, Zap
+  Check, CheckSquare, Eye, EyeOff, FileText, GraduationCap, HeartHandshake, Link as LinkIcon, MoreVertical, Music, Plus, QrCode, Search, Sparkles, Trash2, Upload, UserCheck, Users, X, Zap
 } from 'lucide-react';
+import { useModalA11y } from '../../hooks/useModalA11y';
 import { supabase } from '../../lib/supabase';
 import { getParentOnboardingUrl } from '../../utils/tenantUrlHelper';
 import { maskLastName } from '../../utils/nameHelper';
 import { isTeacherInstrumentCompatible } from '../../services/studentRosterService';
+import { SecretaryLostInstrumentModal } from './modals/SecretaryLostInstrumentModal';
 
 export const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
 
@@ -182,9 +182,10 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
   handleToggleStudentModule,
   getAlphabeticalColor,
 }) => {
+  const addStudentModalRef = useModalA11y(showAddStudentModal, () => setShowAddStudentModal(false));
+  const [showLostInstrumentModal, setShowLostInstrumentModal] = React.useState(false);
 
-
-    // Show all students belonging to the school
+  // Show all students belonging to the school
     const campusStudentsOnly = students;
 
     const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Nicht festgelegt')));
@@ -843,6 +844,15 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
                   <span>{showRealNames ? "Klarnamen" : "DSGVO-Modus"}</span>
                 </button>
+
+                {/* Koffer-Tag Notfall-Scanner */}
+                <button
+                  type="button"
+                  aria-label="Koffer-Tag Notfall-Scanner"
+                  onClick={() => setShowLostInstrumentModal(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '8px', padding: '0 10px', fontSize: '0.76rem', fontWeight: 800, background: '#0f172a', color: '#ffffff', border: 'none', cursor: 'pointer', fontFamily: 'Urbanist, -apple-system, sans-serif', height: '30px', whiteSpace: 'nowrap' }}
+                  title="Koffer-Tag eines Fundstücks scannen"
+                ><QrCode size={13} /><span>Koffer-Tag</span></button>
 
                 {/* Bulk Action Buttons */}
                 {selectedStudentIds.length > 0 && (
@@ -1687,6 +1697,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="manage-student-modal-title"
+            ref={addStudentModalRef}
             onClick={(e) => {
               if (e.target === e.currentTarget) setShowAddStudentModal(false);
             }}
@@ -1877,6 +1888,9 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               </form>
             </div>
           </div>
+        )}
+        {showLostInstrumentModal && (
+          <SecretaryLostInstrumentModal isOpen={showLostInstrumentModal} onClose={() => setShowLostInstrumentModal(false)} students={students} campusTeachers={campusTeachers} schoolId={schoolId} />
         )}
       </>
     );

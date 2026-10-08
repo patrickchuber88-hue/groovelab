@@ -22,6 +22,7 @@ import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/n
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { isWebAuthnSupported, getSanitizedRpId } from '../utils/webauthn';
 import { CampusDynamicAvatar } from './CampusDirectMessages';
+import { CampusUnifiedChatMessage, isChatMessageSystem } from './messages/CampusUnifiedChatMessage';
 
 export interface CampusAppointmentShoutboxModalProps {
   isOpen: boolean;
@@ -302,7 +303,12 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         const effectiveSchoolId = currentUserProfile?.school_id || 
           (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
           occurrence?.school_id || 
-          filtered[0]?.school_id;
+          occurrence?.schoolId ||
+          occurrence?.schedule?.school_id ||
+          teacherObj?.school_id ||
+          studentObj?.school_id ||
+          filtered[0]?.school_id ||
+          (typeof window !== 'undefined' ? (localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id')) : null);
         const decrypted = await decryptMessagesBatch(filtered, effectiveSchoolId);
 
         setChatMessages(decrypted);
@@ -1098,8 +1104,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   <RotateCcw size={9} strokeWidth={2.6} /> <span>Verlegt</span>
                 </span>
               ) : (
-                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(34, 197, 94, 0.22)", border: "1px solid rgba(134, 239, 172, 0.40)", color: "#bbf7d0", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#86efac", display: "inline-block" }} />
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(16, 185, 129, 0.22)", border: "1px solid rgba(16, 185, 129, 0.40)", color: "#a7f3d0", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
                   <span>Planmäßig</span>
                 </span>
               )}
@@ -1258,149 +1264,27 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </div>
           ) : (
             reconciledMessages.map((msg, idx) => {
+              const prevMsg = idx > 0 ? reconciledMessages[idx - 1] : null;
               const isMe = msg.sender_id === currentUserId;
-              const cleanContent = String(msg.content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
+              const senderUser = isMe
+                ? (currentUserRole === 'student' ? studentObj : (teacherObj || fetchedTeacher))
+                : (currentUserRole === 'student' ? (teacherObj || fetchedTeacher) : studentObj);
 
-              const isCancellation = msg.message_type === 'reschedule_notification' ||
-                (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt') || msg.content.includes('wurde abgesagt') || msg.content.includes('storniert') || msg.content.includes('abgesagt')));
-
-              const isReactivation = msg.message_type === 'cancellation_reset' ||
-                (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt') || msg.content.includes('zurückgesetzt')));
-
-              // 1. Reaktivierungs-Eventpill (Monochrom & Apple HIG)
-              if (isReactivation) {
-                const dateObj = new Date(msg.created_at);
-                const timeFormatted = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-
-                return (
-                  <div key={msg.id || idx} style={{ alignSelf: 'center', margin: '6px 0', maxWidth: '92%' }}>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
-                      borderRadius: '100px',
-                      padding: isMobile ? '5px 14px' : '7px 18px',
-                      boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)'
-                    }}>
-                      <RotateCcw size={isMobile ? 12 : 14} color="#15803d" strokeWidth={2.6} style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 800, color: '#15803d' }}>
-                        Termin reaktiviert
-                      </span>
-                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.80rem', color: '#16a34a', fontWeight: 650 }}>
-                        • {dateFormatted}, {timeFormatted} Uhr
-                      </span>
-                    </div>
-                  </div>
-                );
-              }
-
-              // 2. Stornierungs-/Absage-Eventpill (Monochrom & Apple HIG)
-              if (isCancellation) {
-                const dateObj = new Date(msg.created_at);
-                const timeFormatted = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-
-                return (
-                  <div key={msg.id || idx} style={{ alignSelf: 'center', margin: '6px 0', maxWidth: '92%' }}>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: '#fef2f2',
-                      border: '1px solid #fecaca',
-                      borderRadius: '100px',
-                      padding: isMobile ? '5px 14px' : '7px 18px',
-                      boxShadow: '0 1px 3px rgba(239, 68, 68, 0.06)'
-                    }}>
-                      <X size={isMobile ? 12 : 14} color="#dc2626" strokeWidth={2.8} style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 800, color: '#991b1b' }}>
-                        Termin abgesagt
-                      </span>
-                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.80rem', color: '#b91c1c', fontWeight: 650 }}>
-                        • {dateFormatted}, {timeFormatted} Uhr
-                      </span>
-                    </div>
-                  </div>
-                );
-              }
-
-              // 3. Reguläre Chat-Nachricht
-              const senderDisplayName = isMe
-                ? 'Du'
-                : (currentUserRole === 'student' ? teacherDisplayName : studentDisplayName);
+              const laterSysMsg = reconciledMessages.slice(idx + 1).find(m => isChatMessageSystem(m));
+              const isSuperseded = Boolean(laterSysMsg);
 
               return (
-                <div key={msg.id || idx} style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  maxWidth: '82%',
-                  alignItems: isMe ? 'flex-end' : 'flex-start',
-                  gap: '3px'
-                }}>
-                  {(!isMe || msg.sender_role === 'parent') && (
-                    <span style={{
-                      fontSize: isMobile ? '0.80rem' : '0.88rem',
-                      fontWeight: 800,
-                      color: msg.sender_role === 'parent' ? '#1d4ed8' : (currentUserRole === 'student' ? '#15803d' : '#2563eb'),
-                      marginBottom: '2px',
-                      marginLeft: isMe ? '0px' : '8px',
-                      marginRight: isMe ? '8px' : '0px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      <span>{senderDisplayName}</span>
-                      {msg.sender_role === 'parent' && (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '2px 7px',
-                          borderRadius: '6px',
-                          background: '#eff6ff',
-                          border: '1px solid #dbeafe',
-                          color: '#1d4ed8',
-                          fontSize: '0.70rem',
-                          fontWeight: 800,
-                          lineHeight: 1
-                        }}>
-                          <ShieldCheck size={12} color="#1d4ed8" strokeWidth={2.5} />
-                          <span>Eltern</span>
-                        </span>
-                      )}
-                    </span>
-                  )}
-                  <div style={{
-                    background: isMe ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' : '#ffffff',
-                    color: isMe ? '#ffffff' : '#0f172a',
-                    padding: isMobile ? '12px 16px' : '15px 22px',
-                    borderRadius: isMe ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                    fontSize: isMobile ? '0.96rem' : '1.08rem',
-                    lineHeight: 1.5,
-                    wordBreak: 'break-word',
-                    border: isMe ? 'none' : '1px solid #e2e8f0',
-                    boxShadow: isMe ? '0 2px 10px rgba(21, 128, 61, 0.22)' : '0 2px 8px rgba(0,0,0,0.04)'
-                  }}>
-                    {cleanContent}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '8px' }}>
-                      <span style={{ fontSize: isMobile ? '0.74rem' : '0.82rem', color: isMe ? 'rgba(255, 255, 255, 0.88)' : '#64748b', fontWeight: 650 }}>
-                        {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {isMe && (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
-                          <CheckCheck size={isMobile ? 14 : 16} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
-                          <span style={{ fontSize: isMobile ? '0.68rem' : '0.76rem', color: 'rgba(255, 255, 255, 0.88)' }}>
-                            {msg.is_read ? 'Gelesen' : 'Zugestellt'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <CampusUnifiedChatMessage
+                  key={msg.id || idx}
+                  msg={msg}
+                  prevMsg={prevMsg}
+                  currentUserId={currentUserId}
+                  currentUserRole={currentUserRole}
+                  senderUser={senderUser}
+                  isMobile={isMobile}
+                  currentOcc={occurrence}
+                  isSuperseded={isSuperseded}
+                />
               );
             })
           )}
@@ -1443,15 +1327,15 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     padding: isMobile ? '7px 13px' : '9px 16px',
                     minHeight: isMobile ? '34px' : '40px',
                     borderRadius: '100px',
-                    background: isLessonPast ? '#f1f5f9' : '#f0fdf4',
-                    border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #86efac',
-                    color: isLessonPast ? '#94a3b8' : '#15803d',
+                    background: isLessonPast ? '#f1f5f9' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: isLessonPast ? '1.5px solid #cbd5e1' : 'none',
+                    color: isLessonPast ? '#94a3b8' : '#ffffff',
                     fontSize: isMobile ? '0.80rem' : '0.88rem',
                     fontWeight: 850,
                     whiteSpace: 'nowrap',
                     cursor: isLessonPast ? 'not-allowed' : 'pointer',
                     opacity: isLessonPast ? 0.6 : 1,
-                    boxShadow: isLessonPast ? 'none' : '0 1px 3px rgba(34, 197, 94, 0.12)',
+                    boxShadow: isLessonPast ? 'none' : '0 2px 8px rgba(16, 185, 129, 0.28)',
                     flexShrink: 0,
                     display: 'inline-flex',
                     alignItems: 'center',

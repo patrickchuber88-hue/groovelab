@@ -1392,7 +1392,7 @@ export function processPureRawAudioBuffer(
   // Beseitigt Lautheitssprünge in den ersten Sekunden (verursacht durch träge Hardware-AGC
   // des Mikrofons/Betriebssystems). Gleicht Dips bereits ab Sekunde 0.00 sanft und musikalisch
   // an das mittlere Niveau an (max. 3.5 dB), ohne Transienten zu verwaschen oder Pumping zu erzeugen.
-  if (options?.applyLookaheadLeveler !== false && !preserveDynamics) {
+  if (options?.applyLookaheadLeveler === true && !preserveDynamics) {
     applyLookaheadLoudnessLeveler(audioBuffer, {
       maxBoostDb: 3.5,
       targetPeakDb

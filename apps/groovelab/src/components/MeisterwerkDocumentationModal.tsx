@@ -45,7 +45,9 @@ import {
   areSongsIdentical,
   levenshteinDistance,
   normalizeSongStr,
-  extractSongArtistAndTitle
+  extractSongArtistAndTitle,
+  isDummyOrTestSong,
+  isWeeklySnapshotContainer
 } from './student/meisterwerk/utils/meisterwerkSongHelpers';
 import { MeisterwerkRecordingsTab } from './student/meisterwerk/MeisterwerkRecordingsTab';
 import { MeisterwerkLogbuchTab } from './student/meisterwerk/MeisterwerkLogbuchTab';
@@ -59,6 +61,7 @@ import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { getSimulatedNow, getSchoolYearString, CANONICAL_LEHRWERK_COLOR, getLehrwerkColor as getLehrwerkColorUtil, getSongColor, getWeeksBetween, getWeekDateRange } from './student/studentDateUtils';
 import { renderSongVinylCover } from './student/CampusVinylCoverArt';
 import { broadcastPracticeUpdate } from '../utils/studentProgressEngine';
+import { syncStudentPracticeToDb, applyDirectPageStatusUpdate } from '../utils/studentPracticeSync';
 import { useMeisterwerkAudioRecording } from './student/meisterwerk/hooks/useMeisterwerkAudioRecording';
 import { useMeisterwerkMatchGame } from './student/meisterwerk/hooks/useMeisterwerkMatchGame';
 import { useMeisterwerkSkills } from './student/meisterwerk/hooks/useMeisterwerkSkills';
@@ -266,61 +269,62 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [initialModalTab]);
 
+  // 📚 0.1% Goldstandard Lehrwerk Normalizer
+  const normLw = (item: any) => {
+    if (!item) return null;
+    const bid = String(item.lehrwerkId || item.id || '');
+    const btitle = item.bookTitle || item.lehrwerkTitle || item.title || 'Lehrwerk';
+    const bpages = Number(item.totalPages || item.total_pages || 50);
+    return { ...item, id: bid, lehrwerkId: bid, bookTitle: btitle, lehrwerkTitle: btitle, title: btitle, totalPages: bpages, total_pages: bpages };
+  };
+
   // Domain State
   const [progressItems, setProgressItems] = useState<ProgressItem[]>(() => initialProgressItems || []);
-  const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>(() => initialLehrwerke || []);
-  const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>([]);
+  const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>(() => (initialLehrwerke || []).map(normLw).filter(Boolean));
+  const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>(() => (initialLehrwerke || []).map(normLw).filter(Boolean));
   const [activeSongSkills, setActiveSongSkills] = useState<any[]>(() => propActiveSongSkills || []);
   const [assignedCampusSongs, setAssignedCampusSongs] = useState<any[]>(() => propAssignedCampusSongs || initialSongs || []);
   const [songs, setSongs] = useState<any[]>([]);
 
   useEffect(() => {
-    if (propActiveSongSkills && Array.isArray(propActiveSongSkills) && propActiveSongSkills.length > 0) {
-      setActiveSongSkills(propActiveSongSkills);
-    }
+    if (propActiveSongSkills?.length) setActiveSongSkills(propActiveSongSkills);
   }, [propActiveSongSkills]);
 
   useEffect(() => {
-    const songsMap = new Map<string, any>();
+    if (initialProgressItems?.length) setProgressItems(initialProgressItems);
+  }, [initialProgressItems]);
 
-    // 1. Add from activeSongSkills
+  useEffect(() => {
+    if (initialLehrwerke?.length) {
+      const normalized = initialLehrwerke.map(normLw).filter(Boolean);
+      setGlobalLehrwerke(prev => {
+        const map = new Map(prev.map(b => [String(b.id), b]));
+        normalized.forEach(b => map.set(String(b.id), b));
+        return Array.from(map.values());
+      });
+      setAssignedLehrwerke(prev => prev.length > 0 ? prev.map(normLw).filter(Boolean) : normalized);
+    }
+  }, [initialLehrwerke]);
+
+  useEffect(() => {
+    const songsMap = new Map<string, any>();
     (activeSongSkills || []).forEach((skill: any) => {
       const songObj = skill.songs || {};
       const songId = skill.song_id || songObj.id;
-      if (!songId) return;
-      if (!songsMap.has(String(songId))) {
-        songsMap.set(String(songId), {
-          ...songObj,
-          id: songId,
-          skillId: skill.id,
-          title: songObj.title || `Song (ID: ${songId})`,
-          is_current_homework: true
-        });
+      if (songId && !songsMap.has(String(songId))) {
+        const isHw = Boolean(skill.is_current_homework || (progressItems || []).some((p: any) => p.is_current_homework && (p.song_id === songId || (p.topic_name && songObj.title && p.topic_name.toLowerCase().includes(songObj.title.toLowerCase())))));
+        songsMap.set(String(songId), { ...songObj, id: songId, skillId: skill.id, title: songObj.title || `Song (ID: ${songId})`, is_current_homework: isHw });
       }
     });
-
-    // 2. Add from progressItems (Fallback)
     (progressItems || []).forEach((item: any) => {
       if (item.topic_name && !item.topic_name.includes(' - Seite ') && !item.topic_name.startsWith('Hausaufgabe KW ')) {
         const title = item.topic_name.trim();
         const existing = Array.from(songsMap.values()).find(s => (s.title || '').trim().toLowerCase() === title.toLowerCase());
-        if (!existing && title) {
-          songsMap.set(`prog-${item.id}`, {
-            id: `prog-${item.id}`,
-            title: title,
-            is_current_homework: Boolean(item.is_current_homework)
-          });
-        }
+        if (!existing && title) songsMap.set(`prog-${item.id}`, { id: `prog-${item.id}`, title, is_current_homework: Boolean(item.is_current_homework) });
       }
     });
-
-    // 3. Fallback to prop if we computed nothing and we have a prop (e.g. from Dashboard)
     const computed = Array.from(songsMap.values());
-    if (computed.length > 0) {
-      setAssignedCampusSongs(computed);
-    } else if (propAssignedCampusSongs && Array.isArray(propAssignedCampusSongs) && propAssignedCampusSongs.length > 0) {
-      setAssignedCampusSongs(propAssignedCampusSongs);
-    }
+    if (computed.length > 0) setAssignedCampusSongs(computed); else if (propAssignedCampusSongs?.length) setAssignedCampusSongs(propAssignedCampusSongs);
   }, [activeSongSkills, progressItems, propAssignedCampusSongs]);
   const [activeItem, setActiveItem] = useState<ProgressItem | null>(null);
   const [topicName, setTopicName] = useState('');
@@ -479,8 +483,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             }
 
             songList.forEach((song: any) => {
+              if (!song || isDummyOrTestSong(song)) return;
               const sTitle = (song.title || song.topic_name || '').trim();
-              if (!sTitle) return;
+              if (!sTitle || isWeeklySnapshotContainer(sTitle) || isWeeklySnapshotContainer(song.artist)) return;
               const existing = loadedProgress.find((p: any) => (p.topic_name || p.title || '').trim().toLowerCase() === sTitle.toLowerCase());
               if (existing) {
                 existing.is_current_homework = true;
@@ -513,15 +518,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const loadLehrwerke = useCallback(async () => {
     try {
-      const { data } = await supabase.from('campus_lehrwerke').select('*');
-      let combined = data ? [...data] : [];
+      const { data } = await supabase.from('lehrwerke').select('*').order('title');
+      let combined = (data ? [...data] : []).map(normLw).filter(Boolean);
       try {
         const localStored = localStorage.getItem('campus_lehrwerke');
         const localBooks = localStored ? JSON.parse(localStored) : [];
         for (const lb of localBooks) {
-          if (!combined.some(b => String(b.id) === String(lb.id) || b.title === lb.title)) {
-            combined.push(lb);
-          }
+          const n = normLw(lb);
+          if (n && !combined.some(b => String(b.id) === String(n.id) || b.title === n.title)) combined.push(n);
         }
       } catch {}
       setGlobalLehrwerke(combined);
@@ -530,7 +534,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const stored = localStorage.getItem('student_lehrwerke_progress');
       if (stored) {
         const parsed = JSON.parse(stored);
-        localAssigned = parsed.filter((item: any) => item.studentId === student.id);
+        localAssigned = parsed.filter((item: any) => item.studentId === student.id).map(normLw).filter(Boolean);
       }
 
       // 🛡️ Auto-healing: Merge any Lehrwerk found in progress_matrix into assignedLehrwerke (Server Sync Parity)
@@ -558,24 +562,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               );
               
               if (!assignment) {
-                assignment = {
+                assignment = normLw({
                   studentId: student.id,
+                  id: targetId,
                   lehrwerkId: targetId,
                   bookTitle: book?.title || bookTitle,
                   lehrwerkTitle: book?.title || bookTitle,
+                  title: book?.title || bookTitle,
                   totalPages: book?.totalPages || book?.total_pages || 50,
+                  total_pages: book?.totalPages || book?.total_pages || 50,
                   assignedAt: item.created_at || item.updated_at || new Date().toISOString(),
                   pageStates: {}
-                };
+                });
                 healed.push(assignment);
                 needsUpdate = true;
               }
               
               if (!isNaN(pageNum) && assignment.pageStates) {
-                if (!assignment.pageStates[pageNum] || item.is_current_homework) {
+                const isPracticedInPm = Boolean(
+                  item.match_history && Array.isArray(item.match_history) && item.match_history.some((m: any) => m.type === 'student_practiced' || m.type === 'student_focus')
+                );
+                if (!assignment.pageStates[pageNum] || item.is_current_homework || isPracticedInPm) {
                   assignment.pageStates[pageNum] = {
                     ...(assignment.pageStates[pageNum] || {}),
-                    status: item.status === 'MASTERED' ? 'mastered' : (item.status === 'THEORY_DONE' ? 'purple' : (item.is_current_homework ? 'homework' : 'locked')),
+                    studentFocus: assignment.pageStates[pageNum]?.studentFocus || isPracticedInPm,
+                    status: item.status === 'MASTERED' ? 'mastered' : (item.status === 'THEORY_DONE' ? 'purple' : (item.is_current_homework ? 'homework' : (assignment.pageStates[pageNum]?.status || 'locked'))),
                     isCurrentHomework: Boolean(item.is_current_homework),
                     notes: item.teacher_notes || assignment.pageStates[pageNum]?.notes || '',
                     homework_notes: item.homework_notes || item.teacher_notes || assignment.pageStates[pageNum]?.homework_notes || ''
@@ -804,10 +815,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const pageStates = { ...(book.pageStates || {}) };
             const current = pageStates[pageNum] || {};
             const isFocused = Boolean(current.studentFocus);
-            const focusedCount = Object.values(pageStates).filter((p: any) => Boolean(p?.studentFocus)).length;
-            if (!isFocused && focusedCount >= 3) {
-              return book;
-            }
             pageStates[pageNum] = {
               ...current,
               studentFocus: !isFocused,
@@ -843,16 +850,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             detail: { lehrwerkId, pageNum, studentId }
           }));
         }
+
+        if (studentId && lehrwerkId) {
+          const bookObj = (globalLehrwerke || []).find((b: any) => String(b.id || b.lehrwerkId) === String(lehrwerkId)) || (updated || []).find((b: any) => String(b.id || b.lehrwerkId) === String(lehrwerkId));
+          syncStudentPracticeToDb(studentId, bookObj?.title || bookObj?.lehrwerkTitle || 'Lehrwerk', pageNum);
+        }
       } catch (e) {
         console.warn('Error saving student focus:', e);
       }
       return updated;
     });
-  }, [student?.id, setAssignedLehrwerke]);
+  }, [student?.id, setAssignedLehrwerke, globalLehrwerke]);
 
   // Hook 2: Audio Recording
   const {
     isRecordingAudio,
+    isReleasingAudio,
     audioDuration,
     recordingBpm,
     setRecordingBpm,
@@ -1486,33 +1499,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // 📖 Lehrwerk zuweisen
   const handleAssignLehrwerk = useCallback((lehrwerkId: string, directBookObj?: any) => {
     if (!lehrwerkId) return;
-    const book = directBookObj || globalLehrwerke.find(b => String(b.id) === String(lehrwerkId));
+    const book = directBookObj || globalLehrwerke.find(b => String(b.id || b.lehrwerkId) === String(lehrwerkId));
     if (!book) return;
 
     try {
       const stored = localStorage.getItem('student_lehrwerke_progress');
       const parsed = stored ? JSON.parse(stored) : [];
 
-      if (parsed.some((item: any) => String(item.studentId) === String(student.id) && String(item.lehrwerkId) === String(lehrwerkId))) {
+      if (parsed.some((item: any) => String(item.studentId) === String(student.id) && String(item.lehrwerkId || item.id) === String(lehrwerkId))) {
         setActiveLehrwerkId(lehrwerkId);
         setActiveSubView('lehrwerk');
         return;
       }
 
-      const newAssignment = {
-        studentId: student.id,
-        lehrwerkId: lehrwerkId,
-        bookTitle: book.title,
-        lehrwerkTitle: book.title,
-        totalPages: book.totalPages || book.total_pages || 50,
-        assignedAt: new Date().toISOString(),
-        visibility: 'private',
-        pageStates: {}
-      };
+      const bTitle = book.title || book.bookTitle;
+      const bPages = book.totalPages || book.total_pages || 50;
+      const newAssignment = normLw({ studentId: student.id, id: lehrwerkId, lehrwerkId, bookTitle: bTitle, lehrwerkTitle: bTitle, title: bTitle, totalPages: bPages, total_pages: bPages, assignedAt: new Date().toISOString(), visibility: 'private', pageStates: {} });
 
       const updated = [...parsed, newAssignment];
       localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
-      setAssignedLehrwerke(prev => [...prev.filter(a => String(a.lehrwerkId) !== String(lehrwerkId)), newAssignment]);
+      setAssignedLehrwerke(prev => [...prev.filter(a => String(a.lehrwerkId || a.id) !== String(lehrwerkId)), newAssignment]);
       loadLehrwerke();
       setActiveLehrwerkId(lehrwerkId);
       setActiveSubView('lehrwerk');
@@ -1598,32 +1604,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       let createdBook: any = null;
       try {
         const { data, error } = await supabase
-          .from('campus_lehrwerke')
+          .from('lehrwerke')
           .insert({
             title,
-            totalPages: pages,
             total_pages: pages,
-            instrument: defaultInstrument,
             school_id: sId
           })
           .select()
           .single();
         if (!error && data) {
-          createdBook = data;
+          createdBook = normLw(data);
         }
       } catch (dbErr) {
-        console.warn('[Meisterwerk] DB insert campus_lehrwerke fallback:', dbErr);
+        console.warn('[Meisterwerk] DB insert lehrwerke fallback:', dbErr);
       }
 
       if (!createdBook) {
-        createdBook = {
-          id: `lw-${Date.now()}`,
-          title,
-          totalPages: pages,
-          total_pages: pages,
-          instrument: defaultInstrument,
-          school_id: sId
-        };
+        createdBook = normLw({ id: `lw-${Date.now()}`, lehrwerkId: `lw-${Date.now()}`, title, bookTitle: title, totalPages: pages, total_pages: pages, instrument: defaultInstrument, school_id: sId });
       }
 
       try {
@@ -1660,11 +1657,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const stored = localStorage.getItem('student_lehrwerke_progress');
       if (stored) {
         const parsed = JSON.parse(stored);
-        const updated = parsed.filter((item: any) => !(String(item.studentId) === String(student.id) && String(item.lehrwerkId) === String(lehrwerkId)));
+        const updated = parsed.filter((item: any) => !(String(item.studentId) === String(student.id) && String(item.lehrwerkId || item.id) === String(lehrwerkId)));
         localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
-        setAssignedLehrwerke(updated.filter((item: any) => String(item.studentId) === String(student.id)));
+        setAssignedLehrwerke(updated.filter((item: any) => String(item.studentId) === String(student.id)).map(normLw).filter(Boolean));
       }
-      if (activeLehrwerkId === lehrwerkId) {
+      if (String(activeLehrwerkId) === String(lehrwerkId)) {
         setActiveLehrwerkId(null);
       }
       loadLehrwerke();
@@ -1705,6 +1702,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setActivePageNumber(pageNum);
     setActiveInputTab('lehrwerk_page');
   }, [setActiveLehrwerkId, setActivePageNumber, setActiveInputTab]);
+
+  // 🎨 0,1% Goldstandard: Direktes Einfärben & persistentes Speichern der Buchseite
+  const handleTriggerDirectSave = useCallback((bookId: string, pageNum: number, targetStatus: string, targetHomework: boolean) => {
+    const bookObj = (globalLehrwerke || []).find((b: any) => String(b.id || b.lehrwerkId) === String(bookId)) ||
+                    (assignedLehrwerke || []).find((b: any) => String(b.id || b.lehrwerkId) === String(bookId));
+    const bookTitle = bookObj?.title || bookObj?.bookTitle || bookObj?.lehrwerkTitle || 'Lehrwerk';
+    applyDirectPageStatusUpdate({
+      lehrwerkId: bookId,
+      pageNum,
+      rawStatus: targetStatus,
+      isHomework: targetHomework,
+      studentId: student?.id,
+      bookTitle,
+      teacherId,
+      currentAssigned: assignedLehrwerke,
+      setAssignedLehrwerke,
+      setProgressItems,
+      notifyHomeworkChange
+    });
+  }, [globalLehrwerke, assignedLehrwerke, student?.id, teacherId, setAssignedLehrwerke, setProgressItems, notifyHomeworkChange]);
 
   // 📸 Strukturierte Momentaufnahme der aktuellen Wochenaufgabe
   const getCurrentHomeworkSnapshot = useCallback(() => {
@@ -2240,7 +2257,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       color: #334155;
       margin-top: 3px;
       padding-left: 8px;
-      border-left: 2px solid #86efac;
+      border-left: 2px solid #10b981;
     }
     .notes-box {
       border: 1.5px solid #cbd5e1;
@@ -2250,56 +2267,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       min-height: 55px;
       font-size: 10.5pt;
     }
-    .notes-line {
-      margin-bottom: 4px;
-      line-height: 1.4;
-    }
-    .audio-card {
-      border: 1.5px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 10px 14px;
-      background: #f8fafc;
-      margin-bottom: 8px;
-    }
-    .audio-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 0;
-      border-bottom: 1px dashed #e2e8f0;
-      font-size: 10pt;
-    }
-    .audio-item:last-child {
-      border-bottom: none;
-    }
-    .audio-item-title {
-      font-weight: 700;
-      color: #0f172a;
-    }
-    .audio-item-meta {
-      font-size: 9pt;
-      color: #64748b;
-      font-weight: 600;
-    }
-    .audio-hint {
-      font-size: 8.5pt;
-      color: #64748b;
-      margin-top: 6px;
-      font-style: italic;
-    }
-    .practice-tracker {
-      margin-top: 20px;
-      border: 2px dashed #047857;
-      border-radius: 12px;
-      padding: 10px 14px;
-      background: #f0fdf4;
-    }
-    .tracker-title {
-      font-size: 10pt;
-      font-weight: 800;
-      color: #047857;
-      margin-bottom: 8px;
-    }
+    .notes-line { margin-bottom: 4px; line-height: 1.4; }
+    .audio-card { border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; background: #f8fafc; margin-bottom: 8px; }
+    .audio-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; font-size: 10pt; }
+    .audio-item:last-child { border-bottom: none; }
+    .audio-item-title { font-weight: 700; color: #0f172a; }
+    .audio-item-meta { font-size: 9pt; color: #64748b; font-weight: 600; }
+    .audio-hint { font-size: 8.5pt; color: #64748b; margin-top: 6px; font-style: italic; }
+    .practice-tracker { margin-top: 20px; border: 2px dashed #047857; border-radius: 12px; padding: 10px 14px; background: #f0fdf4; }
+    .tracker-title { font-size: 10pt; font-weight: 800; color: #047857; margin-bottom: 8px; }
     .tracker-days {
       display: flex;
       justify-content: space-between;
@@ -2308,7 +2284,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     .tracker-day {
       flex: 1;
       text-align: center;
-      border: 1px solid #86efac;
+      border: 1px solid #10b981;
       background: #ffffff;
       border-radius: 8px;
       padding: 6px 4px;
@@ -2316,7 +2292,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     .day-name {
       font-size: 9pt;
       font-weight: 800;
-      color: #15803d;
+      color: #059669;
       text-transform: uppercase;
     }
     .day-box {
@@ -3461,6 +3437,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               isTeacherHomeworkExpanded={isTeacherHomeworkExpanded}
               isTeacherMode={isTeacherTools}
               isUploadingAudio={isUploadingAudio}
+              isReleasingAudio={isReleasingAudio}
               matchesAudioSearch={matchesAudioSearch}
               mobileRecordingsTab={mobileRecordingsTab}
               newPlaylistTitle=""
@@ -3718,11 +3695,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 setActiveSubView('song');
               }
             }}
-            selectTextbookPage={(bookId: string, pageNum: number) => {
+            selectTextbookPage={(bookId: string, pageNum: number, optionalStatus?: string, optionalHomework?: boolean) => {
               setActiveLehrwerkId(bookId);
               setActivePageNumber(pageNum);
               setActiveInputTab('lehrwerk_page');
               setActiveSubView('lehrwerk');
+              if (optionalStatus === 'MASTERED' || optionalStatus === 'THEORY_DONE' || optionalStatus === 'IN_PROGRESS') {
+                setStatus(optionalStatus);
+              } else {
+                const pState = (assignedLehrwerke || []).find((b: any) => String(b.lehrwerkId || b.id) === String(bookId))?.pageStates?.[pageNum];
+                if (pState) {
+                  setStatus(pState.status === 'mastered' ? 'MASTERED' : 'IN_PROGRESS');
+                  setIsCurrentHomework(Boolean(pState.status === 'homework' || pState.isCurrentHomework));
+                }
+              }
+              if (optionalHomework !== undefined) setIsCurrentHomework(optionalHomework);
             }}
             selectedActiveSongId={selectedActiveSongId}
             selectedCategoryFilter={null}
@@ -3814,7 +3801,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             triggerDebouncedAutoSave={triggerDebouncedAutoSave}
             triggerDebouncedSongSave={triggerDebouncedSongSave}
             triggerDebouncedTeacherNoteSave={triggerDebouncedTeacherNoteSave}
-            triggerDirectSave={() => {}}
+            triggerDirectSave={handleTriggerDirectSave}
             triggerDirectSongSave={triggerDirectSongSave}
             triggerImmediateAutoSave={triggerImmediateAutoSave}
             uiLevel={uiLevel}

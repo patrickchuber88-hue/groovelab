@@ -628,7 +628,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 padding: '10px 16px',
                 borderRadius: '14px',
                 border: '1px dashed #38bdf8',
-                background: '#0f172a',
+                background: 'transparent',
                 color: '#38bdf8',
                 fontSize: '0.82rem',
                 fontWeight: 700,

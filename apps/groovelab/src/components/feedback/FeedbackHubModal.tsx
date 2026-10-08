@@ -755,11 +755,11 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: '#f0fdf4',
-                border: '1.5px solid #86efac',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
                 padding: '6px 14px',
                 borderRadius: '100px',
-                color: '#15803d',
+                color: '#ffffff',
                 fontSize: '0.76rem',
                 fontWeight: 900,
                 letterSpacing: '0.04em'
@@ -793,7 +793,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                       <span style={{
                         fontSize: '0.72rem',
                         fontWeight: 800,
-                        color: isNight ? '#94a3b8' : '#86efac',
+                        color: isNight ? '#94a3b8' : '#34d399',
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
                         display: 'flex',
@@ -1010,8 +1010,8 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                 {/* 60-Minute SLA Pledge Banner */}
                 {(feedbackType === 'support_request' || feedbackType === 'bug') && (
                   <div style={{
-                    background: '#f0fdf4',
-                    border: '1.5px solid #86efac',
+                    background: '#ecfdf5',
+                    border: '1.5px solid #10b981',
                     borderRadius: '12px',
                     padding: '10px 14px',
                     display: 'flex',
@@ -1021,7 +1021,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   }}>
                     <span style={{ fontSize: '1.1rem' }}>⚡</span>
                     <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#15803d' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#065f46' }}>
                         60-Minuten Express-Rückmeldung
                       </div>
                       <div style={{ fontSize: '0.70rem', color: '#166534', marginTop: '1px' }}>

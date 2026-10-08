@@ -452,17 +452,17 @@ export const FeedbackTab: React.FC = () => {
 
         {/* 60-Minute SLA Compliance Card */}
         <div style={{
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-          border: '1.5px solid #86efac',
+          background: '#ecfdf5',
+          border: '1.5px solid #10b981',
           borderRadius: '16px',
           padding: '16px 18px',
-          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)'
+          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
         }}>
-          <div style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Zap size={14} /> 60-Min. SLA Quote
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#166534', marginTop: '4px' }}>
-            99.8% <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d' }}>(Ø {avgResponseMinutes} Min.)</span>
+          <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#065f46', marginTop: '4px' }}>
+            99.8% <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669' }}>(Ø {avgResponseMinutes} Min.)</span>
           </div>
         </div>
 
@@ -1134,10 +1134,10 @@ export const FeedbackTab: React.FC = () => {
                       textCol = '#065f46';
                       hoverBorder = '#34d399';
                     } else if (tpl.category === 'positive') {
-                      bg = isSelected ? '#dcfce7' : '#f0fdf4';
-                      border = isSelected ? '#16a34a' : '#bbf7d0';
-                      textCol = '#15803d';
-                      hoverBorder = '#86efac';
+                      bg = isSelected ? '#ecfdf5' : '#f0fdf4';
+                      border = isSelected ? '#10b981' : '#a7f3d0';
+                      textCol = '#059669';
+                      hoverBorder = '#10b981';
                     } else if (tpl.category === 'info') {
                       bg = isSelected ? '#dbeafe' : '#eff6ff';
                       border = isSelected ? '#2563eb' : '#bfdbfe';

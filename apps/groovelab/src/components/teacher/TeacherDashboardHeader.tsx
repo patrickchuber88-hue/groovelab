@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Users, Sparkles, Settings, LayoutDashboard, Radio, GraduationCap, Eye, EyeOff, Search, Box 
+  Users, Sparkles, Settings, LayoutDashboard, Radio, GraduationCap, Eye, EyeOff, Search, Box, BookOpen 
 } from 'lucide-react';
 import { CampusGroovelabBrand } from '../CampusGroovelabBrand';
 import { AvatarImage } from '../common/AvatarImage';
@@ -14,6 +14,7 @@ export interface TeacherDashboardHeaderProps {
   toggleRealNames: () => void;
   onOpenCommandPalette: () => void;
   teacher?: any;
+  onOpenMediaLibrary?: () => void;
 }
 
 export function TeacherDashboardHeader({
@@ -24,7 +25,8 @@ export function TeacherDashboardHeader({
   showRealNames,
   toggleRealNames,
   onOpenCommandPalette,
-  teacher
+  teacher,
+  onOpenMediaLibrary
 }: TeacherDashboardHeaderProps) {
   return (
     <header style={{
@@ -123,7 +125,29 @@ export function TeacherDashboardHeader({
 
         {/* Quick Actions & Privacy Eye */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-
+          {onOpenMediaLibrary && (
+            <button
+              type="button"
+              onClick={onOpenMediaLibrary}
+              title="4-Säulen-Mediathek öffnen (Notenschnipsel, Didaktik-Vorlagen, Lehrwerke, Playalongs)"
+              style={{
+                background: '#ffffff',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#0f172a',
+                fontSize: '0.8rem',
+                fontWeight: 800
+              }}
+            >
+              <BookOpen size={15} />
+              <span>Mediathek</span>
+            </button>
+          )}
 
           <button
             onClick={toggleRealNames}

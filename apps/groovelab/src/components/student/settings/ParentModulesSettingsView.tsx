@@ -110,7 +110,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
       {/* 2. Modul 1: Campus Studio (Smaragdgrün) */}
       <div style={{
         background: '#ffffff',
-        border: '1.5px solid #86efac',
+        border: '1.5px solid #10b981',
         borderRadius: '22px',
         padding: '22px',
         boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)',
@@ -150,9 +150,10 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
             fontWeight: 850,
             padding: '4px 12px',
             borderRadius: '100px',
-            background: isCampusActive ? '#dcfce7' : '#fef3c7',
-            color: isCampusActive ? '#15803d' : '#b45309',
-            border: `1.5px solid ${isCampusActive ? '#86efac' : '#fde68a'}`,
+            background: isCampusActive ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fef3c7',
+            color: isCampusActive ? '#ffffff' : '#b45309',
+            border: isCampusActive ? 'none' : '1.5px solid #fde68a',
+            boxShadow: isCampusActive ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px'
@@ -187,7 +188,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                <FeatIcon size={13} color="#15803d" />
+                <FeatIcon size={13} color="#10b981" />
                 <span>{feat.label}</span>
               </span>
             );
@@ -204,7 +205,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
           flexWrap: 'wrap',
           gap: '8px'
         }}>
-          <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 800 }}>
+          <span style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 800 }}>
             ● Aktiv für das laufende Schuljahr 2026/27
           </span>
 

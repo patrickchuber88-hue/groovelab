@@ -82,26 +82,48 @@ process.stdout.write('\n─── SÄULE 1: BFSG 2025 & WCAG 2.2 AA (Barrierefre
 const legalTextModalPath = path.join(SRC_DIR, 'components', 'LegalTextModal.tsx');
 const legalContentPath = path.join(SRC_DIR, 'legal', 'legalContent.ts');
 if (fs.existsSync(legalTextModalPath)) {
-  let content = fs.readFileSync(legalTextModalPath, 'utf8');
+  const modalContent = fs.readFileSync(legalTextModalPath, 'utf8');
+  let content = modalContent;
+  let legalContentRaw = '';
   if (fs.existsSync(legalContentPath)) {
-    content += '\n' + fs.readFileSync(legalContentPath, 'utf8');
+    legalContentRaw = fs.readFileSync(legalContentPath, 'utf8');
+    content += '\n' + legalContentRaw;
   }
   
   // 1. Must be "teilweise vereinbar"
   const hasTeilweise = content.includes('teilweise vereinbar');
   // 2. Must NOT claim "vollständig barrierefrei" (Abmahnrisiko § 3a UWG)
   const hasVollstaendig = content.includes('vollständig barrierefrei') || content.includes('vollkommen barrierefrei');
-  // 3. Must cite EN 301 549 or WCAG 2.2 AA
+  // 3. Subtitle must avoid misleading "Konformität nach" (Blickfangwerbung § 5 UWG)
+  const hasMisleadingConformance = legalContentRaw.includes("subtitle: 'Konformität nach BITV");
+  // 4. Must cite EN 301 549 or WCAG 2.2 AA
   const hasStandard = content.includes('EN 301 549') || content.includes('WCAG');
-  // 4. Must cite exceptions (BFSG § 16 / BGG § 12a)
+  // 5. Must cite exceptions (BFSG § 16 / BGG § 12a)
   const hasExceptions = content.includes('16') || content.includes('12a') || content.includes('Unvereinbarkeiten');
+  // 6. Must provide accessible alternatives per EU 2018/1523
+  const hasAlternative = content.includes('Barrierefreie Alternative');
+  // 7. Must cite enforcement bodies (Marktüberwachungsbehörde & Schlichtungsstelle)
+  const hasEnforcement = content.includes('Marktüberwachungsbehörde') && content.includes('Schlichtungsstelle');
+  // 8. LegalTextModal must mechanically implement Escape key and Arrow navigation (Wahrheitsschutz Ziffer 3)
+  const hasEscapeListener = modalContent.includes("'Escape'");
+  const hasArrowNav = modalContent.includes("'ArrowRight'") && modalContent.includes("'ArrowLeft'");
+
+  const allPassed = hasTeilweise && !hasVollstaendig && !hasMisleadingConformance && hasStandard && hasExceptions && hasAlternative && hasEnforcement && hasEscapeListener && hasArrowNav;
+
+  let failReason = '';
+  if (hasVollstaendig) failReason = 'Abmahnrisiko nach § 3a UWG: Text behauptet unzulässigerweise "vollständig barrierefrei"!';
+  else if (hasMisleadingConformance) failReason = 'Abmahnrisiko nach § 5 UWG: Subtitle wirbt irreführend mit "Konformität" statt "Vereinbarkeit"!';
+  else if (!hasAlternative) failReason = 'Verstoß gegen EU 2018/1523: Barrierefreie Alternativen für nutzergenerierte Ausnahmen fehlen!';
+  else if (!hasEnforcement) failReason = 'Unvollständige Durchsetzungsangaben: Marktüberwachungsbehörde oder Schlichtungsstelle fehlen!';
+  else if (!hasEscapeListener) failReason = 'Wahrheitsverstoß: LegalTextModal.tsx besitzt keinen Escape-Listener, obwohl dies in Ziffer 3 deklariert wird!';
+  else if (!hasArrowNav) failReason = 'WAI-ARIA Tablist Verstoß: LegalTextModal.tsx unterstützt keine Pfeiltastennavigation!';
 
   recordCheck(
-    'LEG-01: BFSG 2025 & DIN EN 301 549 Deklarations-Wahrheit (Status „teilweise vereinbar“)',
-    hasTeilweise && !hasVollstaendig && hasStandard && hasExceptions,
-    hasVollstaendig 
-      ? 'Abmahnrisiko nach § 3a UWG: Text behauptet unzulässigerweise "vollständig barrierefrei"!' 
-      : 'Erklärung zur digitalen Barrierefreiheit ist abmahnsicher mit deklarierten Ausnahmen gem. § 16 BFSG verankert.'
+    'LEG-01: BFSG 2025 & DIN EN 301 549 0,1% Goldstandard (Wahrheit, Alternativen & Escape-Parität)',
+    allPassed,
+    allPassed
+      ? 'Erklärung zur Barrierefreiheit erfüllt 100% EU 2018/1523 Pflichtfelder (Vereinbarkeit, Alternativen, Marktüberwachung BW) und LegalTextModal garantiert Escape & Arrow-Navigation.'
+      : failReason
   );
 } else {
   recordCheck('LEG-01: BFSG 2025 Deklaration', false, 'LegalTextModal.tsx existiert nicht.');

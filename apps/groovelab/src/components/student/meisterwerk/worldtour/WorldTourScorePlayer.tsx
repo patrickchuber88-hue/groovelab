@@ -480,29 +480,31 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
                       padding: '5px 12px',
                       borderRadius: '10px',
                       background: liveIntonation?.status === 'hit'
-                        ? '#dcfce7'
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                         : liveIntonation?.status === 'near'
                         ? '#fef3c7'
                         : liveIntonation?.status === 'miss'
                         ? '#fee2e2'
                         : '#fef3c7',
                       color: liveIntonation?.status === 'hit'
-                        ? '#15803d'
+                        ? '#ffffff'
                         : liveIntonation?.status === 'near'
                         ? '#a16207'
                         : liveIntonation?.status === 'miss'
                         ? '#b91c1c'
                         : '#b45309',
-                      border: `1.5px solid ${
-                        liveIntonation?.status === 'hit'
-                          ? '#86efac'
-                          : liveIntonation?.status === 'near'
-                          ? '#fde047'
-                          : liveIntonation?.status === 'miss'
-                          ? '#fca5a5'
-                          : '#fcd34d'
-                      }`,
-                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+                      border: liveIntonation?.status === 'hit'
+                        ? 'none'
+                        : `1.5px solid ${
+                            liveIntonation?.status === 'near'
+                              ? '#fde047'
+                              : liveIntonation?.status === 'miss'
+                              ? '#fca5a5'
+                              : '#fcd34d'
+                          }`,
+                      boxShadow: liveIntonation?.status === 'hit'
+                        ? '0 2px 8px rgba(16, 185, 129, 0.28)'
+                        : '0 2px 6px rgba(0, 0, 0, 0.04)',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -730,9 +732,9 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
               gap: '6px',
               padding: '6px 12px',
               borderRadius: '10px',
-              background: isMetronomeActive ? '#dcfce7' : '#f8fafc',
-              border: `1px solid ${isMetronomeActive ? '#22c55e' : '#cbd5e1'}`,
-              color: isMetronomeActive ? '#15803d' : '#475569',
+              background: isMetronomeActive ? '#ecfdf5' : '#f8fafc',
+              border: `1.5px solid ${isMetronomeActive ? '#10b981' : '#cbd5e1'}`,
+              color: isMetronomeActive ? '#059669' : '#475569',
               fontSize: '0.78rem',
               fontWeight: 800,
               cursor: 'pointer',
@@ -740,7 +742,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
               minHeight: '44px'
             }}
           >
-            <Timer size={14} color={isMetronomeActive ? '#16a34a' : '#64748b'} />
+            <Timer size={14} color={isMetronomeActive ? '#059669' : '#64748b'} />
             <span>Metronom {isMetronomeActive ? 'AN' : 'AUS'}</span>
           </button>
 
@@ -923,14 +925,14 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
             gap: '12px',
             padding: '12px 18px',
             borderRadius: '14px',
-            background: mode === 'practice' ? '#f0fdf4' : '#eff6ff',
-            border: `1.5px solid ${mode === 'practice' ? '#86efac' : '#bfdbfe'}`,
-            color: mode === 'practice' ? '#166534' : '#1e40af',
+            background: mode === 'practice' ? '#ecfdf5' : '#eff6ff',
+            border: `1.5px solid ${mode === 'practice' ? '#10b981' : '#bfdbfe'}`,
+            color: mode === 'practice' ? '#065f46' : '#1e40af',
             animation: 'fade-in 0.25s ease'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Sparkles size={18} color={mode === 'practice' ? '#16a34a' : '#2563eb'} />
+            <Sparkles size={18} color={mode === 'practice' ? '#10b981' : '#2563eb'} />
             <div style={{ fontWeight: 800, fontSize: '0.84rem' }}>
               {practiceCompletedToast}
             </div>

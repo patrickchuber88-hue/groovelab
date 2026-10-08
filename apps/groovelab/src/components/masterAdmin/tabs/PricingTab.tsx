@@ -731,14 +731,14 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </div>
 
             {/* 3. Scope & Lifetime Protection Guarantee */}
-            <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '16px', border: '1.5px solid #86efac' }}>
+            <div style={{ background: '#ecfdf5', padding: '16px', borderRadius: '16px', border: '1.5px solid #10b981' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <ShieldCheck size={18} color="#16a34a" />
-                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#14532d', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                <ShieldCheck size={18} color="#10b981" />
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   3. Geltungsbereich &amp; 100% Lifetime-Bestandsschutz
                 </span>
               </div>
-              <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.45 }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: '#047857', lineHeight: 1.45 }}>
                 <strong>Bestandskunden-Garantie:</strong> Bestehende Sammelzahler-Schulen behalten ihren gebuchten Grundtarif sowie aktive Profile dauerhaft (0,00 {currencySymbol} Mehrkosten). Tarifanpassungen gelten ausschließlich für künftige Neuregistrierungen sowie für Schüler-Neuanmeldungen im neuen Schuljahr. Bei Eltern-Direktabrechnung greift der Treuetarif bei Verlängerung bis 31. Oktober.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

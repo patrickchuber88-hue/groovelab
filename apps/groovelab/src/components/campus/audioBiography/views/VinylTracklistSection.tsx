@@ -94,13 +94,13 @@ export const VinylTracklistSection: React.FC<VinylTracklistSectionProps> = ({
                     borderRadius: '12px',
                     background: isTrackPlaying
                       ? isLight
-                        ? '#dcfce7'
+                        ? '#ecfdf5'
                         : 'rgba(16, 185, 129, 0.2)'
                       : isLight
                       ? '#ffffff'
                       : 'rgba(255, 255, 255, 0.05)',
                     border: isTrackPlaying
-                      ? `1.5px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.5)'}`
+                      ? `1.5px solid ${isLight ? '#10b981' : 'rgba(16, 185, 129, 0.5)'}`
                       : `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'}`,
                     display: 'flex',
                     alignItems: 'center',
@@ -317,13 +317,13 @@ export const VinylTracklistSection: React.FC<VinylTracklistSectionProps> = ({
                     borderRadius: '12px',
                     background: isTrackPlaying
                       ? isLight
-                        ? '#dcfce7'
+                        ? '#ecfdf5'
                         : 'rgba(16, 185, 129, 0.2)'
                       : isLight
                       ? '#ffffff'
                       : 'rgba(255, 255, 255, 0.05)',
                     border: isTrackPlaying
-                      ? `1.5px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.5)'}`
+                      ? `1.5px solid ${isLight ? '#10b981' : 'rgba(16, 185, 129, 0.5)'}`
                       : `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'}`,
                     display: 'flex',
                     alignItems: 'center',

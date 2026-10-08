@@ -42,6 +42,9 @@ import {
   formatNotesForHomeworkSummary,
   fetchAudioNotesFromServer
 } from '../../utils/audioNotesStorage';
+import { StudioWaveformTimelineStage } from './audio/StudioWaveformTimelineStage';
+import { StudioHeroTransportBar } from './audio/StudioHeroTransportBar';
+import { StudioMarkerFeed } from './audio/StudioMarkerFeed';
 
 const isPlayableUrl = (u?: string | null) => Boolean(u && (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('blob:') || u.startsWith('data:')));
 
@@ -59,48 +62,7 @@ export interface AudioNotesModalProps {
   initialAudioBuffer?: AudioBuffer | null;
 }
 
-// ⚡ 1-Tap Quick Feedback Chips für den Musikunterricht (monochrome Vektor-Icons)
-const QUICK_FEEDBACK_CHIPS: Array<{ label: string; tag: AudioNoteTag; text: string; icon: React.ReactNode }> = [
-  { label: 'Rhythmus / Timing', tag: 'tip', text: 'Rhythmus beachten: auf gleichmäßiges Tempo achten', icon: <Clock size={12} strokeWidth={2.4} /> },
-  { label: 'Intonation', tag: 'tip', text: 'Tonhöhe sauber kontrollieren und exakt greifen/intonieren', icon: <Target size={12} strokeWidth={2.4} /> },
-  { label: 'Fingersatz / Haltung', tag: 'tip', text: 'Locker bleiben: Fingersatz und Handhaltung entspannen', icon: <User size={12} strokeWidth={2.4} /> },
-  { label: 'Dynamik', tag: 'tip', text: 'Dynamik gestalten: sanfter anspielen und Akzente setzen', icon: <Lightbulb size={12} strokeWidth={2.4} /> },
-  { label: 'Klasse gespielt!', tag: 'highlight', text: 'Hervorragend gespielt! Schöner Ton und sicher im Takt', icon: <Star size={12} strokeWidth={2.4} /> }
-];
-
 const SPEED_OPTIONS = [1.0, 0.85, 0.75, 0.5];
-
-
-const TAG_CONFIG: Record<AudioNoteTag, { label: string; icon: React.ReactNode; bg: string; color: string; border: string }> = {
-  tip: {
-    label: 'Übe-Tipp',
-    icon: <Lightbulb size={12} strokeWidth={2.4} />,
-    bg: '#fef9c3',
-    color: '#854d0e',
-    border: '#fde047'
-  },
-  bar: {
-    label: 'Takt / Stelle',
-    icon: <Target size={12} strokeWidth={2.4} />,
-    bg: '#ede9fe',
-    color: '#6d28d9',
-    border: '#ddd6fe'
-  },
-  highlight: {
-    label: 'Highlight',
-    icon: <Star size={12} strokeWidth={2.4} />,
-    bg: '#dcfce7',
-    color: '#15803d',
-    border: '#86efac'
-  },
-  general: {
-    label: 'Marker',
-    icon: <Bookmark size={12} strokeWidth={2.4} />,
-    bg: '#f1f5f9',
-    color: '#334155',
-    border: '#cbd5e1'
-  }
-};
 
 // 🏛️ Plattformweite Hilfsfunktion für 100% tonhöhenneutrale Tempoanpassung bei nativer Studioqualität
 const applyPreservesPitch = (audio: HTMLAudioElement, speed: number) => {
@@ -1232,30 +1194,51 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
               style={{
                 width: '40px',
                 height: '40px',
-                borderRadius: '12px',
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.18) 100%)',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#0f172a'
+                color: '#dc2626',
+                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.18)'
               }}
             >
-              <MessageSquareQuote size={20} strokeWidth={2.2} />
+              <Bookmark size={20} strokeWidth={2.4} fill="#ef4444" />
             </div>
             <div>
-              <h2
-                id="audio-notes-title"
-                style={{
-                  margin: 0,
-                  fontSize: '1.05rem',
-                  fontWeight: 900,
-                  color: '#0f172a',
-                  letterSpacing: '-0.015em'
-                }}
-              >
-                {isStudent ? 'Übe-Begleiter & Marker' : 'Audio-Notizen & Timeline-Marker'}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2
+                  id="audio-notes-title"
+                  style={{
+                    margin: 0,
+                    fontSize: '1.05rem',
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    letterSpacing: '-0.02em'
+                  }}
+                >
+                  {isStudent ? 'Übe-Begleiter & Marker' : 'Audio-Notizen & Timeline-Marker'}
+                </h2>
+                <span
+                  style={{
+                    fontSize: '0.62rem',
+                    fontWeight: 850,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    padding: '2px 7px',
+                    borderRadius: '999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ef4444' }} />
+                  <span>Studio</span>
+                </span>
+              </div>
               <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, marginTop: '2px' }}>
                 {title} • {formatTime(duration)}
               </div>
@@ -1348,1207 +1331,82 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {/* 🌊 SoundCloud-Style Interactive Waveform Stage */}
-          <div
-            style={{
-              background: '#f8fafc',
-              borderRadius: '20px',
-              border: '1.5px solid #e2e8f0',
-              padding: '14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}
-          >
-            {/* Kopfzeile der Wellenform mit Zoom & Positions-Badge */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    fontSize: '0.74rem',
-                    fontWeight: 850,
-                    color: '#0f172a',
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    padding: '3px 8px',
-                    borderRadius: '6px'
-                  }}
-                >
-                  {formatTime(currentPlayTime)} / {formatTime(duration)}
-                </span>
+          {/* 🌊 1. High-Energy Kinetische Wellenform & Laser-Playhead (YouTube Style) */}
+          <StudioWaveformTimelineStage
+            duration={duration}
+            currentPlayTime={currentPlayTime}
+            isPlaying={isPlaying}
+            notes={notes}
+            waveformBars={waveformBars}
+            zoomLevel={zoomLevel}
+            setZoomLevel={setZoomLevel}
+            spotLoopNoteId={spotLoopNoteId}
+            spotLoopRange={spotLoopRangeRef.current}
+            draggingNoteId={draggingNoteId}
+            draggedTime={draggedTime}
+            isStudent={isStudent}
+            isMobile={isMobile}
+            formatTime={formatTime}
+            waveformScrollRef={waveformScrollRef}
+            waveformContainerRef={waveformContainerRef}
+            onWaveformPointerDown={handleWaveformPointerDown}
+            onPinPointerDown={handlePinPointerDown}
+            onPlayNotePreRoll={handlePlayNotePreRoll}
+          />
 
-                {/* 🎯 Pillar 6: Fortschrittsanzeige "X von Y geübt" */}
-                {notes.length > 0 && (
-                  <span
-                    style={{
-                      fontSize: '0.70rem',
-                      fontWeight: 800,
-                      color: practicedCount === notes.length ? '#15803d' : '#475569',
-                      background: practicedCount === notes.length ? '#dcfce7' : '#ffffff',
-                      border: `1px solid ${practicedCount === notes.length ? '#86efac' : '#cbd5e1'}`,
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <CheckCircle2 size={11} strokeWidth={2.4} color={practicedCount === notes.length ? '#15803d' : '#64748b'} />
-                    <span>{practicedCount}/{notes.length} geübt ({progressPercent}%)</span>
-                  </span>
-                )}
-              </div>
+          {/* 🎬 2. Hero Transport Dock & Segmented Speed Capsule (YouTube Player Bar) */}
+          <StudioHeroTransportBar
+            isLoading={isLoading}
+            isPlaying={isPlaying}
+            isLooping={isLooping}
+            currentPlayTime={currentPlayTime}
+            playbackSpeed={playbackSpeed}
+            formatTime={formatTime}
+            onTogglePlay={togglePlay}
+            onToggleLoop={handleToggleLoop}
+            onSetSpeed={handleSetSpeed}
+            onOpenNoteAtTime={handleOpenNoteAtTime}
+            isMobile={isMobile}
+          />
 
-              {/* 🔍 Pillar 8: Zoom Toggle Controls */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 750, marginRight: '4px' }}>
-                  Zoom:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setZoomLevel(1)}
-                  style={{
-                    background: zoomLevel === 1 ? '#0f172a' : '#ffffff',
-                    color: zoomLevel === 1 ? '#ffffff' : '#64748b',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '2px 7px',
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  1x
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoomLevel(2)}
-                  style={{
-                    background: zoomLevel === 2 ? '#0f172a' : '#ffffff',
-                    color: zoomLevel === 2 ? '#ffffff' : '#64748b',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '2px 7px',
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  2x
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoomLevel(3)}
-                  style={{
-                    background: zoomLevel === 3 ? '#0f172a' : '#ffffff',
-                    color: zoomLevel === 3 ? '#ffffff' : '#64748b',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '2px 7px',
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  3x
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollbarer Wellenform-Container */}
-            <div
-              ref={waveformScrollRef}
-              style={{
-                width: '100%',
-                overflowX: zoomLevel > 1 ? 'auto' : 'hidden',
-                borderRadius: '14px',
-                border: '1.5px solid #e2e8f0',
-                background: '#ffffff',
-                boxSizing: 'border-box'
-              }}
-            >
-              <div
-                ref={waveformContainerRef}
-                onPointerDown={handleWaveformPointerDown}
-                style={{
-                  position: 'relative',
-                  width: `${zoomLevel * 100}%`,
-                  minWidth: '100%',
-                  height: '96px',
-                  padding: '0 8px',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
-                  overflow: 'visible'
-                }}
-                title="Klicke zum Springen oder tippe doppelt für neue Notiz"
-              >
-                {/* Amplitude Bars */}
-                <svg
-                  viewBox={`0 0 ${800 * zoomLevel} 80`}
-                  preserveAspectRatio="none"
-                  style={{ width: '100%', height: '100%', display: 'block' }}
-                >
-                  {waveformBars.map((bar, i) => {
-                    const barTimeRatio = i / waveformBars.length;
-                    const isPlayed = barTimeRatio <= (duration > 0 ? currentPlayTime / duration : 0);
-                    return (
-                      <rect
-                        key={i}
-                        x={bar.x}
-                        y={bar.y}
-                        width={bar.width}
-                        height={bar.height}
-                        rx={bar.width / 2}
-                        ry={bar.width / 2}
-                        fill={isPlayed ? '#0f172a' : '#cbd5e1'}
-                        style={{ transition: 'fill 0.08s ease' }}
-                      />
-                    );
-                  })}
-                </svg>
-
-                {/* 🌈 SoundCloud-Style Pins on the Timeline (Regenbogen-Farbkonzept) */}
-                {notes.map((note, idx) => {
-                  const isDraggingThis = draggingNoteId === note.id;
-                  const displayTime = isDraggingThis && draggedTime !== null ? draggedTime : note.time;
-                  const pinPercent = duration > 0 ? (displayTime / duration) * 100 : 0;
-                  const isPracticed = note.isPracticed;
-                  const rainbowColor = getMarkerColor(idx);
-
-                  return (
-                    <div
-                      key={note.id}
-                      onPointerDown={(e) => (!isStudent || note.authorRole === 'student') ? handlePinPointerDown(e, note.id, note.time) : undefined}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlayNotePreRoll(note.time);
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left: `${pinPercent}%`,
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        cursor: isDraggingThis ? 'grabbing' : (!isStudent || note.authorRole === 'student') ? 'grab' : 'pointer',
-                        zIndex: isDraggingThis ? 50 : 35,
-                        userSelect: 'none',
-                        touchAction: (!isStudent || note.authorRole === 'student') ? 'none' : 'manipulation',
-                        padding: 0,
-                        pointerEvents: 'auto'
-                      }}
-                      title={`Marker #${idx + 1} (${rainbowColor.label}) • ${formatTime(note.time)}: ${note.text} (Klick: Vorhören mit Pre-Roll · Ziehen: Verschieben)`}
-                      className="hover-scale-mini"
-                    >
-                      {/* Pin Bubble (Bunt nach Regenbogen-Palette) */}
-                      <div
-                        style={{
-                          position: 'relative',
-                          top: '-8px',
-                          width: isMobile ? '22px' : '20px',
-                          height: isMobile ? '22px' : '20px',
-                          borderRadius: '50%',
-                          background: rainbowColor.bg,
-                          border: `1.5px solid ${rainbowColor.border}`,
-                          color: rainbowColor.iconColor,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: `0 2px 8px ${rainbowColor.border}66`,
-                          transition: 'background 0.2s ease, transform 0.15s ease',
-                          flexShrink: 0
-                        }}
-                      >
-                        {isPracticed ? (
-                          <Check size={11} strokeWidth={2.8} />
-                        ) : (
-                          <Bookmark size={11} strokeWidth={2.4} fill="currentColor" />
-                        )}
-                      </div>
-
-                      {/* Tooltip bei aktivem Ziehen */}
-                      {isDraggingThis && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '-32px',
-                            background: '#0f172a',
-                            color: '#ffffff',
-                            fontSize: '0.65rem',
-                            fontWeight: 850,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
-                          }}
-                        >
-                          #{idx + 1} • {formatTime(displayTime)}
-                        </div>
-                      )}
-
-                      {/* Vertikale Leitlinie in passender Regenbogenfarbe */}
-                      <div
-                        style={{
-                          width: '1.5px',
-                          flex: 1,
-                          background: rainbowColor.bg,
-                          opacity: 0.65
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* 🔴 Aktiver Spot-Loop Indikator auf der Timeline */}
-                {spotLoopNoteId && spotLoopRangeRef.current && duration > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      left: `${(spotLoopRangeRef.current.start / duration) * 100}%`,
-                      width: `${((spotLoopRangeRef.current.end - spotLoopRangeRef.current.start) / duration) * 100}%`,
-                      background: 'rgba(59, 130, 246, 0.22)',
-                      borderLeft: '2px solid #3b82f6',
-                      borderRight: '2px solid #3b82f6',
-                      pointerEvents: 'none',
-                      zIndex: 25
-                    }}
-                  />
-                )}
-
-                {/* Live Playhead Needle */}
-                {isPlaying && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      bottom: '-6px',
-                      left: `${playPercent}%`,
-                      transform: 'translateX(-50%)',
-                      width: '2px',
-                      background: '#0f172a',
-                      boxShadow: '0 0 8px rgba(15, 23, 42, 0.4)',
-                      pointerEvents: 'none',
-                      zIndex: 40
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '8px',
-                        height: '8px',
-                        background: '#0f172a',
-                        borderRadius: '50%',
-                        border: '1.5px solid #ffffff'
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 🎛️ Transport Controls, Tempo-Selector & Notiz-Trigger */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? '6px' : '8px', alignItems: 'center' }}>
-              {/* Play / Pause Button (mind. 44px für Notenständer-Touch) */}
-              <button
-                type="button"
-                onClick={togglePlay}
-                style={{
-                  flex: isMobile ? '1 1 130px' : 2,
-                  minHeight: '44px',
-                  background: isPlaying ? '#0f172a' : '#ffffff',
-                  color: isPlaying ? '#ffffff' : '#0f172a',
-                  border: '1.5px solid #cbd5e1',
-                  borderRadius: '12px',
-                  padding: isMobile ? '8px 10px' : '9px 14px',
-                  fontSize: isMobile ? '0.78rem' : '0.84rem',
-                  fontWeight: 850,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s ease',
-                  touchAction: 'manipulation'
-                }}
-                className="hover-scale-mini"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" />
-                    <span>Lade Audio...</span>
-                  </>
-                ) : isPlaying ? (
-                  <>
-                    <Square size={15} fill="currentColor" />
-                    <span>Pause</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={15} fill="#16a34a" color="#16a34a" />
-                    <span>Abspielen ({formatTime(currentPlayTime)})</span>
-                  </>
-                )}
-              </button>
-
-              {/* 🔁 Track Loop Toggle */}
-              <button
-                type="button"
-                onClick={handleToggleLoop}
-                style={{
-                  minHeight: '44px',
-                  minWidth: '44px',
-                  background: isLooping ? '#f1f5f9' : '#ffffff',
-                  color: isLooping ? '#0f172a' : '#64748b',
-                  border: isLooping ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
-                  borderRadius: '12px',
-                  padding: '9px 12px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  touchAction: 'manipulation'
-                }}
-                className="hover-scale-mini"
-                title={isLooping ? 'Endlos-Loop aktiv' : 'Loop aktivieren (Taste: L)'}
-              >
-                <Repeat size={16} strokeWidth={isLooping ? 2.6 : 2.0} />
-              </button>
-
-              {/* 🎚️ Pillar 4: Integrierter Tempo-Selector (0.5x bis 1.0x) */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
-                  borderRadius: '12px',
-                  padding: '3px',
-                  gap: '2px',
-                  flex: isMobile ? '1 1 auto' : 'none',
-                  justifyContent: isMobile ? 'space-around' : 'flex-start'
-                }}
-                title="Übegeschwindigkeit wählen (Taste: 1-4)"
-              >
-                {SPEED_OPTIONS.map((spd) => {
-                  const isActive = playbackSpeed === spd;
-                  return (
-                    <button
-                      key={spd}
-                      type="button"
-                      onClick={() => handleSetSpeed(spd)}
-                      style={{
-                        background: isActive ? '#0f172a' : 'transparent',
-                        color: isActive ? '#ffffff' : '#64748b',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: isMobile ? '7px 7px' : '6px 8px',
-                        fontSize: isMobile ? '0.72rem' : '0.74rem',
-                        fontWeight: isActive ? 900 : 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.1s ease',
-                        touchAction: 'manipulation',
-                        minHeight: '34px'
-                      }}
-                    >
-                      {spd === 1.0 ? '1.0x' : `${spd}x`}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 📌 Pillar 1: Marker setzen mit Auto-Pause (Universell für Schüler & Lehrkraft) */}
-              <button
-                type="button"
-                onClick={() => handleOpenNoteAtTime(currentPlayTime)}
-                style={{
-                  minHeight: '44px',
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '9px 14px',
-                  fontSize: '0.84rem',
-                  fontWeight: 850,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)',
-                  transition: 'all 0.15s ease',
-                  flex: isMobile ? '1 1 auto' : 'none',
-                  touchAction: 'manipulation'
-                }}
-                className="hover-scale-mini"
-                title="Marker an aktueller Position setzen (Pausiert automatisch · Shortcut: M)"
-                aria-label="Marker an aktueller Position setzen"
-              >
-                <Bookmark size={15} strokeWidth={2.4} fill="currentColor" />
-                <span>+ Marker</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 📝 Pillar 1 & 3: New Note / Marker Creation Drawer (Universell für Schüler & Lehrkraft) */}
-          {isAddingNote && (
-            <div
-              style={{
-                background: '#ffffff',
-                borderRadius: '18px',
-                border: '1.5px solid #0f172a',
-                padding: '14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.08)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span
-                    style={{
-                      fontSize: '0.80rem',
-                      fontWeight: 900,
-                      color: '#0f172a',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px'
-                    }}
-                  >
-                    <Bookmark size={14} strokeWidth={2.4} />
-                    <span>Marker bei {formatTime(newNoteTime)}</span>
-                  </span>
-
-                  {/* 1,5s Pre-Roll Vorhören Button */}
-                  <button
-                    type="button"
-                    onClick={() => playFrom(Math.max(0, newNoteTime - 1.5))}
-                    style={{
-                      background: '#f1f5f9',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '2px 8px',
-                      fontSize: '0.70rem',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer'
-                    }}
-                    title="1,5 Sekunden vor dieser Stelle abspielen"
-                  >
-                    <Play size={10} fill="currentColor" />
-                    <span>Vorhören (-1,5s)</span>
-                  </button>
-                </div>
-
-                {/* Quick-Tags */}
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {(Object.keys(TAG_CONFIG) as AudioNoteTag[]).map(t => {
-                    const cfg = TAG_CONFIG[t];
-                    const isSelected = newNoteTag === t;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setNewNoteTag(t)}
-                        style={{
-                          background: isSelected ? cfg.bg : '#f8fafc',
-                          border: isSelected ? `1.5px solid ${cfg.border}` : '1px solid #e2e8f0',
-                          color: isSelected ? cfg.color : '#64748b',
-                          fontSize: '0.68rem',
-                          fontWeight: isSelected ? 850 : 700,
-                          padding: '3px 7px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px'
-                        }}
-                      >
-                        {cfg.icon}
-                        <span>{cfg.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ⚡ Pillar 3: 1-Tap Quick-Feedback Chips */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                {QUICK_FEEDBACK_CHIPS.map((chip, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setNewNoteText(prev => (prev.trim() ? `${prev.trim()} • ${chip.text}` : chip.text));
-                      setNewNoteTag(chip.tag);
-                    }}
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '4px 8px',
-                      fontSize: '0.72rem',
-                      fontWeight: 750,
-                      color: '#334155',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      transition: 'all 0.12s ease'
-                    }}
-                    className="hover-scale-mini"
-                  >
-                    <span>{chip.icon}</span>
-                    <span>{chip.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Textarea mit 16px Anti-Zoom auf iOS */}
-              <textarea
-                ref={noteInputRef}
-                value={newNoteText}
-                onChange={(e) => setNewNoteText(e.target.value)}
-                placeholder="z. B. Takt 12: Daumen locker lassen oder Stelle noch 3x langsam wiederholen..."
-                rows={2}
-                style={{
-                  width: '100%',
-                  borderRadius: '10px',
-                  border: '1.5px solid #cbd5e1',
-                  padding: '8px 10px',
-                  fontSize: '16px', // iOS Safari Auto-Zoom Schutz
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  resize: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {/* 🎙️ Voice Dictation Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleVoiceDictation('new')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '6px 12px',
-                    borderRadius: '999px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    border: isListening && activeVoiceTargetRef.current === 'new' ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                    background: isListening && activeVoiceTargetRef.current === 'new' ? '#fef2f2' : '#ffffff',
-                    color: isListening && activeVoiceTargetRef.current === 'new' ? '#dc2626' : '#334155',
-                    boxShadow: isListening && activeVoiceTargetRef.current === 'new' ? '0 0 12px rgba(239, 68, 68, 0.4)' : '0 1px 3px rgba(0,0,0,0.04)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title={isListening && activeVoiceTargetRef.current === 'new' ? "Diktat stoppen (Taste: D)" : "Sprache zu Text diktieren (Taste: D)"}
-                >
-                  <Mic size={13} color={isListening && activeVoiceTargetRef.current === 'new' ? "#ef4444" : "#0284c7"} />
-                  <span>{isListening && activeVoiceTargetRef.current === 'new' ? 'Hört zu... (Diktat Stopp)' : 'Diktieren (Taste: D)'}</span>
-                </button>
-
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isListening) stopListening();
-                      setIsAddingNote(false);
-                    }}
-                    style={{
-                      background: '#f1f5f9',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '8px 14px',
-                      fontSize: '0.78rem',
-                      fontWeight: 750,
-                      color: '#64748b',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Abbrechen
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!newNoteText.trim()}
-                    onClick={handleSaveNewNote}
-                    style={{
-                      background: '#0f172a',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '8px 16px',
-                      fontSize: '0.78rem',
-                      fontWeight: 850,
-                      cursor: newNoteText.trim() ? 'pointer' : 'not-allowed',
-                      opacity: newNoteText.trim() ? 1 : 0.5,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Check size={14} strokeWidth={2.6} />
-                    <span>Marker speichern</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 📋 Chronological Notes List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Gesetzte Marker ({notes.length})
-            </div>
-
-            {notes.length === 0 ? (
-              <div
-                style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  color: '#64748b',
-                  fontSize: '0.78rem',
-                  fontWeight: 700
-                }}
-              >
-                <Bookmark size={14} strokeWidth={2.2} color="#94a3b8" />
-                <span>Tippe auf die Wellenform oder nutze <strong style={{ color: '#0f172a' }}>+ Marker</strong>, um Übe-Marker zu setzen.</span>
-              </div>
-            ) : (
-              notes.map((n, idx) => {
-                const tagCfg = (n.tag && TAG_CONFIG[n.tag]) ? TAG_CONFIG[n.tag] : TAG_CONFIG.general;
-                const isEditing = editingNoteId === n.id;
-                const isAuthorTeacher = n.authorRole === 'teacher';
-                const isSpotLoopActive = spotLoopNoteId === n.id;
-                const isPracticed = !!n.isPracticed;
-                const rainbowColor = getMarkerColor(idx);
-
-                if (isEditing) {
-                  return (
-                    <div
-                      key={n.id}
-                      style={{
-                        background: '#ffffff',
-                        border: '1.5px solid #0f172a',
-                        borderLeft: `4px solid ${rainbowColor.bg}`,
-                        borderRadius: '14px',
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                        {/* ⏱️ Nudge Stepper: ±0,1s Feineinstellung */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0f172a' }}>
-                            Zeitpunkt: {formatTime(editingTime)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setEditingTime(t => Math.max(0, Number((t - 0.1).toFixed(1))))}
-                            style={{
-                              background: '#f1f5f9',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '5px',
-                              padding: '2px 6px',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                            title="0,1s zurück (Pfeiltaste Links)"
-                          >
-                            -0.1s
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingTime(t => Math.min(duration, Number((t + 0.1).toFixed(1))))}
-                            style={{
-                              background: '#f1f5f9',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '5px',
-                              padding: '2px 6px',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                            title="0,1s vor (Pfeiltaste Rechts)"
-                          >
-                            +0.1s
-                          </button>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '3px' }}>
-                          {(Object.keys(TAG_CONFIG) as AudioNoteTag[]).map(t => {
-                            const cfg = TAG_CONFIG[t];
-                            const isSel = editingTag === t;
-                            return (
-                              <button
-                                key={t}
-                                type="button"
-                                onClick={() => setEditingTag(t)}
-                                style={{
-                                  background: isSel ? cfg.bg : '#f8fafc',
-                                  border: isSel ? `1.5px solid ${cfg.border}` : '1px solid #e2e8f0',
-                                  color: isSel ? cfg.color : '#64748b',
-                                  fontSize: '0.66rem',
-                                  fontWeight: isSel ? 850 : 700,
-                                  padding: '2px 6px',
-                                  borderRadius: '5px',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                {cfg.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <textarea
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        rows={2}
-                        style={{
-                          width: '100%',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          padding: '6px 8px',
-                          fontSize: '16px', // iOS Safari Auto-Zoom Schutz
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          resize: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        {/* 🎙️ Voice Dictation Button for Edit Mode */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleVoiceDictation('edit')}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '5px 10px',
-                            borderRadius: '999px',
-                            fontSize: '0.70rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            border: isListening && activeVoiceTargetRef.current === 'edit' ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                            background: isListening && activeVoiceTargetRef.current === 'edit' ? '#fef2f2' : '#ffffff',
-                            color: isListening && activeVoiceTargetRef.current === 'edit' ? '#dc2626' : '#334155',
-                            boxShadow: isListening && activeVoiceTargetRef.current === 'edit' ? '0 0 10px rgba(239, 68, 68, 0.4)' : 'none',
-                            transition: 'all 0.15s ease'
-                          }}
-                          title={isListening && activeVoiceTargetRef.current === 'edit' ? "Diktat stoppen (Taste: D)" : "Sprache zu Text diktieren (Taste: D)"}
-                        >
-                          <Mic size={12} color={isListening && activeVoiceTargetRef.current === 'edit' ? "#ef4444" : "#0284c7"} />
-                          <span>{isListening && activeVoiceTargetRef.current === 'edit' ? 'Hört zu...' : 'Diktieren (Taste: D)'}</span>
-                        </button>
-
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isListening) stopListening();
-                              setEditingNoteId(null);
-                            }}
-                            style={{
-                              background: '#f1f5f9',
-                              border: 'none',
-                              borderRadius: '6px',
-                              padding: '6px 12px',
-                              fontSize: '0.74rem',
-                              fontWeight: 750,
-                              color: '#64748b',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Abbrechen
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEditedNote(n.id)}
-                            style={{
-                              background: '#0f172a',
-                              border: 'none',
-                              borderRadius: '6px',
-                              padding: '6px 14px',
-                              fontSize: '0.74rem',
-                              fontWeight: 850,
-                              color: '#ffffff',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Übernehmen
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={n.id}
-                    style={{
-                      background: isPracticed ? '#f0fdf4' : '#ffffff',
-                      border: `1.5px solid ${isPracticed ? '#bbf7d0' : '#e2e8f0'}`,
-                      borderLeft: `4px solid ${rainbowColor.bg}`,
-                      borderRadius: '14px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale-mini"
-                  >
-                    {/* 🔝 Zeile 1 (Header): Checkbox, Index, Timestamp, Tag, Author & Actions */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        {/* 🎯 Pillar 6: 'Geübt'-Checkbox für Schüler */}
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePracticed(n.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '1px',
-                            color: isPracticed ? '#16a34a' : '#94a3b8',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          title={isPracticed ? 'Als noch offen markieren' : 'Als geübt abhaken'}
-                        >
-                          {isPracticed ? (
-                            <CheckCircle2 size={18} strokeWidth={2.4} />
-                          ) : (
-                            <Circle size={18} strokeWidth={2.0} />
-                          )}
-                        </button>
-
-                        {/* 🌈 Marker Rainbow Index Badge */}
-                        <span
-                          style={{
-                            background: rainbowColor.lightBg,
-                            border: `1px solid ${rainbowColor.lightBorder}`,
-                            color: rainbowColor.bg,
-                            fontSize: '0.68rem',
-                            fontWeight: 900,
-                            padding: '2px 7px',
-                            borderRadius: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                          title={`Marker #${idx + 1} (${rainbowColor.label})`}
-                        >
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rainbowColor.bg }} />
-                          <span>#{idx + 1}</span>
-                        </span>
-
-                        {/* Timestamp Pill */}
-                        <span
-                          style={{
-                            background: '#f1f5f9',
-                            border: '1px solid #e2e8f0',
-                            color: '#334155',
-                            fontSize: '0.68rem',
-                            fontWeight: 850,
-                            padding: '2px 7px',
-                            borderRadius: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          <Clock size={11} strokeWidth={2.2} color="#64748b" />
-                          <span>{formatTime(n.time)}</span>
-                        </span>
-
-                        {/* Tag Badge */}
-                        <span
-                          style={{
-                            background: tagCfg.bg,
-                            border: `1px solid ${tagCfg.border}`,
-                            color: tagCfg.color,
-                            fontSize: '0.66rem',
-                            fontWeight: 850,
-                            padding: '2px 7px',
-                            borderRadius: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          {tagCfg.icon}
-                          <span>{tagCfg.label}</span>
-                        </span>
-
-                        {/* Author Pill */}
-                        <span
-                          style={{
-                            fontSize: '0.66rem',
-                            fontWeight: 700,
-                            color: '#64748b',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '2px 4px'
-                          }}
-                        >
-                          {isAuthorTeacher ? (
-                            <GraduationCap size={11} strokeWidth={2.4} color="#0f172a" />
-                          ) : (
-                            <User size={11} strokeWidth={2.4} color="#64748b" />
-                          )}
-                          <span>{isAuthorTeacher ? 'Lehrkraft' : 'Schüler'}{n.authorName ? ` (${n.authorName})` : ''}</span>
-                        </span>
-
-                        {/* Status 'Geübt' Badge */}
-                        {isPracticed && (
-                          <span
-                            style={{
-                              background: '#dcfce7',
-                              border: '1px solid #86efac',
-                              color: '#15803d',
-                              fontSize: '0.64rem',
-                              fontWeight: 850,
-                              padding: '2px 6px',
-                              borderRadius: '5px'
-                            }}
-                          >
-                            ✓ Geübt
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Actions: Edit & Delete */}
-                      {(!isStudent || n.authorRole === 'student') && (
-                        <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingNoteId(n.id);
-                              setEditingText(n.text);
-                              setEditingTag(n.tag || 'general');
-                              setEditingTime(n.time);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#94a3b8',
-                              cursor: 'pointer',
-                              padding: isMobile ? '6px 8px' : '4px',
-                              borderRadius: '6px',
-                              minHeight: '36px',
-                              minWidth: '36px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              touchAction: 'manipulation'
-                            }}
-                            title="Marker bearbeiten / Position feintunen"
-                          >
-                            <Edit3 size={15} strokeWidth={2.2} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteNote(n.id)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#f87171',
-                              cursor: 'pointer',
-                              padding: isMobile ? '6px 8px' : '4px',
-                              borderRadius: '6px',
-                              minHeight: '36px',
-                              minWidth: '36px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              touchAction: 'manipulation'
-                            }}
-                            title="Marker löschen"
-                          >
-                            <Trash2 size={15} strokeWidth={2.2} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 📝 Zeile 2 (Body): Volle Kartenbreite für Notizentext mit sauberem Zeilenabstand */}
-                    <div
-                      style={{
-                        fontSize: isMobile ? '0.82rem' : '0.86rem',
-                        color: '#0f172a',
-                        fontWeight: 600,
-                        lineHeight: 1.45,
-                        wordBreak: 'break-word',
-                        paddingLeft: isMobile ? '0px' : '26px'
-                      }}
-                    >
-                      {n.text}
-                    </div>
-
-                    {/* 🎬 Zeile 3 (Footer): Vorhören (-1,5s) & Stufenloser Spot-Loop Aktionsleiste */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        paddingLeft: isMobile ? '0px' : '26px',
-                        marginTop: '2px',
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      {/* ⏱️ Pillar 2: Pre-Roll Play Button */}
-                      <button
-                        type="button"
-                        onClick={() => handlePlayNotePreRoll(n.time)}
-                        style={{
-                          background: '#0f172a',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '5px 11px',
-                          fontSize: '0.72rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.12)'
-                        }}
-                        title={`Ab Minute ${formatTime(Math.max(0, n.time - 1.5))} mit 1,5s Vorlauf abspielen`}
-                      >
-                        <Play size={11} fill="currentColor" />
-                        <span>Vorhören (-1,5s)</span>
-                      </button>
-
-                      {/* 🔁 Pillar 2: Stufenloser Spot-Loop Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleSpotLoop(n)}
-                        style={{
-                          background: isSpotLoopActive ? '#3b82f6' : '#f8fafc',
-                          color: isSpotLoopActive ? '#ffffff' : '#475569',
-                          border: isSpotLoopActive ? '1px solid #2563eb' : '1px solid #cbd5e1',
-                          borderRadius: '8px',
-                          padding: '5px 11px',
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px'
-                        }}
-                        title={isSpotLoopActive ? 'Spot-Schleife beenden' : `${getNoteLoopDuration(n)}s Übeschleife wiederholen`}
-                      >
-                        <Repeat size={12} strokeWidth={isSpotLoopActive ? 2.6 : 2.0} />
-                        <span>{isSpotLoopActive ? `Loop aktiv (${getNoteLoopDuration(n).toFixed(1)}s)` : `${getNoteLoopDuration(n).toFixed(1)}s Loop`}</span>
-                      </button>
-                    </div>
-
-                    {/* 🎚️ Inline-Expander: Stufenloser Loop-Dauer-Slider (1s bis 15s) bei aktivem Loop */}
-                    {isSpotLoopActive && (
-                      <div
-                        style={{
-                          marginLeft: '26px',
-                          marginTop: '2px',
-                          background: '#eff6ff',
-                          border: '1.5px solid #bfdbfe',
-                          borderRadius: '10px',
-                          padding: '8px 12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          flexWrap: 'wrap'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.74rem', fontWeight: 800, color: '#1e40af' }}>
-                          <Repeat size={13} strokeWidth={2.4} />
-                          <span>Loop: <strong>{getNoteLoopDuration(n).toFixed(1)}s</strong></span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '150px' }}>
-                          <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 700 }}>1s</span>
-                          <input
-                            type="range"
-                            min="1.0"
-                            max="15.0"
-                            step="0.5"
-                            value={getNoteLoopDuration(n)}
-                            onChange={(e) => handleAdjustLoopDuration(n, parseFloat(e.target.value))}
-                            style={{
-                              flex: 1,
-                              cursor: 'pointer',
-                              accentColor: '#2563eb',
-                              height: '4px'
-                            }}
-                            title={`Loop-Länge einstellen: ${getNoteLoopDuration(n)}s`}
-                          />
-                          <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 700 }}>15s</span>
-                        </div>
-
-                        {/* Quick Presets */}
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {[2.0, 4.0, 8.0].map(preset => {
-                            const isCurrent = Math.abs(getNoteLoopDuration(n) - preset) < 0.1;
-                            return (
-                              <button
-                                key={preset}
-                                type="button"
-                                onClick={() => handleAdjustLoopDuration(n, preset)}
-                                style={{
-                                  background: isCurrent ? '#2563eb' : '#ffffff',
-                                  color: isCurrent ? '#ffffff' : '#1e40af',
-                                  border: isCurrent ? '1px solid #1d4ed8' : '1px solid #bfdbfe',
-                                  borderRadius: '6px',
-                                  padding: '2px 7px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                {preset}s
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {/* 📱 3. Creator Moments & Marker Feed (Instagram Story Style) */}
+          <StudioMarkerFeed
+            notes={notes}
+            duration={duration}
+            isStudent={isStudent}
+            isMobile={isMobile}
+            formatTime={formatTime}
+            isAddingNote={isAddingNote}
+            setIsAddingNote={setIsAddingNote}
+            newNoteTime={newNoteTime}
+            newNoteText={newNoteText}
+            setNewNoteText={setNewNoteText}
+            newNoteTag={newNoteTag}
+            setNewNoteTag={setNewNoteTag}
+            onSaveNewNote={handleSaveNewNote}
+            noteInputRef={noteInputRef}
+            editingNoteId={editingNoteId}
+            setEditingNoteId={setEditingNoteId}
+            editingText={editingText}
+            setEditingText={setEditingText}
+            editingTag={editingTag}
+            setEditingTag={setEditingTag}
+            editingTime={editingTime}
+            setEditingTime={setEditingTime}
+            onSaveEditedNote={handleSaveEditedNote}
+            onDeleteNote={handleDeleteNote}
+            spotLoopNoteId={spotLoopNoteId}
+            getNoteLoopDuration={getNoteLoopDuration}
+            onToggleSpotLoop={handleToggleSpotLoop}
+            onAdjustLoopDuration={handleAdjustLoopDuration}
+            onPlayNotePreRoll={handlePlayNotePreRoll}
+            onTogglePracticed={handleTogglePracticed}
+            isListening={isListening}
+            activeVoiceTarget={activeVoiceTargetRef.current}
+            onToggleVoiceDictation={handleToggleVoiceDictation}
+            onOpenNoteAtTime={handleOpenNoteAtTime}
+            currentPlayTime={currentPlayTime}
+          />
         </div>
 
         {/* 🚪 Footer mit DAW-Shortcuts (Desktop) bzw. Safe-Area Button (Mobile) */}

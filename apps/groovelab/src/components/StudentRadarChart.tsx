@@ -106,5 +106,6 @@ function arePropsEqual(prev: StudentRadarChartProps, next: StudentRadarChartProp
   });
 }
 
-export default React.memo(StudentRadarChartComponent, arePropsEqual);
+export const StudentRadarChart = React.memo(StudentRadarChartComponent, arePropsEqual);
+export default StudentRadarChart;
 

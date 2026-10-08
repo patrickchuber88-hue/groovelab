@@ -783,10 +783,10 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                       <div
                         key={item.id}
                         style={{
-                          background: reflEntry?.status === 'hilfe' ? '#fef2f2' : reflEntry?.status === 'wackelig' ? '#fffbeb' : item.status === 'mastered' ? '#f0fdf4' : '#ffffff',
+                          background: reflEntry?.status === 'hilfe' ? '#fef2f2' : reflEntry?.status === 'wackelig' ? '#fffbeb' : item.status === 'mastered' ? '#ecfdf5' : '#ffffff',
                           padding: '10px 14px',
                           borderRadius: '12px',
-                          border: reflEntry?.status === 'hilfe' ? '1.5px solid #fca5a5' : reflEntry?.status === 'wackelig' ? '1.5px solid #fde68a' : item.status === 'mastered' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          border: reflEntry?.status === 'hilfe' ? '1.5px solid #fca5a5' : reflEntry?.status === 'wackelig' ? '1.5px solid #fde68a' : item.status === 'mastered' ? '1px solid #10b981' : '1px solid #e2e8f0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -796,7 +796,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                          <span style={{ fontWeight: 800, color: item.status === 'mastered' ? '#15803d' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 800, color: item.status === 'mastered' ? '#059669' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {item.status === 'mastered' ? '🎉 ' : '🎵 '}{item.title || item.topic_name}
                           </span>
                         </div>
@@ -804,9 +804,9 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                           {reflEntry && (
                             <span
                               style={{
-                                background: reflEntry.status === 'super' ? '#dcfce7' : reflEntry.status === 'wackelig' ? '#fef3c7' : '#fee2e2',
-                                color: reflEntry.status === 'super' ? '#15803d' : reflEntry.status === 'wackelig' ? '#b45309' : '#b91c1c',
-                                border: reflEntry.status === 'super' ? '1px solid #86efac' : reflEntry.status === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
+                                background: reflEntry.status === 'super' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : reflEntry.status === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                color: reflEntry.status === 'super' ? '#ffffff' : reflEntry.status === 'wackelig' ? '#b45309' : '#b91c1c',
+                                border: reflEntry.status === 'super' ? 'none' : reflEntry.status === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
                                 padding: '2px 8px',
                                 borderRadius: '6px',
                                 fontWeight: 900,
@@ -821,8 +821,8 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                           )}
                           <span
                             style={{
-                              background: item.status === 'mastered' ? '#dcfce7' : '#eff6ff',
-                              color: item.status === 'mastered' ? '#15803d' : '#2563eb',
+                              background: item.status === 'mastered' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#eff6ff',
+                              color: item.status === 'mastered' ? '#ffffff' : '#2563eb',
                               padding: '2px 8px',
                               borderRadius: '6px',
                               fontWeight: 850,
@@ -1017,8 +1017,8 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                             <span style={{
                               fontSize: '0.70rem',
                               fontWeight: 700,
-                              color: tok.status === 'FULLY_REDEEMED' ? '#15803d' : '#94a3b8',
-                              background: tok.status === 'FULLY_REDEEMED' ? '#dcfce7' : '#f1f5f9',
+                              color: tok.status === 'FULLY_REDEEMED' ? '#ffffff' : '#94a3b8',
+                              background: tok.status === 'FULLY_REDEEMED' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
                               padding: '2px 8px',
                               borderRadius: '6px'
                             }}>
@@ -1266,8 +1266,8 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                         Altersstufe (Campus)
                       </span>
                       <span style={{
-                        background: '#dcfce7',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
                         padding: '2px 8px',
                         borderRadius: '100px',
                         fontSize: '0.68rem',
@@ -1466,9 +1466,9 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span
                     style={{
-                      background: appUsageMode === 'parent_hybrid' ? '#eff6ff' : '#f0fdf4',
-                      color: appUsageMode === 'parent_hybrid' ? '#1d4ed8' : '#15803d',
-                      border: appUsageMode === 'parent_hybrid' ? '1px solid #bfdbfe' : '1px solid #bbf7d0',
+                      background: appUsageMode === 'parent_hybrid' ? '#eff6ff' : '#ecfdf5',
+                      color: appUsageMode === 'parent_hybrid' ? '#1d4ed8' : '#059669',
+                      border: appUsageMode === 'parent_hybrid' ? '1px solid #bfdbfe' : '1px solid #10b981',
                       padding: '4px 12px',
                       borderRadius: '100px',
                       fontSize: '0.78rem',

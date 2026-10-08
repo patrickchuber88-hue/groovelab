@@ -255,7 +255,7 @@ const DocumentStage: React.FC<{ doc: LegalDocumentDefinition; extraBadge?: strin
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '100px', border: '1px solid #86efac' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#ecfdf5', color: '#065f46', padding: '3px 10px', borderRadius: '100px', border: '1px solid #10b981' }}>
               {doc.badge}
             </span>
             {extraBadge && (
@@ -282,12 +282,30 @@ const DocumentStage: React.FC<{ doc: LegalDocumentDefinition; extraBadge?: strin
               Wichtigste Kernpunkte & Schutzgarantien im Überblick:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px' }}>
-              {doc.summaryPoints.map((point, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, background: '#ffffff', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <CheckCircle2 size={15} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <span>{point}</span>
-                </div>
-              ))}
+              {doc.summaryPoints.map((point, idx) => {
+                const isOverarchingLast = idx === doc.summaryPoints.length - 1 && doc.summaryPoints.length % 2 !== 0;
+                return (
+                  <div 
+                    key={idx} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'flex-start', 
+                      gap: '8px', 
+                      fontSize: '0.78rem', 
+                      color: '#334155', 
+                      lineHeight: 1.45, 
+                      background: '#ffffff', 
+                      padding: '8px 12px', 
+                      borderRadius: '10px', 
+                      border: '1px solid #e2e8f0',
+                      gridColumn: isOverarchingLast ? '1 / -1' : undefined
+                    }}
+                  >
+                    <CheckCircle2 size={15} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>{point}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -308,6 +326,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<LegalTab>(initialTab);
   const contentRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -317,6 +336,20 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
       }
     }
   }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleTabChange = (tab: LegalTab) => {
     setActiveTab(tab);
@@ -577,18 +610,39 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 { id: 'child_protection' as const, label: 'Kinderschutz', icon: HeartHandshake },
                 { id: 'cancellation' as const, label: 'Widerruf', icon: Undo2 },
                 { id: 'accessibility' as const, label: 'Barrierefreiheit', icon: Accessibility }
-              ].map(tab => {
+              ].map((tab, tabIdx, tabArr) => {
                 const isActive = activeTab === tab.id;
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
+                    ref={(el) => { tabRefs.current[tab.id] = el; }}
                     role="tab"
                     id={`legal-tab-${tab.id}`}
                     aria-selected={isActive}
                     aria-controls={`legal-tabpanel-${tab.id}`}
                     tabIndex={isActive ? 0 : -1}
                     onClick={() => handleTabChange(tab.id)}
+                    onKeyDown={(e) => {
+                      let targetTabId: LegalTab | null = null;
+                      if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        targetTabId = tabArr[(tabIdx + 1) % tabArr.length].id;
+                      } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        targetTabId = tabArr[(tabIdx - 1 + tabArr.length) % tabArr.length].id;
+                      } else if (e.key === 'Home') {
+                        e.preventDefault();
+                        targetTabId = tabArr[0].id;
+                      } else if (e.key === 'End') {
+                        e.preventDefault();
+                        targetTabId = tabArr[tabArr.length - 1].id;
+                      }
+                      if (targetTabId) {
+                        handleTabChange(targetTabId);
+                        tabRefs.current[targetTabId]?.focus();
+                      }
+                    }}
                     style={{
                       flex: '0 0 auto',
                       padding: '7px 13px',

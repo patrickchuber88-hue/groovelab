@@ -4,12 +4,34 @@
  * 
  * Transparently handles AES-256 decrypted content for campus_direct_messages
  * with high-performance in-memory caching to guarantee < 1ms render times.
+ * 
+ * Invariants & 0.1% Goldstandard:
+ * 1. Zero-Ciphertext Leakage: 'enc:' strings are NEVER cached or rendered as plaintext.
+ * 2. Fail-Closed Masking: Un-decryptable messages always return '[Verschlüsselte Nachricht]'.
+ * 3. Self-Healing School Resolution: Automatically resolves school_id from persistent storage.
  */
 
 import { supabase } from '../supabase';
 
 // L1 In-Memory Decryption Cache: hash/ciphertext -> plaintext
 const decryptedCache = new Map<string, string>();
+
+/**
+ * Resolves the effective school UUID with comprehensive fallback hierarchy.
+ */
+export function resolveEffectiveSchoolId(schoolId?: string | null): string {
+  if (schoolId && schoolId.trim() !== '') return schoolId;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('groovelab_school_id')
+        || localStorage.getItem('campus_school_id')
+        || sessionStorage.getItem('groovelab_school_id')
+        || localStorage.getItem('groovelab_last_school_id');
+      if (stored && stored.trim() !== '') return stored;
+    } catch {}
+  }
+  return '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'; // Authoritative default sandbox
+}
 
 /**
  * Primes the L1 decryption cache with a known plaintext for an encrypted message.
@@ -20,8 +42,9 @@ export function primeDecryptedCache(
   ciphertext: string | null | undefined,
   plaintext: string | null | undefined
 ): void {
-  if (!schoolId || !ciphertext || !plaintext) return;
-  const cacheKey = `${schoolId}:${ciphertext}`;
+  if (!ciphertext || !plaintext) return;
+  const effectiveSchoolId = resolveEffectiveSchoolId(schoolId);
+  const cacheKey = `${effectiveSchoolId}:${ciphertext}`;
   decryptedCache.set(cacheKey, plaintext);
 }
 
@@ -42,10 +65,11 @@ export async function decryptMessageContent(
 ): Promise<string> {
   if (!content) return '';
   if (!content.startsWith('enc:')) return content;
-  if (!schoolId) return content;
 
-  // Check cache first
-  const cacheKey = `${schoolId}:${content}`;
+  const effectiveSchoolId = resolveEffectiveSchoolId(schoolId);
+  const cacheKey = `${effectiveSchoolId}:${content}`;
+
+  // Check L1 cache first (< 0.1ms)
   if (decryptedCache.has(cacheKey)) {
     return decryptedCache.get(cacheKey)!;
   }
@@ -53,21 +77,27 @@ export async function decryptMessageContent(
   try {
     const { data, error } = await supabase.rpc('decrypt_message_content', {
       p_content: content,
-      p_school_id: schoolId
+      p_school_id: effectiveSchoolId
     });
 
     if (error || !data) {
-      return content;
+      return '[Verschlüsselte Nachricht]';
     }
 
     const decrypted = String(data);
-    if (!decrypted.startsWith('[Verschlüsselt')) {
+    if (!decrypted.startsWith('[Verschlüsselt') && !decrypted.startsWith('enc:')) {
       decryptedCache.set(cacheKey, decrypted);
+      return decrypted;
     }
+
+    if (decrypted.startsWith('enc:')) {
+      return '[Verschlüsselte Nachricht]';
+    }
+
     return decrypted;
   } catch (e) {
-    console.warn('[messageCrypto] Decryption error, falling back to raw:', e);
-    return content;
+    console.warn('[messageCrypto] Decryption error, falling back to fail-closed mask:', e);
+    return '[Verschlüsselte Nachricht]';
   }
 }
 
@@ -80,7 +110,8 @@ export async function decryptMessagesBatch<T extends { content?: string | null; 
   schoolId: string | null | undefined
 ): Promise<T[]> {
   if (!messages || messages.length === 0) return [];
-  if (!schoolId) return messages;
+
+  const effectiveSchoolId = resolveEffectiveSchoolId(schoolId);
 
   // 1. Separate messages that need network decryption from cached/plain messages
   const needsDecryption: { index: number; content: string }[] = [];
@@ -90,7 +121,7 @@ export async function decryptMessagesBatch<T extends { content?: string | null; 
     const msg = messages[i];
     const rawContent = msg.content;
     if (rawContent && typeof rawContent === 'string' && rawContent.startsWith('enc:')) {
-      const cacheKey = `${schoolId}:${rawContent}`;
+      const cacheKey = `${effectiveSchoolId}:${rawContent}`;
       if (decryptedCache.has(cacheKey)) {
         results[i] = { ...msg, content: decryptedCache.get(cacheKey)! };
       } else {
@@ -109,26 +140,41 @@ export async function decryptMessagesBatch<T extends { content?: string | null; 
     const payload = uniqueCiphertexts.map(c => ({ content: c }));
     const { data, error } = await supabase.rpc('decrypt_message_batch', {
       p_messages: payload,
-      p_school_id: schoolId
+      p_school_id: effectiveSchoolId
     });
+
+    const decryptedMap = new Map<string, string>();
 
     if (!error && Array.isArray(data)) {
       data.forEach((item: any, idx: number) => {
         const rawCipher = uniqueCiphertexts[idx];
-        const decrypted = item?.content || rawCipher;
-        if (decrypted && !decrypted.startsWith('[Verschlüsselt')) {
-          decryptedCache.set(`${schoolId}:${rawCipher}`, decrypted);
+        let decrypted = item?.content;
+        if (!decrypted || decrypted.startsWith('enc:')) {
+          decrypted = '[Verschlüsselte Nachricht]';
+        } else if (!decrypted.startsWith('[Verschlüsselt')) {
+          decryptedCache.set(`${effectiveSchoolId}:${rawCipher}`, decrypted);
         }
+        decryptedMap.set(rawCipher, decrypted);
       });
 
-      // Apply cached decrypted content to all matching items
+      // Apply decrypted content to all matching items
       for (const item of needsDecryption) {
-        const decrypted = decryptedCache.get(`${schoolId}:${item.content}`) || item.content;
-        results[item.index] = { ...results[item.index], content: decrypted };
+        const finalContent = decryptedMap.get(item.content)
+          || decryptedCache.get(`${effectiveSchoolId}:${item.content}`)
+          || '[Verschlüsselte Nachricht]';
+        results[item.index] = { ...results[item.index], content: finalContent };
+      }
+    } else {
+      // Fail-closed fallback: never leak raw ciphertexts to caller
+      for (const item of needsDecryption) {
+        results[item.index] = { ...results[item.index], content: '[Verschlüsselte Nachricht]' };
       }
     }
   } catch (e) {
-    console.warn('[messageCrypto] Batch decryption error:', e);
+    console.warn('[messageCrypto] Batch decryption error, masking ciphertexts:', e);
+    for (const item of needsDecryption) {
+      results[item.index] = { ...results[item.index], content: '[Verschlüsselte Nachricht]' };
+    }
   }
 
   return results;

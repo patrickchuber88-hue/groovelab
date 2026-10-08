@@ -14,7 +14,7 @@ import {
   calculateWeeklyStreakState 
 } from '../utils/studentAvatarDashboardUtils';
 import { resolveCampusStudentAvatar } from '../../StudioAvatar';
-import { getEngineTargetMinutes, getEngineEffectiveLevel } from '../../../utils/studentProgressEngine';
+import { getEngineTargetMinutes, getEngineEffectiveLevel, computeGroundTruthMetrics } from '../../../utils/studentProgressEngine';
 
 interface UseStudentStreaksProps {
   studentId: string;
@@ -22,6 +22,8 @@ interface UseStudentStreaksProps {
   fokusLogs: any[];
   sessionActive: boolean;
   secondsElapsed: number;
+  songSkills?: any[];
+  progressItems?: any[];
   onRefreshStudentAndAvatar?: () => Promise<void>;
 }
 
@@ -31,6 +33,8 @@ export function useStudentStreaks({
   fokusLogs,
   sessionActive,
   secondsElapsed,
+  songSkills,
+  progressItems,
   onRefreshStudentAndAvatar
 }: UseStudentStreaksProps) {
   const [avatarFromDb, setAvatar] = useState<Avatar | null>(null);
@@ -102,11 +106,22 @@ export function useStudentStreaks({
           .maybeSingle();
 
         if (isMounted) {
-          const dbXp = Math.max(
+          const engineMetrics = computeGroundTruthMetrics({
+            fokusLogs: fokusLogs || [],
+            songSkills: songSkills || [],
+            progressMatrix: progressItems || [],
+            user: studentUser,
+            avatar: avData,
+            stats: statsData,
+            simulatedDate: getSimulatedNow()
+          });
+
+          const authoritativeXp = Math.max(
             avData?.xp || 0,
             statsData?.current_xp || 0,
             studentUser?.campus_xp || 0,
-            studentUser?.xp || 0
+            studentUser?.xp || 0,
+            engineMetrics.totalXp || 0
           );
           const dbFlame = avData?.streak_flame ?? statsData?.streak_flame ?? studentUser?.streak_flame ?? 0;
           const dbLevel = avData?.evolution_level || 1;
@@ -120,12 +135,12 @@ export function useStudentStreaks({
             instrument_type: dbInstrument,
             evolution_level: dbLevel,
             asset_path: dbAsset,
-            streak_flame: dbFlame,
-            xp: Math.max(prev?.xp || 0, dbXp)
+            streak_flame: Math.max(dbFlame, engineMetrics.streakFlame || 0),
+            xp: authoritativeXp
           }));
 
-          if (dbXp > 0 && typeof localStorage !== 'undefined') {
-            localStorage.setItem(`campus_bonus_xp_${effectiveUserId}`, String(dbXp));
+          if (authoritativeXp > 0 && typeof localStorage !== 'undefined') {
+            localStorage.setItem(`campus_bonus_xp_${effectiveUserId}`, String(authoritativeXp));
           }
         }
       } catch (err) {
@@ -138,7 +153,7 @@ export function useStudentStreaks({
     return () => {
       isMounted = false;
     };
-  }, [effectiveUserId, studentUser]);
+  }, [effectiveUserId, studentUser, fokusLogs, songSkills, progressItems]);
 
   // 🌟 Real-time listener for XP awards (e.g. from Groove-Trainer, Missions, Challenges)
   useEffect(() => {
@@ -173,8 +188,19 @@ export function useStudentStreaks({
     return () => window.removeEventListener('campus-xp-awarded', handleXpAwarded);
   }, [studentId, studentUser]);
 
+  const liveGroundTruthMetrics = useMemo(() => {
+    return computeGroundTruthMetrics({
+      fokusLogs: fokusLogs || [],
+      songSkills: songSkills || [],
+      progressMatrix: progressItems || [],
+      user: studentUser,
+      avatar: avatarFromDb,
+      simulatedDate: getSimulatedNow()
+    });
+  }, [fokusLogs, songSkills, progressItems, studentUser, avatarFromDb]);
+
   const currentLevel = avatar.evolution_level || 1;
-  const currentXp = avatar.xp || 0;
+  const currentXp = Math.max(avatar.xp || 0, liveGroundTruthMetrics.totalXp || 0);
   const { levelTitle, prevThreshold, nextThreshold, xpPercentage } = useMemo(() => {
     return getLevelProgress(currentLevel, currentXp, avatar.instrument_type);
   }, [currentLevel, currentXp, avatar.instrument_type]);

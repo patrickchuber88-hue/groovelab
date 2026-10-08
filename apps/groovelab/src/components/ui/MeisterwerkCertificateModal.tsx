@@ -437,7 +437,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '2px solid #ffffff'
+                  border: 'none'
                 }}>
                   <ShieldCheck size={28} color="#ffffff" />
                 </div>

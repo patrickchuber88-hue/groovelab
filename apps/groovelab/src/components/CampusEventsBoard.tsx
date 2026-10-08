@@ -74,6 +74,8 @@ import { formatGermanDate, formatGermanWeekday } from '../utils/formatters';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 import { CampusCalendarSyncHubModal } from './CampusCalendarSyncHubModal';
 import { CampusHolidayDetailModal } from './modals/CampusHolidayDetailModal';
+import { StudentRescheduleDecisionModal } from './student/modals/StudentRescheduleDecisionModal';
+import { respondToRescheduleProposal } from '../services/studentRescheduleService';
 import { 
   StatutoryEventItem, 
   getStatutoryHolidaysAndFeiertage, 
@@ -207,7 +209,11 @@ const readInitialEventsCache = (sId?: string, uId?: string) => {
       const raw = localStorage.getItem(k);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.lessons) && parsed.lessons.length > 0) {
+        if (parsed && (
+          (Array.isArray(parsed.lessons) && parsed.lessons.length > 0) ||
+          (Array.isArray(parsed.customEvents) && parsed.customEvents.length > 0) ||
+          (Array.isArray(parsed.schoolRooms) && parsed.schoolRooms.length > 0)
+        )) {
           return parsed;
         }
       }
@@ -352,7 +358,6 @@ export function CampusEventsBoard({
   const [orientationTick, setOrientationTick] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [eventsCardIndex, setEventsCardIndex] = useState<number>(0);
-  const fullYearLoadedRef = useRef(false);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -479,6 +484,7 @@ export function CampusEventsBoard({
 
   // 1:1 Shoutbox States
   const [activeChatOcc, setActiveChatOcc] = useState<LessonOccurrence | null>(null);
+  const [studentRescheduleModalOcc, setStudentRescheduleModalOcc] = useState<any | null>(null);
   const [confirmCancelOccId, setConfirmCancelOccId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
@@ -2281,15 +2287,13 @@ export function CampusEventsBoard({
     let fallbackTimer: any = null;
     if (!hasCache) {
       fallbackTimer = setTimeout(() => {
+        if (lessonsRef.current && lessonsRef.current.length > 0) return;
         fetchCustomEvents();
         fetchSchoolCalendarSettings();
         fetchSchoolRooms();
         fetchAnnouncements();
-        if (role === 'student') {
-          fetchStudentEnsembles();
-          fetchStudentProgramPoints();
-        }
-      }, 350);
+        if (role === 'student') { fetchStudentEnsembles(); fetchStudentProgramPoints(); }
+      }, 2500);
     }
 
     let debounceTimer: any = null;
@@ -2734,7 +2738,7 @@ export function CampusEventsBoard({
       '#f59e0b': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', textDark: '#92400e' }, // Amber / Workshop
       '#3b82f6': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', textDark: '#1d4ed8' }, // Blau / Vorspiel
       '#ef4444': { color: '#e11d48', bg: '#fff1f2', border: '#fecdd3', textDark: '#9f1239' }, // Rot / Prüfung
-      '#34a853': { color: '#16a34a', bg: '#f0fdf4', border: '#86efac', textDark: '#166534' }, // Grün / Ferien
+      '#34a853': { color: '#059669', bg: '#ecfdf5', border: '#10b981', textDark: '#065f46' }, // Grün / Ferien
       '#6366f1': { color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe', textDark: '#4338ca' }, // Indigo / Feiertag
     };
 
@@ -2747,7 +2751,7 @@ export function CampusEventsBoard({
 
     // 1. 🏖️ Schulferien: Campus-Smaragdgrün (explizite Vorgabe: "Ferien sollen grün sein")
     if (cLower === 'ferien' || cLower.includes('ferien') || tLower.includes('ferien') || tLower.includes('schulfrei') || tLower.includes('break') || tLower.includes('holiday')) {
-      return { color: '#16a34a', bg: '#f0fdf4', border: '#86efac', textDark: '#166534' };
+      return { color: '#059669', bg: '#ecfdf5', border: '#10b981', textDark: '#065f46' };
     }
 
     // 2. 🏛️ Gesetzliche Feiertage: Hoheitliches Indigo (strikt abgegrenzt von Ferien!)
@@ -3056,7 +3060,7 @@ export function CampusEventsBoard({
         try {
           let text = '';
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2500);
+          const timeoutId = setTimeout(() => controller.abort(), 1200);
 
           try {
             const res = await fetch(singleUrl, { signal: controller.signal });
@@ -3065,7 +3069,7 @@ export function CampusEventsBoard({
           } catch (corsErr: any) {
             // Zero US / Third-Party Cloud: Fail-safe without third-party proxies
             if (corsErr?.name === 'AbortError') {
-              console.warn('[CampusEventsBoard] Calendar feed timed out after 2.5s, skipping:', singleUrl);
+              console.warn('[CampusEventsBoard] Calendar feed timed out after 1.2s, skipping:', singleUrl);
             } else {
               console.warn('[CampusEventsBoard] Direct calendar sync failed, skipping unreachable external feed:', singleUrl);
             }
@@ -3164,7 +3168,7 @@ export function CampusEventsBoard({
   };
 
   // 🏛️ Tier-1 High-Performance Fetch for Column 1 (Single-Flight Full-Year + Additive Zero-Wipe SWR)
-  const fetchLessons = async (options?: { silent?: boolean }) => {
+  const fetchLessons = async (options?: { silent?: boolean; fullYear?: boolean }) => {
     if (!options?.silent && lessonsRef.current.length === 0) {
       setLoadingLessons(true);
     }
@@ -3176,8 +3180,10 @@ export function CampusEventsBoard({
       const day = startRange.getDay() || 7;
       startRange.setDate(startRange.getDate() - day + 1 - 14); // 2 weeks back for recent past lessons
 
-      const endRange = new Date(now);
-      endRange.setDate(endRange.getDate() + 365); // 1 full school year ahead
+      // 🏛️ 0,1% Goldstandard: Kanonischer Schuljahres-Horizont (bis 31. August) - Parität mit B2B-Vertrag & DIN 66398
+      const syMonth = now.getMonth(); // 0 = Jan, 6 = Jul, 7 = Aug, 8 = Sep
+      const syEndYear = syMonth >= 7 ? now.getFullYear() + 1 : now.getFullYear();
+      const endRange = new Date(syEndYear, 7, 31, 23, 59, 59); // 31. August des laufenden Schuljahres
 
       // Auto-expand current month & active week in the UI
       const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -3225,9 +3231,11 @@ export function CampusEventsBoard({
       let bootstrapData: any = null;
       if (effectiveSchoolId) {
         try {
+          const safeUserId = (userId && isUUID(userId)) ? userId : null;
+          const safeSchoolId = (effectiveSchoolId && isUUID(effectiveSchoolId)) ? effectiveSchoolId : null;
           const { data: bootRes, error: bootErr } = await supabase.rpc('get_campus_events_bootstrap', {
-            p_school_id: effectiveSchoolId,
-            p_user_id: userId || null,
+            p_school_id: safeSchoolId,
+            p_user_id: safeUserId,
             p_role: role || null,
             p_start_date: startYear,
             p_end_date: endYear
@@ -3294,36 +3302,22 @@ export function CampusEventsBoard({
           if (r.name) roomMap.set(r.name.toLowerCase().trim(), r);
         });
       } else {
-        // 🏛️ Tier-1 High-Performance Fallback: Wave 1 (Parallel fetch with strict date bounds)
-        let scheduleQuery = supabase
-          .from('schedules')
-          .select('*');
+        let scheduleQuery = supabase.from('schedules')
+          .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, instrument, role), rooms(id, name)');
 
-        if (effectiveSchoolId) {
-          scheduleQuery = scheduleQuery.eq('school_id', effectiveSchoolId);
-        }
-
-        if (role === 'student') {
-          scheduleQuery = scheduleQuery.eq('student_id', userId);
-        } else if (role === 'teacher' || (role === 'admin' && userId)) {
-          scheduleQuery = scheduleQuery.eq('teacher_id', userId);
-        }
+        if (effectiveSchoolId) scheduleQuery = scheduleQuery.eq('school_id', effectiveSchoolId);
+        if (role === 'student') scheduleQuery = scheduleQuery.eq('student_id', userId);
+        else if (role === 'teacher' || (role === 'admin' && userId)) scheduleQuery = scheduleQuery.eq('teacher_id', userId);
 
         // Bounded occurrences: strictly scoped between startYear and endYear
         let occurrenceQuery = supabase
           .from('schedule_occurrences')
-          .select('*')
+          .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, instrument, role)')
           .or(`and(date.gte.${startYear},date.lte.${endYear}),and(original_date.gte.${startYear},original_date.lte.${endYear})`);
 
-        if (effectiveSchoolId) {
-          occurrenceQuery = occurrenceQuery.eq('school_id', effectiveSchoolId);
-        }
-
-        if (role === 'student') {
-          occurrenceQuery = occurrenceQuery.eq('student_id', userId);
-        } else if (role === 'teacher' || (role === 'admin' && userId)) {
-          occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
-        }
+        if (effectiveSchoolId) occurrenceQuery = occurrenceQuery.eq('school_id', effectiveSchoolId);
+        if (role === 'student') occurrenceQuery = occurrenceQuery.eq('student_id', userId);
+        else if (role === 'teacher' || (role === 'admin' && userId)) occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
 
         const [rawSchedulesRes, occurrencesRes, roomsRes] = await Promise.all([
           scheduleQuery,
@@ -3352,6 +3346,7 @@ export function CampusEventsBoard({
           ...schedules.map((s: any) => s.teacher_id),
           ...occurrences.map((o: any) => o.student_id),
           ...occurrences.map((o: any) => o.teacher_id),
+          (studentUser as any)?.teacher_id,
           userId
         ].filter(Boolean)));
 
@@ -3359,7 +3354,7 @@ export function CampusEventsBoard({
         if (allUserIds.length > 0) {
           const { data: batchUsers } = await supabase
             .from('users')
-            .select('id, first_name, last_name, photo_url, instrument, room_id, rooms:room_id(id, name), teacher_id')
+            .select('id, first_name, last_name, nickname, photo_url, instrument, teacher_id')
             .in('id', allUserIds);
 
           (batchUsers || []).forEach((u: any) => {
@@ -3367,10 +3362,13 @@ export function CampusEventsBoard({
           });
         }
 
-        if (role === 'student' && userId) {
-          const stUser = userMap.get(userId);
+        if (role === 'student') {
+          const stUser = (userId ? userMap.get(userId) : null) || studentUser;
           if (stUser?.teacher_id) {
             studentTeacherObj = userMap.get(stUser.teacher_id) || null;
+            if (studentTeacherObj) {
+              setCurrentTeacherProfile(studentTeacherObj);
+            }
           }
         } else if (userId && (role === 'teacher' || role === 'admin')) {
           teacherProfileObj = userMap.get(userId) || null;
@@ -4035,28 +4033,32 @@ export function CampusEventsBoard({
         return merged;
       });
 
-      // 🏛️ Tier-1 SWR Persistence: Scoped with schoolId & userId + resilient fallback
-      try {
-        const payload = JSON.stringify({
-          customEvents: bootstrapData?.events || customEvents,
-          lessons: allMergedOccurrences,
-          schoolRooms: bootstrapData?.rooms || schoolRooms,
-          schoolAnnouncements: bootstrapData?.announcements || schoolAnnouncements,
-          calendarUrl: bootstrapData?.calendar_settings?.calendar_url || calendarUrl,
-          studentEnsembleIds: bootstrapData?.student_ensembles || studentEnsembleIds,
-          studentProgramPoints: bootstrapData?.student_program_points || studentProgramPoints,
-          timestamp: Date.now()
-        });
-        if (effectiveSchoolId) {
-          localStorage.setItem(`cg_events_swr_${effectiveSchoolId}_${userId || 'anon'}`, payload);
-        }
-        localStorage.setItem(`cg_events_swr_global_${userId || 'anon'}`, payload);
-      } catch (e) {}
+      // 🏛️ Tier-1 SWR Persistence: Scoped with schoolId & userId + resilient fallback (Async non-blocking)
+      setTimeout(() => {
+        try {
+          const payload = JSON.stringify({
+            customEvents: bootstrapData?.events || customEvents,
+            lessons: allMergedOccurrences,
+            schoolRooms: bootstrapData?.rooms || schoolRooms,
+            schoolAnnouncements: bootstrapData?.announcements || schoolAnnouncements,
+            calendarUrl: bootstrapData?.calendar_settings?.calendar_url || calendarUrl,
+            studentEnsembleIds: bootstrapData?.student_ensembles || studentEnsembleIds,
+            studentProgramPoints: bootstrapData?.student_program_points || studentProgramPoints,
+            timestamp: Date.now()
+          });
+          if (effectiveSchoolId) {
+            localStorage.setItem(`cg_events_swr_${effectiveSchoolId}_${userId || 'anon'}`, payload);
+          }
+          localStorage.setItem(`cg_events_swr_global_${userId || 'anon'}`, payload);
+        } catch (e) {}
+      }, 0);
 
       // Fetch active conversations (occurrence_ids that have 1:1 shoutbox messages)
       let chatQuery = supabase
         .from('campus_direct_messages')
-        .select('occurrence_id, sender_id, recipient_id, content');
+        .select('occurrence_id, sender_id, recipient_id, content')
+        .gte('created_at', startYear)
+        .limit(100);
 
       if (userId && (role === 'student' || role === 'teacher')) {
         chatQuery = chatQuery.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`);
@@ -4988,8 +4990,8 @@ export function CampusEventsBoard({
     }
   };
 
-  // Timeline Events merger (Column 2 merges custom + subscribed)
-  const getMergedTimelineEvents = () => {
+  // 🏛️ Tier-1 Memoized Timeline Events (Column 2 merges custom + subscribed + statutory holidays)
+  const timelineEvents = useMemo(() => {
     const simNow = getEffectiveAppDate();
     const todayStr = `${simNow.getFullYear()}-${String(simNow.getMonth() + 1).padStart(2, '0')}-${String(simNow.getDate()).padStart(2, '0')}`;
     
@@ -5093,7 +5095,9 @@ export function CampusEventsBoard({
       if (a.event_date !== b.event_date) return a.event_date.localeCompare(b.event_date);
       return a.start_time.localeCompare(b.start_time);
     });
-  };
+  }, [subscribedEvents, customEvents, showSchoolHolidays, showHolidayFilter, holidayStateCode, eventFilter, role, userId]);
+
+  const getMergedTimelineEvents = () => timelineEvents;
 
   // Split lesson list for Column 1 (Tier-1 Memoized to prevent render-blocking)
   const filteredLessons = useMemo(() => {
@@ -6177,17 +6181,20 @@ export function CampusEventsBoard({
 
       const opponentName = groupFirstNames || (role === 'student'
         ? (() => {
-            const rawTeacher = occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name || '');
-            if (!rawTeacher || rawTeacher.trim().toLowerCase() === 'lehrkraft') {
-              return 'Lehrkraft';
+            const resolvedT = occ.teacher || currentTeacherProfile;
+            const rawTeacher = resolvedT ? (typeof resolvedT === 'string' ? resolvedT : formatTeacherFullName(resolvedT)) : (occ.teacher_name || '');
+            const clean = rawTeacher ? rawTeacher.trim().replace(/^lehrkraft:\s*/i, '') : '';
+            if (clean && clean.toLowerCase() !== 'lehrkraft') return clean;
+            if (currentTeacherProfile) {
+              const cName = formatTeacherFullName(currentTeacherProfile);
+              if (cName && cName.toLowerCase() !== 'lehrkraft') return cName.replace(/^lehrkraft:\s*/i, '');
             }
-            return rawTeacher.trim().toLowerCase().startsWith('lehrkraft:') ? rawTeacher.trim() : `Lehrkraft: ${rawTeacher.trim()}`;
+            return 'Lehrkraft';
           })()
         : (() => {
             const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
             const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
-            const id = occ.student_id || occ.student?.id || occ.id;
-            return formatSingleStudentAnonymized(fn, ln, id);
+            return formatSingleStudentAnonymized(fn, ln, occ.student_id || occ.student?.id || occ.id);
           })());
 
       const displaySubject = formatDisplaySubjectOrInstrument(occ, occ.teacher || currentTeacherProfile);
@@ -6348,6 +6355,11 @@ export function CampusEventsBoard({
       return (
         <div 
           key={occ.id}
+          onClick={() => {
+            if (role === 'student' && isRescheduled && !isConfirmedOcc) {
+              setStudentRescheduleModalOcc(occ);
+            }
+          }}
           style={{
             display: 'flex',
             flexDirection: 'row',
@@ -6360,7 +6372,8 @@ export function CampusEventsBoard({
             boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
             transition: 'all 0.2s',
             gap: '12px',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            cursor: (role === 'student' && isRescheduled && !isConfirmedOcc) ? 'pointer' : 'default'
           }}
           className="hover-scale-subtle"
         >
@@ -6426,15 +6439,19 @@ export function CampusEventsBoard({
                   <span style={{
                     fontSize: '10px',
                     fontWeight: 800,
-                    background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
-                    color: isGroupOcc ? '#0369a1' : '#b45309',
-                    border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
+                    background: isGroupOcc ? '#e0f2fe' : (isConfirmedOcc ? '#fef3c7' : '#fefce8'),
+                    color: isGroupOcc ? '#0369a1' : (isConfirmedOcc ? '#854d0e' : '#b45309'),
+                    border: isGroupOcc ? (isConfirmedOcc ? '1.5px solid #0284c7' : '1.5px dashed #0284c7') : (isConfirmedOcc ? '1.5px solid #eab308' : '1.5px dashed #eab308'),
                     padding: '1px 6px',
                     borderRadius: '6px',
                     textTransform: 'uppercase',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
                     flexShrink: 0
                   }}>
-                    Verschoben
+                    {isConfirmedOcc && <Check size={10} strokeWidth={2.8} />}
+                    <span>{isConfirmedOcc ? 'Bestätigt' : 'Vorschlag'}</span>
                   </span>
                 )}
                 {isCanceled && (
@@ -6619,6 +6636,24 @@ export function CampusEventsBoard({
                 </span>
               )}
             </button>
+
+            {/* Prüfen Button für Schüler bei vorgeschlagener Terminverschiebung */}
+            {role === 'student' && isRescheduled && !isConfirmedOcc && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setStudentRescheduleModalOcc(occ); }}
+                title="Terminvorschlag prüfen (Bestätigen oder Ablehnen)"
+                aria-label="Terminvorschlag prüfen"
+                style={{
+                  background: '#fef3c7', color: '#b45309', border: 'none', padding: '0 10px', height: '40px',
+                  borderRadius: '12px', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: '5px', flexShrink: 0
+                }}
+              >
+                <Calendar size={14} color="#b45309" strokeWidth={2.4} />
+                <span>Prüfen</span>
+              </button>
+            )}
 
             {/* Absagen Icon (Nur für zukünftige Termine, geschützt via Master-PIN) */}
             {!isPastOcc && (
@@ -7150,8 +7185,7 @@ export function CampusEventsBoard({
         {/* Unified Timeline List (Single Source of Scroll on Mobile) */}
         <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: isMobilePortrait ? 'none' : '1 1 0%', minHeight: 0, overflowY: isMobilePortrait ? 'visible' : 'auto', height: isMobilePortrait ? 'auto' : undefined, display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '0px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {(() => {
-            const timelineEvents = getMergedTimelineEvents();
-            if (loadingEvents) {
+            if (loadingEvents && timelineEvents.length === 0) {
               return (
                 <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
                   Termine werden geladen...
@@ -7288,12 +7322,13 @@ export function CampusEventsBoard({
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      padding: '14px 16px 14px 20px',
-                      borderRadius: '16px',
+                      padding: windowWidth < 768 ? '14px 14px' : '16px 20px',
+                      borderRadius: windowWidth < 768 ? '16px' : '24px',
                       cursor: isStatutory ? 'pointer' : ((role === 'admin' || role === 'secretary') ? 'grab' : 'pointer'),
-                      background: colors.bg || '#f8fafc',
-                      border: `1px solid ${colors.border || '#e2e8f0'}`,
-                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: `5px solid ${catColor}`,
+                      boxShadow: `0 4px 16px rgba(0, 0, 0, 0.02), -2px 0 10px ${catColor}25`,
                       position: 'relative',
                       overflow: 'hidden',
                       flexShrink: 0,
@@ -7301,16 +7336,6 @@ export function CampusEventsBoard({
                     }}
                     className="hover-scale-subtle"
                   >
-                    {/* Flush 4px Accent Bar on Left Edge (Zero Corner Distortion) */}
-                    <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: '10px',
-                      bottom: '10px',
-                      width: '4px',
-                      borderRadius: '0 3px 3px 0',
-                      background: catColor
-                    }} />
 
                     {/* Row 1: Category Badge on Left & Duration/Time on Right */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', minHeight: '20px' }}>
@@ -7492,7 +7517,7 @@ export function CampusEventsBoard({
             </span>
           </div>
           <p style={{ color: '#64748b', fontSize: '0.80rem', margin: '3px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
-            Bühnenauftritte, Soundchecks &amp; Mitwirkenden-Abläufe
+            Deine persönliche Übersicht für Auftritte &amp; Veranstaltungen
           </p>
         </div>
 
@@ -7504,66 +7529,39 @@ export function CampusEventsBoard({
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          padding: '36px 20px',
+          padding: '40px 24px',
           background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
-          border: '1.5px dashed #cbd5e1',
-          borderRadius: '20px',
-          gap: '16px'
+          border: '1px solid #e2e8f0',
+          borderRadius: '24px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+          gap: '20px'
         }}>
           {/* Subtle Icon Squircle */}
           <div style={{
             width: '56px',
             height: '56px',
             borderRadius: '18px',
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
+            background: 'rgba(52, 168, 83, 0.08)',
+            border: '1px solid rgba(52, 168, 83, 0.15)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
+            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.06)'
           }}>
-            <Sparkles size={26} color="#64748b" />
+            <Sparkles size={26} color={brandColor} />
           </div>
 
           <div style={{ maxWidth: '340px' }}>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
               Hier entsteht eine neue Funktion
             </h4>
-            <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', lineHeight: 1.55, fontWeight: 550 }}>
-              {isForStudent 
-                ? 'Wir entwickeln deine zentrale Mitwirkungs- & Event-Zentrale. Sobald dich deine Lehrkraft für Konzerte, Schülervorspiele oder Ensemble-Projekte einteilt, findest du deine Soundcheck-Zeiten und deinen Ablaufplan direkt hier.'
-                : 'Wir entwickeln das zentrale Mitwirkungs- & Programmbegleit-Board. Zukünftig planst du hier Schülervorspiele, Konzertbeiträge und Bühnenabläufe nahtlos im Team mit dem Sekretariat.'}
+            <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', lineHeight: 1.6, fontWeight: 550 }}>
+              Wir arbeiten an einem zentralen Bereich für deine Event-Beteiligungen. Künftig behältst du hier alle Termine, Mitwirkungen und Vorbereitungen auf einen Blick im Auge.
             </p>
           </div>
 
-          {/* Feature Preview Checklist */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            textAlign: 'left',
-            background: '#ffffff',
-            border: '1px solid #f1f5f9',
-            borderRadius: '14px',
-            padding: '14px 16px',
-            width: '100%',
-            maxWidth: '310px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-          }}>
-            {[
-              'Automatische Benachrichtigung bei Mitwirkungen',
-              'Soundcheck- & Ablaufzeiten auf die Minute genau',
-              'Digitales Programmheft & Raum-Übersicht'
-            ].map((text, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#475569', fontWeight: 650 }}>
-                <Check size={14} color={brandColor} style={{ flexShrink: 0 }} />
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Rocket size={14} color="#94a3b8" /> <CampusGroovelabText /> Roadmap
+          <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Rocket size={14} color="#94a3b8" /> In Vorbereitung • Campus Roadmap
           </div>
         </div>
       </div>
@@ -14324,6 +14322,41 @@ export function CampusEventsBoard({
               fetchLessons();
             }
           }}
+        />
+      )}
+
+      {/* 🏛️ 0,1% Goldstandard: Student Reschedule Decision Modal */}
+      {studentRescheduleModalOcc && (
+        <StudentRescheduleDecisionModal
+          isOpen={Boolean(studentRescheduleModalOcc)}
+          onClose={() => setStudentRescheduleModalOcc(null)}
+          occurrence={studentRescheduleModalOcc}
+          onConfirm={async (occId) => {
+            await respondToRescheduleProposal({
+              occurrenceId: occId,
+              decision: 'accept',
+              studentId: studentRescheduleModalOcc?.student_id || userId,
+              teacherId: studentRescheduleModalOcc?.teacher_id || studentRescheduleModalOcc?.teacher?.id,
+              occurrenceDate: studentRescheduleModalOcc?.date,
+              occurrenceStartTime: studentRescheduleModalOcc?.start_time,
+              client: defaultSupabase
+            });
+            if (typeof fetchLessons === 'function') fetchLessons();
+          }}
+          onReject={async (occ) => {
+            await respondToRescheduleProposal({
+              occurrenceId: occ.id,
+              decision: 'reject',
+              rejectionReason: 'Termin passt nicht',
+              studentId: occ.student_id || userId,
+              teacherId: occ.teacher_id || occ.teacher?.id,
+              occurrenceDate: occ.date,
+              occurrenceStartTime: occ.start_time,
+              client: defaultSupabase
+            });
+            if (typeof fetchLessons === 'function') fetchLessons();
+          }}
+          onOpenChat={() => setActiveChatOcc(studentRescheduleModalOcc)}
         />
       )}
       

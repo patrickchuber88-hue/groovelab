@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { CampusSidebarRailItem } from '../layout/CampusSidebarRailItem';
 import { CampusSidebarUserHub } from '../layout/CampusSidebarUserHub';
+import { CampusRibbonNoteIcon } from '../CampusGroovelabBrand';
 
 export interface CampusMobileSidebarDrawerProps {
   isOpen: boolean;
@@ -384,7 +385,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 padding: '0 12px',
                 borderRadius: '9999px',
                 background: '#fef2f2',
-                border: '1px solid rgba(239, 68, 68, 0.35)',
+                border: 'none',
                 color: '#b91c1c',
                 fontWeight: 750,
                 fontSize: '0.78rem',
@@ -491,7 +492,6 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 <GraduationCap
                   size={18}
                   color={activePlatform === 'campus' ? '#ffffff' : 'rgba(52, 168, 83, 0.85)'}
-                  strokeWidth={2.4}
                 />
                 <span>Campus</span>
               </button>
@@ -528,10 +528,9 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 className="hover-scale-mini"
                 title="Zu GrooveLab wechseln"
               >
-                <Music
-                  size={17}
+                <CampusRibbonNoteIcon
+                  size={18}
                   color={activePlatform === 'groovelab' ? '#0f172a' : 'rgba(202, 138, 4, 0.85)'}
-                  strokeWidth={2.4}
                 />
                 <span>GrooveLab</span>
               </button>
@@ -547,7 +546,7 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <GraduationCap size={20} color="#34a853" strokeWidth={2.5} />
+                <GraduationCap size={20} color="#34a853" />
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34a853' }}>Campus</div>
             </div>

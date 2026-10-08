@@ -41,10 +41,150 @@ export function cleanHomeworkNote(rawNote?: string | null): string {
 export function cleanTitle(str?: string | null): string {
   if (!str) return '';
   return str
+    .replace(/^campus[- ]song\s*[-–:]\s*/i, '')
+    .replace(/^campus[- ]song\s+/i, '')
     .replace(/linken park/gi, 'Linkin Park')
     .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
     .replace(/\s*\([^)]*\)\s*$/, '')
     .trim();
+}
+
+/**
+ * 🛡️ 0.1% Goldstandard Guard: Erkennt Hausaufgaben-Wochen-Container (z. B. "Hausaufgabe KW 40", "Unbekannt - Hausaufgabe KW 40").
+ * Diese Container dürfen NIEMALS als Song oder Einzelaufgabe im Hausaufgaben-Widget oder Repertoire gerendert werden.
+ */
+export function isWeeklySnapshotContainer(raw?: string | null): boolean {
+  if (!raw) return false;
+  const clean = String(raw).trim().toLowerCase();
+  if (!clean) return false;
+  if (clean.startsWith('hausaufgabe kw') || clean.startsWith('hausaufgaben kw')) return true;
+  if (clean.includes('hausaufgabe kw') || clean.includes('hausaufgaben kw')) return true;
+  if (/^(unbekannt\s*[-–:]\s*)?hausaufgabe[n]?\s*kw\s*\d+/i.test(clean)) return true;
+  if (/^kw\s*\d+\s*[-–:]\s*hausaufgabe/i.test(clean)) return true;
+  if (/\bhausaufgabe[n]?\s+kw\s*\d+\b/i.test(clean)) return true;
+  return false;
+}
+
+/**
+ * 🛡️ 0.1% Goldstandard Sanitizer: Filtert Test-, Dummy- und Container-Artefakte heraus.
+ */
+export function isDummyOrTestSong(songOrTitle?: any): boolean {
+  if (!songOrTitle) return false;
+  const rawTitle = typeof songOrTitle === 'string'
+    ? songOrTitle
+    : (songOrTitle.title || songOrTitle.topic_name || songOrTitle.song_title || '');
+  if (isWeeklySnapshotContainer(rawTitle)) return true;
+  const t = rawTitle.trim().toLowerCase();
+  const a = (typeof songOrTitle === 'object' ? (songOrTitle.artist || songOrTitle.songs?.artist || '') : '').trim().toLowerCase();
+  if (isWeeklySnapshotContainer(a)) return true;
+  if (t === 'test' || t === 'test - test' || t === 'test-test' || t === 'unbenannter song' || t === 'song') return true;
+  if (a === 'test' && t === 'test') return true;
+  if (t === 'campus-song' || t === 'campus song') return true;
+  return false;
+}
+
+/**
+ * 0.1% Goldstandard Formatter: Formatiert aufeinanderfolgende Buchseiten als Bereich (z.B. "S. 1-3" statt "S. 1, S. 2, S. 3").
+ * Mehrere nicht zusammenhängende Bereiche werden mit Komma getrennt (z.B. "S. 1-3, 5").
+ */
+export function formatConsecutivePageRanges(pages?: number[] | null, prefix = 'S. '): string {
+  if (!pages || !Array.isArray(pages) || pages.length === 0) return '';
+  const sorted = Array.from(new Set(pages.filter(p => typeof p === 'number' && !isNaN(p)))).sort((a, b) => a - b);
+  if (sorted.length === 0) return '';
+
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let end = start;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    if (current === end + 1) {
+      end = current;
+    } else {
+      if (start === end) {
+        ranges.push(`${start}`);
+      } else {
+        ranges.push(`${start}-${end}`);
+      }
+      start = current;
+      end = current;
+    }
+  }
+  if (start === end) {
+    ranges.push(`${start}`);
+  } else {
+    ranges.push(`${start}-${end}`);
+  }
+
+  return `${prefix}${ranges.join(', ')}`;
+}
+
+/**
+ * 0.1% Goldstandard Formatter: Formatiert Hausaufgaben-Übungen verlustfrei und konsekutiv.
+ * Z.B. ['1', '2', '3', '4'] -> 'Üb. 1–4'
+ * ['1', '2', '5'] -> 'Üb. 1–2, 5'
+ * Alphanumerische Übungen ('1', '2a', '3') werden sauber integriert.
+ * Verhindert Informationsverlust durch Abschneiden ('...').
+ */
+export function formatConsecutiveExerciseRanges(
+  exercises?: (string | number)[] | null,
+  prefix = 'Üb. '
+): string {
+  if (!exercises || !Array.isArray(exercises) || exercises.length === 0) return '';
+
+  const cleaned = exercises
+    .map(e => String(e).replace(/^(?:Nr\.|Üb\.|Übung)\s*/i, '').trim())
+    .filter(e => e.length > 0);
+
+  if (cleaned.length === 0) return '';
+
+  const numericValues: number[] = [];
+  const nonNumericValues: string[] = [];
+
+  cleaned.forEach(item => {
+    const num = Number(item);
+    if (!isNaN(num) && Number.isInteger(num) && num > 0) {
+      numericValues.push(num);
+    } else {
+      nonNumericValues.push(item);
+    }
+  });
+
+  const parts: string[] = [];
+
+  if (numericValues.length > 0) {
+    const sorted = Array.from(new Set(numericValues)).sort((a, b) => a - b);
+    let start = sorted[0];
+    let end = start;
+
+    for (let i = 1; i < sorted.length; i++) {
+      const current = sorted[i];
+      if (current === end + 1) {
+        end = current;
+      } else {
+        if (start === end) {
+          parts.push(`${start}`);
+        } else {
+          parts.push(`${start}–${end}`);
+        }
+        start = current;
+        end = current;
+      }
+    }
+    if (start === end) {
+      parts.push(`${start}`);
+    } else {
+      parts.push(`${start}–${end}`);
+    }
+  }
+
+  if (nonNumericValues.length > 0) {
+    const uniqueNonNumeric = Array.from(new Set(nonNumericValues));
+    parts.push(...uniqueNonNumeric);
+  }
+
+  if (parts.length === 0) return '';
+  return `${prefix}${parts.join(', ')}`;
 }
 
 export interface ActiveHomeworkSummaryResult {
@@ -119,7 +259,7 @@ export function deriveActiveHomeworkSummary({
 
   // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
   (progressItems || []).forEach(item => {
-    if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
+    if (!item.topic_name || isWeeklySnapshotContainer(item.topic_name)) return;
 
     if (item.topic_name.includes(' - Seite ')) {
       const parts = item.topic_name.split(' - Seite ');
@@ -142,8 +282,10 @@ export function deriveActiveHomeworkSummary({
         }
       }
     } else {
-      // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht als Campus-Hausaufgabe erscheinen
+      // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen NIEMALS als Campus-Hausaufgabe erscheinen
       if (item.is_campus_active === false) return;
+      if (item.songs && item.songs.is_campus_active === false) return;
+      if (isDummyOrTestSong(item)) return;
 
       const localHw = currentStudentId
         ? (localStorage.getItem(`song_hw_${currentStudentId}_${item.id}`) ??
@@ -154,7 +296,7 @@ export function deriveActiveHomeworkSummary({
         const isSongHw = localHw === 'true' || Boolean(item.is_current_homework);
         if (isSongHw) {
           const cleanT = cleanTitle((item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, ''));
-          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+          if (cleanT && !isDummyOrTestSong(cleanT) && !isWeeklySnapshotContainer(cleanT) && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
             const cachedNote =
               (currentStudentId
                 ? localStorage.getItem(`song_note_${currentStudentId}_${item.id}`) ||
@@ -171,10 +313,12 @@ export function deriveActiveHomeworkSummary({
     }
   });
 
-  // 3. Also incorporate student's activeSongSkills
+  // 3. Also incorporate student's activeSongSkills ONLY if explicitly assigned to Campus and marked as homework
   (activeSongSkills || []).forEach((skill: any) => {
     // 🛡️ Bounded Context Isolation: Reine GrooveLab-Skills dürfen nicht im Campus-Modul erscheinen
-    if (skill.songs && skill.songs.is_campus_active === false) return;
+    if (!skill.songs || skill.songs.is_campus_active !== true) return;
+    if (skill.is_campus_active === false) return;
+    if (isDummyOrTestSong(skill) || isDummyOrTestSong(skill.songs)) return;
 
     const localHw = currentStudentId
       ? (localStorage.getItem(`song_hw_${currentStudentId}_${skill.id}`) ??
@@ -185,14 +329,22 @@ export function deriveActiveHomeworkSummary({
     const isHw = localHw === 'true' || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
     if (isHw) {
-      const songArtist = skill.songs?.artist || skill.artist || '';
-      const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-      if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-      const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      let songArtist = (skill.songs?.artist || skill.artist || '').trim();
+      let songTitle = (skill.songs?.title || skill.title || skill.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+      if (songTitle.includes(' - Seite ') || isWeeklySnapshotContainer(songTitle)) return;
+      if (isDummyOrTestSong(songTitle) || isDummyOrTestSong(songArtist)) return;
+      const cleanSongTitle = cleanTitle(songTitle);
+      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanSongTitle}`
+        : `${cleanSongTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
       const cleanT = cleanTitle(fullTitle);
 
-      if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+      if (cleanT && !isDummyOrTestSong(cleanT) && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
         const cachedNote =
           (currentStudentId
             ? localStorage.getItem(`song_note_${currentStudentId}_${skill.id}`) ||
@@ -213,10 +365,12 @@ export function deriveActiveHomeworkSummary({
     }
   });
 
-  // 4. Also incorporate student's assignedCampusSongs
+  // 4. Also incorporate student's assignedCampusSongs (must be campus active)
   (assignedCampusSongs || []).forEach((cSong: any) => {
     // 🛡️ Bounded Context Isolation: Explizite Campus-Zuordnung vorausgesetzt
     if (cSong.is_campus_active === false) return;
+    if (cSong.songs && cSong.songs.is_campus_active === false) return;
+    if (isDummyOrTestSong(cSong) || isDummyOrTestSong(cSong.songs)) return;
 
     const localHw = currentStudentId
       ? (localStorage.getItem(`song_hw_${currentStudentId}_${cSong.id}`) ??
@@ -229,14 +383,22 @@ export function deriveActiveHomeworkSummary({
       (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
 
     if (isHw) {
-      const songArtist = cSong.songs?.artist || cSong.artist || '';
-      const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
-      if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
-      const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      let songArtist = (cSong.songs?.artist || cSong.artist || '').trim();
+      let songTitle = (cSong.songs?.title || cSong.title || cSong.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+      if (songTitle.includes(' - Seite ') || isWeeklySnapshotContainer(songTitle)) return;
+      if (isDummyOrTestSong(songTitle) || isDummyOrTestSong(songArtist)) return;
+      const cleanSongTitle = cleanTitle(songTitle);
+      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanSongTitle}`
+        : `${cleanSongTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
       const cleanT = cleanTitle(fullTitle);
 
-      if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+      if (cleanT && !isDummyOrTestSong(cleanT) && !isWeeklySnapshotContainer(cleanT) && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
         const cachedNote =
           (currentStudentId
             ? localStorage.getItem(`song_note_${currentStudentId}_${cSong.id}`) ||
@@ -257,7 +419,62 @@ export function deriveActiveHomeworkSummary({
     }
   });
 
-  // 5. Snapshot Fallback Hydration
+  // 5. Authoritative Snapshot Hydration (1:1 Symmetrie mit MeisterwerkDocumentTab Wochen-Fahrplan)
+  // Wenn für die aktuelle Woche ein Wochen-Snapshot (z. B. Hausaufgabe KW xx) existiert,
+  // entpacke SNAPSHOT_SONGS und SNAPSHOT_LEHRWERKE vollumfänglich und dedupliziert.
+  const curWeekSnap = (progressItems || []).find((item: any) => {
+    if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+    if (!currentWeekStr) return false;
+    const kwMatch = item.topic_name.match(/KW\s*(\d+)/i);
+    const curKwMatch = currentWeekStr.match(/-W(\d+)/i);
+    if (kwMatch && curKwMatch && parseInt(kwMatch[1], 10) === parseInt(curKwMatch[1], 10)) return true;
+    return false;
+  });
+
+  if (curWeekSnap) {
+    const rawNotes = curWeekSnap.homework_notes || curWeekSnap.teacher_notes;
+    if (rawNotes) {
+      let parsedSnapNotes: any = null;
+      try {
+        parsedSnapNotes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
+      } catch {}
+      if (!Array.isArray(parsedSnapNotes) && typeof rawNotes === 'string' && rawNotes.includes('SNAPSHOT_')) {
+        parsedSnapNotes = [rawNotes];
+      }
+
+      if (Array.isArray(parsedSnapNotes)) {
+        const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
+        if (snapSongEntry) {
+          try {
+            const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+            const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+            const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+            const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+            const parsedSongs = JSON.parse(jsonStr);
+            if (Array.isArray(parsedSongs)) {
+              parsedSongs.forEach((song: any) => {
+                if (song.is_campus_active === false) return;
+                if (isDummyOrTestSong(song) || isDummyOrTestSong(song.title) || isDummyOrTestSong(song.topic_name)) return;
+                const tName = cleanTitle(song.topic_name || song.title || '');
+                if (tName && !isDummyOrTestSong(tName) && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+                  otherActiveHWItems.push({
+                    ...song,
+                    topic_name: tName,
+                    title: tName,
+                    is_current_homework: true
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('Error hydrating current week SNAPSHOT_SONGS in briefing helper:', e);
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Snapshot Fallback Hydration für Vorwochen
   if (Object.keys(activeLehrwerkeMap).length === 0 || otherActiveHWItems.length === 0) {
     const allSnapshotCandidates = (progressItems || []).filter((item: any) => {
       if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
@@ -332,9 +549,10 @@ export function deriveActiveHomeworkSummary({
             parsedSongs.forEach((song: any) => {
               // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht über Snapshots in Campus gelangen
               if (song.is_campus_active === false) return;
+              if (isDummyOrTestSong(song) || isDummyOrTestSong(song.title) || isDummyOrTestSong(song.topic_name)) return;
 
               const tName = cleanTitle(song.topic_name || song.title || '');
-              if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+              if (tName && !isDummyOrTestSong(tName) && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
                 otherActiveHWItems.push({
                   ...song,
                   topic_name: tName,
@@ -408,7 +626,7 @@ export function deriveJuniorHomeworkSummary({
 
     if (pages.length > 0) {
       pages.sort((a, b) => a - b);
-      const formattedPages = pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`;
+      const formattedPages = formatConsecutivePageRanges(pages);
       const existingBook = activeJuniorBooks.find(b => b.title.toLowerCase() === bookTitle.toLowerCase());
       if (existingBook) {
         existingBook.book = existingBook.book || book;
@@ -416,7 +634,7 @@ export function deriveJuniorHomeworkSummary({
           if (!existingBook.pages.includes(p)) existingBook.pages.push(p);
         });
         existingBook.pages.sort((a, b) => a - b);
-        existingBook.formattedPages = existingBook.pages.length === 1 ? `S. ${existingBook.pages[0]}` : `S. ${existingBook.pages[0]}–${existingBook.pages[existingBook.pages.length - 1]}`;
+        existingBook.formattedPages = formatConsecutivePageRanges(existingBook.pages);
         notes.forEach(n => {
           if (!existingBook.notes?.includes(n)) {
             existingBook.notes = [...(existingBook.notes || []), n];
@@ -436,7 +654,7 @@ export function deriveJuniorHomeworkSummary({
 
   // Also incorporate progressItems for books
   (progressItems || []).forEach(item => {
-    if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
+    if (!item.topic_name || isWeeklySnapshotContainer(item.topic_name) || !item.is_current_homework) return;
     if (item.topic_name.includes(' - Seite ')) {
       const parts = item.topic_name.split(' - Seite ');
       const rawBookTitle = cleanTitle(parts[0].trim());
@@ -453,7 +671,7 @@ export function deriveJuniorHomeworkSummary({
           if (!existingBook.pages.includes(pageNum)) {
             existingBook.pages.push(pageNum);
             existingBook.pages.sort((a, b) => a - b);
-            existingBook.formattedPages = existingBook.pages.length === 1 ? `S. ${existingBook.pages[0]}` : `S. ${existingBook.pages[0]}–${existingBook.pages[existingBook.pages.length - 1]}`;
+            existingBook.formattedPages = formatConsecutivePageRanges(existingBook.pages);
           }
           if (formattedNote && !existingBook.notes?.includes(formattedNote)) {
             existingBook.notes = [...(existingBook.notes || []), formattedNote];
@@ -462,7 +680,7 @@ export function deriveJuniorHomeworkSummary({
           activeJuniorBooks.push({
             title: resolvedTitle,
             pages: [pageNum],
-            formattedPages: `S. ${pageNum}`,
+            formattedPages: formatConsecutivePageRanges([pageNum]),
             notes: formattedNote ? [formattedNote] : [],
             book
           });
@@ -474,10 +692,11 @@ export function deriveJuniorHomeworkSummary({
   // 2. Songs & progress items
   const activeJuniorSongs: any[] = [];
   (progressItems || []).forEach(item => {
-    if (item.topic_name.startsWith('Hausaufgabe KW ') || item.topic_name.includes(' - Seite ')) return;
+    if (isWeeklySnapshotContainer(item.topic_name) || item.topic_name.includes(' - Seite ')) return;
     
     // 🛡️ Bounded Context Isolation: Reine GrooveLab-Songs dürfen nicht als Campus-Hausaufgabe erscheinen
     if (item.is_campus_active === false) return;
+    if (isDummyOrTestSong(item) || isDummyOrTestSong(item.topic_name)) return;
 
     const localHw = studentId
       ? (localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
@@ -487,7 +706,7 @@ export function deriveJuniorHomeworkSummary({
     const isSongHw = localHw === 'true' || (localHw !== 'false' && (Boolean(item.is_current_homework) || Boolean(item.homework_notes) || Boolean(item.teacher_notes)));
     if (isSongHw) {
       const cleanT = cleanTitle(item.topic_name);
-      if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name) === cleanT)) {
+      if (cleanT && !isDummyOrTestSong(cleanT) && !isWeeklySnapshotContainer(cleanT) && !activeJuniorSongs.some(existing => cleanTitle(existing.topic_name) === cleanT)) {
         const cleanNote = cleanHomeworkNote(item.homework_notes || item.teacher_notes);
         activeJuniorSongs.push({
           ...item,
@@ -498,8 +717,10 @@ export function deriveJuniorHomeworkSummary({
   });
 
   (activeSongSkills || []).forEach((skill: any) => {
-    // 🛡️ Bounded Context Isolation: Reine GrooveLab-Skills dürfen nicht im Campus-Modul erscheinen
-    if (skill.songs && skill.songs.is_campus_active === false) return;
+    // 🛡️ Bounded Context Isolation: Reine GrooveLab-Skills dürfen NIEMALS im Campus-Modul erscheinen
+    if (!skill.songs || skill.songs.is_campus_active !== true) return;
+    if (skill.is_campus_active === false) return;
+    if (isDummyOrTestSong(skill) || isDummyOrTestSong(skill.songs)) return;
 
     const localHw = studentId
       ? (localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
@@ -507,15 +728,24 @@ export function deriveJuniorHomeworkSummary({
          (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null))
       : null;
 
-    const isHw = localHw === 'true' || (localHw !== 'false' && (Boolean(skill.is_current_homework) || Boolean(skill.homework_notes) || Boolean(skill.teacher_notes)));
+    const isHw = localHw === 'true' || (localHw !== 'false' && Boolean(skill.is_current_homework));
     if (isHw) {
-      const songArtist = skill.songs?.artist || skill.artist || '';
-      const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-      const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      let songArtist = (skill.songs?.artist || skill.artist || '').trim();
+      let songTitle = (skill.songs?.title || skill.title || skill.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+      if (songTitle.includes(' - Seite ') || isWeeklySnapshotContainer(songTitle)) return;
+      if (isDummyOrTestSong(songTitle) || isDummyOrTestSong(songArtist)) return;
+      const cleanSongTitle = cleanTitle(songTitle);
+      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanSongTitle}`
+        : `${cleanSongTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
       const cleanT = cleanTitle(fullTitle);
 
-      if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name || existing.title) === cleanT)) {
+      if (cleanT && !isDummyOrTestSong(cleanT) && !isWeeklySnapshotContainer(cleanT) && !activeJuniorSongs.some(existing => cleanTitle(existing.topic_name || existing.title) === cleanT)) {
         const cachedNote =
           (studentId
             ? localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
@@ -539,6 +769,8 @@ export function deriveJuniorHomeworkSummary({
   (assignedCampusSongs || []).forEach((cSong: any) => {
     // 🛡️ Bounded Context Isolation: Explizite Campus-Zuordnung vorausgesetzt
     if (cSong.is_campus_active === false) return;
+    if (cSong.songs && cSong.songs.is_campus_active === false) return;
+    if (isDummyOrTestSong(cSong) || isDummyOrTestSong(cSong.songs)) return;
 
     const localHw = studentId
       ? (localStorage.getItem(`song_hw_${studentId}_${cSong.id}`) ??
@@ -546,13 +778,22 @@ export function deriveJuniorHomeworkSummary({
       : null;
     const isHw = localHw === 'true' || (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
     if (isHw) {
-      const songArtist = cSong.songs?.artist || cSong.artist || '';
-      const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
-      const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      let songArtist = (cSong.songs?.artist || cSong.artist || '').trim();
+      let songTitle = (cSong.songs?.title || cSong.title || cSong.song_title || 'Song').trim();
+      if (/^campus[- ]song$/i.test(songArtist)) {
+        songArtist = '';
+      }
+      songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
+      if (songTitle.includes(' - Seite ') || isWeeklySnapshotContainer(songTitle)) return;
+      if (isDummyOrTestSong(songTitle) || isDummyOrTestSong(songArtist)) return;
+      const cleanSongTitle = cleanTitle(songTitle);
+      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
+        ? `${songArtist} - ${cleanSongTitle}`
+        : `${cleanSongTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
       const cleanT = cleanTitle(fullTitle);
 
-      if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name || existing.title) === cleanT)) {
+      if (cleanT && !isDummyOrTestSong(cleanT) && !isWeeklySnapshotContainer(cleanT) && !activeJuniorSongs.some(existing => cleanTitle(existing.topic_name || existing.title) === cleanT)) {
         const cachedNote =
           (studentId
             ? localStorage.getItem(`song_note_${studentId}_${cSong.id}`) ||

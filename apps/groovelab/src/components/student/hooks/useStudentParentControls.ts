@@ -394,23 +394,62 @@ export function useStudentParentControls({
     }
   };
 
-  // Family profile switcher
-  const handleSwitchFamilyStudent = (targetStudentId: string) => {
+  // Family profile switcher (0,1% Goldstandard Zero-Reload SSOT)
+  const handleSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked: boolean = false) => {
     const target = familyProfiles.find(p => p.id === targetStudentId);
-    if (target && target.has_personal_pin && !isParentUnlocked) {
+    if (target && target.has_personal_pin && !isParentUnlocked && !keepParentUnlocked) {
       setPendingSiblingUnlock(target);
     } else {
-      executeSwitchFamilyStudent(targetStudentId);
+      executeSwitchFamilyStudent(targetStudentId, keepParentUnlocked);
     }
   };
 
-  const executeSwitchFamilyStudent = (targetStudentId: string) => {
+  const executeSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked: boolean = false) => {
+    const target = familyProfiles.find(p => p.id === targetStudentId);
     try {
+      // 1. Session Storage: Autoritativer aktiver Benutzer für sofortige RLS- & Auth-Integrität
+      sessionStorage.setItem('groovelab_user_id', targetStudentId);
+      if (target) {
+        const isStudentRole = (target.role || 'student').toLowerCase() === 'student';
+        const userToCache = isStudentRole ? { ...target, last_name: undefined } : target;
+        sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
+      }
+
+      // 2. Local Storage: Multi-Tier Persistenz & Standalone PWA Kaltstart-Fallback
+      localStorage.setItem('campus_active_student_id', targetStudentId);
+      localStorage.setItem('groovelab_user_id', targetStudentId);
       localStorage.setItem('groovelab_active_student_id', targetStudentId);
+
+      // 3. Didaktische Stufe (UI-Level) pro Schüler synchronisieren
+      const targetUiLevel = target?.campus_ui_level || 'junior';
+      localStorage.setItem(`campus_student_ui_level_${targetStudentId}`, targetUiLevel);
+      localStorage.setItem('campus_student_ui_level', targetUiLevel);
+
+      // 4. Elternbereich-Session-Lease absichern
+      if (keepParentUnlocked) {
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, 'true');
+        sessionStorage.setItem(`groovelab_parent_unlocked_${targetStudentId}`, 'true');
+      } else {
+        sessionStorage.removeItem('groovelab_parent_unlocked_global');
+        if (studentId) {
+          sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
+          sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
+        }
+        sessionStorage.removeItem(`groovelab_parent_session_${targetStudentId}`);
+        sessionStorage.removeItem(`groovelab_parent_unlocked_${targetStudentId}`);
+      }
     } catch (e) {
-      console.warn('Could not set active student in storage:', e);
+      console.warn('[ParentControls] Could not set active student in storage:', e);
     }
-    window.location.reload();
+
+    // 5. Reaktivitäts-Events: 0 ms Umschaltung ohne störenden Page-Reload
+    window.dispatchEvent(new CustomEvent('campus_family_student_switched', { 
+      detail: targetStudentId 
+    }));
+    window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { 
+      detail: { studentId: targetStudentId, uiLevel: target?.campus_ui_level || 'junior' } 
+    }));
   };
 
   const handleRemoveFamilyProfile = (removeStudentId: string) => {

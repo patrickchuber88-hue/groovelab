@@ -819,9 +819,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         {/* SÄULE 1: BIOMETRIE & PASSKEYS AUF DIESEM GERÄT */}
                         <div style={{
                           background: isCurrentDevicePasskeyActive 
-                            ? 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)' 
+                            ? 'linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%)' 
                             : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                          border: isCurrentDevicePasskeyActive ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
+                          border: isCurrentDevicePasskeyActive ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
                           borderRadius: '20px',
                           padding: '20px',
                           display: 'flex',
@@ -835,12 +835,12 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 width: '44px',
                                 height: '44px',
                                 borderRadius: '12px',
-                                background: isCurrentDevicePasskeyActive ? '#dcfce7' : '#f1f5f9',
-                                color: isCurrentDevicePasskeyActive ? '#16a34a' : '#64748b',
+                                background: isCurrentDevicePasskeyActive ? '#ecfdf5' : '#f1f5f9',
+                                color: isCurrentDevicePasskeyActive ? '#10b981' : '#64748b',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: isCurrentDevicePasskeyActive ? '0 4px 12px rgba(22, 163, 74, 0.2)' : 'none'
+                                boxShadow: isCurrentDevicePasskeyActive ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
                               }}>
                                 <Fingerprint size={24} />
                               </div>
@@ -850,9 +850,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                     Touch ID / Face ID auf diesem Gerät
                                   </h4>
                                   <span style={{
-                                    background: isCurrentDevicePasskeyActive ? '#dcfce7' : '#f1f5f9',
-                                    color: isCurrentDevicePasskeyActive ? '#15803d' : '#64748b',
-                                    border: isCurrentDevicePasskeyActive ? '1px solid #86efac' : '1px solid #cbd5e1',
+                                    background: isCurrentDevicePasskeyActive ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                                    color: isCurrentDevicePasskeyActive ? '#ffffff' : '#64748b',
+                                    border: isCurrentDevicePasskeyActive ? 'none' : '1px solid #cbd5e1',
                                     padding: '2px 8px',
                                     borderRadius: '100px',
                                     fontSize: '0.65rem',
@@ -878,8 +878,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                     disabled={biometricsStatus === 'verifying'}
                                     style={{
                                       background: '#ffffff',
-                                      border: '1.5px solid #86efac',
-                                      color: '#15803d',
+                                      border: '1.5px solid #10b981',
+                                      color: '#059669',
                                       padding: '8px 14px',
                                       borderRadius: '10px',
                                       fontWeight: 800,
@@ -946,9 +946,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             <div style={{
                               padding: '10px 14px',
                               borderRadius: '10px',
-                              background: biometricsStatus === 'error' ? '#fef2f2' : '#f0fdf4',
-                              border: biometricsStatus === 'error' ? '1px solid #fca5a5' : '1px solid #86efac',
-                              color: biometricsStatus === 'error' ? '#991b1b' : '#166534',
+                              background: biometricsStatus === 'error' ? '#fef2f2' : '#ecfdf5',
+                              border: biometricsStatus === 'error' ? '1px solid #fca5a5' : '1px solid #10b981',
+                              color: biometricsStatus === 'error' ? '#991b1b' : '#065f46',
                               fontSize: '0.74rem',
                               fontWeight: 700,
                               display: 'flex',
@@ -1850,9 +1850,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           {/* CARD 2: AUTO-CLEAN APPLE SWITCH HERO */}
                           <div style={{
                             background: autoDeleteExpiredUsers
-                              ? 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)'
+                              ? 'linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%)'
                               : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                            border: autoDeleteExpiredUsers ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
+                            border: autoDeleteExpiredUsers ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
                             borderRadius: '20px',
                             padding: '20px',
                             display: 'flex',
@@ -1867,12 +1867,12 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   width: '42px',
                                   height: '42px',
                                   borderRadius: '12px',
-                                  background: autoDeleteExpiredUsers ? '#dcfce7' : '#f1f5f9',
-                                  color: autoDeleteExpiredUsers ? '#16a34a' : '#64748b',
+                                  background: autoDeleteExpiredUsers ? '#ecfdf5' : '#f1f5f9',
+                                  color: autoDeleteExpiredUsers ? '#10b981' : '#64748b',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxShadow: autoDeleteExpiredUsers ? '0 4px 12px rgba(22, 163, 74, 0.2)' : 'none'
+                                  boxShadow: autoDeleteExpiredUsers ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
                                 }}>
                                   <ShieldCheck size={24} />
                                 </div>
@@ -1882,9 +1882,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                       Automatische DSGVO-Bereinigung (Auto-Clean)
                                     </h4>
                                     <span style={{
-                                      background: autoDeleteExpiredUsers ? '#dcfce7' : '#f1f5f9',
-                                      color: autoDeleteExpiredUsers ? '#15803d' : '#64748b',
-                                      border: autoDeleteExpiredUsers ? '1px solid #86efac' : '1px solid #cbd5e1',
+                                      background: autoDeleteExpiredUsers ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                                      color: autoDeleteExpiredUsers ? '#ffffff' : '#64748b',
+                                      border: autoDeleteExpiredUsers ? 'none' : '1px solid #cbd5e1',
                                       padding: '2px 8px',
                                       borderRadius: '100px',
                                       fontSize: '0.64rem',

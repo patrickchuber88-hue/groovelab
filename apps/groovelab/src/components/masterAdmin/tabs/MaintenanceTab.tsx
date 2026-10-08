@@ -763,7 +763,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               }}
               style={{
                 background: '#ffffff',
-                border: '1px solid #86efac',
+                border: '1.5px solid #10b981',
                 color: '#047857',
                 padding: '6px 14px',
                 borderRadius: '100px',
@@ -2495,8 +2495,8 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    background: announcement.isActive ? '#f0fdf4' : '#f8fafc',
-                    border: `1.5px solid ${announcement.isActive ? '#86efac' : '#e2e8f0'}`,
+                    background: announcement.isActive ? '#ecfdf5' : '#f8fafc',
+                    border: `1.5px solid ${announcement.isActive ? '#10b981' : '#e2e8f0'}`,
                     padding: '6px 12px',
                     borderRadius: '100px',
                     cursor: 'pointer',
@@ -2508,7 +2508,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   <span style={{
                     fontSize: '0.76rem',
                     fontWeight: 900,
-                    color: announcement.isActive ? '#15803d' : '#64748b',
+                    color: announcement.isActive ? '#059669' : '#64748b',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '5px'
@@ -2554,9 +2554,9 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 borderRadius: '18px',
                 padding: '16px 20px',
                 background: announcement.isActive 
-                  ? 'linear-gradient(135deg, rgba(240, 253, 244, 0.95) 0%, rgba(220, 252, 231, 0.95) 100%)' 
+                  ? '#ecfdf5' 
                   : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: `1.5px solid ${announcement.isActive ? '#86efac' : '#e2e8f0'}`,
+                border: `1.5px solid ${announcement.isActive ? '#10b981' : '#e2e8f0'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -2873,11 +2873,11 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   <span style={{
                     fontSize: '0.70rem',
                     fontWeight: 800,
-                    background: announcement.isActive ? '#dcfce7' : '#f1f5f9',
-                    color: announcement.isActive ? '#15803d' : '#64748b',
+                    background: announcement.isActive ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                    color: announcement.isActive ? '#ffffff' : '#64748b',
                     padding: '3px 8px',
                     borderRadius: '100px',
-                    border: announcement.isActive ? '1px solid #86efac' : '1px solid #e2e8f0'
+                    border: announcement.isActive ? 'none' : '1px solid #e2e8f0'
                   }}>
                     {announcement.isActive ? '● LIVE IM SYSTEM' : '○ ENTWURF (VORSCHAU)'}
                   </span>
@@ -3391,9 +3391,9 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 style={{
                   padding: '10px 14px',
                   borderRadius: '12px',
-                  background: '#f0fdf4',
-                  border: '1px solid #86efac',
-                  color: '#15803d',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  color: '#ffffff',
                   fontSize: '0.82rem',
                   fontWeight: 850,
                   cursor: 'pointer',
@@ -3405,7 +3405,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 }}
                 className="hover-scale-mini"
               >
-                {vacuumingStorage ? <RefreshCw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                {vacuumingStorage ? <RefreshCw size={14} className="animate-spin" color="#ffffff" /> : <ShieldCheck size={14} color="#ffffff" />}
                 <span>{vacuumingStorage ? 'Prüfe Audio-Storage...' : 'Audio-Tresor prüfen & bereinigen'}</span>
               </button>
             </div>
@@ -3612,14 +3612,14 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   textTransform: 'uppercase',
                   padding: '5px 14px',
                   borderRadius: '100px',
-                  background: 'rgba(34, 197, 94, 0.2)',
-                  color: '#86efac',
-                  border: '1px solid rgba(34, 197, 94, 0.35)',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  color: '#34d399',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}>
-                  <CheckCircle2 size={14} color="#86efac" />
+                  <CheckCircle2 size={14} color="#34d399" />
                   Audit-Status: 100% Gültig (9/9 Kriterien)
                 </span>
                 <span style={{

@@ -22,8 +22,7 @@ import { isUUID } from '../utils/uuidValidator';
 import { isLocalDevEnvironment } from '../utils/devEnvironment';
 import { invalidateActiveSessionsCache, optimisticallyInjectActiveSession } from '../repositories/scheduleRepository';
 import { CampusLoginSponsorBadge } from './ui/CampusLoginSponsorBadge';
-
-
+import { TriAuthGatewayBar } from './auth/TriAuthGatewayBar';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -4209,6 +4208,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         <CampusLoginSponsorBadge schoolId={schoolData?.id} schoolData={schoolData} isGroovelabKiosk={isGroovelabKiosk} />
 
+        {/* 🛡️ Tri-Auth Gateway Bar (SEC-90): Gleichberechtigtes Drei-Säulen-Login */}
+        <TriAuthGatewayBar
+          activeMethod={expandedSection === 'pin' ? 'pin' : (biometricLoading ? 'passkey' : 'qr')}
+          onSelectMethod={(m) => {
+            if (m === 'pin') setExpandedSection('pin');
+            else { setExpandedSection('none'); if (m === 'passkey') handleTriggerBiometricLogin(); }
+          }}
+          isWebAuthnSupported={biometricsAvailable}
+          isGroovelabKiosk={isGroovelabKiosk}
+          hasStoredBiometrics={scopedBiometricProfiles.length > 0}
+        />
+
       {/* Main Standard QR-Scanner Card */}
       {expandedSection === 'none' && (
       <div style={{
@@ -4535,7 +4546,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           height: '22px',
                           borderRadius: '50%',
                           background: '#ef4444',
-                          border: '2px solid #ffffff',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -7847,11 +7858,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     borderRadius: '16px',
                     background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
                     color: '#ffffff',
-                    border: '1.5px solid #eab308',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
                     fontSize: '1rem',
                     fontWeight: 900,
                     cursor: adminLoginLoading ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.2)',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.25)',
                     transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',

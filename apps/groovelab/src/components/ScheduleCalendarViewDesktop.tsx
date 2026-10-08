@@ -5330,7 +5330,7 @@ export function ScheduleCalendarViewDesktop({
       case 'canceled_by_teacher_ausfall':
         return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#34a853' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(254, 243, 199, 0.55)', border: '#eab308', text: '#854d0e' };
       default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
     }
   };
@@ -8353,9 +8353,9 @@ export function ScheduleCalendarViewDesktop({
                                              gap: '2px',
                                              textTransform: 'uppercase',
                                              letterSpacing: '0.02em',
-                                             background: isConfirmed ? '#e6f4ea' : '#fef3c7',
-                                             color: isConfirmed ? '#137333' : '#b45309',
-                                             border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                                             background: isConfirmed ? '#fef3c7' : '#fefce8',
+                                             color: isConfirmed ? '#854d0e' : '#b45309',
+                                             border: isConfirmed ? '1px solid #eab308' : '1px dashed #f59e0b',
                                              flexShrink: 0,
                                              whiteSpace: 'nowrap',
                                              cursor: isConfirmed ? 'default' : 'pointer'

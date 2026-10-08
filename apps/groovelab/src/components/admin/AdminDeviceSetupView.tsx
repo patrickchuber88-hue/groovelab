@@ -11,6 +11,7 @@ import {
   Lightbulb, Eye, EyeOff, Lock, Clock, ShieldCheck, Monitor, 
   AlertCircle, Sparkles, Unplug, BookOpen, AlertTriangle 
 } from 'lucide-react';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 export interface AdminDeviceSetupViewProps {
   rooms: any[];
@@ -42,6 +43,7 @@ export function AdminDeviceSetupView({
   activePlatform = 'groovelab'
 }: AdminDeviceSetupViewProps) {
   const [activeGrooveSettingsModal, setActiveGrooveSettingsModal] = useState<'hours' | 'security' | 'devices' | 'analytics' | 'maintenance' | null>(null);
+  const grooveSettingsModalRef = useModalA11y<HTMLDivElement>(Boolean(activeGrooveSettingsModal), () => setActiveGrooveSettingsModal(null));
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
   const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 1024 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, .sim-viewport-landscape, .sim-viewport-iphone14, [class*="sim-viewport-mobile"], [class*="sim-viewport-tablet"]')));
@@ -762,24 +764,14 @@ export function AdminDeviceSetupView({
       {/* FOCUS MODALS FOR GROOVELAB SETTINGS */}
       {activeGrooveSettingsModal && (
         <div 
+          ref={grooveSettingsModalRef}
           role="dialog"
           aria-modal="true"
           aria-label="GrooveLab Einstellungen"
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            zIndex: 10000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            boxSizing: 'border-box'
+            position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)', zIndex: 10000, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: '20px', boxSizing: 'border-box'
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) setActiveGrooveSettingsModal(null);
@@ -1095,7 +1087,7 @@ export function AdminDeviceSetupView({
                         </p>
                       </div>
                       {kioskPinSavedFeedback && (
-                        <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#166534', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Check size={14} /> PIN erfolgreich gespeichert!
                         </div>
                       )}

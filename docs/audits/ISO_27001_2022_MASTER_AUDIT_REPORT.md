@@ -40,7 +40,7 @@ Die Plattform erfüllt sämtliche Anforderungen für eine Zertifizierung nach IS
 
 ### 4. Kontext der Organisation
 - **4.1 Verstehen der Organisation und ihres Kontextes:** Bereitstellung einer hochsicheren Schulmanagement- und Übeplattform für Musikschulen im DACH-Raum. Schutzziele: Vertraulichkeit (besonders Minderjährigendaten), Integrität (GoBD-Finanzdaten, Meisterwerke) und Verfügbarkeit (SLA 99,5%).
-- **4.2 Verstehen der Erfordernisse interessierter Parteien:** Schulträger (DSGVO Art. 28 AVV, BSI C5), Eltern (Minderjährigenschutz Art. 8 DSGVO), Personalräte (§ 87 BetrVG Dienstvereinbarung), Cyber-Versicherer (Hiscox/Exali 2.000.000 € Deckung).
+- **4.2 Verstehen der Erfordernisse interessierter Parteien:** Schulträger (DSGVO Art. 28 AVV, BSI C5), Eltern (Minderjährigenschutz Art. 8 DSGVO), Personalräte (§ 87 BetrVG Dienstvereinbarung), Cyber-Versicherer (Hiscox/Exali 1.000.000 € Deckung, 2-fach maximiert).
 - **4.3 Festlegung des Anwendungsbereichs des ISMS:** Vollständige Plattform einschließlich Serverinfrastruktur bei Hetzner, Postgres-Backend, PostgREST API-Gateway, React/Vite Frontend und CI/CD-Pipelines.
 
 ### 5. Führung (Leadership)

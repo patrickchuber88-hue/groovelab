@@ -108,62 +108,34 @@ export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
     }
 
     // 2. Clear ephemeral student and audio storage keys from localStorage
-    // (Preserve essential school station / kiosk pairing configurations)
+    // 🛡️ 0,1% GOLDSTANDARD INVERTED PURGE DOKTRIN (DEFAULT-DENY):
+    // Jedes Byte im Browser-Speicher wird atomar getilgt, ES SEI DENN, der Key ist explizit
+    // als persistente Schul-Kiosk-Hardware oder Station-Pairing-Konfiguration gewhitelistet.
+    // Invariante DSGVO Art. 17: Bereinigt restlos alle PII- und Dynamic-Caches:
+    // - cg_events_swr_ (Event SWR-Caches)
+    // - cg_schedule_swr_ (Stundenplan SWR-Caches)
+    // - campus_junior_recordings_ (Lokale Schüler-Audio-Caches)
+    // - groovelab_student_ (Schüler-Tokens und lokale Profile)
     if (typeof window !== 'undefined' && window.localStorage) {
+      const PERSISTENT_KIOSK_EXACT_KEYS = new Set([
+        'groovelab_station_id',
+        'groovelab_active_platform',
+        'campus_active_platform'
+      ]);
+
+      const isPersistentKioskKey = (k: string): boolean => {
+        if (PERSISTENT_KIOSK_EXACT_KEYS.has(k)) return true;
+        if (k.startsWith('groovelab_kiosk_') || k.startsWith('campus_kiosk_')) return true;
+        return false;
+      };
+
       const keysToDelete: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (!k) continue;
 
-        // Never delete school kiosk tokens or station IDs
-        if (
-          k.startsWith('groovelab_kiosk_') ||
-          k.startsWith('campus_kiosk_') ||
-          k === 'groovelab_station_id' ||
-          k === 'groovelab_active_platform'
-        ) {
-          continue;
-        }
-
-        // Target student-specific caches, recordings, audio memo drafts, and administrative office caches
-        if (
-          k.startsWith('campus_junior_recordings_') ||
-          k.startsWith('campus_homework_notes_') ||
-          k.startsWith('groovelab_student_') ||
-          k.startsWith('offline_audio_') ||
-          k.startsWith('cached_audio_') ||
-          k.startsWith('campus_temp_audio_') ||
-          k.startsWith('cg_mediathek_cache_') ||
-          k.startsWith('campus_schedule_cache_') ||
-          k.startsWith('cg_shield_usage_dates_') ||
-          k.startsWith('campus_family_profiles') ||
-          k.startsWith('campus_student_ui_level_') ||
-          k.startsWith('cg_parent_max_screen_minutes_') ||
-          k.startsWith('campus_music_stand_mode') ||
-          k.startsWith('campus_student_tts_mode') ||
-          k.startsWith('campus_student_briefing_sidebar_collapsed') ||
-          k.startsWith('campus_mastery_complete_') ||
-          k.startsWith('groovelab_parent_') ||
-          k.startsWith('campus_audio_cache_') ||
-          k.startsWith('campus_current_student_') ||
-          k.startsWith('campus_last_student_') ||
-          k.startsWith('campus_active_user_') ||
-          k.startsWith('campus_device_') ||
-          k.startsWith('groovelab_user_') ||
-          k.startsWith('groovelab_school_overrides') ||
-          k.startsWith('campus_school_overrides') ||
-          k.startsWith('groovelab_school_profile') ||
-          k.startsWith('groovelab_storage_addon_gb_') ||
-          k.startsWith('groovelab_storage_used_bytes') ||
-          k.startsWith('groovelab_secretary_subtab') ||
-          k.startsWith('cg_events_swr_') ||
-          k.startsWith('cg_schedule_swr_') ||
-          k.startsWith('cg_worldtour_progress_') ||
-          k === 'campus_worldtour_offline_progress' ||
-          k === 'groovelab_storage_addon_gb' ||
-          k === 'groovelab_storage_used_bytes' ||
-          k === 'groovelab_cached_user'
-        ) {
+        // Nur autorisierte Hardware-Kiosk-Tokens dürfen überleben
+        if (!isPersistentKioskKey(k)) {
           keysToDelete.push(k);
         }
       }

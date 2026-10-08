@@ -85,13 +85,13 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
           </span>
 
           <span style={{
-            background: isHardship ? '#fef3c7' : (isDirectBilled ? '#eff6ff' : '#f0fdf4'),
-            color: isHardship ? '#92400e' : (isDirectBilled ? '#1e40af' : '#166534'),
+            background: isHardship ? '#fef3c7' : (isDirectBilled ? '#eff6ff' : '#ecfdf5'),
+            color: isHardship ? '#92400e' : (isDirectBilled ? '#1e40af' : '#059669'),
             fontSize: '0.72rem',
             fontWeight: 800,
             padding: '4px 10px',
             borderRadius: '100px',
-            border: `1.5px solid ${isHardship ? '#fde68a' : (isDirectBilled ? '#bfdbfe' : '#bbf7d0')}`
+            border: `1.5px solid ${isHardship ? '#fde68a' : (isDirectBilled ? '#bfdbfe' : '#10b981')}`
           }}>
             {isHardship
               ? 'Härtefall / Befreit'
@@ -140,20 +140,20 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
               padding: '10px 16px',
               minHeight: '44px',
               borderRadius: '12px',
-              background: downloadSuccess ? '#f0fdf4' : '#0f172a',
-              color: downloadSuccess ? '#166534' : '#ffffff',
-              border: `1.5px solid ${downloadSuccess ? '#86efac' : '#0f172a'}`,
+              background: downloadSuccess ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#0f172a',
+              color: '#ffffff',
+              border: downloadSuccess ? 'none' : '1.5px solid #0f172a',
               fontSize: '0.78rem',
               fontWeight: 800,
               cursor: isGenerating ? 'wait' : 'pointer',
-              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.12)',
+              boxShadow: downloadSuccess ? '0 2px 8px rgba(16, 185, 129, 0.28)' : '0 2px 6px rgba(15, 23, 42, 0.12)',
               transition: 'all 0.18s ease-in-out'
             }}
             title={isDirectBilled ? 'Vertragsbeleg herunterladen' : 'Amtlichen Schullizenz-Nachweis als PDF herunterladen'}
           >
             {downloadSuccess ? (
               <>
-                <CheckCircle2 size={16} color="#166534" />
+                <CheckCircle2 size={16} color="#ffffff" />
                 <span>PDF gespeichert</span>
               </>
             ) : (
@@ -188,9 +188,10 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
               width: '40px',
               height: '40px',
               borderRadius: '12px',
-              background: '#f0fdf4',
-              color: '#059669',
-              border: '1.5px solid #bbf7d0',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -209,13 +210,13 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
           </div>
 
           <span style={{
-            background: '#f0fdf4',
-            color: '#166534',
+            background: '#ecfdf5',
+            color: '#059669',
             padding: '4px 10px',
             borderRadius: '100px',
             fontSize: '0.72rem',
             fontWeight: 800,
-            border: '1px solid #bbf7d0'
+            border: '1px solid #10b981'
           }}>
             Endet automatisch
           </span>

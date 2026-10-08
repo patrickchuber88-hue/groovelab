@@ -102,8 +102,8 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
       {/* If 0 errors: Clean, peaceful status banner */}
       {logs.length === 0 ? (
         <div style={{
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-          border: '1.5px solid #86efac',
+          background: '#ecfdf5',
+          border: '1.5px solid #10b981',
           borderRadius: '20px',
           padding: '24px 28px',
           display: 'flex',
@@ -111,32 +111,32 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '16px',
-          boxShadow: '0 4px 16px rgba(34, 197, 94, 0.06)'
+          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.06)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
               width: '44px',
               height: '44px',
               borderRadius: '14px',
-              background: '#dcfce7',
-              color: '#15803d',
+              background: '#ffffff',
+              color: '#10b981',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.15)'
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
             }}>
               <CheckCircle2 size={24} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#14532d', fontFamily: '"Outfit", sans-serif' }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#065f46', fontFamily: '"Outfit", sans-serif' }}>
                   Client Incident Monitor: 100% Fehlerfrei
                 </h4>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#bbf7d0', color: '#166534' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#a7f3d0', color: '#065f46' }}>
                   Zero-PII &amp; DSGVO
                 </span>
               </div>
-              <p style={{ margin: '3px 0 0 0', fontSize: '0.84rem', color: '#166534', fontWeight: 550 }}>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.84rem', color: '#047857', fontWeight: 550 }}>
                 Keine unhandled Exceptions, Audio-Abbrüche oder Timeouts in den letzten 24 Stunden erfasst. Alle Benutzer-Clients laufen stabil.
               </p>
             </div>
@@ -147,8 +147,8 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
             disabled={loading}
             style={{
               background: '#ffffff',
-              border: '1.5px solid #86efac',
-              color: '#166534',
+              border: '1.5px solid #10b981',
+              color: '#065f46',
               padding: '9px 16px',
               borderRadius: '12px',
               fontSize: '0.80rem',

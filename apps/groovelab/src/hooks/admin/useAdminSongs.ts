@@ -1,5 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { isUUID } from '../../utils/uuidValidator';
+import {
+  DEFAULT_TEXTBAUSTEINE,
+  fetchSchoolTextbausteine,
+  saveSchoolTextbausteine
+} from '../../services/textbausteineService';
+
+export { DEFAULT_TEXTBAUSTEINE };
 
 export interface UseAdminSongsParams {
   admin: any;
@@ -18,7 +26,7 @@ export function useAdminSongs({
 }: UseAdminSongsParams) {
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [songSearch, setSongSearch] = useState('');
-  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
+  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext' | 'notenschnipsel'>('songs');
   const [bulkModeSongs, setBulkModeSongs] = useState(false);
   const [bulkTextSongs, setBulkTextSongs] = useState('');
   const [bulkModeLehrwerke, setBulkModeLehrwerke] = useState(false);
@@ -63,6 +71,102 @@ export function useAdminSongs({
   const [showTextbausteinModal, setShowTextbausteinModal] = useState(false);
   const [showTeacherToolsModal, setShowTeacherToolsModal] = useState(false);
 
+  // 📚 Autoritativer Lehrwerk-Fetch (100% DSGVO & UrhDaG § 1 Abs. 2)
+  const fetchLehrwerke = useCallback(async () => {
+    try {
+      const schoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id);
+      let query = supabase.from('lehrwerke').select('*');
+      if (schoolId && isUUID(schoolId)) {
+        query = query.or(`school_id.eq.${schoolId},school_id.is.null`);
+      }
+      const { data, error } = await query.order('title');
+      const dbList = (!error && data) ? data.map((d: any) => ({
+        ...d,
+        totalPages: d.total_pages || 50
+      })) : [];
+
+      let customLw: any[] = [];
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('custom_lehrwerke');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) customLw = parsed;
+          }
+        } catch {}
+      }
+
+      const combined = [...dbList];
+      customLw.forEach(c => {
+        if (c && c.id && !combined.some(x => x.id === c.id || (x.title && x.title.toLowerCase() === (c.title || '').toLowerCase()))) {
+          combined.push({
+            ...c,
+            totalPages: c.total_pages || c.totalPages || 50
+          });
+        }
+      });
+      setLehrwerke(combined);
+    } catch (err) {
+      console.warn('[useAdminSongs] Error loading lehrwerke:', err);
+    }
+  }, [admin]);
+
+  // 📝 Schnelltext / Textbausteine Hydration & Resiliente Fallback-Kette
+  const isInitialTbLoad = useRef(true);
+  const fetchTextbausteine = useCallback(() => {
+    const schoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id) || 'global';
+    setTextbausteine(fetchSchoolTextbausteine(schoolId));
+  }, [admin]);
+
+  // 💾 Automatischer LocalStorage-Sync bei Modifikationen (Writeback)
+  useEffect(() => {
+    if (isInitialTbLoad.current) {
+      isInitialTbLoad.current = false;
+      return;
+    }
+    const schoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id) || 'global';
+    if (textbausteine && textbausteine.length > 0) {
+      saveSchoolTextbausteine(schoolId, textbausteine);
+    }
+  }, [textbausteine, admin]);
+
+  useEffect(() => {
+    fetchLehrwerke();
+    fetchTextbausteine();
+  }, [fetchLehrwerke, fetchTextbausteine]);
+
+  // 🛡️ 0,1% Goldstandard Healing: Bestehende Schul-Songs ohne Campus-Aktivierung für Campus autorisieren
+  const hasHealedCampusSongs = useRef(false);
+  useEffect(() => {
+    if (hasHealedCampusSongs.current) return;
+    if (activePlatform !== 'campus' || !songs || songs.length === 0) return;
+    
+    const unactivatedSongs = songs.filter(s => s.is_campus_active !== true);
+    if (unactivatedSongs.length === 0) {
+      hasHealedCampusSongs.current = true;
+      return;
+    }
+
+    const unactivatedIds = unactivatedSongs.map(s => s.id);
+    hasHealedCampusSongs.current = true;
+
+    // Optimistisch lokal setzen für sofortige 0ms UI-Latenz
+    setSongs(prev => prev.map(s => unactivatedIds.includes(s.id) ? { ...s, is_campus_active: true } : s));
+
+    // Asynchron in Supabase persistieren
+    supabase
+      .from('songs')
+      .update({ is_campus_active: true })
+      .in('id', unactivatedIds)
+      .then(({ error }) => {
+        if (error) {
+          console.warn('[useAdminSongs] Auto-heal songs error:', error);
+        } else {
+          window.dispatchEvent(new CustomEvent('groovelab_songs_updated'));
+        }
+      });
+  }, [songs, activePlatform, setSongs]);
+
   // Touch handlers for swipe in mediathek
   const touchStartXRef = useRef<number | null>(null);
   const handleMediathekTouchStart = (e: React.TouchEvent) => {
@@ -77,9 +181,11 @@ export function useAdminSongs({
         // Swipe left
         if (mediathekTab === 'songs') setMediathekTab('lehrwerke');
         else if (mediathekTab === 'lehrwerke') setMediathekTab('schnelltext');
+        else if (mediathekTab === 'schnelltext') setMediathekTab('notenschnipsel');
       } else {
         // Swipe right
-        if (mediathekTab === 'schnelltext') setMediathekTab('lehrwerke');
+        if (mediathekTab === 'notenschnipsel') setMediathekTab('schnelltext');
+        else if (mediathekTab === 'schnelltext') setMediathekTab('lehrwerke');
         else if (mediathekTab === 'lehrwerke') setMediathekTab('songs');
       }
     }
@@ -272,6 +378,28 @@ export function useAdminSongs({
     }
   };
 
+  const handleToggleSongCampusActive = async (songId: string, currentVal: boolean) => {
+    const newVal = !currentVal;
+    try {
+      setSongs(prev => prev.map(s => s.id === songId ? { ...s, is_campus_active: newVal } : s));
+      const { error } = await supabase
+        .from('songs')
+        .update({ is_campus_active: newVal })
+        .eq('id', songId);
+
+      if (error) {
+        setSongs(prev => prev.map(s => s.id === songId ? { ...s, is_campus_active: currentVal } : s));
+        console.error('[useAdminSongs] Error toggling is_campus_active:', error);
+        alert('Fehler beim Aktualisieren: ' + error.message);
+      } else {
+        window.dispatchEvent(new CustomEvent('groovelab_songs_updated'));
+      }
+    } catch (err: any) {
+      setSongs(prev => prev.map(s => s.id === songId ? { ...s, is_campus_active: currentVal } : s));
+      console.error('[useAdminSongs] Error toggling is_campus_active:', err);
+    }
+  };
+
   return {
     lehrwerke,
     setLehrwerke,
@@ -321,8 +449,11 @@ export function useAdminSongs({
     setShowTeacherToolsModal,
     handleMediathekTouchStart,
     handleMediathekTouchEnd,
+    fetchLehrwerke,
+    fetchTextbausteine,
     handleAddSong,
     handleUpdateSong,
-    handleDeleteSong
+    handleDeleteSong,
+    handleToggleSongCampusActive
   };
 }

@@ -16,6 +16,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { StudioAvatar } from '../StudioAvatar';
+import { CampusRibbonNoteIcon } from '../CampusGroovelabBrand';
 import { formatTeacherFullName } from '../../utils/nameHelper';
 import { isDevEnvironment } from '../../utils/tenantUrlHelper';
 
@@ -240,7 +241,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                 outline: 'none'
               }}
             >
-              <Music size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#eab308'} />
+              <CampusRibbonNoteIcon size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#eab308'} />
               {windowWidth > 640 && <span>GrooveLab</span>}
             </div>
           )}
@@ -720,7 +721,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                   alignItems: 'center', 
                   justifyContent: 'center',
                   gap: '6px', 
-                  background: '#fce8e6', 
+                  background: '#ffffff', 
                   border: '1.5px solid #ea4335', 
                   height: windowWidth <= 768 ? '36px' : '40px',
                   padding: windowWidth <= 480 ? '0 10px' : '0 14px', 

@@ -68,9 +68,9 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
         background: '#ffffff',
         borderRadius: '24px',
         padding: '20px 24px',
-        border: section.isHomeworkFocus ? '2px solid #86efac' : '1px solid #cbd5e1',
+        border: section.isHomeworkFocus ? '2px solid #10b981' : '1px solid #cbd5e1',
         boxShadow: section.isHomeworkFocus
-          ? '0 6px 20px rgba(34, 197, 94, 0.15)'
+          ? '0 6px 20px rgba(16, 185, 129, 0.16)'
           : '0 4px 16px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
@@ -125,10 +125,11 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
               gap: '4px',
               fontSize: '0.72rem',
               fontWeight: 850,
-              background: '#dcfce7',
-              color: '#15803d',
-              border: '1px solid #86efac',
-              padding: '2px 8px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.28)',
+              padding: '3px 10px',
               borderRadius: '99px'
             }}>
               <span>📌 Hausaufgaben-Fokus</span>
@@ -148,9 +149,10 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
                 gap: '5px',
                 padding: '6px 12px',
                 borderRadius: '10px',
-                border: section.isHomeworkFocus ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
-                background: section.isHomeworkFocus ? '#f0fdf4' : '#ffffff',
-                color: section.isHomeworkFocus ? '#16a34a' : '#475569',
+                border: section.isHomeworkFocus ? 'none' : '1.5px solid #cbd5e1',
+                background: section.isHomeworkFocus ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                color: section.isHomeworkFocus ? '#ffffff' : '#475569',
+                boxShadow: section.isHomeworkFocus ? '0 2px 6px rgba(16, 185, 129, 0.28)' : 'none',
                 fontSize: '0.76rem',
                 fontWeight: 800,
                 cursor: 'pointer',
@@ -360,9 +362,10 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
 
           <span style={{
             fontSize: '0.72rem',
-            color: '#15803d',
+            color: '#059669',
             fontWeight: 850,
-            background: '#dcfce7',
+            background: '#ecfdf5',
+            border: '1px solid #10b981',
             padding: '3px 8px',
             borderRadius: '8px'
           }}>

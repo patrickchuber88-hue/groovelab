@@ -294,17 +294,17 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              background: '#f0fdf4',
-              border: '1.5px solid #86efac',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
               borderRadius: '14px',
               padding: '10px 14px',
               fontSize: '0.78rem',
               fontWeight: 800,
-              color: '#15803d',
-              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.12)'
+              color: '#ffffff',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)'
             }}
           >
-            <Check size={16} color="#16a34a" />
+            <Check size={16} color="#ffffff" />
             <span>PWA-Zugangslink erfolgreich in die Zwischenablage kopiert!</span>
           </div>
         )}

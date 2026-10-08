@@ -149,6 +149,79 @@ export async function runClosedLoopLifecycleForensicScan() {
     );
   }
 
+  // 4. Verify Migration 533 & Closed-Loop Student Reschedule Decision Engine (0.1% Goldstandard)
+  const migration533Path = path.join(ROOT_DIR, 'supabase', 'migrations', '533_enterprise_authoritative_reschedule_decision_and_realtime.sql');
+  const migration533Exists = fs.existsSync(migration533Path);
+  assert(
+    migration533Exists,
+    'Migration 533 Presence',
+    'Migration 533 (Authoritative Reschedule Decision & Realtime Sync) exists',
+    'Migration 533 missing from supabase/migrations'
+  );
+
+  if (migration533Exists) {
+    const mig533Sql = fs.readFileSync(migration533Path, 'utf8');
+
+    // 4.1 Authoritative RPC respond_to_reschedule_authoritative
+    const hasRespondRpc = mig533Sql.includes('respond_to_reschedule_authoritative');
+    assert(
+      hasRespondRpc,
+      'Authoritative RPC: respond_to_reschedule_authoritative',
+      'respond_to_reschedule_authoritative SECURITY DEFINER RPC exists and is defined',
+      'Missing respond_to_reschedule_authoritative RPC in Migration 533'
+    );
+
+    // 4.2 Room booking purge on reject
+    const hasRoomPurgeOnReject = mig533Sql.includes('DELETE FROM public.room_bookings') && mig533Sql.includes("p_decision = 'reject'");
+    assert(
+      hasRoomPurgeOnReject,
+      'Atomic Room Booking Rollback on Reject',
+      'respond_to_reschedule_authoritative purges reserved room_bookings on student rejection',
+      'Missing room_bookings purge on rejection in Migration 533'
+    );
+
+    // 4.3 Enum support for reschedule_rejected
+    const hasEnumExtension = mig533Sql.includes('reschedule_rejected') && mig533Sql.includes('schedule_status');
+    assert(
+      hasEnumExtension,
+      'PostgreSQL Enum: reschedule_rejected Supported',
+      'schedule_status enum is extended to include reschedule_rejected',
+      'Missing reschedule_rejected enum expansion in Migration 533'
+    );
+
+    // 4.4 Immutable GoBD Audit Logging
+    const hasAuditLog533 = mig533Sql.includes('log_application_audit_event') && mig533Sql.includes('RESCHEDULE_ACCEPTED') && mig533Sql.includes('RESCHEDULE_REJECTED');
+    assert(
+      hasAuditLog533,
+      'Revisionssicheres Audit-Logging: Reschedule Decisions',
+      'respond_to_reschedule_authoritative writes Merkle-Hash audit log records for accept and reject',
+      'Missing audit logging for reschedule decisions in Migration 533'
+    );
+  }
+
+  // 4.5 Satellite Service studentRescheduleService
+  const satelliteServicePath = path.join(SRC_DIR, 'services', 'studentRescheduleService.ts');
+  const satelliteServiceExists = fs.existsSync(satelliteServicePath);
+  assert(
+    satelliteServiceExists,
+    'Satellite Service: studentRescheduleService Presence',
+    'studentRescheduleService.ts encapsulates authoritative decision RPC, SWR invalidation, and haptics',
+    'studentRescheduleService.ts not found in apps/groovelab/src/services'
+  );
+
+  // 4.6 Cross-Device Realtime WebSocket in useStudentSchedule
+  const studentScheduleHookPath = path.join(SRC_DIR, 'components', 'student', 'hooks', 'useStudentSchedule.ts');
+  if (fs.existsSync(studentScheduleHookPath)) {
+    const hookCode = fs.readFileSync(studentScheduleHookPath, 'utf8');
+    const hasRealtimeWs = hookCode.includes("table: 'schedule_occurrences'") && hookCode.includes('student_schedule_realtime_');
+    assert(
+      hasRealtimeWs,
+      'Cross-Device Realtime WebSocket in useStudentSchedule',
+      'useStudentSchedule subscribes to Supabase postgres_changes on schedule_occurrences for instant multi-device sync',
+      'Missing Supabase Realtime WebSocket subscription in useStudentSchedule.ts'
+    );
+  }
+
   // Summary Output
   console.log('────────────────────────────────────────────────────────────────────');
   console.log('  LIFECYCLE FORENSIC INVARIANTS RESULTS');

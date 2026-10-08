@@ -147,16 +147,16 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                   completedCount === milestones.length
                     ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
                     : isLight
-                    ? '#dcfce7'
+                    ? '#ecfdf5'
                     : 'rgba(16, 185, 129, 0.18)',
                 border: `1.5px solid ${
                   completedCount === milestones.length
                     ? '#f59e0b'
                     : isLight
-                    ? '#86efac'
+                    ? '#10b981'
                     : 'rgba(16, 185, 129, 0.35)'
                 }`,
-                color: completedCount === milestones.length ? '#b45309' : isLight ? '#15803d' : '#34d399',
+                color: completedCount === milestones.length ? '#b45309' : isLight ? '#059669' : '#34d399',
                 padding: '4px 12px',
                 borderRadius: '100px',
                 fontSize: '0.75rem',
@@ -607,7 +607,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                 ? '#fee2e2'
                                 : 'rgba(239, 68, 68, 0.18)'
                               : isLight
-                              ? '#dcfce7'
+                              ? '#ecfdf5'
                               : 'rgba(16, 185, 129, 0.18)',
                           border: `1px solid ${
                             ms.visibility === 'private'
@@ -615,7 +615,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                 ? '#fca5a5'
                                 : 'rgba(239, 68, 68, 0.4)'
                               : isLight
-                              ? '#86efac'
+                              ? '#10b981'
                               : 'rgba(16, 185, 129, 0.4)'
                           }`,
                           color:
@@ -624,7 +624,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                 ? '#dc2626'
                                 : '#fca5a5'
                               : isLight
-                              ? '#15803d'
+                              ? '#059669'
                               : '#34d399',
                           padding: '4px 8px',
                           borderRadius: '100px',

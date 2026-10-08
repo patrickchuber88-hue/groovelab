@@ -193,13 +193,14 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
                     {b.pageNums.map((pNum: number) => (
                       <span key={`p-pill-${pNum}`} style={{
-                        background: '#dcfce7',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
                         fontSize: '0.78rem',
                         fontWeight: 900,
                         padding: '3px 8px',
                         borderRadius: '7px',
-                        border: '1px solid #bbf7d0'
+                        border: 'none',
+                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                       }}>
                         S. {pNum}
                       </span>
@@ -283,10 +284,10 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
           {/* 4. Unterrichtsaufnahmen Audio Preview Pill & Station Tray */}
           {missionInfo.audioTracks && missionInfo.audioTracks.length > 0 && (
             <div style={{
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              background: '#ecfdf5',
               borderRadius: '20px',
               padding: '12px 14px',
-              border: '1.5px solid #86efac',
+              border: '1.5px solid #10b981',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px'
@@ -297,23 +298,23 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                     width: '32px',
                     height: '32px',
                     borderRadius: '10px',
-                    background: '#16a34a',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)'
+                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
                   }}>
                     <Headphones size={17} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#14532d' }}>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#065f46' }}>
                       {missionInfo.audioTracks.length === 1
                         ? '1 Unterrichtsaufnahme bereit'
                         : `${missionInfo.audioTracks.length} Unterrichtsaufnahmen bereit`}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 650 }}>
+                    <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 650 }}>
                       {missionInfo.audioTracks.length === 1
                         ? 'Im Übe-Timer als Play-Along abspielbar'
                         : 'Wähle deine Startspur für das Üben:'}
@@ -373,13 +374,13 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
             padding: '4px 4px 0 4px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 750, color: '#475569' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)' }}>
                 <Check size={13} strokeWidth={3} />
               </div>
               <span>Noten aufgeschlagen &amp; Notenständer bereit</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', fontWeight: 750, color: '#475569' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)' }}>
                 <Check size={13} strokeWidth={3} />
               </div>
               <span>Instrument zur Hand &amp; startklar</span>

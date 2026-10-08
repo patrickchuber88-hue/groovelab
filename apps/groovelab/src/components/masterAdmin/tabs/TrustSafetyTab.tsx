@@ -429,7 +429,7 @@ export function TrustSafetyTab() {
           color: '#ffffff',
           padding: '14px 20px',
           borderRadius: '16px',
-          border: '1px solid #10b981',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
           zIndex: 99999,
           display: 'flex',
@@ -971,19 +971,19 @@ export function TrustSafetyTab() {
                           type="button"
                           onClick={() => handleRestoreAccess(rec.studentId, rec.playlistId)}
                           style={{
-                            background: '#dcfce7',
-                            border: '1px solid #86efac',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            border: 'none',
                             borderRadius: '8px',
                             padding: '6px 10px',
                             fontSize: '0.74rem',
                             fontWeight: 800,
-                            color: '#15803d',
+                            color: '#ffffff',
                             cursor: 'pointer',
                             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.transform = 'translateY(-1px)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(22, 163, 74, 0.2)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.28)';
                           }}
                           onMouseOut={(e) => {
                             e.currentTarget.style.transform = 'translateY(0)';

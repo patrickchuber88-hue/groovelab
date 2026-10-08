@@ -113,7 +113,7 @@
 - [x] **77. Revisionssichere AGB-Protokollierung:** Zeitpunkt, IP-Hash, Version (`2026.3`) und User-ID werden bei Registrierung und Elternaktivierung unlöschbar erfasst (`public.legal_consents`).
 - [x] **78. DSGVO-Verarbeitungsverzeichnis (VVT):** Vollständiges Muster-VVT nach Art. 30 DSGVO liegt für Musikschulen und Schulträger vor (`VVT_MUSTER_SCHULTRAEGER_ART30.md`).
 - [x] **79. Stand-Alone AVV Suite (Art. 28 DSGVO):** Behördlich vollständiger Auftragsverarbeitungsvertrag inklusive Anlage 1 (Gegenstand & Daten) und Anlage 2 (Vollständige TOMs gem. Art. 32 DSGVO).
-- [x] **80. Gewerbliche IT- & Cyber-Haftpflicht:** Aktive Police mit **2.000.000 € Deckungssumme** schützt Plattform und Schulträger vor Vermögensschäden.
+- [x] **80. Gewerbliche IT- & Cyber-Haftpflicht:** Aktive Police mit **1.000.000 € Deckungssumme (2-fach maximiert auf 2 Mio. €)** schützt Plattform und Schulträger vor Vermögensschäden.
 - [x] **81. 100 % Google-Fonts- & CDN-Freiheit:** Alle Schriften (Plus Jakarta Sans, Urbanist) und Icons (Lucide) werden lokal aus dem eigenen Bundle ausgeliefert (0 % US-Serverkontakt).
 - [x] **82. Cookie-Freiheits-Zertifikat:** Die Plattform nutzt ausschließlich technisch notwendige Session-Speicher; kein nerviges oder abmahnfähiges Cookie-Banner erforderlich.
 - [x] **83. E-Mail-Zustellbarkeit (DNS-Hardening):** SPF-, DKIM- und DMARC-Einträge (`p=reject`) für die Domain `campus-groovelab.de` weltweit aktiv.

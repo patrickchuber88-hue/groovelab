@@ -963,7 +963,7 @@ export const generateParentQuickstartPDF = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  const step2Text = '2. PIN eingeben';
+  const step2Text = '2. Schülerausweis scannen oder Zugangs-PIN eingeben (ohne Registrierung)';
   const step3Text = activePlatform === 'groovelab'
     ? '3. Musiker-Avatar wählen, Band-Room beitreten und losgrooven!'
     : activePlatform === 'campus'
@@ -4031,7 +4031,7 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
   const termsSummary = `• Laufzeit & Kündigung: Synchronisiert mit dem Schuljahr; Kündigungsfrist 1 Monat zum Schuljahresende.
 • Haftungsgrenze (Liability Cap): Beschränkt auf die Netto-Jahresvergütung, maximal 10.000,00 € (§ 7 AGB).
-• Versicherungsschutz: Gewerbliche IT-Haftpflicht- & Cyberpolice mit mindestens 2.000.000,00 € Deckungssumme.
+• Versicherungsschutz: Gewerbliche IT-Haftpflicht- & Cyberpolice mit mindestens 1.000.000,00 € Deckungssumme (2-fach maximiert).
 • BGH-konformes Aufrechnungsverbot: Aufrechnung nur mit unbestrittenen oder rechtskräftigen Forderungen (Synallagma ausgenommen).
 • IT-Sicherheitsstandard: Einhaltung des Stands der Technik (BSI / OWASP ASVS Level 3); keine Haftung für unvorhersehbare Zero-Day-Attacken bei ordnungsgemäßem Patching.
 • Salvatorische Klausel: Es gelten die gesetzlichen Vorschriften (§ 306 Abs. 2 BGB).`;

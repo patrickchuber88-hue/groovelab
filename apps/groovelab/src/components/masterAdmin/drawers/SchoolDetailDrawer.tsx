@@ -814,7 +814,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   padding: '12px 18px',
                   borderRadius: '14px',
                   background: 'linear-gradient(135deg, #ecfdf5 0%, #fefce8 100%)',
-                  border: '1px solid #86efac',
+                  border: '1px solid #10b981',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between'

@@ -669,7 +669,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                         {/* Statutory Countdown / Status Badge */}
                         <div>
                           {req.status === 'completed' && (
-                            <div style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '4px 10px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <div style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #10b981', padding: '4px 10px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                               <CheckCircle2 size={13} /> Erledigt am {new Date(req.completed_at || req.created_at).toLocaleDateString('de-DE')}
                             </div>
                           )}
@@ -680,7 +680,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                           )}
                           {req.status === 'pending' && (
                             daysLeft > 14 ? (
-                              <div style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <Clock size={14} /> Noch {daysLeft} Tage Frist (Fristgerecht)
                               </div>
                             ) : daysLeft >= 4 ? (

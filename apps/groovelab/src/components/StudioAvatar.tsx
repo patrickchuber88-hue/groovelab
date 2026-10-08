@@ -11,7 +11,9 @@ import {
   getInstrumentTypeKey,
   getEffectiveInstrument,
   resolveCampusStudentAvatar,
-  resolveGrooveLabTeacherAvatar
+  resolveGrooveLabTeacherAvatar,
+  resolveGrooveLabStudentAvatar,
+  isInstrumentAvatar
 } from '../utils/avatarResolutionEngine';
 
 export {
@@ -23,7 +25,9 @@ export {
   getInstrumentTypeKey,
   getEffectiveInstrument,
   resolveCampusStudentAvatar,
-  resolveGrooveLabTeacherAvatar
+  resolveGrooveLabTeacherAvatar,
+  resolveGrooveLabStudentAvatar,
+  isInstrumentAvatar
 };
 
 export const resolveStudentInstrumentAsync = async (user: any): Promise<string> => {
@@ -200,22 +204,13 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
     if (isExplicitTeacher) {
       displaySrc = resolveGrooveLabTeacherAvatar(targetUser, src);
     } else {
-      // Student in GrooveLab: Single Source of Truth
-      const isGhost = (s: string | null | undefined) => !s || s === '/avatar_ghost.jpg' || s === '/avatar_ghost.png';
-      const isHero = (s: string | null | undefined) => !s || s.includes('campus_login_hero');
-      
-      const effectiveSrc = (isHero(src) || isGhost(src)) ? null : src;
-      const userAvatar = (isHero(targetUser?.avatar_url) || isGhost(targetUser?.avatar_url)) ? null : targetUser?.avatar_url;
-      const userPhoto = (isHero(targetUser?.photo_url) || isGhost(targetUser?.photo_url)) ? null : targetUser?.photo_url;
-      
-      // Custom musician avatar selection wins if present and not a ghost
-      const candidate = userAvatar || userPhoto || effectiveSrc;
-      if (candidate) {
-        displaySrc = candidate;
-      } else {
-        const effInst = resolvedInstrument || getEffectiveInstrument(targetUser) || targetUser?.instrument || 'Gitarre';
-        displaySrc = getDefaultMusicianAvatarUrl(effInst, role);
-      }
+      // Student in GrooveLab: Single Source of Truth Musician Avatar
+      displaySrc = resolveGrooveLabStudentAvatar(
+        targetUser 
+          ? { ...targetUser, resolved_instrument: resolvedInstrument || targetUser.resolved_instrument } 
+          : { instrument: resolvedInstrument }, 
+        src
+      );
     }
   }
 

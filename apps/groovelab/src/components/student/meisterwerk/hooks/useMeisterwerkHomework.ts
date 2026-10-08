@@ -11,7 +11,9 @@ import {
 } from '../../studentDateUtils';
 import {
   extractSongArtistAndTitle,
-  areSongsIdentical
+  areSongsIdentical,
+  isWeeklySnapshotContainer,
+  stripInstrumentFromTitle
 } from '../utils/meisterwerkSongHelpers';
 
 export const isSongMatch = (a: any, b: any) => areSongsIdentical(a, b);
@@ -22,6 +24,7 @@ export const getNormalizedSongTitle = (s: any) => {
 };
 import { harmonizeAudioList } from '../../../../utils/audioNamingHelper';
 import { parseHomeworkNotesPayload } from '../../../../utils/homeworkSnapshotHelper';
+import { syncSingleBookPageFromMeisterwerk } from '../../../../services/homeworkSyncEngine';
 
 export interface UseMeisterwerkHomeworkParams {
   student: Student;
@@ -207,9 +210,12 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       const skillPercent = songProgressPercent !== undefined ? songProgressPercent : (skill?.progress_percent || 0);
 
       const songArtist = skill?.songs?.artist || skill?.artist || '';
-      const songTitle = skill?.songs?.title || skill?.title || skill?.song_title || topicName.replace(/\s*\([^)]*\)\s*$/, '').trim() || 'Song';
-      const songInstrument = skill?.instrument ? ` (${skill.instrument})` : '';
-      const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+      const fallbackTitle = (!isWeeklySnapshotContainer(topicName) ? topicName.replace(/\s*\([^)]*\)\s*$/, '').trim() : '') || 'Song';
+      const rawSongTitle = skill?.songs?.title || skill?.title || skill?.song_title || fallbackTitle;
+      const songTitle = stripInstrumentFromTitle(rawSongTitle);
+      if (isWeeklySnapshotContainer(songTitle) || isWeeklySnapshotContainer(songArtist)) return;
+      const fullTitle = songArtist ? `${songArtist} - ${songTitle}` : `${songTitle}`;
+      if (isWeeklySnapshotContainer(fullTitle)) return;
 
       const noteToSave = songNoteOverride !== undefined
         ? songNoteOverride
@@ -329,9 +335,9 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       }
 
       let updatedSnapSongs = (Array.isArray(currentSnapSongs) ? currentSnapSongs : []).filter(
-        s => !isSongMatch(s, skill || { topic_name: fullTitle })
+        s => !isSongMatch(s, skill || { topic_name: fullTitle }) && !isWeeklySnapshotContainer(s.title) && !isWeeklySnapshotContainer(s.topic_name)
       );
-      if (targetHomework) {
+      if (targetHomework && !isWeeklySnapshotContainer(targetSongObj.title) && !isWeeklySnapshotContainer(targetSongObj.topic_name)) {
         updatedSnapSongs.push(targetSongObj);
       }
 
@@ -624,21 +630,8 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         const updated = parsed.map((item: any) => {
           if (item.studentId === student.id && item.lehrwerkId === activeLehrwerkId) {
             const existingPageState = item.pageStates?.[activePageNumber] || {};
-            return {
-              ...item,
-              pageStates: {
-                ...item.pageStates,
-                [activePageNumber]: {
-                  ...existingPageState,
-                  status: pageStatus,
-                  notes: (teacherNotes || '').trim(),
-                  homeworkNotes: (pageHomeworkNotes || '').trim(),
-                  studentNotes: (studentNotes || '').trim(),
-                  studentNotesIsPrivate: isStudentNotePrivate,
-                  updatedAt: new Date(Date.now() + 10000).toISOString()
-                }
-              }
-            };
+            const nextPages = { ...item.pageStates, [activePageNumber]: { ...existingPageState, status: pageStatus, notes: (teacherNotes || '').trim(), homeworkNotes: (pageHomeworkNotes || '').trim(), studentNotes: (studentNotes || '').trim(), studentNotesIsPrivate: isStudentNotePrivate, updatedAt: new Date(Date.now() + 10000).toISOString() } };
+            return { ...item, pageStates: nextPages };
           }
           return item;
         });
@@ -732,22 +725,28 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       const activeTId = await getCurrentTeacherId();
       const currentWeek = getISOWeek();
 
-      const rowHomeworkNotes = isSong
-        ? (songHomeworkNotes || '').trim()
-        : (isLehrwerkPage
-            ? (pageHomeworkNotes || '').trim()
-            : combinedHomeworkNotes);
+      const activeBook = (isLehrwerkPage && activeLehrwerkId)
+        ? (assignedLehrwerke.find((a: any) => String(a.lehrwerkId || a.id) === String(activeLehrwerkId)) || globalLehrwerke.find((g: any) => String(g.id || g.lehrwerkId) === String(activeLehrwerkId)))
+        : null;
+      const activeBookTitle = activeBook?.title || activeBook?.bookTitle || activeBook?.lehrwerkTitle || 'Lehrwerk';
+      const rowTopicName = (isLehrwerkPage && activePageNumber !== null) ? `${activeBookTitle} - Seite ${activePageNumber}` : finalTopicName;
+      const rowHomeworkNotes = isSong ? (songHomeworkNotes || '').trim() : (isLehrwerkPage ? (pageHomeworkNotes || '').trim() : combinedHomeworkNotes);
 
       const row = {
         student_id: student.id,
         teacher_id: activeTId,
-        topic_name: finalTopicName,
+        topic_name: rowTopicName,
         status,
         is_current_homework: finalIsCurrentHomework,
         teacher_notes: (effectiveTeacherNotes || '').trim(),
         homework_notes: rowHomeworkNotes,
         updated_at: new Date().toISOString()
       };
+
+      if (isLehrwerkPage && activeLehrwerkId && activePageNumber !== null) {
+        const pStatus = status === 'MASTERED' ? 'mastered' : (status === 'THEORY_DONE' ? 'purple' : (finalIsCurrentHomework ? 'homework' : 'locked'));
+        syncSingleBookPageFromMeisterwerk({ studentId: student.id, bookId: activeLehrwerkId, bookTitle: activeBookTitle, pageNum: activePageNumber, pageStatus: pStatus, pageNote: (pageHomeworkNotes || '').trim(), teacherId: activeTId || undefined });
+      }
 
       if (!isLehrwerkPage && !isSong) {
         try {
@@ -768,9 +767,8 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         dbError = error;
       } else {
         const existingThisWeek = progressItems.find(item => 
-          item.topic_name === finalTopicName && 
-          item.updated_at && 
-          getISOWeek(item.updated_at) === currentWeek
+          item.topic_name === rowTopicName && 
+          (isLehrwerkPage || (item.updated_at && getISOWeek(item.updated_at) === currentWeek))
         );
 
         if (existingThisWeek?.id) {
@@ -889,10 +887,10 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
 
     const sourceS: any[] = [];
     (progressItems || []).forEach((item: any) => {
-      if (item.is_current_homework && !item.topic_name?.includes(' - Seite ') && !item.topic_name?.startsWith('Hausaufgabe KW ')) {
+      if (item.is_current_homework && !item.topic_name?.includes(' - Seite ') && !isWeeklySnapshotContainer(item.topic_name)) {
         const cleanTopic = getNormalizedSongTitle(item);
         const canKey = getCanonicalSongKey(item);
-        if (cleanTopic && !sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
+        if (cleanTopic && !isWeeklySnapshotContainer(cleanTopic) && !sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
           sourceS.push({
             id: item.id,
             topic_name: item.topic_name,
@@ -909,11 +907,13 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       if (isMarkedHw) {
         const cleanTopic = getNormalizedSongTitle(skill);
         const canKey = getCanonicalSongKey(skill);
-        if (!sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
+        if (cleanTopic && !isWeeklySnapshotContainer(cleanTopic) && !sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
           const songArtist = skill.songs?.artist || skill.artist || '';
-          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+          const rawSongTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+          const songTitle = stripInstrumentFromTitle(rawSongTitle);
+          if (isWeeklySnapshotContainer(songTitle) || isWeeklySnapshotContainer(songArtist)) return;
+          const fullTitle = songArtist ? `${songArtist} - ${songTitle}` : `${songTitle}`;
+          if (isWeeklySnapshotContainer(fullTitle)) return;
           sourceS.push({
             id: skill.id,
             topic_name: fullTitle,

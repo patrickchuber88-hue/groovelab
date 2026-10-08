@@ -16,6 +16,7 @@ const isPlayableUrl = (u?: string): boolean => {
 
 const AudioEditorModal = lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 const AudioNotesModal = lazy(() => import('./campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
+import { DynamicStageWaveformScrubber, DynamicStageActiveBadges } from './audio/DynamicStageWaveformScrubber';
 
 export interface AudioTrackItem {
   url: string;
@@ -173,9 +174,9 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
               <span style={{
                 fontSize: '0.64rem',
                 fontWeight: 800,
-                color: '#15803d',
-                background: '#dcfce7',
-                border: '1px solid #86efac',
+                color: '#059669',
+                background: '#ecfdf5',
+                border: '1px solid #10b981',
                 borderRadius: '100px',
                 padding: '1px 6px',
                 lineHeight: 1.3,
@@ -536,108 +537,19 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   };
 
   const startWebAudioPlayback = async (options: { loop: boolean; offsetSec?: number }) => {
-    try {
-      const ctx = SharedAudioEngine.getContext();
-      let buffer = audioBufferRef.current;
-      if (!buffer) {
-        buffer = await loadAudioBuffer();
+    stopWebAudio();
+    const audio = audioRef.current;
+    if (audio) {
+      if (options.offsetSec !== undefined) {
+        audio.currentTime = options.offsetSec;
       }
-      if (!ctx || !buffer) {
-        // Fallback: HTML5
-        if (audioRef.current) {
-          audioRef.current.currentTime = options.offsetSec || 0;
-          audioRef.current.loop = options.loop;
-          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        }
-        return;
-      }
-
-      stopWebAudio();
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
-      }
-
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.playbackRate.value = playbackRate || 1;
-
-      const hasLocatorLoop = Boolean(options.loop && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec);
-      const loopStartBound = hasLocatorLoop ? loopLocator!.startSec : 0;
-      const loopEndBound = hasLocatorLoop ? Math.min(buffer.duration, loopLocator!.endSec) : buffer.duration;
-
-      source.loop = options.loop;
-      if (options.loop) {
-        source.loopStart = loopStartBound;
-        source.loopEnd = loopEndBound;
-      }
-      source.connect(ctx.destination);
-
-      const bufDur = buffer.duration;
-      let playStart = options.offsetSec !== undefined ? options.offsetSec : currentTime;
-      if (hasLocatorLoop) {
-        if (playStart < loopStartBound || playStart >= loopEndBound - 0.05) {
-          playStart = loopStartBound;
-        }
-      } else {
-        if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
-      }
-
-      source.start(0, playStart);
-      loopSourceRef.current = source;
-      isWebAudioPlayingRef.current = true;
-      loopStartTimestampRef.current = ctx.currentTime;
-      loopOffsetSecRef.current = playStart;
-      setIsPlaying(true);
-      setCurrentTime(playStart);
-
-      source.onended = () => {
-        if (!options.loop && isWebAudioPlayingRef.current && loopSourceRef.current === source) {
-          stopWebAudio();
-          setIsPlaying(false);
-          setCurrentTime(0);
-        }
-      };
-
-      const updatePlayhead = () => {
-        if (!isWebAudioPlayingRef.current || !loopSourceRef.current || !ctx || !audioBufferRef.current) return;
-        const curBufDur = audioBufferRef.current.duration;
-        if (curBufDur > 0) {
-          const elapsed = (ctx.currentTime - loopStartTimestampRef.current) * (playbackRate || 1);
-          const current = (loopOffsetSecRef.current + elapsed);
-          const now = performance.now();
-          if (options.loop) {
-            if (hasLocatorLoop) {
-              const loopSpan = Math.max(0.05, loopEndBound - loopStartBound);
-              const offsetInLoop = (current - loopStartBound) % loopSpan;
-              if (now - lastPlayheadUpdateRef.current >= 40) {
-                lastPlayheadUpdateRef.current = now;
-                setCurrentTime(loopStartBound + (offsetInLoop < 0 ? offsetInLoop + loopSpan : offsetInLoop));
-              }
-            } else {
-              if (now - lastPlayheadUpdateRef.current >= 40) {
-                lastPlayheadUpdateRef.current = now;
-                setCurrentTime(current % curBufDur);
-              }
-            }
-          } else {
-            if (current >= curBufDur) {
-              stopWebAudio();
-              setIsPlaying(false);
-              setCurrentTime(0);
-              return;
-            }
-            if (now - lastPlayheadUpdateRef.current >= 40) {
-              lastPlayheadUpdateRef.current = now;
-              setCurrentTime(Math.min(curBufDur, current));
-            }
-          }
-        }
-        animFrameRef.current = requestAnimationFrame(updatePlayhead);
-      };
-      animFrameRef.current = requestAnimationFrame(updatePlayhead);
-    } catch (err) {
-      console.warn('[CompactAudioStrip] Web Audio playback error:', err);
-      setIsPlaying(false);
+      audio.loop = options.loop && (!loopLocator || !loopLocator.enabled);
+      applyPitchPreservation(audio, playbackRate);
+      audio.volume = 1;
+      audio.play().then(() => setIsPlaying(true)).catch(err => {
+        console.warn('[CompactAudioStrip] Playback prevented:', err);
+        setIsPlaying(false);
+      });
     }
   };
 
@@ -806,6 +718,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
     };
 
+    if (!countInSoundActive) {
+      playNative();
+      return;
+    }
+
     const leadTimeMs = Math.round(leadTime * 1000);
     timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
     timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
@@ -826,7 +743,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
     };
     const handleTimeUpdate = () => {
-      if (isWebAudioPlayingRef.current || countInTimerRef.current) return; // 🛡️ Freeze time update while WebAudio or count-in is active
+      if (countInTimerRef.current) return;
       const cur = audio.currentTime;
       setCurrentTime(cur);
       if (cur > duration) {
@@ -902,9 +819,9 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         }}
         aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
-          border: isLooping ? '2px solid #16a34a' : (hasActiveLocator ? '1.5px solid #86efac' : '1px solid #cbd5e1'),
-          background: isLooping ? '#bbf7d0' : (hasActiveLocator ? '#f0fdf4' : '#ffffff'),
-          color: isLooping ? '#15803d' : (hasActiveLocator ? '#166534' : '#64748b'),
+          border: isLooping ? 'none' : (hasActiveLocator ? '1.5px solid #10b981' : '1px solid #cbd5e1'),
+          background: isLooping ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasActiveLocator ? '#ecfdf5' : '#ffffff'),
+          color: isLooping ? '#ffffff' : (hasActiveLocator ? '#059669' : '#64748b'),
           height: isMobile ? '44px' : '36px',
           minWidth: isMobile ? '44px' : '36px',
           padding: '0 8px',
@@ -1123,9 +1040,9 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   return (
     <div 
       style={{
-        background: isPlaying ? '#f0fdf4' : '#ffffff',
+        background: isPlaying ? '#ecfdf5' : '#ffffff',
         borderRadius: '14px',
-        border: isPlaying ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+        border: isPlaying ? '1.5px solid #10b981' : '1px solid #e2e8f0',
         padding: isMobile ? '10px 12px' : '8px 12px',
         width: '100%',
         maxWidth: '100%',
@@ -1134,6 +1051,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           : '0 1px 3px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
+        flexWrap: isPlaying ? 'nowrap' : 'wrap',
         alignItems: isMobile ? 'stretch' : 'center',
         gap: isMobile ? '8px' : '9px',
         boxSizing: 'border-box',
@@ -1223,7 +1141,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           )}
         </button>
 
-        {/* Middle: Title, Waveform, Time */}
+        {/* Middle: Title, Waveform (Play) / Scrubber (Stop), Time */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
             <span style={{
@@ -1248,182 +1166,42 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             </span>
           </div>
 
-          {/* Mini Waveform with Klick-zu-Position Scrubbing */}
-          {(() => {
-            const hasLocator = Boolean(loopLocator && loopLocator.endSec > loopLocator.startSec && duration > 0);
-            const startPct = hasLocator ? Math.max(0, Math.min(100, (loopLocator!.startSec / duration) * 100)) : 0;
-            const endPct = hasLocator ? Math.max(0, Math.min(100, (loopLocator!.endSec / duration) * 100)) : 100;
-            const spanPct = Math.max(0, endPct - startPct);
-            const isLoopActive = Boolean(isLooping && loopLocator?.enabled);
-
-            return (
-              <div 
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const clickX = e.clientX - rect.left;
-                  const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-                  let newTime = newRatio * (duration || 0);
-                  if (isLoopActive && hasLocator) {
-                    if (newTime < loopLocator!.startSec || newTime > loopLocator!.endSec) {
-                      newTime = loopLocator!.startSec;
-                    }
-                  }
-                  setCurrentTime(newTime);
-                  if (audioRef.current) audioRef.current.currentTime = newTime;
-                }}
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '2px',
-                  height: '24px',
-                  cursor: 'pointer',
-                  width: '100%',
-                  maxWidth: isMobile ? '100%' : '200px',
-                  padding: '2px 0',
-                  boxSizing: 'border-box'
-                }}
-                title={hasLocator ? `A/B-Loop: ${formatTime(loopLocator!.startSec)} - ${formatTime(loopLocator!.endSec)} (Tippen zum Spulen)` : "Tippen zum Spulen"}
-              >
-                {/* 📍 A/B Loop Corridor & Pins */}
-                {hasLocator && (
-                  <>
-                    {/* Shaded Corridor between A and B */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left: `${startPct}%`,
-                        width: `${spanPct}%`,
-                        background: isLoopActive ? 'rgba(22, 163, 74, 0.15)' : 'rgba(148, 163, 184, 0.08)',
-                        borderRadius: '3px',
-                        pointerEvents: 'none',
-                        transition: 'all 0.15s ease'
-                      }}
-                    />
-
-                    {/* Marker A (Start) */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '-2px',
-                        bottom: '-2px',
-                        left: `${startPct}%`,
-                        width: '1.5px',
-                        background: isLoopActive ? '#16a34a' : '#94a3b8',
-                        borderRadius: '1px',
-                        pointerEvents: 'none',
-                        zIndex: 4,
-                        transition: 'all 0.15s ease'
-                      }}
-                      title={`Loop Start (A): ${formatTime(loopLocator!.startSec)}`}
-                    >
-                      <span
-                        style={{
-                          position: 'absolute',
-                          top: '-7px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          fontSize: '0.45rem',
-                          fontWeight: 900,
-                          lineHeight: 1,
-                          color: '#ffffff',
-                          background: isLoopActive ? '#16a34a' : '#64748b',
-                          borderRadius: '2px',
-                          padding: '1px 2px',
-                          letterSpacing: '-0.02em',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
-                        }}
-                      >
-                        A
-                      </span>
-                    </div>
-
-                    {/* Marker B (Ende) */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '-2px',
-                        bottom: '-2px',
-                        left: `${endPct}%`,
-                        width: '1.5px',
-                        background: isLoopActive ? '#ef4444' : '#94a3b8',
-                        borderRadius: '1px',
-                        pointerEvents: 'none',
-                        zIndex: 4,
-                        transition: 'all 0.15s ease'
-                      }}
-                      title={`Loop Ende (B): ${formatTime(loopLocator!.endSec)}`}
-                    >
-                      <span
-                        style={{
-                          position: 'absolute',
-                          bottom: '-7px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          fontSize: '0.45rem',
-                          fontWeight: 900,
-                          lineHeight: 1,
-                          color: '#ffffff',
-                          background: isLoopActive ? '#ef4444' : '#64748b',
-                          borderRadius: '2px',
-                          padding: '1px 2px',
-                          letterSpacing: '-0.02em',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
-                        }}
-                      >
-                        B
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {ORGANIC_WAVEFORM.map((h, i) => {
-                  const barRatio = i / ORGANIC_WAVEFORM.length;
-                  const isFilled = barRatio <= progressRatio;
-                  const isHead = Math.abs(barRatio - progressRatio) < (1 / ORGANIC_WAVEFORM.length);
-                  const barSec = duration > 0 ? barRatio * duration : 0;
-                  const isOutsideLocator = Boolean(
-                    isLoopActive &&
-                    loopLocator &&
-                    loopLocator.enabled &&
-                    duration > 0 &&
-                    (barSec < loopLocator.startSec || barSec > loopLocator.endSec)
-                  );
-
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        flex: 1,
-                        minWidth: '2px',
-                        height: `${Math.max(18, h)}%`,
-                        borderRadius: '9999px',
-                        background: isFilled 
-                          ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' 
-                          : 'rgba(22, 163, 74, 0.14)',
-                        opacity: isOutsideLocator ? 0.32 : 1,
-                        boxShadow: isHead && isPlaying ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
-                        transition: 'background 0.1s ease, height 0.15s ease, opacity 0.15s ease'
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })()}
+          {/* 0,1% Dynamic Stage Waveform & Scrubber */}
+          <DynamicStageWaveformScrubber
+            isPlaying={isPlaying}
+            duration={duration}
+            currentTime={currentTime}
+            onSeek={(newTime) => {
+              setCurrentTime(newTime);
+              if (audioRef.current) audioRef.current.currentTime = newTime;
+            }}
+            isLooping={isLooping}
+            loopLocator={loopLocator}
+            uiLevel={uiLevel}
+          />
         </div>
 
-        {/* Desktop-Only: Secondary Tools in Single Row */}
-        {!isMobile && renderSecondaryTools()}
+        {/* Desktop-Only: Bei PLAY werden Buttons entfernt und nur Active Badges gezeigt. Bei STOP volle Toolbox! */}
+        {!isMobile && (
+          isPlaying ? (
+            <DynamicStageActiveBadges
+              playbackRate={playbackRate}
+              speedLabel={getSpeedLabel()}
+              isLooping={isLooping}
+              hasActiveLocator={hasActiveLocator}
+              countInSoundActive={countInSoundActive}
+            />
+          ) : (
+            <>
+              {renderSecondaryTools()}
+              {renderTriageHub()}
+            </>
+          )
+        )}
       </div>
 
-      {/* Desktop-Only: Triage Hub in Single Row */}
-      {!isMobile && renderTriageHub()}
-
-      {/* Mobile-Only: 2nd Row for Tools & Triage */}
-      {isMobile && (
+      {/* Mobile-Only: 2nd Row for Tools & Triage bei STOP, oder Active Badges bei PLAY */}
+      {isMobile && !isPlaying && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -1437,6 +1215,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           {renderSecondaryTools()}
           {renderTriageHub()}
         </div>
+      )}
+      {isMobile && isPlaying && (
+        <DynamicStageActiveBadges
+          playbackRate={playbackRate}
+          speedLabel={getSpeedLabel()}
+          isLooping={isLooping}
+          hasActiveLocator={hasActiveLocator}
+          countInSoundActive={countInSoundActive}
+        />
       )}
 
       {/* Audio Editor Modal */}
@@ -1639,108 +1426,19 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   };
 
   const startWebAudioPlayback = async (options: { loop: boolean; offsetSec?: number }) => {
-    try {
-      const ctx = SharedAudioEngine.getContext();
-      let buffer = audioBufferRef.current;
-      if (!buffer) {
-        buffer = await loadAudioBuffer();
+    stopWebAudio();
+    const audio = audioRef.current;
+    if (audio) {
+      if (options.offsetSec !== undefined) {
+        audio.currentTime = options.offsetSec;
       }
-      if (!ctx || !buffer) {
-        // Fallback: HTML5
-        if (audioRef.current) {
-          audioRef.current.currentTime = options.offsetSec || 0;
-          audioRef.current.loop = options.loop;
-          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        }
-        return;
-      }
-
-      stopWebAudio();
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
-      }
-
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.playbackRate.value = playbackRate || 1;
-
-      const hasLocatorLoop = Boolean(options.loop && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec);
-      const loopStartBound = hasLocatorLoop ? loopLocator!.startSec : 0;
-      const loopEndBound = hasLocatorLoop ? Math.min(buffer.duration, loopLocator!.endSec) : buffer.duration;
-
-      source.loop = options.loop;
-      if (options.loop) {
-        source.loopStart = loopStartBound;
-        source.loopEnd = loopEndBound;
-      }
-      source.connect(ctx.destination);
-
-      const bufDur = buffer.duration;
-      let playStart = options.offsetSec !== undefined ? options.offsetSec : currentTime;
-      if (hasLocatorLoop) {
-        if (playStart < loopStartBound || playStart >= loopEndBound - 0.05) {
-          playStart = loopStartBound;
-        }
-      } else {
-        if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
-      }
-
-      source.start(0, playStart);
-      loopSourceRef.current = source;
-      isWebAudioPlayingRef.current = true;
-      loopStartTimestampRef.current = ctx.currentTime;
-      loopOffsetSecRef.current = playStart;
-      setIsPlaying(true);
-      setCurrentTime(playStart);
-
-      source.onended = () => {
-        if (!options.loop && isWebAudioPlayingRef.current && loopSourceRef.current === source) {
-          stopWebAudio();
-          setIsPlaying(false);
-          setCurrentTime(0);
-        }
-      };
-
-      const updatePlayhead = () => {
-        if (!isWebAudioPlayingRef.current || !loopSourceRef.current || !ctx || !audioBufferRef.current) return;
-        const curBufDur = audioBufferRef.current.duration;
-        if (curBufDur > 0) {
-          const elapsed = (ctx.currentTime - loopStartTimestampRef.current) * (playbackRate || 1);
-          const current = (loopOffsetSecRef.current + elapsed);
-          const now = performance.now();
-          if (options.loop) {
-            if (hasLocatorLoop) {
-              const loopSpan = Math.max(0.05, loopEndBound - loopStartBound);
-              const offsetInLoop = (current - loopStartBound) % loopSpan;
-              if (now - lastPlayheadUpdateRef.current >= 40) {
-                lastPlayheadUpdateRef.current = now;
-                setCurrentTime(loopStartBound + (offsetInLoop < 0 ? offsetInLoop + loopSpan : offsetInLoop));
-              }
-            } else {
-              if (now - lastPlayheadUpdateRef.current >= 40) {
-                lastPlayheadUpdateRef.current = now;
-                setCurrentTime(current % curBufDur);
-              }
-            }
-          } else {
-            if (current >= curBufDur) {
-              stopWebAudio();
-              setIsPlaying(false);
-              setCurrentTime(0);
-              return;
-            }
-            if (now - lastPlayheadUpdateRef.current >= 40) {
-              lastPlayheadUpdateRef.current = now;
-              setCurrentTime(Math.min(curBufDur, current));
-            }
-          }
-        }
-        animFrameRef.current = requestAnimationFrame(updatePlayhead);
-      };
-      animFrameRef.current = requestAnimationFrame(updatePlayhead);
-    } catch (err) {
-      console.warn('[AppleSplitCapsulePlayer] Web Audio playback error:', err);
-      setIsPlaying(false);
+      audio.loop = options.loop && (!loopLocator || !loopLocator.enabled);
+      applyPitchPreservation(audio, playbackRate);
+      audio.volume = 1;
+      audio.play().then(() => setIsPlaying(true)).catch(err => {
+        console.warn('[AppleSplitCapsulePlayer] Playback prevented:', err);
+        setIsPlaying(false);
+      });
     }
   };
 
@@ -1909,6 +1607,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
     };
 
+    if (!countInSoundActive) {
+      playNative();
+      return;
+    }
+
     const leadTimeMs = Math.round(leadTime * 1000);
     timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
     timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
@@ -1929,7 +1632,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     };
     const handleTimeUpdate = () => {
-      if (isWebAudioPlayingRef.current || countInTimerRef.current) return; // 🛡️ Freeze time update while WebAudio or count-in is active
+      if (countInTimerRef.current) return;
       const cur = audio.currentTime;
       setCurrentTime(cur);
       if (cur > duration) {
@@ -1944,7 +1647,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     };
     const handleEnded = () => {
-      if (!isLooping && !isWebAudioPlayingRef.current) {
+      if (!isLooping) {
         setIsPlaying(false);
         setCurrentTime(0);
       }
@@ -2005,9 +1708,9 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         }}
         aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
-          border: isLooping ? '2px solid #16a34a' : (hasActiveLocator ? '1.5px solid #86efac' : '1px solid #cbd5e1'),
-          background: isLooping ? '#bbf7d0' : (hasActiveLocator ? '#f0fdf4' : '#ffffff'),
-          color: isLooping ? '#15803d' : (hasActiveLocator ? '#166534' : '#64748b'),
+          border: isLooping ? 'none' : (hasActiveLocator ? '1.5px solid #10b981' : '1px solid #cbd5e1'),
+          background: isLooping ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasActiveLocator ? '#ecfdf5' : '#ffffff'),
+          color: isLooping ? '#ffffff' : (hasActiveLocator ? '#059669' : '#64748b'),
           height: isMobile ? '44px' : '34px',
           minWidth: isMobile ? '44px' : '34px',
           padding: '0 8px',
@@ -2304,9 +2007,9 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             <span style={{
               fontSize: '0.64rem',
               fontWeight: 800,
-              color: '#15803d',
-              background: '#dcfce7',
-              border: '1px solid #86efac',
+              color: '#059669',
+              background: '#ecfdf5',
+              border: '1px solid #10b981',
               borderRadius: '100px',
               padding: '1px 6px',
               lineHeight: 1.3,
@@ -2509,72 +2212,42 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             </span>
           </div>
 
-          <div 
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const clickX = e.clientX - rect.left;
-              const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-              const newTime = newRatio * (duration || 0);
+          {/* 0,1% Dynamic Stage Waveform & Scrubber */}
+          <DynamicStageWaveformScrubber
+            isPlaying={isPlaying}
+            duration={duration}
+            currentTime={currentTime}
+            onSeek={(newTime) => {
               setCurrentTime(newTime);
               if (audioRef.current) audioRef.current.currentTime = newTime;
             }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px',
-              height: '24px',
-              cursor: 'pointer',
-              width: '100%',
-              padding: '2px 0',
-              boxSizing: 'border-box'
-            }}
-            title="Tippen zum Vor- oder Zurückspulen"
-          >
-            {ORGANIC_WAVEFORM.map((h, i) => {
-              const barRatio = i / ORGANIC_WAVEFORM.length;
-              const isFilled = barRatio <= progressRatio;
-              const isHead = Math.abs(barRatio - progressRatio) < (1 / ORGANIC_WAVEFORM.length);
-              const barSec = duration > 0 ? barRatio * duration : 0;
-              const isOutsideLocator = Boolean(
-                isLooping &&
-                loopLocator &&
-                loopLocator.enabled &&
-                duration > 0 &&
-                (barSec < loopLocator.startSec || barSec > loopLocator.endSec)
-              );
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1,
-                    minWidth: '2px',
-                    height: `${Math.max(18, h)}%`,
-                    borderRadius: '9999px',
-                    background: isFilled 
-                      ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' 
-                      : 'rgba(22, 163, 74, 0.14)',
-                    opacity: isOutsideLocator ? 0.32 : 1,
-                    boxShadow: isHead && isPlaying ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
-                    transition: 'background 0.1s ease, height 0.15s ease, opacity 0.15s ease'
-                  }}
-                />
-              );
-            })}
-          </div>
+            isLooping={isLooping}
+            loopLocator={loopLocator}
+            uiLevel={uiLevel}
+          />
         </div>
 
-        {/* Desktop-Only: Secondary Tools & Delete in Single Row */}
+        {/* Desktop-Only: Bei PLAY werden Buttons entfernt und nur Active Badges gezeigt. Bei STOP volle Toolbox! */}
         {!isMobile && (
-          <>
-            {renderSecondaryTools()}
-            {renderDeleteButton()}
-          </>
+          isPlaying ? (
+            <DynamicStageActiveBadges
+              playbackRate={playbackRate}
+              speedLabel={getSpeedLabel()}
+              isLooping={isLooping}
+              hasActiveLocator={hasActiveLocator}
+              countInSoundActive={countInSoundActive}
+            />
+          ) : (
+            <>
+              {renderSecondaryTools()}
+              {renderDeleteButton()}
+            </>
+          )
         )}
       </div>
 
-      {/* Mobile-Only: 3rd Row for Tools & Delete Button */}
-      {isMobile && (
+      {/* Mobile-Only: 3rd Row for Tools & Delete Button bei STOP, oder Active Badges bei PLAY */}
+      {isMobile && !isPlaying && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -2588,6 +2261,15 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           {renderSecondaryTools()}
           {renderDeleteButton()}
         </div>
+      )}
+      {isMobile && isPlaying && (
+        <DynamicStageActiveBadges
+          playbackRate={playbackRate}
+          speedLabel={getSpeedLabel()}
+          isLooping={isLooping}
+          hasActiveLocator={hasActiveLocator}
+          countInSoundActive={countInSoundActive}
+        />
       )}
 
       {/* Audio Editor Modal */}

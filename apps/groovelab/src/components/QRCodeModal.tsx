@@ -9,6 +9,7 @@ import { isDevEnvironment, getCanonicalQrLandingUrl } from '../utils/tenantUrlHe
 import { getSchoolProfileDTO } from '../api/bffClient';
 import { formatUserDisplayName } from '../utils/userDisplayName';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
+import { downloadAppleWalletPass, openGoogleWalletPass } from '../services/wallet/appleWalletPassService';
 
 interface QRCodeModalProps {
   user: {
@@ -322,93 +323,36 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     }
   };
 
-  const downloadWalletPass = () => {
-    // Senior Developer Apple Wallet Pass Generator & Web Passbook Link
-    const passData = {
-      formatVersion: 1,
-      passTypeIdentifier: "pass.de.campus-groovelab.id",
-      serialNumber: user.qr_token || user.teacher_qr_token || user.id || "10001",
-      teamIdentifier: "GROOVELAB",
-      organizationName: "Campus-Groovelab",
-      description: "Digitaler Schulausweis",
-      logoText: "Campus-Groovelab",
-      foregroundColor: "rgb(255, 255, 255)",
-      backgroundColor: user.role === 'admin' || user.role === 'secretary' ? "rgb(234, 67, 53)" : (user.role === 'teacher' ? "rgb(52, 168, 83)" : "rgb(234, 179, 8)"),
-      generic: {
-        primaryFields: [
-          {
-            key: "name",
-            label: "AUSWEISINHABER",
-            value: formatUserDisplayName(user)
-          }
-        ],
-        secondaryFields: [
-          {
-            key: "role",
-            label: "ROLLE",
-            value: user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : (user.role === 'teacher' ? 'Lehrkraft' : 'Schüler'))
-          }
-        ],
-        barcode: {
-          format: "PKBarcodeFormatQR",
-          message: getCanonicalQrLandingUrl(user.qr_token || user.teacher_qr_token || user.ausweis_nummer),
-          messageEncoding: "iso-8859-1"
-        }
-      }
-    };
+  const downloadWalletPass = async () => {
+    const isCampus = activePlatform !== 'groovelab';
+    const qrToken = user.qr_token || user.teacher_qr_token || user.ausweis_nummer || user.id || '';
+    const userName = formatUserDisplayName(user);
+    const userRole = user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : (user.role === 'teacher' ? 'Lehrkraft' : 'Schüler'));
 
-    try {
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS) {
-        // Direct Apple Wallet Web Pass Opening
-        const passString = JSON.stringify(passData, null, 2);
-        const blob = new Blob([passString], { type: 'application/vnd.apple.pkpass' });
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `campus-groovelab-pass.pkpass`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-      } else {
-        const passString = JSON.stringify(passData, null, 2);
-        const blob = new Blob([passString], { type: 'application/vnd.apple.pkpass' });
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `campus-groovelab-pass.pkpass`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-      }
-    } catch (e) {
-      alert('Der Apple Wallet Pass wurde erstellt und heruntergeladen.');
-    }
+    await downloadAppleWalletPass({
+      schoolName: schoolNameAndCity,
+      userName,
+      userRole,
+      instrument: user.instrument || 'Instrument',
+      qrToken,
+      isCampus
+    });
   };
 
   const downloadGoogleWalletPass = () => {
-    // Senior Developer Google Wallet Pass Handler & Web Save Link
-    const userQr = user.qr_token || user.teacher_qr_token || user.id;
+    const isCampus = activePlatform !== 'groovelab';
+    const qrToken = user.qr_token || user.teacher_qr_token || user.ausweis_nummer || user.id || '';
     const userName = formatUserDisplayName(user);
     const userRole = user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : (user.role === 'teacher' ? 'Lehrkraft' : 'Schüler'));
-    
-    // Official Google Wallet Web Save Intent / Pass Link
-    const googleWalletUrl = `https://pay.google.com/gp/v/save/eyJhbGciOiJSUzI1NiJ9?token=${encodeURIComponent(userQr || '')}&title=${encodeURIComponent('Campus-Groovelab')}&name=${encodeURIComponent(userName)}&role=${encodeURIComponent(userRole)}`;
 
-    try {
-      const isAndroid = /Android/i.test(navigator.userAgent);
-      if (isAndroid) {
-        // Open Google Pay / Wallet Native Intent
-        window.open(googleWalletUrl, '_blank');
-      } else {
-        // Web Pass Card / Google Wallet Link
-        window.open(googleWalletUrl, '_blank');
-      }
-    } catch (e) {
-      alert('Google Wallet Pass wurde geöffnet.');
-    }
+    openGoogleWalletPass({
+      schoolName: schoolNameAndCity,
+      userName,
+      userRole,
+      instrument: user.instrument || 'Instrument',
+      qrToken,
+      isCampus
+    });
   };
   
   return (

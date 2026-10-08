@@ -173,21 +173,21 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
           {/* Notice Banner */}
           {isAbsent ? (
             <div style={{
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-              border: '1px solid #86efac',
+              background: '#ecfdf5',
+              border: '1.5px solid #10b981',
               borderRadius: '12px',
               padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(34, 197, 94, 0.06)'
+              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)'
             }}>
-              <CheckCircle2 size={16} color="#166534" style={{ flexShrink: 0 }} />
+              <CheckCircle2 size={16} color="#10b981" style={{ flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <strong style={{ fontSize: '0.78rem', color: '#166534', display: 'block', fontWeight: 800 }}>
+                <strong style={{ fontSize: '0.78rem', color: '#065f46', display: 'block', fontWeight: 800 }}>
                   Aktuell als abwesend gemeldet
                 </strong>
-                <span style={{ fontSize: '0.70rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
+                <span style={{ fontSize: '0.70rem', color: '#059669', lineHeight: 1.35, fontWeight: 600 }}>
                   Bis einschließlich {(teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil) ? new Date(String(teacher.ausfall_until || teacher.ausfallUntil).substring(0, 10) + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'auf Weiteres'}. Du kannst dich jederzeit vorzeitig wieder verfügbar melden.
                 </span>
               </div>
@@ -463,11 +463,11 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
               <span style={{ 
                 fontSize: '0.62rem', 
                 fontWeight: 800, 
-                color: absenceHandlingOwner ? '#15803d' : '#ef4444',
-                background: absenceHandlingOwner ? '#dcfce7' : '#fee2e2',
+                color: absenceHandlingOwner ? '#ffffff' : '#ef4444',
+                background: absenceHandlingOwner ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fee2e2',
                 padding: '2px 8px',
                 borderRadius: '100px',
-                border: `1px solid ${absenceHandlingOwner ? '#bbf7d0' : '#fecaca'}`,
+                border: absenceHandlingOwner ? 'none' : '1px solid #fecaca',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '3px'

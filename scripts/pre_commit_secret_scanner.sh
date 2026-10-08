@@ -19,7 +19,7 @@ else
         echo "  ℹ️  Keine Staged-Dateien im Git-Index gefunden. Schalte automatisch auf Vollscan (--all) um..."
         SCAN_ALL=true
     else
-        FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/|^deploy/' | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || true)
+        FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/|^deploy/|^\.agents/|^docs/' | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || true)
         if [ -z "$FILES" ]; then
             echo "  ✓ Keine relevanten Code-, Paket-, Skript-, Deploy- oder Migrationsdateien verändert."
             exit 0
@@ -28,10 +28,22 @@ else
 fi
 
 if [ "$SCAN_ALL" = true ]; then
-    FILES=$(git ls-files --cached --others --exclude-standard 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 'deploy/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || find apps/groovelab/src packages scripts supabase/migrations deploy -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" -o -name "*.conf" -o -name "*.yml" -o -name "*.yaml" \) -print | grep -v 'pre_commit_secret_scanner.sh')
+    FILES=$(git ls-files --cached --others --exclude-standard 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 'deploy/*' '.agents/*' 'docs/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' | grep -v 'pre_commit_secret_scanner.sh' || find apps/groovelab/src packages scripts supabase/migrations deploy .agents docs -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" -o -name "*.conf" -o -name "*.yml" -o -name "*.yaml" -o -name "*.md" \) -print | grep -v 'pre_commit_secret_scanner.sh')
     if [ -z "$FILES" ]; then
         echo "  ✓ Keine relevanten Code-, Paket-, Skript-, Deploy- oder Migrationsdateien gefunden."
         exit 0
+    fi
+fi
+
+# ------------------------------------------------------------------------------
+# 0,1% Exocortex Product Bible Integrity Pre-Commit Preflight
+# ------------------------------------------------------------------------------
+if echo "$FILES" | grep -q "docs/SYSTEM_FEATURE_MATRIX.md"; then
+    echo "📖 Prüfe Exocortex & Product Bible Integrität (500 KB Floor-Ratchet & Schema)..."
+    if ! node scripts/product_bible_guard.mjs --check; then
+        echo "❌ [PRE-COMMIT BLOCKED] docs/SYSTEM_FEATURE_MATRIX.md hat die Integritätsprüfung nicht bestanden!"
+        echo "   Führe 'npm run exocortex:restore' aus, um den letzten validen Stand wiederherzustellen."
+        exit 1
     fi
 fi
 

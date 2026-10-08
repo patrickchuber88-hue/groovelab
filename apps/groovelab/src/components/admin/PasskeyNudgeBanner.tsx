@@ -169,11 +169,11 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
         overflow: 'hidden',
         transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
         borderRadius: '18px',
-        background: 'rgba(240, 253, 244, 0.95)',
+        background: 'rgba(236, 253, 245, 0.96)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '1.5px solid #86efac',
-        boxShadow: '0 16px 36px rgba(22, 101, 52, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08)',
+        border: '1.5px solid #10b981',
+        boxShadow: '0 16px 36px rgba(16, 185, 129, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -189,11 +189,11 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
           height: '38px',
           borderRadius: '12px',
           background: '#ffffff',
-          color: '#15803d',
+          color: '#10b981',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 2px 6px rgba(21, 128, 61, 0.15)',
+          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.15)',
           flexShrink: 0
         }}>
           <Fingerprint size={22} strokeWidth={2.3} />
@@ -202,13 +202,13 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
         <div>
           <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>Schneller &amp; sicherer anmelden mit Passkey</span>
-            <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: '#16a34a', color: '#ffffff' }}>
+            <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff' }}>
               Empfohlen
             </span>
           </div>
           <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
             {successMsg ? (
-              <span style={{ color: '#15803d', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ color: '#059669', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Check size={14} /> {successMsg}
               </span>
             ) : errorMsg ? (
@@ -231,7 +231,7 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
             style={{
               padding: '7px 14px',
               borderRadius: '10px',
-              background: '#15803d',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               color: '#ffffff',
               fontSize: '0.76rem',
               fontWeight: 800,

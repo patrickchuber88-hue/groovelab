@@ -911,13 +911,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   </span>
                 ))}
                 <span style={{ 
-                  background: isThirdOrMoreChild ? '#dcfce7' : '#f1f5f9', 
-                  border: `1px solid ${isThirdOrMoreChild ? '#86efac' : '#cbd5e1'}`, 
-                  padding: '3px 8px', 
+                  background: isThirdOrMoreChild ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9', 
+                  border: isThirdOrMoreChild ? 'none' : '1px solid #cbd5e1', 
+                  padding: isThirdOrMoreChild ? '4px 9px' : '3px 8px', 
                   borderRadius: '6px', 
                   fontSize: '0.72rem', 
                   fontWeight: 800, 
-                  color: isThirdOrMoreChild ? '#166534' : '#475569' 
+                  color: isThirdOrMoreChild ? '#ffffff' : '#475569' 
                 }}>
                   {linkedSiblings.length + 1}. Kind: {student.first_name || 'Aktuelles Kind'} {isThirdOrMoreChild ? '(🎉 100% Gratis)' : `(${monthlyRate}/Mo.)`}
                 </span>
@@ -926,7 +926,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
             {/* Status Feedback */}
             {isThirdOrMoreChild ? (
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '6px 10px', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46', background: '#ecfdf5', border: '1px solid #10b981', padding: '6px 10px', borderRadius: '8px' }}>
                 🎉 Glückwunsch! Als 3. aktives Kind ist der Campus-Zugang für {student.first_name || 'dieses Kind'} für das gesamte Schuljahr 100% KOSTENLOS (0,00 €)!
               </div>
             ) : activePaidSiblingsCount === 1 ? (
@@ -1130,11 +1130,11 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 type="button"
                 onClick={() => handleCopy(referenceCode, 'reference')}
                 style={{
-                  background: copiedField === 'reference' ? '#059669' : '#ffffff',
-                  border: '1px solid #86efac',
+                  background: copiedField === 'reference' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                  border: copiedField === 'reference' ? 'none' : '1.5px solid #10b981',
                   borderRadius: '8px',
                   padding: '6px 12px',
-                  color: copiedField === 'reference' ? '#ffffff' : '#047857',
+                  color: copiedField === 'reference' ? '#ffffff' : '#059669',
                   fontSize: '0.74rem',
                   fontWeight: 800,
                   cursor: 'pointer',
@@ -1740,7 +1740,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
                     Audio-Tresor &amp; Loopstation
                   </span>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '2px 6px', borderRadius: '4px' }}>
                     Geschützter Audio-Tresor
                   </span>
                 </div>
@@ -2170,8 +2170,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
               <div>
                 <span style={{
-                  background: '#dcfce7',
-                  color: '#15803d',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
                   fontSize: '0.74rem',
                   fontWeight: 900,
                   textTransform: 'uppercase',

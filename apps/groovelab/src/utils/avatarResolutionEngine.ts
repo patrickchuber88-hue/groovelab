@@ -103,18 +103,30 @@ export const getInstrumentAvatarUrl = (instrument: string | null | undefined): s
   return '/avatars/neutral_instrument_avatar.png';
 };
 
-export const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
+export const getDefaultMusicianAvatarUrl = (
+  instrument: string | null | undefined, 
+  role: string | null | undefined,
+  genderOrName?: string | null
+): string => {
   const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
   if (isTeacher) return '/avatar_ghost.jpg';
   
-  if (!instrument) return '/avatars/student_eguitar_1.png';
+  const g = (genderOrName || '').toLowerCase().trim();
+  const isFemale = g === 'female' || g === 'f' || g === 'w' || g === 'girl' || 
+    g.includes('amelia') || g.includes('emma') || g.includes('mia') || g.includes('sophia') || 
+    g.includes('hannah') || g.includes('anna') || g.includes('lea') || g.includes('lara') || 
+    g.includes('marie') || g.includes('laura') || g.includes('lisa') || g.includes('charlotte') ||
+    g.includes('elena') || g.includes('marlene') || g.includes('clara') || g.includes('julia') ||
+    g.includes('zoe') || g.includes('maya') || g.includes('lilly') || g.includes('johanna');
+
+  if (!instrument) return isFemale ? '/avatars/student_girl_blonde_guitar.png' : '/avatars/student_eguitar_1.png';
   const inst = instrument.toLowerCase().trim();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/student_boy_black_guitar.png';
-  if (inst.includes('bass')) return '/avatars/student_boy_black_bass.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/student_boy_black_drums.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/student_boy_black_piano.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/student_boy_red_vocals.png';
-  return '/avatars/student_eguitar_1.png';
+  if (inst.includes('guitar') || inst.includes('gitarre')) return isFemale ? '/avatars/student_girl_blonde_guitar.png' : '/avatars/student_boy_black_guitar.png';
+  if (inst.includes('bass')) return isFemale ? '/avatars/student_girl_black_bass.png' : '/avatars/student_boy_black_bass.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug')) return isFemale ? '/avatars/student_girl_blonde_drums.png' : '/avatars/student_boy_black_drums.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return isFemale ? '/avatars/student_girl_black_piano.png' : '/avatars/student_boy_black_piano.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return isFemale ? '/avatars/student_girl_red_vocals.png' : '/avatars/student_boy_red_vocals.png';
+  return isFemale ? '/avatars/student_girl_blonde_guitar.png' : '/avatars/student_eguitar_1.png';
 };
 
 export const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
@@ -328,4 +340,72 @@ export const resolveGrooveLabTeacherAvatar = (user?: any, src?: string | null): 
   // 4. Fallback: ghost musician avatar
   return '/avatar_ghost.jpg';
 };
+
+/**
+ * Detects whether an avatar URL points to a 3D instrument without a musician (Campus style).
+ */
+export const isInstrumentAvatar = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  const u = String(url).toLowerCase();
+  return (
+    u.includes('gitarre_avatar') ||
+    u.includes('guitar_avatar') ||
+    u.includes('egitarre_avatar') ||
+    u.includes('bass_avatar') ||
+    u.includes('ebass_avatar') ||
+    u.includes('kontrabass_avatar') ||
+    u.includes('schlagzeug_avatar') ||
+    u.includes('drums_avatar') ||
+    u.includes('klavier_avatar') ||
+    u.includes('piano_avatar') ||
+    u.includes('gesang_avatar') ||
+    u.includes('vocals_avatar') ||
+    u.includes('trompete_avatar') ||
+    u.includes('trumpet_avatar') ||
+    u.includes('posaune_avatar') ||
+    u.includes('trombone_avatar') ||
+    u.includes('saxophon_avatar') ||
+    u.includes('saxophone_avatar') ||
+    u.includes('klarinette_avatar') ||
+    u.includes('clarinet_avatar') ||
+    u.includes('querfloete_avatar') ||
+    u.includes('flute_avatar') ||
+    u.includes('blockfloete_avatar') ||
+    u.includes('violine_avatar') ||
+    u.includes('violin_avatar') ||
+    u.includes('cello_avatar') ||
+    u.includes('horn_avatar') ||
+    u.includes('bariton_avatar') ||
+    u.includes('oboe_avatar') ||
+    u.includes('neutral_instrument_avatar')
+  );
+};
+
+/**
+ * 🎸 GrooveLab Student Musician Avatar SSOT (0,1% Enterprise Goldstandard)
+ * - In GrooveLab, students MUST ALWAYS receive their 3D musician avatar (human character playing the instrument).
+ * - Strictly filters out Campus 3D instrument avatars (/avatars/*_avatar*.png) and chalkboard (/campus_login_hero.png).
+ * - Honors selected student musician avatars (STUDENT_AVATARS: student_*, bandstyle_*, teen_*, avatar_boy, avatar_girl).
+ * - Falls back to getDefaultMusicianAvatarUrl based on effective instrument & name/gender hint.
+ */
+export const resolveGrooveLabStudentAvatar = (user?: any, src?: string | null): string => {
+  const isGhost = (s: string | null | undefined) => !s || s === '/avatar_ghost.jpg' || s === '/avatar_ghost.png';
+  const isHero = (s: string | null | undefined) => !s || s.includes('campus_login_hero');
+
+  const effectiveSrc = (isHero(src) || isGhost(src) || isInstrumentAvatar(src)) ? null : src;
+  const userAvatar = (isHero(user?.avatar_url) || isGhost(user?.avatar_url) || isInstrumentAvatar(user?.avatar_url)) ? null : user?.avatar_url;
+  const userPhoto = (isHero(user?.photo_url) || isGhost(user?.photo_url) || isInstrumentAvatar(user?.photo_url)) ? null : user?.photo_url;
+
+  // 1. Explicit valid musician avatar (custom upload or selected 3D student musician avatar)
+  const candidate = userAvatar || userPhoto || effectiveSrc;
+  if (candidate && !isInstrumentAvatar(candidate) && !isHero(candidate) && !isGhost(candidate)) {
+    return candidate;
+  }
+
+  // 2. Resolve default musician avatar based on instrument & gender/name hint
+  const effInst = getEffectiveInstrument(user) || user?.instrument || 'Gitarre';
+  const nameOrGender = user?.gender || user?.first_name || (user?.name ? String(user.name).split(' ')[0] : '');
+  return getDefaultMusicianAvatarUrl(effInst, 'student', nameOrGender);
+};
+
 

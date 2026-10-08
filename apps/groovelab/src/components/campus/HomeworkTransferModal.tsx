@@ -406,9 +406,10 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                   height: '30px',
                   padding: '0 10px',
                   borderRadius: '100px',
-                  background: '#f0fdf4',
-                  color: '#15803d',
-                  border: '1px solid #86efac',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
                   fontSize: '0.74rem',
                   fontWeight: 850,
                   cursor: 'pointer',
@@ -418,7 +419,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                 }}
                 className="hover-scale-mini"
               >
-                <Check size={12} strokeWidth={3} />
+                <Check size={12} strokeWidth={3} color="#ffffff" />
                 <span>Alle abhaken</span>
               </button>
 
@@ -557,17 +558,17 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                                       border: isPReactivate 
                                         ? '1.2px solid #eab308' 
                                         : isPMaster 
-                                          ? '1.2px solid #86efac' 
+                                          ? 'none' 
                                           : '1px solid #cbd5e1',
                                       background: isPReactivate 
                                         ? '#fef08a' 
                                         : isPMaster 
-                                          ? '#dcfce7' 
+                                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                                           : '#f1f5f9',
                                       color: isPReactivate 
                                         ? '#713f12' 
                                         : isPMaster 
-                                          ? '#15803d' 
+                                          ? '#ffffff' 
                                           : '#64748b',
                                       cursor: 'pointer',
                                       display: 'inline-flex',
@@ -577,7 +578,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                                       boxShadow: isPReactivate 
                                         ? '0 1px 3px rgba(234, 179, 8, 0.25)' 
                                         : isPMaster 
-                                          ? '0 1px 2px rgba(22, 163, 74, 0.12)' 
+                                          ? '0 1px 4px rgba(16, 185, 129, 0.25)' 
                                           : 'none'
                                     }}
                                     className="hover-scale-mini"
@@ -588,7 +589,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                                         : `Seite ${p}: Pausiert (Tippen zum Übernehmen)`}
                                   >
                                     {isPReactivate && <RotateCw size={10} strokeWidth={2.6} color="#713f12" />}
-                                    {isPMaster && <Check size={10} strokeWidth={3} color="#15803d" />}
+                                    {isPMaster && <Check size={10} strokeWidth={3} color="#ffffff" />}
                                     {isPPark && <Pause size={9} strokeWidth={2.5} color="#64748b" />}
                                     <span>S. {p}</span>
                                     <span style={{ fontSize: '0.64rem', opacity: 0.85 }}>

@@ -1310,7 +1310,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                             letterSpacing: '0.1em', 
                             transform: 'rotate(-2deg)', 
                             boxShadow: '0 4px 15px rgba(234, 179, 8, 0.4)',
-                            border: '2px solid black',
+                            border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
@@ -1707,7 +1707,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                                 alt="" 
                                               />
                                               {isMastered && !isPendingOffer && (
-                                                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', zIndex: 10 }}>
                                                   <Check size={12} strokeWidth={4} />
                                                 </div>
                                               )}
@@ -1831,12 +1831,12 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                     borderRadius: '10px',
                     padding: '6px 10px',
                     fontSize: '0.64rem',
-                    color: '#86efac',
+                    color: '#a7f3d0',
                     fontWeight: 600,
                     marginBottom: '8px',
                     lineHeight: 1.3
                   }}>
-                    <ShieldCheck size={12} color="#4ade80" style={{ flexShrink: 0 }} />
+                    <ShieldCheck size={12} color="#10b981" style={{ flexShrink: 0 }} />
                     <span><strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.</span>
                   </div>
 

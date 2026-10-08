@@ -86,15 +86,15 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
               width: '68px',
               height: '68px',
               borderRadius: '22px',
-              background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-              border: '1.5px solid #86efac',
-              boxShadow: '0 8px 20px rgba(34, 197, 94, 0.2)',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto'
             }}>
-              <ShieldCheck size={36} color="#15803d" />
+              <ShieldCheck size={36} color="#ffffff" />
             </div>
 
             {/* Title & Subtitle */}
@@ -130,18 +130,19 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
             {firstPinSavedSuccess && (
               <div style={{
                 padding: '10px 14px',
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
                 borderRadius: '14px',
-                color: '#15803d',
+                color: '#ffffff',
                 fontSize: '0.82rem',
                 fontWeight: 800,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px'
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
               }}>
-                <CheckCircle size={18} />
+                <CheckCircle size={18} color="#ffffff" />
                 <span>PIN erfolgreich gespeichert! 🚀</span>
               </div>
             )}
@@ -163,20 +164,20 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                 style={{
                   padding: '12px 14px',
                   borderRadius: '16px',
-                  border: firstPinActiveField === 'new' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
-                  background: firstPinActiveField === 'new' ? '#f0fdf4' : '#f8fafc',
+                  border: firstPinActiveField === 'new' ? '2px solid #10b981' : '1.5px solid #e2e8f0',
+                  background: firstPinActiveField === 'new' ? '#ecfdf5' : '#f8fafc',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   textAlign: 'left'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'new' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'new' ? '#059669' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     1. Neue 4-stellige PIN
                   </span>
                   {pinFormNew.length === 4 && (
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Check size={13} strokeWidth={3} /> 4 Ziffern
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Check size={13} strokeWidth={3} color="#10b981" /> 4 Ziffern
                     </span>
                   )}
                 </div>
@@ -193,7 +194,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                           width: '42px',
                           height: '46px',
                           borderRadius: '12px',
-                          border: isFilled ? '2px solid #15803d' : (firstPinActiveField === 'new' && pinFormNew.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                          border: isFilled ? '2px solid #10b981' : (firstPinActiveField === 'new' && pinFormNew.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
                           background: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
@@ -201,7 +202,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                           fontSize: '1.25rem',
                           fontWeight: 900,
                           color: '#0f172a',
-                          boxShadow: isFilled ? '0 2px 6px rgba(21, 128, 61, 0.15)' : 'none',
+                          boxShadow: isFilled ? '0 2px 6px rgba(16, 185, 129, 0.20)' : 'none',
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -227,21 +228,21 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                 style={{
                   padding: '12px 14px',
                   borderRadius: '16px',
-                  border: firstPinActiveField === 'confirm' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
-                  background: firstPinActiveField === 'confirm' ? '#f0fdf4' : '#f8fafc',
+                  border: firstPinActiveField === 'confirm' ? '2px solid #10b981' : '1.5px solid #e2e8f0',
+                  background: firstPinActiveField === 'confirm' ? '#ecfdf5' : '#f8fafc',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   textAlign: 'left'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'confirm' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'confirm' ? '#059669' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     2. PIN wiederholen
                   </span>
                   {pinFormConfirm.length === 4 && (
                     pinFormNew === pinFormConfirm ? (
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <CheckCheck size={14} strokeWidth={2.5} /> Stimmt überein
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <CheckCheck size={14} strokeWidth={2.5} color="#10b981" /> Stimmt überein
                       </span>
                     ) : (
                       <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#dc2626' }}>
@@ -263,7 +264,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                           width: '42px',
                           height: '46px',
                           borderRadius: '12px',
-                          border: isFilled ? (pinFormNew === pinFormConfirm && pinFormConfirm.length === 4 ? '2px solid #15803d' : '2px solid #64748b') : (firstPinActiveField === 'confirm' && pinFormConfirm.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                          border: isFilled ? (pinFormNew === pinFormConfirm && pinFormConfirm.length === 4 ? '2px solid #10b981' : '2px solid #64748b') : (firstPinActiveField === 'confirm' && pinFormConfirm.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
                           background: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
@@ -495,7 +496,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                 padding: '15px',
                 borderRadius: '16px',
                 background: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && pinFormNew === pinFormConfirm) 
-                  ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' 
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                   : '#cbd5e1',
                 color: '#ffffff',
                 border: 'none',
@@ -503,7 +504,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                 fontWeight: 900,
                 cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && pinFormNew === pinFormConfirm && !isSavingPin) ? 'pointer' : 'not-allowed',
                 boxShadow: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && pinFormNew === pinFormConfirm) 
-                  ? '0 6px 20px rgba(21, 128, 61, 0.35)' 
+                  ? '0 6px 20px rgba(16, 185, 129, 0.35)' 
                   : 'none',
                 transition: 'all 0.2s ease',
                 display: 'flex',

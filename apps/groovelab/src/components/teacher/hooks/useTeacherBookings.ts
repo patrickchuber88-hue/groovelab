@@ -713,12 +713,28 @@ export function useTeacherBookings({
     window.addEventListener('storage', handleFilteredStorage);
     window.addEventListener('refresh-bookings', loadMyBookings);
     window.addEventListener('groovelab_schedule_changed', loadMyBookings);
+    window.addEventListener('campus_schedule_sync', loadMyBookings);
+
+    // 📡 0.1% Goldstandard: Supabase Realtime Subscription für schedule_occurrences
+    const channel = supabase
+      .channel(`realtime_teacher_bookings_${userId || 'global'}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'schedule_occurrences'
+      }, () => {
+        loadMyBookings();
+      })
+      .subscribe();
+
     return () => {
       window.removeEventListener('storage', handleFilteredStorage);
       window.removeEventListener('refresh-bookings', loadMyBookings);
       window.removeEventListener('groovelab_schedule_changed', loadMyBookings);
+      window.removeEventListener('campus_schedule_sync', loadMyBookings);
+      supabase.removeChannel(channel);
     };
-  }, [loadMyBookings]);
+  }, [loadMyBookings, userId]);
 
   const visibleChangedAppointments = useMemo(() => {
     if (!myChangedAppointments || myChangedAppointments.length === 0) return [];

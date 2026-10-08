@@ -355,14 +355,15 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                   {recSuccess ? (
                     <div
                       style={{
-                        background: '#dcfce7',
-                        border: '1px solid #86efac',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)',
                         borderRadius: '12px',
                         padding: '12px',
                         textAlign: 'center',
                         fontSize: '0.82rem',
                         fontWeight: 850,
-                        color: '#15803d'
+                        color: '#ffffff'
                       }}
                     >
                       ✓ Empfehlung erfolgreich an {studentFirstName}s Eltern übermittelt!

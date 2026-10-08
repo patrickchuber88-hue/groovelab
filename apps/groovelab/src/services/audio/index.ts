@@ -13,3 +13,4 @@ export * from './DidacticWsolaEngine';
 export * from './YinPitchDetectionEngine';
 export * from './EarSynthEngine';
 export * from './RelationalHarmonicEngine';
+export * from './audioContextPool';

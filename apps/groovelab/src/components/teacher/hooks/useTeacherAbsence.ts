@@ -10,6 +10,7 @@ import { UrgentCancellationItem } from '../TeacherUrgentCancellationsModal';
 import { ActiveMakeupTokenItem } from '../TeacherMakeupRadarWidget';
 import { AbsenceNotifData } from '../TeacherAbsenceNotifModal';
 import { TEACHER_WITH_SCHOOL_SELECT } from './useTeacherData';
+import { SmartRoomSwappingService, PendingAbsenceDispatch } from '../../../services/room/smartRoomSwappingService';
 
 export interface UseTeacherAbsenceProps {
   userId: string;
@@ -77,6 +78,21 @@ export function useTeacherAbsence({
   const [absenceNotifModal, setAbsenceNotifModal] = useState<AbsenceNotifData | null>(null);
   const [showAbsenceEndedModal, setShowAbsenceEndedModal] = useState(false);
   const [showAbsenceOverviewModal, setShowAbsenceOverviewModal] = useState(false);
+
+  // ⏳ 0,1% Goldstandard: 15-Minuten-Grace-Period State für vorgemerkte Ausfälle
+  const [pendingAbsence, setPendingAbsence] = useState<PendingAbsenceDispatch | null>(() => 
+    SmartRoomSwappingService.getPendingAbsence(userId)
+  );
+
+  useEffect(() => {
+    const handlePendingUpdate = (e: any) => {
+      if (e.detail?.teacherId === userId) {
+        setPendingAbsence(e.detail.record);
+      }
+    };
+    window.addEventListener('campus_pending_absence_updated', handlePendingUpdate);
+    return () => window.removeEventListener('campus_pending_absence_updated', handlePendingUpdate);
+  }, [userId]);
 
   // Urgent cancellations radar
   const [urgentCancellations, setUrgentCancellations] = useState<UrgentCancellationItem[]>([]);
@@ -481,25 +497,56 @@ export function useTeacherAbsence({
       }
 
       const pushTeacherName = teacherDisplayName || formatTeacherFullName(teacher) || 'deiner Lehrkraft';
-      affectedSlots.forEach((slot: any) => {
-        if (slot.student_id) {
-          const dateObj = slot.date_str ? new Date(slot.date_str + 'T00:00:00') : new Date(slot.datetime || Date.now());
-          const dateFormatted = !isNaN(dateObj.getTime())
-            ? dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
-            : 'in Kürze';
-          const pushTitle = 'Terminabsage ✕';
-          const pushBody = `Terminabsage: Dein Unterricht am ${dateFormatted} um ${slot.time_str} Uhr bei ${pushTeacherName} entfällt.`;
+      
+      // 0,1% Goldstandard: Vorlaufzeit-Klassifikation (< 60 Min. Sofortversand vs. >= 60 Min. 15m Grace-Period)
+      const firstSlot = affectedSlots[0];
+      const firstSlotDateTime = firstSlot?.date_str && firstSlot?.time_str ? `${firstSlot.date_str}T${firstSlot.time_str}:00` : undefined;
+      const strategy = SmartRoomSwappingService.evaluateDispatchStrategy(firstSlotDateTime, todayD);
 
-          supabase.functions.invoke('send-push', {
-            body: {
-              userId: slot.student_id,
-              title: pushTitle,
-              body: pushBody,
-              url: '/'
-            }
-          }).catch(pushErr => console.warn('Non-blocking push error:', pushErr));
-        }
-      });
+      if (strategy.hasGracePeriod) {
+        // Normalfall: 15-Minuten Schonfrist mit Undo-Möglichkeit
+        SmartRoomSwappingService.createPendingAbsence({
+          teacherId: userId,
+          teacherName: pushTeacherName,
+          schoolId: teacher?.school_id || schoolData?.id || '',
+          startDate: absenceStartDate,
+          untilDate: absenceUntilDate,
+          isUrgent: false,
+          minutesUntilFirstSlot: strategy.minutesUntilFirstSlot,
+          affectedSlots: affectedSlots.map((s: any) => ({
+            student_id: s.student_id,
+            student_name: s.student_name,
+            date_str: s.date_str,
+            time_str: s.time_str,
+            datetime: s.datetime,
+            room_id: s.room_id
+          })),
+          handlingOwner: absenceHandlingOwner || 'secretariat',
+          officialNote: absenceOfficialNote
+        });
+        setPendingAbsence(SmartRoomSwappingService.getPendingAbsence(userId));
+      } else {
+        // Eilfall (< 60 Min.): Sofortiger Push-Versand ohne Verzögerung!
+        affectedSlots.forEach((slot: any) => {
+          if (slot.student_id) {
+            const dateObj = slot.date_str ? new Date(slot.date_str + 'T00:00:00') : new Date(slot.datetime || Date.now());
+            const dateFormatted = !isNaN(dateObj.getTime())
+              ? dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+              : 'in Kürze';
+            const pushTitle = 'Terminabsage ✕';
+            const pushBody = `Terminabsage: Dein Unterricht am ${dateFormatted} um ${slot.time_str} Uhr bei ${pushTeacherName} entfällt.`;
+
+            supabase.functions.invoke('send-push', {
+              body: {
+                userId: slot.student_id,
+                title: pushTitle,
+                body: pushBody,
+                url: '/'
+              }
+            }).catch(pushErr => console.warn('Non-blocking push error:', pushErr));
+          }
+        });
+      }
 
       setTeacher((prev: any) => prev ? { ...prev, ausfall_until: absenceUntilVal, ausfall_start: absenceStartVal } : prev);
       setShowAbsenceModal(false);
@@ -583,6 +630,24 @@ export function useTeacherAbsence({
           }).catch(e => console.warn('Push error on reinstate:', e));
         }
       });
+
+      // 0,1% Goldstandard: Wenn Stammkraft Lehrer A reaktiviert wird, Raum-Kollisionen auflösen
+      try {
+        const schoolId = effectiveProfile.school_id || teacher?.school_id || schoolData?.id || '';
+        const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
+        const { data: allRooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
+        const { data: allBookings } = await supabase.from('room_bookings').select('*').eq('school_id', schoolId);
+        await SmartRoomSwappingService.resolveReinstatementCollisions({
+          supabase,
+          schoolId,
+          teacherA: { id: userId, name: teacherDisplayName },
+          dateStr: todayStr,
+          allRooms: allRooms || [],
+          existingBookings: allBookings || []
+        });
+      } catch (colErr) {
+        console.warn('[SmartRoomSwappingService] Reinstatement collision error:', colErr);
+      }
 
       try {
         const { data: schedules } = await supabase
@@ -733,6 +798,64 @@ export function useTeacherAbsence({
     }
   }, [userId, teacher, setTeacher, onRefresh]);
 
+  // ⏳ 0,1% Goldstandard: 1-Tap Undo während der 15-Minuten-Grace-Period
+  const handleUndoPendingAbsence = useCallback(async () => {
+    try {
+      setSubmittingAbsence(true);
+      SmartRoomSwappingService.cancelPendingAbsence(userId);
+      setPendingAbsence(null);
+
+      // Revert database ausfall state
+      try {
+        await supabase.rpc('end_teacher_absence', { p_teacher_id: userId });
+      } catch (rpcErr) {
+        console.warn('end_teacher_absence rpc fallback:', rpcErr);
+      }
+
+      await supabase
+        .from('users')
+        .update({ 
+          ausfall_until: ABSENCE_RESET_SENTINEL,
+          ausfall_start: ABSENCE_RESET_SENTINEL
+        })
+        .eq('id', userId);
+
+      setTeacher((prev: any) => prev ? { ...prev, ausfall_until: null, ausfall_start: null } : prev);
+
+      // Bereinige nicht reaktivierte Krisen-Mitteilungen
+      try {
+        await supabase
+          .from('crisis_notifications')
+          .delete()
+          .eq('teacher_id', userId)
+          .eq('is_reinstated', false);
+      } catch (delErr) {
+        console.warn('Non-blocking crisis notifications cleanup:', delErr);
+      }
+
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Error undoing pending absence:', err);
+    } finally {
+      setSubmittingAbsence(false);
+    }
+  }, [userId, setTeacher, onRefresh]);
+
+  // ⚡ 0,1% Goldstandard: Sofortiger manueller Push-Versand ohne Restwartezeit
+  const handleDispatchPendingAbsenceNow = useCallback(async () => {
+    try {
+      setSubmittingAbsence(true);
+      await SmartRoomSwappingService.executeDispatch(userId, supabase, () => {
+        setPendingAbsence(null);
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Error dispatching pending absence now:', err);
+    } finally {
+      setSubmittingAbsence(false);
+    }
+  }, [userId, onRefresh]);
+
   return {
     quickAbsencePreset,
     setQuickAbsencePreset,
@@ -784,6 +907,9 @@ export function useTeacherAbsence({
     unreadCancellationsCount,
     handleMarkStudentContacted,
     handleReportAbsence,
-    handleEndAbsence
+    handleEndAbsence,
+    pendingAbsence,
+    handleUndoPendingAbsence,
+    handleDispatchPendingAbsenceNow
   };
 }

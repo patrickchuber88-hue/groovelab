@@ -69,9 +69,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     clientInfo += `;session_token=${sessionToken}`;
   }
 
-  const activeUserId = typeof sessionStorage !== 'undefined' 
-    ? sessionStorage.getItem('groovelab_user_id')
-    : null;
+  const activeUserId = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null)
+    || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_user_id') : null);
   if (activeUserId) {
     clientInfo += `;user_id=${activeUserId}`;
   }

@@ -43,3 +43,11 @@ scratch/
 .env.local
 .env.*.local
 !.env.example
+
+# 0,1% Multi-Agent Worktrees (Isolierte Subagenten-Workspaces)
+.worktrees/
+.worktrees/*
+
+# 0,1% Exocortex Product Bible Snapshots (Keep MANIFEST.json & .gitkeep, ignore raw .md snapshots)
+docs/.exocortex_vault/*.md
+

@@ -85,7 +85,7 @@ export function useCampusNavigationAndWorkspaces({
     const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
     if (platform === 'campus') {
       const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
-      return (tab === 'live' || tab === 'mediathek' || tab === 'songs') ? 'briefing' : tab;
+      return tab === 'live' ? 'briefing' : (tab === 'mediathek' ? 'songs' : tab);
     }
     if (platform === 'ensembles') {
       return (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
@@ -175,7 +175,7 @@ export function useCampusNavigationAndWorkspaces({
   }, []);
 
   const setActiveStudentTab = useCallback((val: any) => {
-    const targetVal = (val === 'mediathek' || val === 'songs') ? 'briefing' : val;
+    const targetVal = val === 'mediathek' ? 'songs' : val;
     if (targetVal === 'messages') {
       onResetRecipient?.();
     }

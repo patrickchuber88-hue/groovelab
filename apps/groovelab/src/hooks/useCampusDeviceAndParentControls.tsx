@@ -195,8 +195,25 @@ export function useCampusDeviceAndParentControls({
     };
     const handleFamilyStudentSwitched = (e: any) => {
       if (e?.detail && typeof e.detail === 'string') {
-        console.log('[App] Family student switch event received:', e.detail);
-        setLoggedInUserId(e.detail);
+        const nextId = e.detail;
+        console.log('[App] Family student switch event received:', nextId);
+        setLoggedInUserId(nextId);
+        try {
+          const raw = localStorage.getItem('campus_family_profiles') || '[]';
+          const list = JSON.parse(raw);
+          const matched = list.find((p: any) => p.id === nextId);
+          if (matched) {
+            setUser((prev: any) => ({
+              ...(prev || {}),
+              ...matched,
+              id: nextId,
+              role: 'student',
+              schools: prev?.schools || matched?.schools || null
+            }));
+          }
+        } catch (err) {
+          console.warn('[App] Could not optimistically set user on sibling switch:', err);
+        }
       }
     };
     window.addEventListener('campus_family_student_switched', handleFamilyStudentSwitched);
@@ -215,7 +232,7 @@ export function useCampusDeviceAndParentControls({
       window.removeEventListener('storage', handleSimDateSync);
       window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     };
-  }, [setLoggedInUserId]);
+  }, [setLoggedInUserId, setUser]);
 
   // Effect to resolve the kiosk token on mount
   useEffect(() => {

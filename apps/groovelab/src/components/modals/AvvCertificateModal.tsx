@@ -294,23 +294,23 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
 
             {/* Seal Box */}
             <div style={{
-              background: '#f0fdf4',
-              border: '1.5px solid #86efac',
+              background: '#ecfdf5',
+              border: '1.5px solid #10b981',
               borderRadius: '12px',
               padding: '14px',
               display: 'flex',
               alignItems: 'center',
               gap: '14px'
             }}>
-              <CheckCircle2 size={28} color="#16a34a" style={{ flexShrink: 0 }} />
+              <CheckCircle2 size={28} color="#10b981" style={{ flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#166534' }}>
+                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#065f46' }}>
                   Kryptografisches Prüfsiegel &amp; Revisionssicherheit
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#15803d', fontFamily: 'monospace', wordBreak: 'break-all', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.72rem', color: '#059669', fontFamily: 'monospace', wordBreak: 'break-all', marginTop: '2px' }}>
                   SHA-256 Checksumme: {dynamicHash || 'Wird generiert...'}
                 </div>
-                <div style={{ fontSize: '0.70rem', color: '#166534', marginTop: '3px' }}>
+                <div style={{ fontSize: '0.70rem', color: '#065f46', marginTop: '3px' }}>
                   Die Integrität des Vertragstextes ist unveränderbar in der PostgreSQL-Audit-Datenbank persistent protokolliert.
                 </div>
               </div>

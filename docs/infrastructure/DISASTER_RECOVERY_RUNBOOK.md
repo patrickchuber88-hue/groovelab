@@ -49,9 +49,10 @@ graph TD
   - Key: `age1upgweqzpg4dggd5as4c0le4gd265hgfcmw0ptn5gajr7u9szwdwq7dtqca`
   - *Funktion:* Wird stündlich vom Cronjob genutzt, um Dumps vor dem Speichern asymmetrisch zu verschlüsseln. Selbst wenn ein Angreifer Root-Zugriff auf den Server erlangt, kann er mit diesem Public Key keine früheren Backups entschlüsseln.
 - **Private Key (Entschlüsselung / Disaster Recovery):**
-  - Pfad auf Server (für automatisierte Drills): `/etc/campus-groovelab/backup_age_secret.key` (Berechtigung: `0400`, `deployuser:deployuser`)
-  - Offline-Aufbewahrung: Sicher im Tresor des Betreibers (Password Manager / Hardware Token).
-  - Key: `AGE-SECRET-KEY-1JA3AWPMT5X4QDDFLF2J9G4N6A7D9NRKMHFZQK0NJ6YMDX6MMY20S5TXNAC`
+  - Offline-Aufbewahrung (ZWINGEND): Ausschließlich sicher im Tresor des Betreibers (Password Manager / Hardware Token / YubiKey).
+  - Sicherheits-Axiom: Der produktive Private Key darf NIEMALS im Git-Repository oder unverschlüsselt auf dem Server verweilen.
+  - Key: `<DEIN_AGE_SECRET_KEY_AUS_SICHEREM_TRESOR>`
+  - *Hinweis für automatisierte Drills:* Für unüberwachte nächtliche Wiederherstellungstests wird ausschließlich ein ephemerer Drill-Key für synthetische Daten verwendet (`/etc/campus-groovelab/drill_age_secret.key`). Mandantenschlüssel verbleiben strikt offline.
 
 ---
 
@@ -140,7 +141,12 @@ Im Falle eines Rechenzentrums-Ausfalls oder zerstörten VPS wird ein neuer Hetzn
 ```bash
 sudo mkdir -p /etc/campus-groovelab
 echo "age1upgweqzpg4dggd5as4c0le4gd265hgfcmw0ptn5gajr7u9szwdwq7dtqca" | sudo tee /etc/campus-groovelab/backup_age_public.key
-echo "AGE-SECRET-KEY-1JA3AWPMT5X4QDDFLF2J9G4N6A7D9NRKMHFZQK0NJ6YMDX6MMY20S5TXNAC" | sudo tee /etc/campus-groovelab/backup_age_secret.key
+
+# Private Key im Notfall manuell aus dem sicheren Offline-Tresor (z. B. Bitwarden/1Password) einfügen:
+read -sp "Gib den Age Secret Key aus dem sicheren Tresor ein: " AGE_KEY
+echo "$AGE_KEY" | sudo tee /etc/campus-groovelab/backup_age_secret.key > /dev/null
+unset AGE_KEY
+
 sudo chmod 0400 /etc/campus-groovelab/backup_age_secret.key
 sudo chown deployuser:deployuser /etc/campus-groovelab/*
 ```

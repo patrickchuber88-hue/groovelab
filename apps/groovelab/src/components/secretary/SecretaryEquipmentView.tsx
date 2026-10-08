@@ -485,9 +485,9 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                                 fontWeight: 800, 
                                 padding: '2px 8px', 
                                 borderRadius: '6px',
-                                background: inst.roomId ? '#e2e8f0' : '#dcfce7',
-                                color: inst.roomId ? '#475569' : '#15803d',
-                                border: inst.roomId ? '1px solid #cbd5e1' : '1px solid #86efac'
+                                background: inst.roomId ? '#e2e8f0' : '#ecfdf5',
+                                color: inst.roomId ? '#475569' : '#059669',
+                                border: inst.roomId ? '1px solid #cbd5e1' : '1px solid #10b981'
                               }}
                             >
                               {inst.roomName ? inst.roomName : 'Frei'}

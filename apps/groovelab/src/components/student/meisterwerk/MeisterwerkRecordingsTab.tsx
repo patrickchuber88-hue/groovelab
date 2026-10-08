@@ -51,6 +51,7 @@ export interface MeisterwerkRecordingsTabProps {
   isCurrentHomework?: boolean;
   isMobileOrSim: boolean;
   isRecordingAudio: boolean;
+  isReleasingAudio?: boolean;
   isRecordingMetronomeActive: boolean;
   isRecordingPadActive?: boolean;
   setIsRecordingPadActive?: React.Dispatch<React.SetStateAction<boolean>>;
@@ -210,9 +211,9 @@ const AbAudioComparisonBar: React.FC<AbAudioComparisonBarProps> = ({ teacherAudi
           type="button"
           onClick={() => handleToggle('teacher')}
           style={{
-            background: activePlaying === 'teacher' ? '#15803d' : '#ffffff',
-            border: activePlaying === 'teacher' ? '1px solid #15803d' : '1px solid #86efac',
-            color: activePlaying === 'teacher' ? '#ffffff' : '#15803d',
+            background: activePlaying === 'teacher' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+            border: activePlaying === 'teacher' ? 'none' : '1px solid #10b981',
+            color: activePlaying === 'teacher' ? '#ffffff' : '#059669',
             borderRadius: '100px',
             padding: '3px 9px',
             fontSize: '0.70rem',
@@ -221,13 +222,13 @@ const AbAudioComparisonBar: React.FC<AbAudioComparisonBarProps> = ({ teacherAudi
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
-            boxShadow: activePlaying === 'teacher' ? '0 2px 6px rgba(21, 128, 61, 0.3)' : 'none',
+            boxShadow: activePlaying === 'teacher' ? '0 2px 6px rgba(16, 185, 129, 0.28)' : 'none',
             transition: 'all 0.15s ease'
           }}
           className="hover-scale-mini"
           title="Vorbild der Lehrkraft anhören"
         >
-          {activePlaying === 'teacher' ? <Pause size={10} fill="#ffffff" /> : <Play size={10} fill="#15803d" />}
+          {activePlaying === 'teacher' ? <Pause size={10} fill="#ffffff" /> : <Play size={10} fill="#059669" />}
           <span>Lehrkraft</span>
         </button>
 
@@ -1049,6 +1050,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     isCurrentHomework,
     isMobileOrSim,
     isRecordingAudio,
+    isReleasingAudio,
     isRecordingMetronomeActive,
     isRecordingPadActive,
     setIsRecordingPadActive,
@@ -2255,9 +2257,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
           badgeTitle={aud.isDuettTake 
             ? "Synchrones Duett (Spur 1 & Spur 2) - Klicke auf Duett-Deck zum Abhören" 
             : (aud.cloudSyncStatus === 'synced' ? "Revisionssicher im Audio-Tresor gesichert" : (isShared ? "Mit Lehrkraft geteilt (Klicken, um wieder privat zu machen)" : "Privat (Nur für dich sichtbar - Klicken zum Teilen mit Lehrkraft)"))}
-          badgeBg={aud.isDuettTake ? "#f3e8ff" : (aud.cloudSyncStatus === 'synced' ? "#fef3c7" : (isShared ? "#dcfce7" : "#f8fafc"))}
-          badgeColor={aud.isDuettTake ? "#6b21a8" : (aud.cloudSyncStatus === 'synced' ? "#b45309" : (isShared ? "#15803d" : "#334155"))}
-          badgeBorder={aud.isDuettTake ? "1px solid #ddd6fe" : (aud.cloudSyncStatus === 'synced' ? "1px solid #fde68a" : (isShared ? "1px solid #86efac" : "1.5px solid #cbd5e1"))}
+          badgeBg={aud.isDuettTake ? "#f3e8ff" : (aud.cloudSyncStatus === 'synced' ? "#fef3c7" : (isShared ? "#ecfdf5" : "#f8fafc"))}
+          badgeColor={aud.isDuettTake ? "#6b21a8" : (aud.cloudSyncStatus === 'synced' ? "#b45309" : (isShared ? "#059669" : "#334155"))}
+          badgeBorder={aud.isDuettTake ? "1px solid #ddd6fe" : (aud.cloudSyncStatus === 'synced' ? "1px solid #fde68a" : (isShared ? "1px solid #10b981" : "1.5px solid #cbd5e1"))}
           onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
           metronomeBpm={effectiveBpm || (aud.isDuettTake ? (recordingBpm || 100) : undefined)}
           onOpenDuettDeck={(hasValidBpm || aud.isDuettTake || aud.teacherAudioUrl) ? () => {
@@ -2629,9 +2631,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         alignItems: 'center',
                         height: '48px',
                         borderRadius: '14px',
-                        background: isRecordingMetronomeActive ? '#dcfce7' : '#ffffff',
-                        border: isRecordingMetronomeActive ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
-                        boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0,0,0,0.03)',
+                        background: isRecordingMetronomeActive ? '#ecfdf5' : '#ffffff',
+                        border: isRecordingMetronomeActive ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
+                        boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(16, 185, 129, 0.16)' : '0 1px 2px rgba(0,0,0,0.03)',
                         transition: 'all 0.18s ease',
                         flexShrink: 0
                       }}
@@ -2655,7 +2657,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
+                          color: isRecordingMetronomeActive ? '#059669' : '#64748b',
                           fontSize: '0.80rem',
                           fontWeight: 850,
                           touchAction: 'manipulation',
@@ -2665,7 +2667,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       >
                         <MechanicalMetronomeIcon
                           size={17}
-                          color={isRecordingMetronomeActive ? '#16a34a' : '#64748b'}
+                          color={isRecordingMetronomeActive ? '#10b981' : '#64748b'}
                           strokeWidth={isRecordingMetronomeActive ? 2.5 : 2}
                         />
                         <span>{isRecordingMetronomeActive ? 'Klick AN' : 'Klick'}</span>
@@ -2676,7 +2678,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         style={{
                           width: '1px',
                           height: '24px',
-                          background: isRecordingMetronomeActive ? '#86efac' : '#e2e8f0',
+                          background: isRecordingMetronomeActive ? '#10b981' : '#e2e8f0',
                           flexShrink: 0
                         }}
                       />
@@ -2839,9 +2841,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                     flex: 1,
                                     padding: '5px 0',
                                     borderRadius: '8px',
-                                    border: isSelected ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
-                                    background: isSelected ? '#dcfce7' : '#f8fafc',
-                                    color: isSelected ? '#15803d' : '#475569',
+                                    border: isSelected ? 'none' : '1px solid #e2e8f0',
+                                    background: isSelected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f8fafc',
+                                    color: isSelected ? '#ffffff' : '#475569',
                                     fontSize: '0.70rem',
                                     fontWeight: 850,
                                     cursor: 'pointer',
@@ -2922,11 +2924,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '8px',
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      border: '1.5px solid #86efac',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      border: 'none',
                       borderRadius: '12px',
                       padding: '6px 10px',
-                      color: '#15803d'
+                      color: '#ffffff'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                         <Check size={14} strokeWidth={3} />
@@ -2963,28 +2965,32 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-                      <span style={{ fontSize: '0.80rem', fontWeight: 950, color: '#991b1b' }}>AUFNAHME LÄUFT</span>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isReleasingAudio ? '#f59e0b' : '#ef4444', display: 'inline-block' }} />
+                      <span style={{ fontSize: '0.80rem', fontWeight: 950, color: isReleasingAudio ? '#b45309' : '#991b1b' }}>
+                        {isReleasingAudio ? 'KLINGT AUS...' : 'AUFNAHME LÄUFT'}
+                      </span>
                     </div>
-                    <div style={{ fontSize: '0.80rem', fontWeight: 950, color: '#dc2626', background: '#ffffff', padding: '2px 6px', borderRadius: '100px', border: '1px solid #fecdd3' }}>
+                    <div style={{ fontSize: '0.80rem', fontWeight: 950, color: isReleasingAudio ? '#d97706' : '#dc2626', background: '#ffffff', padding: '2px 6px', borderRadius: '100px', border: isReleasingAudio ? '1px solid #fde68a' : '1px solid #fecdd3' }}>
                       {formatRecordTime(audioDuration)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
                     <button
                       type="button"
+                      disabled={isReleasingAudio}
                       onClick={() => stopRecordingAudio()}
-                      style={{ flex: 1, height: '42px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '0.84rem', fontWeight: 950, cursor: 'pointer' }}
-                      className="hover-scale"
+                      style={{ flex: 1, height: '42px', background: isReleasingAudio ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '0.84rem', fontWeight: 950, cursor: isReleasingAudio ? 'wait' : 'pointer' }}
+                      className={isReleasingAudio ? undefined : "hover-scale"}
                     >
-                      Stopp & Take sichern
+                      {isReleasingAudio ? 'Klingt aus & sichert...' : 'Stopp & Take sichern'}
                     </button>
                     {handleRetakeRecordingAudio && (
                       <button
                         type="button"
+                        disabled={isReleasingAudio}
                         onClick={handleRetakeRecordingAudio}
-                        style={{ height: '42px', background: '#ffffff', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '10px', padding: '0 10px', fontSize: '0.78rem', fontWeight: 850, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        className="hover-scale-mini"
+                        style={{ height: '42px', background: '#ffffff', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '10px', padding: '0 10px', fontSize: '0.78rem', fontWeight: 850, cursor: isReleasingAudio ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: isReleasingAudio ? 0.6 : 1 }}
+                        className={isReleasingAudio ? undefined : "hover-scale-mini"}
                         title="Neu aufnehmen"
                       >
                         <RotateCcw size={13} strokeWidth={2.4} />
@@ -3434,9 +3440,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 <span style={{
                   fontSize: '0.72rem',
                   fontWeight: 850,
-                  color: '#15803d',
-                  background: '#f0fdf4',
-                  border: '1px solid #dcfce7',
+                  color: '#059669',
+                  background: '#ecfdf5',
+                  border: '1px solid #10b981',
                   padding: '2px 9px',
                   borderRadius: '100px'
                 }}>
@@ -3806,8 +3812,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     background: '#ffffff',
                     borderRadius: '24px',
                     padding: isMobileOrSim ? '16px 14px' : '24px',
-                    border: '1.5px solid #dcfce7',
-                    boxShadow: '0 4px 20px rgba(21, 128, 61, 0.04)',
+                    border: '1.5px solid #10b981',
+                    boxShadow: '0 4px 20px rgba(16, 185, 129, 0.08)',
                     position: 'relative'
                   }}
                 >
@@ -3824,17 +3830,17 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         width: '38px',
                         height: '38px',
                         borderRadius: '12px',
-                        background: '#dcfce7',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 2px 6px rgba(21, 128, 61, 0.12)'
+                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.28)'
                       }}>
                         <Mic size={18} strokeWidth={2.4} />
                       </div>
                       <div>
-                        <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           Vom Unterricht
                         </span>
                         <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
@@ -3846,9 +3852,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     <span style={{
                       fontSize: '0.74rem',
                       fontWeight: 850,
-                      color: '#15803d',
-                      background: '#f0fdf4',
-                      border: '1px solid #dcfce7',
+                      color: '#059669',
+                      background: '#ecfdf5',
+                      border: '1px solid #10b981',
                       padding: '3px 10px',
                       borderRadius: '100px'
                     }}>

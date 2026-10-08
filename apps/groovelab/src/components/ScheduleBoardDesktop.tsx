@@ -6689,7 +6689,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               setActiveTab('calendar');
               loadInitialData();
             }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
+            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
           >
             Zurück zur Ansicht
           </button>
@@ -6935,15 +6935,15 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     role="region"
                     aria-label="Tauschmodus aktiv"
                     style={{
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      border: '1.5px solid #86efac',
+                      background: '#ecfdf5',
+                      border: '1.5px solid #10b981',
                       borderRadius: '16px',
                       padding: '12px 18px',
                       marginBottom: '14px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      boxShadow: '0 4px 16px rgba(22, 163, 74, 0.12)',
+                      boxShadow: '0 4px 16px rgba(16, 185, 129, 0.12)',
                       animation: 'floating-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
                     }}
                   >
@@ -6952,23 +6952,23 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         width: '36px',
                         height: '36px',
                         borderRadius: '10px',
-                        background: '#34a853',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#ffffff',
-                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.3)'
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
                       }}>
                         <ArrowLeftRight size={18} strokeWidth={2.4} />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#14532d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span>Tauschmodus aktiv</span>
-                          <span style={{ fontSize: '0.70rem', fontWeight: 700, background: '#bbf7d0', color: '#15803d', padding: '1px 8px', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '0.70rem', fontWeight: 700, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', padding: '1px 8px', borderRadius: '12px' }}>
                             1:1 Tausch
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: '#166534', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '2px' }}>
                           Wähle den Schüler aus, mit dem <strong>{swapSourceStudent ? `${swapSourceStudent.first_name || 'Schüler'} ${maskLastName(swapSourceStudent.last_name || '', showRealNames)}` : 'der Termin'}</strong> ({swapSourceStudent?.assignedTime || ''} Uhr) getauscht werden soll.
                         </div>
                       </div>
@@ -6981,8 +6981,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       }}
                       style={{
                         background: '#ffffff',
-                        border: '1px solid #86efac',
-                        color: '#15803d',
+                        border: '1.5px solid #10b981',
+                        color: '#059669',
                         fontWeight: 700,
                         fontSize: '0.78rem',
                         padding: '8px 14px',
@@ -6994,8 +6994,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                         transition: 'all 0.15s ease'
                       }}
-                      onMouseOver={e => { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.borderColor = '#4ade80'; }}
-                      onMouseOut={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#86efac'; }}
+                      onMouseOver={e => { e.currentTarget.style.background = '#ecfdf5'; e.currentTarget.style.borderColor = '#059669'; }}
+                      onMouseOut={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#10b981'; }}
                     >
                       <X size={14} />
                       <span>Abbrechen (Esc)</span>
@@ -7878,7 +7878,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                         top: `${top}px`,
                                         height: `${height}px`,
                                         border: '2px solid #8b5cf6',
-                                        background: 'repeating-linear-gradient(45deg, rgba(52, 168, 83, 0.1), rgba(52, 168, 83, 0.1) 8px, rgba(139, 92, 246, 0.1) 8px, rgba(139, 92, 246, 0.1) 16px)',
+                                        background: 'repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.08) 8px, rgba(139, 92, 246, 0.18) 8px, rgba(139, 92, 246, 0.18) 16px)',
                                         zIndex: 4,
                                         pointerEvents: 'none',
                                         boxSizing: 'border-box'
@@ -9061,9 +9061,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               position: 'absolute',
                               top: '3px',
                               right: '3px',
-                              background: 'rgba(52, 168, 83, 0.12)',
-                              border: '1px solid #86efac',
-                              color: '#15803d',
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              border: '1px solid #10b981',
+                              color: '#059669',
                               fontSize: '0.58rem',
                               fontWeight: 800,
                               padding: '1px 6px',

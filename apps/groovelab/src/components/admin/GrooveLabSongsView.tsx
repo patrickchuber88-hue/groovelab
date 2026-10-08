@@ -50,6 +50,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
 
   const INSTRUMENTS = ["E-Gitarre", "E-Bass", "E-Drums", "E-Piano", "Vocals"];
 
+  // 🛡️ 0,1% Goldstandard Bounded Context: GrooveLab zeigt ausschließlich GrooveLab Band-Repertoire
   const filteredSongs = (songs || []).filter((s: any) => {
     const q = songSearch.toLowerCase().trim();
     const matchesSearch =
@@ -60,7 +61,9 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
     const matchesLevel =
       levelFilter === "all" || String(s.level || 1) === levelFilter;
 
-    return matchesSearch && matchesLevel;
+    const matchesPlatform = s.is_groovelab_active === true;
+
+    return matchesSearch && matchesLevel && matchesPlatform;
   });
 
   return (

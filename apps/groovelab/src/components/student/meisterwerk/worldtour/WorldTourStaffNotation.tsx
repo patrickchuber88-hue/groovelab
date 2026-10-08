@@ -14,28 +14,14 @@ interface WorldTourStaffNotationProps {
   onNoteTap?: (noteIndex: number) => void;
 }
 
-// 🎼 Treble Clef Y-Mapping (Top line F5 = 0, line spacing = 10)
-const TREBLE_PITCH_STAFF_Y: Record<string, number> = {
-  'C3': 85, 'D3': 80, 'E3': 75, 'F3': 70, 'F#3': 70, 'G3': 65, 'Ab3': 60, 'A3': 60, 'Bb3': 55, 'B3': 55,
-  'C4': 50, 'C#4': 50, 'Db4': 45, 'D4': 45, 'D#4': 45, 'Eb4': 40, 'E4': 40, 'F4': 35, 'F#4': 35, 'Gb4': 30,
-  'G4': 30, 'G#4': 30, 'Ab4': 25, 'A4': 25, 'A#4': 25, 'Bb4': 20, 'B4': 20,
-  'C5': 15, 'C#5': 15, 'Db5': 10, 'D5': 10, 'D#5': 10, 'Eb5': 5, 'E5': 5,
-  'F5': 0, 'F#5': 0, 'Gb5': -5, 'G5': -5, 'G#5': -5, 'Ab5': -10, 'A5': -10, 'Bb5': -15, 'B5': -15, 'C6': -20
-};
-
-// 🎼 Bass Clef Y-Mapping (Top line A3 = 0, line spacing = 10)
-// Staff lines: A3 (0), F3 (10), D3 (20 - middle), B2 (30), G2 (40 - bottom)
-// Staff spaces: G3 (5), E3 (15), C3 (25), A2 (35)
-// Above staff: Middle C (C4 = -10, ledger line 1 above), B3 (-5)
-// Below staff: F2 (45), E2 (50, ledger line 1 below), D2 (55), C2 (60, ledger line 2 below)
-const BASS_PITCH_STAFF_Y: Record<string, number> = {
-  'C2': 60, 'D2': 55, 'Eb2': 50, 'E2': 50, 'F2': 45, 'F#2': 45, 'G2': 40, 'Ab2': 35, 'A2': 35, 'Bb2': 30, 'B2': 30,
-  'C3': 25, 'C#3': 25, 'Db3': 20, 'D3': 20, 'D#3': 20, 'Eb3': 15, 'E3': 15, 'F3': 10, 'F#3': 10, 'G3': 5, 'Ab3': 0, 'A3': 0, 'Bb3': -5, 'B3': -5,
-  'C4': -10, 'C#4': -10, 'D4': -15, 'Eb4': -20, 'E4': -20, 'F4': -25, 'G4': -30
+// 🎼 Diatonische Stufen-Zuordnung für World Tour (Stufen: C=0, D=1, E=2, F=3, G=4, A=5, B/H=6)
+const WORLD_TOUR_DIATONIC_STEP: Record<string, number> = {
+  'C': 0, 'D': 1, 'E': 2, 'F': 3, 'G': 4, 'A': 5, 'B': 6, 'H': 6
 };
 
 /**
  * Resolves the staff Y offset for any note pitch respecting clef and base diatonic letter.
+ * 2027 0,1% Goldstandard: Mathematisch deterministisch (Treble F5=0, Bass A3=0, 5px pro Stufe)
  */
 export function getPitchStaffY(
   pitch: string,
@@ -44,14 +30,26 @@ export function getPitchStaffY(
   drumType?: string
 ): number {
   if (isDrumClef) {
-    return drumType === 'snare' ? 20 : drumType === 'hihat' ? -5 : 40;
+    if (drumType === 'snare') return 15;      // 3. Zwischenraum (C5)
+    if (drumType === 'hihat') return -5;      // Zwischenraum über System (G5)
+    if (drumType === 'kick') return 35;       // 1. Zwischenraum (F4)
+    if (drumType === 'tom') return 10;        // 4. Linie (D5)
+    return 15;
   }
   const clean = (pitch || '').replace(/[^A-Ga-g#0-9]/g, '');
   const match = clean.match(/^([A-Ga-g])[#b♮]?([0-9])$/);
   if (!match) return isBassClef ? 20 : 30;
-  const diatonicKey = `${match[1].toUpperCase()}${match[2]}`;
-  const table = isBassClef ? BASS_PITCH_STAFF_Y : TREBLE_PITCH_STAFF_Y;
-  return table[diatonicKey] ?? (isBassClef ? 20 : 30);
+
+  const letter = match[1].toUpperCase();
+  const octave = parseInt(match[2], 10);
+  const step = WORLD_TOUR_DIATONIC_STEP[letter] ?? 0;
+  const diatonicIndex = octave * 7 + step;
+
+  // Treble: Top Line F5 (Stufe 38) = 0
+  // Bass:   Top Line A3 (Stufe 26) = 0
+  // Linienabstand = 10px -> Halber Schritt (Linie <-> Zwischenraum) = 5px
+  const topStaffIndex = isBassClef ? 26 : 38;
+  return (topStaffIndex - diatonicIndex) * 5;
 }
 
 // Boomwhackers Color System for Junior Mode
@@ -770,7 +768,7 @@ export const WorldTourStaffNotation: React.FC<WorldTourStaffNotationProps> = ({
                             )}
 
                             {/* Ledger Lines below staff */}
-                            {!isRest && [50, 60, 70, 80].map(ledgerY => (
+                            {!isRest && [50, 60, 70, 80, 90, 100].map(ledgerY => (
                               rawY >= ledgerY ? (
                                 <line
                                   key={`ledger-below-${ledgerY}`}
@@ -785,7 +783,7 @@ export const WorldTourStaffNotation: React.FC<WorldTourStaffNotationProps> = ({
                             ))}
 
                             {/* Ledger Lines above staff */}
-                            {!isRest && [-10, -20, -30].map(ledgerY => (
+                            {!isRest && [-10, -20, -30, -40].map(ledgerY => (
                               rawY <= ledgerY ? (
                                 <line
                                   key={`ledger-above-${ledgerY}`}

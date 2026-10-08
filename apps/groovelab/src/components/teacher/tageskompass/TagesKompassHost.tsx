@@ -32,6 +32,8 @@ export interface TagesKompassHostProps {
   playingAudioUrl?: string | null;
   onTogglePlayAudio?: (url: string) => void;
   onSaveQuickHomework: (prep: TagesKompassPrep, customNote?: string) => Promise<void>;
+  onDeleteHomework?: (prep: TagesKompassPrep) => Promise<void>;
+  onDeleteAudioTrack?: (prep: TagesKompassPrep, url: string) => Promise<void>;
   onSaveCatchUpHomework?: (studentId: string, textOrAudio: string, isAudio?: boolean) => Promise<void>;
   onOpenStudio?: () => void;
   onOpenToolbox?: () => void;
@@ -60,6 +62,8 @@ export const TagesKompassHost: React.FC<TagesKompassHostProps> = ({
   playingAudioUrl,
   onTogglePlayAudio,
   onSaveQuickHomework,
+  onDeleteHomework,
+  onDeleteAudioTrack,
   onSaveCatchUpHomework,
   onOpenStudio,
   onOpenToolbox,
@@ -192,6 +196,8 @@ export const TagesKompassHost: React.FC<TagesKompassHostProps> = ({
       playingAudioUrl={playingAudioUrl}
       onTogglePlayAudio={onTogglePlayAudio}
       onSaveQuickHomework={onSaveQuickHomework}
+      onDeleteHomework={onDeleteHomework}
+      onDeleteAudioTrack={onDeleteAudioTrack}
       onOpenStudio={onOpenStudio}
       onOpenToolbox={onOpenToolbox}
       onOpenNotes={onOpenNotes}

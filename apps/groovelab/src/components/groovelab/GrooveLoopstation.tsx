@@ -49,6 +49,7 @@ import {
   DidacticUiLevel,
   playTonePreview
 } from '../../services/audio/RelationalHarmonicEngine';
+import { StudioSampleLibrary } from '../../services/audio/StudioSampleLibrary';
 
 export interface Track {
   id: number;
@@ -1421,87 +1422,30 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       const beatSecs = 60.0 / bpm;
 
-      // 🥁 Premium Studio Drum Synthesizer DSP
-      const playKick = (t: number, gainVal: number, subFreq = 45, punch = 1.0) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(155 * punch, t);
-        osc.frequency.exponentialRampToValueAtTime(subFreq, t + 0.06);
-        gain.gain.setValueAtTime(gainVal * 1.15, t);
-        gain.gain.exponentialRampToValueAtTime(0.00001, t + 0.16);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.17);
-
-        // Click transient for punch
-        const clickOsc = ctx.createOscillator();
-        const clickGain = ctx.createGain();
-        clickOsc.type = 'triangle';
-        clickOsc.frequency.setValueAtTime(320, t);
-        clickOsc.frequency.exponentialRampToValueAtTime(60, t + 0.012);
-        clickGain.gain.setValueAtTime(gainVal * 0.35, t);
-        clickGain.gain.exponentialRampToValueAtTime(0.00001, t + 0.015);
-        clickOsc.connect(clickGain);
-        clickGain.connect(ctx.destination);
-        clickOsc.start(t);
-        clickOsc.stop(t + 0.018);
+      // 🥁 Premium 0,1% Goldstandard Studio Drum Library (Echte Pop/Rock Samples mit Fallback)
+      const playKick = (t: number, gainVal: number, _subFreq = 45, punch = 1.0) => {
+        StudioSampleLibrary.trigger(ctx, 'kick', {
+          time: t,
+          velocity: Math.min(1.2, gainVal * 1.15),
+          pitchMultiplier: punch,
+          destination: ctx.destination
+        });
       };
 
       const playSnare = (t: number, gainVal: number, isClap = false) => {
-        const osc = ctx.createOscillator();
-        const oscGain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(195, t);
-        osc.frequency.exponentialRampToValueAtTime(80, t + 0.045);
-        oscGain.gain.setValueAtTime(gainVal * 0.7, t);
-        oscGain.gain.exponentialRampToValueAtTime(0.00001, t + 0.075);
-        osc.connect(oscGain);
-        oscGain.connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.08);
-
-        const dur = isClap ? 0.13 : 0.095;
-        const bufferSize = Math.floor(ctx.sampleRate * dur);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-        const bp = ctx.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.frequency.setValueAtTime(isClap ? 1800 : 2500, t);
-        bp.Q.setValueAtTime(2.8, t);
-        const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(gainVal * 0.85, t);
-        noiseGain.gain.exponentialRampToValueAtTime(0.00001, t + dur - 0.01);
-        noise.connect(bp);
-        bp.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
-        noise.start(t);
-        noise.stop(t + dur);
+        StudioSampleLibrary.trigger(ctx, isClap ? 'clap' : 'snare', {
+          time: t,
+          velocity: Math.min(1.2, gainVal * 0.95),
+          destination: ctx.destination
+        });
       };
 
       const playHiHat = (t: number, gainVal: number, isOpen = false) => {
-        const dur = isOpen ? 0.16 : 0.038;
-        const bufferSize = Math.floor(ctx.sampleRate * dur);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-        const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass';
-        hp.frequency.setValueAtTime(7000, t);
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(gainVal * 0.5, t);
-        gain.gain.exponentialRampToValueAtTime(0.00001, t + dur);
-        noise.connect(hp);
-        hp.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start(t);
-        noise.stop(t + dur);
+        StudioSampleLibrary.trigger(ctx, isOpen ? 'hatOpen' : 'hatClosed', {
+          time: t,
+          velocity: Math.min(1.2, gainVal * (isOpen ? 0.75 : 0.60)),
+          destination: ctx.destination
+        });
       };
 
       if (soundType === 'rock_beat') {
@@ -4036,21 +3980,21 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               width: "100%",
               padding: "10px 16px",
               borderRadius: "14px",
-              background: "linear-gradient(135deg, rgba(240, 253, 244, 0.9) 0%, rgba(220, 252, 231, 0.8) 100%)",
-              border: "1.5px solid #86efac",
+              background: "rgba(236, 253, 245, 0.95)",
+              border: "1.5px solid #10b981",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               fontSize: "0.76rem",
               boxSizing: "border-box",
               marginBottom: "14px",
-              boxShadow: "0 2px 8px rgba(34, 197, 94, 0.08)"
+              boxShadow: "0 2px 8px rgba(16, 185, 129, 0.12)"
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#15803d", fontWeight: 850 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#065f46", fontWeight: 850 }}>
                 <span style={{ fontSize: "1.05rem" }}>✨</span>
                 <span>Audio-Tresor aktiv: Unbegrenzte Loopstation-Aufnahmen im Hausaufgabenheft &amp; Protokoll</span>
               </div>
-              <span style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 800, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
+              <span style={{ fontSize: '0.70rem', color: '#059669', fontWeight: 800, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #10b981' }}>
                 💎 Lossless Studio-Qualität (Kein Kontingent)
               </span>
             </div>
@@ -6563,8 +6507,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                             <span style={{
                               fontSize: '0.66rem',
                               fontWeight: 800,
-                              background: '#dcfce7',
-                              color: '#15803d',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: '#ffffff',
                               padding: '2px 8px',
                               borderRadius: '100px',
                               display: 'inline-flex',

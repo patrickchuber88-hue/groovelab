@@ -149,11 +149,11 @@ export const JuniorMilestonesSection: React.FC<JuniorMilestonesSectionProps> = (
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            background: isLight ? '#f0fdf4' : 'rgba(52, 168, 83, 0.12)',
-            border: `1px solid ${isLight ? '#86efac' : 'rgba(52, 168, 83, 0.3)'}`,
+            background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.12)',
+            border: `1px solid ${isLight ? '#10b981' : 'rgba(16, 185, 129, 0.3)'}`,
             padding: '4px 12px',
             borderRadius: '100px',
-            color: isLight ? '#166534' : '#86efac',
+            color: isLight ? '#065f46' : '#34d399',
             fontSize: '0.76rem',
             fontWeight: 800
           }}
@@ -250,7 +250,7 @@ export const JuniorMilestonesSection: React.FC<JuniorMilestonesSectionProps> = (
                 border: isDone
                   ? ms.isVerified
                     ? '1.5px solid #f59e0b'
-                    : `1.5px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.4)'}`
+                    : `1.5px solid ${isLight ? '#10b981' : 'rgba(16, 185, 129, 0.4)'}`
                   : isActive
                   ? '2px solid #34a853'
                   : (isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)'),
@@ -272,7 +272,7 @@ export const JuniorMilestonesSection: React.FC<JuniorMilestonesSectionProps> = (
                     fontWeight: 800,
                     letterSpacing: '0.03em',
                     color: isDone
-                      ? (isLight ? '#15803d' : '#86efac')
+                      ? (isLight ? '#059669' : '#10b981')
                       : isActive
                       ? '#34a853'
                       : (isLight ? '#64748b' : '#94a3b8')
@@ -456,7 +456,7 @@ export const JuniorMilestonesSection: React.FC<JuniorMilestonesSectionProps> = (
                       ? (isLight ? '#64748b' : '#94a3b8')
                       : isActive
                       ? '#34a853'
-                      : (isLight ? '#15803d' : '#86efac')
+                      : (isLight ? '#059669' : '#10b981')
                   }}
                 >
                   {isDone ? (

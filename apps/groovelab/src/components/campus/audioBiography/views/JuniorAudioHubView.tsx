@@ -421,8 +421,8 @@ export const JuniorAudioHubView: React.FC<JuniorAudioHubViewProps> = ({
       {/* 🌟 4. MIT FAMILIE TEILEN */}
       <div
         style={{
-          background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.1)',
-          border: '1.5px solid #86efac',
+          background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.1)',
+          border: `1.5px solid ${isLight ? '#10b981' : 'rgba(16, 185, 129, 0.3)'}`,
           borderRadius: '20px',
           padding: '16px 22px',
           display: 'flex',

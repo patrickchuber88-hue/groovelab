@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { StudioRecordingPlayer } from './StudioRecordingPlayer';
 import { formatTeacherFullName } from '../../../../utils/nameHelper';
+import { StudentRescheduleDecisionModal } from '../../modals/StudentRescheduleDecisionModal';
+import { StudentRescheduleToast } from '../../StudentRescheduleToast';
 
 export interface StudentBriefingModalsHubProps {
   // 1. Question Modal
@@ -53,6 +55,14 @@ export interface StudentBriefingModalsHubProps {
   handleOpenHomeworkBookWithView?: (tab: string, subView: string) => void;
   handleTabChangeLocal: (tab: string) => void;
   studentUiLevel?: string;
+
+  // 4. Reschedule Decision Modal & Realtime Toast
+  rescheduleDecisionModalOcc?: any | null;
+  setRescheduleDecisionModalOcc?: (appt: any | null) => void;
+  handleTriggerConfirmReschedule?: (...args: any[]) => void;
+  handleRejectReschedule?: (occ: any) => Promise<void>;
+  scheduleOccurrences?: any[];
+  isMobile?: boolean;
 }
 
 export function StudentBriefingModalsHub({
@@ -87,7 +97,14 @@ export function StudentBriefingModalsHub({
   getJuniorWeeklyHomeworkSummary,
   handleOpenHomeworkBookWithView,
   handleTabChangeLocal,
-  studentUiLevel
+  studentUiLevel,
+
+  rescheduleDecisionModalOcc,
+  setRescheduleDecisionModalOcc,
+  handleTriggerConfirmReschedule,
+  handleRejectReschedule,
+  scheduleOccurrences,
+  isMobile
 }: StudentBriefingModalsHubProps) {
   const formatQuickieDuration = (secs?: number | null) => {
     if (secs === null || secs === undefined || isNaN(secs)) return '0:00';
@@ -95,6 +112,20 @@ export function StudentBriefingModalsHub({
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
+
+  const pendingReschedules = React.useMemo(() => {
+    return (scheduleOccurrences || []).filter((occ: any) => {
+      if (!occ) return false;
+      const status = String(occ.status || '').toLowerCase();
+      if (status === 'rescheduled_confirmed' || status === 'reschedule_rejected' || status === 'confirmed') {
+        return false;
+      }
+      if (occ.student_acknowledged || occ.studentAcknowledged) {
+        return false;
+      }
+      return status === 'pending_reschedule' || status === 'pending_student_approval' || Boolean(occ.is_moved && !occ.student_acknowledged);
+    });
+  }, [scheduleOccurrences]);
 
   return (
     <>
@@ -680,7 +711,7 @@ export function StudentBriefingModalsHub({
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         border: 'none',
                         borderRadius: '14px',
                         padding: '12px',
@@ -688,7 +719,7 @@ export function StudentBriefingModalsHub({
                         fontSize: '0.88rem',
                         fontWeight: 900,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
                       }}
                       className="hover-scale"
                     >
@@ -886,9 +917,10 @@ export function StudentBriefingModalsHub({
                             justifyContent: 'space-between',
                             padding: '10px 14px',
                             borderRadius: '12px',
-                            background: isSelected ? '#f0fdf4' : '#ffffff',
-                            border: isSelected ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-                            color: isSelected ? '#15803d' : '#334155',
+                            background: isSelected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                            border: isSelected ? 'none' : '1px solid #e2e8f0',
+                            color: isSelected ? '#ffffff' : '#334155',
+                            boxShadow: isSelected ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none',
                             fontSize: '0.82rem',
                             fontWeight: 800,
                             cursor: 'pointer',
@@ -897,7 +929,7 @@ export function StudentBriefingModalsHub({
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Headphones size={15} color={isSelected ? '#16a34a' : '#64748b'} />
+                            <Headphones size={15} color={isSelected ? '#ffffff' : '#64748b'} />
                             <span>{trackLabel}</span>
                           </div>
                           {t.duration && (
@@ -959,6 +991,47 @@ export function StudentBriefingModalsHub({
           </div>
         );
       })()}
+
+      {/* 📅 0.1% Goldstandard: Student Reschedule Decision Hub */}
+      {rescheduleDecisionModalOcc && (
+        <StudentRescheduleDecisionModal
+          isOpen={Boolean(rescheduleDecisionModalOcc)}
+          onClose={() => setRescheduleDecisionModalOcc && setRescheduleDecisionModalOcc(null)}
+          occurrence={rescheduleDecisionModalOcc}
+          teacherName={briefingData?.todayLesson?.teacher_name || briefingData?.nextLesson?.teacher_name || studentUser?.teacher_name}
+          instrumentName={studentInstrumentName}
+          onConfirm={async (occId) => {
+            if (handleTriggerConfirmReschedule) {
+              await handleTriggerConfirmReschedule(occId);
+            }
+          }}
+          onReject={async (occ) => {
+            if (handleRejectReschedule) {
+              await handleRejectReschedule(occ);
+            }
+          }}
+          onOpenChat={(teacherId, defaultMsg) => {
+            if (setAppointmentChatData && setShowAppointmentChat) {
+              setAppointmentChatData({
+                occurrence: rescheduleDecisionModalOcc,
+                teacherId,
+                teacherName: briefingData?.todayLesson?.teacher_name || briefingData?.nextLesson?.teacher_name || studentUser?.teacher_name,
+                initialMessage: defaultMsg
+              });
+              setShowAppointmentChat(true);
+            }
+          }}
+        />
+      )}
+
+      {/* 🔔 0.1% Goldstandard: Collision-Free Toast Notification */}
+      {pendingReschedules.length > 0 && (
+        <StudentRescheduleToast
+          pendingOccurrences={pendingReschedules}
+          onOpenDecision={(occ) => setRescheduleDecisionModalOcc && setRescheduleDecisionModalOcc(occ)}
+          isMobile={Boolean(isMobile)}
+        />
+      )}
     </>
   );
 }

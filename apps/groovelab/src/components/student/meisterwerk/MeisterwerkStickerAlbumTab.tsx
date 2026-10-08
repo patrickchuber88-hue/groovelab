@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
-  BookOpen, Music, Sliders, RotateCcw, Download, Star, Check, X, Award, ChevronRight,
-  Lock, Trophy, Compass, Clock, Sparkles, Flame, Target, Archive, Building2, GraduationCap
+  BookOpen, Music, Sliders, RotateCcw, Download, Star, Check, X, Award, ChevronRight, Lock, Trophy, Compass, Clock, Sparkles, Flame, Target, Archive, Building2, GraduationCap
 } from "lucide-react";
+import { useModalA11y } from "../../../hooks/useModalA11y";
 import Confetti from "react-confetti";
 import { isDevEnvironment } from "../../../utils/tenantUrlHelper";
 import { ALL_STICKERS, calculateCampusSchoolYearNumber, getUnifiedStickersMap, StickerUnlockResult } from "../../../domain/stickersAndTresor";
@@ -50,6 +50,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
   const [isXpLegendOpen, setIsXpLegendOpen] = useState(false);
   const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [selectedStickerDetailIdx, setSelectedStickerDetailIdx] = useState<number>(0);
+  const stickerDetailModalRef = useModalA11y(Boolean(selectedPreviewSticker), () => setSelectedPreviewSticker(null));
 
   const effectiveSchoolName = (() => {
     const candidates = [
@@ -2156,7 +2157,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                     background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
                     borderRadius: '26px',
                     padding: isMobileOrSim ? '20px 16px' : '28px 30px',
-                    border: '2px solid rgba(234, 179, 8, 0.4)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.12)',
                     boxShadow: '0 16px 36px -8px rgba(15, 23, 42, 0.4), 0 0 24px rgba(234, 179, 8, 0.15)',
                     display: 'flex',
                     flexDirection: 'column',
@@ -2597,6 +2598,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Sticker ${st.title} Details`}
+                ref={stickerDetailModalRef}
                 style={{
                   position: 'fixed',
                   inset: 0,

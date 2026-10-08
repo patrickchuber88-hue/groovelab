@@ -415,9 +415,9 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                     justifyContent: 'space-between',
                     padding: '12px 14px',
                     borderRadius: '14px',
-                    background: isCurrent ? '#f0fdf4' : '#f8fafc',
-                    border: isCurrent ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-                    boxShadow: isCurrent ? '0 2px 8px rgba(34, 197, 94, 0.08)' : 'none'
+                    background: isCurrent ? '#ecfdf5' : '#f8fafc',
+                    border: isCurrent ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.12)' : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -425,12 +425,12 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                       width: '36px',
                       height: '36px',
                       borderRadius: '10px',
-                      background: isCurrent ? '#dcfce7' : '#ffffff',
+                      background: isCurrent ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: isCurrent ? '#16a34a' : '#64748b',
-                      border: isCurrent ? '1px solid #86efac' : '1px solid rgba(0,0,0,0.06)'
+                      color: isCurrent ? '#ffffff' : '#64748b',
+                      border: isCurrent ? 'none' : '1px solid rgba(0,0,0,0.06)'
                     }}>
                       {isTablet ? <Tablet size={18} /> : isPhone ? <Smartphone size={18} /> : <Laptop size={18} />}
                     </div>
@@ -444,9 +444,10 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                             fontWeight: 850,
                             padding: '2px 8px',
                             borderRadius: '8px',
-                            background: '#dcfce7',
-                            color: '#15803d',
-                            border: '1px solid #86efac'
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                           }}>
                             🟢 Dieses Gerät (Aktiv)
                           </span>
@@ -583,16 +584,17 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
           <div style={{
             padding: '10px 12px',
             borderRadius: '10px',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            color: '#15803d',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            border: 'none',
+            color: '#ffffff',
             fontSize: '0.75rem',
-            fontWeight: 700,
+            fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
           }}>
-            <CheckCircle2 size={15} aria-hidden="true" />
+            <CheckCircle2 size={15} color="#ffffff" aria-hidden="true" />
             <span>{scrubSuccessMessage}</span>
           </div>
         )}

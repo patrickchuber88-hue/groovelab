@@ -9,6 +9,7 @@
  */
 
 import { UniversalLatencyEngine } from '../utils/universalLatencyEngine';
+import { acquireAudioLease, releaseAudioLease } from './audio/audioContextPool';
 
 export interface AudioRouteInfo {
   routeType: 'speaker' | 'headphones' | 'bluetooth' | 'usb';
@@ -258,27 +259,28 @@ class AudioLatencyService {
       throw new Error('Audio calibration requires a browser environment');
     }
 
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) {
+    const audioCtx = await acquireAudioLease('audio-latency-calibration');
+    if (!audioCtx) {
       throw new Error('Web Audio API is not supported on this browser');
-    }
-
-    const audioCtx = new AudioContextClass();
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
     }
 
     onProgress?.(15, 'Mikrofon initialisieren...');
 
     // Request raw mic stream without echo cancellation or noise suppression for true acoustic measurement
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        latency: 0
-      } as MediaTrackConstraints & { latency?: number }
-    });
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          latency: 0
+        } as MediaTrackConstraints & { latency?: number }
+      });
+    } catch (micErr) {
+      releaseAudioLease('audio-latency-calibration');
+      throw micErr;
+    }
 
     try {
       onProgress?.(20, 'Akustisches Mess-Signal vorbereiten...');
@@ -447,7 +449,7 @@ class AudioLatencyService {
     } finally {
       // Stop all mic tracks
       stream.getTracks().forEach(t => t.stop());
-      await audioCtx.close();
+      releaseAudioLease('audio-latency-calibration');
     }
   }
 

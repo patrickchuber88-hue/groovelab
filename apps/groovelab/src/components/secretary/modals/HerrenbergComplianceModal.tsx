@@ -132,7 +132,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
               height: '42px',
               borderRadius: '12px',
               background: '#ecfdf5',
-              border: '1.5px solid #86efac',
+              border: '1.5px solid #10b981',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -152,9 +152,9 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                   textTransform: 'uppercase',
                   padding: '2px 8px',
                   borderRadius: '6px',
-                  background: '#dcfce7',
-                  color: '#15803d',
-                  border: '1px solid #86efac'
+                  background: '#ecfdf5',
+                  color: '#059669',
+                  border: '1px solid #10b981'
                 }}>
                   BSG B 12 R 3/20 R
                 </span>
@@ -418,7 +418,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                       color: '#059669',
                       padding: '2px 8px',
                       borderRadius: '6px',
-                      border: '1px solid #86efac'
+                      border: '1px solid #10b981'
                     }}>
                       Säule {pillar.nr}
                     </span>
@@ -504,7 +504,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                     onClick={() => toggleCheck(item.id)}
                     style={{
                       background: '#ffffff',
-                      border: checkedItems[item.id] ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
+                      border: checkedItems[item.id] ? '1.5px solid #10b981' : '1.5px solid #e2e8f0',
                       borderRadius: '14px',
                       padding: '14px 18px',
                       display: 'flex',
@@ -599,16 +599,16 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                         gap: '6px',
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        border: copiedClause === clause.key ? '1px solid #86efac' : '1px solid #cbd5e1',
-                        background: copiedClause === clause.key ? '#ecfdf5' : '#ffffff',
-                        color: copiedClause === clause.key ? '#059669' : '#475569',
+                        border: copiedClause === clause.key ? 'none' : '1px solid #cbd5e1',
+                        background: copiedClause === clause.key ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                        color: copiedClause === clause.key ? '#ffffff' : '#475569',
                         fontSize: '0.74rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      {copiedClause === clause.key ? <Check size={14} /> : <Copy size={14} />}
+                      {copiedClause === clause.key ? <Check size={14} color="#ffffff" /> : <Copy size={14} />}
                       <span>{copiedClause === clause.key ? 'Kopiert!' : 'Kopieren'}</span>
                     </button>
                   </div>

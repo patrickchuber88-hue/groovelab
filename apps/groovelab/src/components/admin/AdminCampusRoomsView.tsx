@@ -9,6 +9,8 @@ import { supabase } from "../../lib/supabase";
 import { formatTeacherFullName, maskLastName } from "../../utils/nameHelper";
 import { CampusMyBookingsList } from "./rooms/CampusMyBookingsList";
 import { isInsideRegularWindow, isLessonBooking, purgeSpuriousLessonBookings } from "./rooms/roomBookingHelpers";
+import { useRoomSidebarState } from "./rooms/useRoomSidebarState";
+import { RoomSidebarToggleBtn } from "./rooms/RoomSidebarToggleBtn";
 
 const capitalizeName = (str: string | null | undefined): string => {
   if (!str) return "";
@@ -240,6 +242,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
   setSuccessAnimationRoomId,
 }) => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const { isRightSidebarOpen, setIsRightSidebarOpen, toggleSidebar } = useRoomSidebarState();
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     const storedWorkspace = typeof window !== 'undefined'
       ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
@@ -1921,6 +1924,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       // CRITICAL: Do NOT set isDateFilterActive(true) here! It filters out the active room and causes unexpected room jumping.
       setShowMyBookingsOnly(false); // Make sure booking sidebar is shown
       setShowPreviewField(true); // Force preview card to show immediately on first click
+      setIsRightSidebarOpen(true);
     };
 
     const handleCellClickWithDebounce = (dayIdx: number, hourStr: string, e?: React.MouseEvent<any>) => {
@@ -2379,6 +2383,14 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       return a.startTime.localeCompare(b.startTime);
     });
 
+    const todayBerlinStr = toBerlinYYYYMMDD(new Date());
+    const nowTimeStr = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+    const upcomingMyBookingsCount = myBookings.filter((b: any) => {
+      if (b.date > todayBerlinStr) return true;
+      if (b.date === todayBerlinStr) return (b.endTime || '23:59') >= nowTimeStr;
+      return false;
+    }).length;
+
     const DAYS_OF_WEEK = [
       { label: 'Montag', value: 'Monday', short: 'Mo' },
       { label: 'Dienstag', value: 'Tuesday', short: 'Di' },
@@ -2461,52 +2473,20 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
           }
           @media (max-width: 800px) {
-            .calendar-header-flex {
-              flex-direction: column !important;
-              align-items: stretch !important;
-              gap: 12px !important;
-            }
-            .calendar-controls-wrapper {
-              width: 100% !important;
-              justify-content: space-between !important;
-              gap: 8px !important;
-            }
-            .calendar-today-btn {
-              padding: 8px 14px !important;
-              font-size: 0.78rem !important;
-              height: 40px !important;
-              border-radius: 12px !important;
-              min-width: 72px !important;
-              flex-shrink: 0 !important;
-            }
-            .calendar-week-pagination {
-              padding: 4px 8px !important;
-              border-radius: 14px !important;
-              height: 40px !important;
-              flex-grow: 1 !important;
-              min-width: 0 !important;
-              justify-content: space-between !important;
-              gap: 4px !important;
-            }
-            .calendar-week-chevron-btn {
-              padding: 6px !important;
-              border-radius: 10px !important;
-              min-width: 36px !important;
-              height: 36px !important;
-              flex-shrink: 0 !important;
-            }
-            .calendar-week-label {
-              min-width: 0 !important;
-              font-size: 0.72rem !important;
-              flex-shrink: 1 !important;
-              white-space: nowrap !important;
-              gap: 4px !important;
-            }
+            .calendar-header-flex { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+            .calendar-controls-wrapper { width: 100% !important; justify-content: space-between !important; gap: 8px !important; }
+            .calendar-today-btn { padding: 8px 14px !important; font-size: 0.78rem !important; height: 40px !important; border-radius: 12px !important; min-width: 72px !important; flex-shrink: 0 !important; }
+            .calendar-week-pagination { padding: 4px 8px !important; border-radius: 14px !important; height: 40px !important; flex-grow: 1 !important; min-width: 0 !important; justify-content: space-between !important; gap: 4px !important; }
+            .calendar-week-chevron-btn { padding: 6px !important; border-radius: 10px !important; min-width: 36px !important; height: 36px !important; flex-shrink: 0 !important; }
+            .calendar-week-label { min-width: 0 !important; font-size: 0.72rem !important; flex-shrink: 1 !important; white-space: nowrap !important; gap: 4px !important; }
           }
           .rooms-board-grid {
-            grid-template-columns: 1fr 340px;
+            grid-template-columns: minmax(0, 1fr) 340px;
           }
-          @media (max-width: 1400px) {
+          .rooms-board-grid.sidebar-collapsed {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+          @media (max-width: 1024px) {
             .rooms-board-grid {
               grid-template-columns: 1fr !important;
             }
@@ -2522,12 +2502,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           }
         `}</style>
 
-        <div 
-          className="rooms-board-grid" 
+        <div
+          className={`rooms-board-grid ${!isRightSidebarOpen ? 'sidebar-collapsed' : ''}`}
           style={{ 
             display: isMobile ? 'flex' : 'grid', 
             flexDirection: isMobile ? 'column' : undefined,
-            gridTemplateColumns: isMobile ? '100%' : undefined,
+            gridTemplateColumns: isMobile ? '100%' : (!isRightSidebarOpen ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 340px'),
             gap: isMobile ? '12px' : '20px', 
             alignItems: 'stretch', 
             minWidth: 0,
@@ -3195,7 +3175,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   }}
                 >
                   <Calendar size={15} strokeWidth={2.4} />
-                  <span>Meine ({myBookings.length})</span>
+                  <span>Meine{upcomingMyBookingsCount > 0 ? ` (${upcomingMyBookingsCount})` : ''}</span>
                 </button>
 
                 {/* + Raum buchen (Campus Green Pill) */}
@@ -3583,8 +3563,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       {[
                         { label: 'Alle', value: 'Alle', icon: null },
                         { label: 'Klavier', value: 'klavier', icon: Music },
-                        { label: 'Drums', value: 'schlagzeug', icon: Disc },
-                        { label: 'PA', value: 'pa', icon: Volume2 }
+                        { label: 'Schlagzeug', value: 'schlagzeug', icon: Disc }
                       ].map((eq) => {
                         const isSelected = selectedEquipmentFilter === eq.value;
                         const IconComponent = eq.icon;
@@ -3811,6 +3790,14 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           <ChevronRight size={16} />
                         </button>
                       </div>
+
+                      {!isMobile && (
+                        <RoomSidebarToggleBtn
+                          isOpen={isRightSidebarOpen}
+                          onToggle={toggleSidebar}
+                          brandColor={brandColor}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -4163,10 +4150,20 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           )}
            {/* Right Sidebar: Booking Form OR Meine Buchungen */}
           {!isMobile && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%', alignSelf: 'stretch' }}>
+            <div
+              className="rooms-right-sidebar-panel"
+              style={{
+                display: !isRightSidebarOpen ? 'none' : 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                height: '100%',
+                alignSelf: 'stretch'
+              }}
+            >
               {/* Apple / Linear Segmented Control Header */}
               <div style={{
                 display: 'flex',
+                alignItems: 'center',
                 background: '#f2f2f7',
                 padding: '4px',
                 borderRadius: '16px',
@@ -4220,17 +4217,25 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                 >
                   <Calendar size={14} color={showMyBookingsOnly ? '#7c3aed' : '#64748b'} strokeWidth={2.4} />
                   <span>Meine Buchungen</span>
-                  <span style={{
-                    fontSize: '0.66rem',
-                    fontWeight: 900,
-                    background: showMyBookingsOnly ? '#7c3aed' : '#cbd5e1',
-                    color: '#ffffff',
-                    padding: '1px 6px',
-                    borderRadius: '100px'
-                  }}>
-                    {myBookings.length}
-                  </span>
+                  {upcomingMyBookingsCount > 0 && (
+                    <span style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 900,
+                      background: showMyBookingsOnly ? '#7c3aed' : '#cbd5e1',
+                      color: '#ffffff',
+                      padding: '1px 6px',
+                      borderRadius: '100px'
+                    }}>
+                      {upcomingMyBookingsCount}
+                    </span>
+                  )}
                 </button>
+                <RoomSidebarToggleBtn
+                  isOpen={isRightSidebarOpen}
+                  onToggle={toggleSidebar}
+                  brandColor={brandColor}
+                  variant="sidebar-close"
+                />
               </div>
 
               {showMyBookingsOnly ? (
@@ -4252,7 +4257,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     Meine Buchungen
                     <span style={{ fontSize: '0.72rem', background: 'rgba(175, 82, 222, 0.12)', color: '#af52de', padding: '2px 8px', borderRadius: '8px', fontWeight: 900 }}>
-                      {myBookings.length}
+                      {upcomingMyBookingsCount}
                     </span>
                   </h3>
 
@@ -5275,9 +5280,11 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       }}
                     >
                       <span>Meine Buchungen</span>
-                      <span style={{ fontSize: '0.68rem', background: '#7c3aed', color: '#ffffff', padding: '1px 6px', borderRadius: '100px', fontWeight: 900 }}>
-                        {myBookings.length}
-                      </span>
+                      {upcomingMyBookingsCount > 0 && (
+                        <span style={{ fontSize: '0.68rem', background: '#7c3aed', color: '#ffffff', padding: '1px 6px', borderRadius: '100px', fontWeight: 900 }}>
+                          {upcomingMyBookingsCount}
+                        </span>
+                      )}
                     </button>
                   </div>
 

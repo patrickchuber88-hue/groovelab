@@ -140,13 +140,13 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
     passTitle: 'Campus Pass',
     roleSubtitle: 'Campus Verwaltung',
     cardBorder: '1px solid rgba(52, 168, 83, 0.22)',
-    cardHoverBorder: '#86efac',
-    cardBgGradient: 'linear-gradient(145deg, #ffffff 0%, rgba(240, 253, 244, 0.65) 100%)',
-    cardHoverBg: '#f0fdf4',
-    accentColor: '#16a34a',
-    badgeBg: '#dcfce7',
-    badgeColor: '#15803d',
-    glowShadow: '0 4px 12px rgba(52, 168, 83, 0.08)'
+    cardHoverBorder: '#10b981',
+    cardBgGradient: 'linear-gradient(145deg, #ffffff 0%, rgba(236, 253, 245, 0.65) 100%)',
+    cardHoverBg: '#ecfdf5',
+    accentColor: '#10b981',
+    badgeBg: '#ecfdf5',
+    badgeColor: '#059669',
+    glowShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
   } : {
     passTitle: 'GrooveLab Pass',
     roleSubtitle: 'GrooveLab Verwaltung',

@@ -30,6 +30,38 @@ const getInitials = (firstName: string, lastName: string): string => {
   return [firstInit, lastInit].filter(Boolean).join(' ');
 }
 
+// Helper to grammatically decline German instrument names with 'unterricht'
+const formatInstrumentLesson = (instrument?: string): string => {
+  if (!instrument || !instrument.trim()) return 'Musikunterricht';
+  const clean = instrument.trim();
+  const lower = clean.toLowerCase();
+
+  // Sonderegeln / Fächer
+  if (lower.includes('gesang') || lower.includes('stimme') || lower.includes('vocal')) return 'Gesangsunterricht';
+  if (lower.includes('früherziehung') || lower.includes('mfe')) return 'Musikalische Früherziehung';
+  if (lower.includes('ensemble') || lower.includes('band')) return 'Bandprobe';
+  if (lower.includes('theorie') || lower.includes('gehörbildung')) return 'Theorieunterricht';
+
+  // Endung auf 'e' -> Fugen-n (Gitarre -> Gitarrenunterricht, Geige -> Geigenunterricht, etc.)
+  if (lower.endsWith('e')) {
+    return `${clean}nunterricht`;
+  }
+
+  // Endung auf Konsonant (Klavier -> Klavierunterricht, Schlagzeug -> Schlagzeugunterricht, etc.)
+  return `${clean}unterricht`;
+};
+
+// Helper to strictly sanitize instrument names: NEVER allow generic placeholders like 'Musiker'
+const cleanInstrument = (raw?: string): string => {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'musiker' || lower === 'mensch' || lower === 'allgemein' || lower === 'schüler' || lower === 'student') {
+    return '';
+  }
+  return trimmed;
+};
+
 // Normalize helpers for deduplication
 const normalizeTitle = (t: string) => (t || '').trim().toLowerCase();
 const normalizeTime = (t: string) => {
@@ -236,7 +268,7 @@ Deno.serve(async (req) => {
       .from('schedules')
       .select(`
         *,
-        teacher:teacher_id(first_name, last_name),
+        teacher:teacher_id(first_name, last_name, instrument),
         student:student_id(first_name, last_name, instrument),
         room:room_id(name)
       `)
@@ -255,7 +287,7 @@ Deno.serve(async (req) => {
       .from('schedule_occurrences')
       .select(`
         *,
-        teacher:teacher_id(first_name, last_name),
+        teacher:teacher_id(first_name, last_name, instrument),
         student:student_id(first_name, last_name, instrument)
       `)
       .gte('date', pastBoundaryStr)
@@ -565,14 +597,47 @@ Deno.serve(async (req) => {
     }
 
     // 7. Generate RFC 5545 iCalendar data stream
-    const calendarName = role === 'student' ? `Campus & Musikunterricht (${first_name})` : `Campus & Unterricht (${first_name} ${last_name})`
+    // 0,1% Goldstandard Naming: [Instrument]unterricht - [Lehrkraft] (z. B. Gitarrenunterricht - Peter Pan)
+    let instrumentName = '';
+    let teacherName = '';
+
+    if (role === 'student') {
+      const primarySchedule = schedules?.[0] || occurrences?.[0];
+      if (primarySchedule?.teacher) {
+        teacherName = `${primarySchedule.teacher.first_name || ''} ${primarySchedule.teacher.last_name || ''}`.trim();
+        if (primarySchedule.teacher.instrument) {
+          instrumentName = primarySchedule.teacher.instrument;
+        }
+      }
+      if (!cleanInstrument(instrumentName) && primarySchedule?.student?.instrument) {
+        instrumentName = primarySchedule.student.instrument;
+      }
+      if (!cleanInstrument(instrumentName)) {
+        instrumentName = user.instrument || '';
+      }
+    } else {
+      // Lehrer oder Schulleitung (Lehrkraft ist der Benutzer selbst)
+      teacherName = `${first_name || ''} ${last_name || ''}`.trim();
+      instrumentName = user.instrument || schedules?.[0]?.teacher?.instrument || '';
+    }
+
+    const effectiveFeedInstrument = cleanInstrument(instrumentName) || 'Gitarre';
+    const lessonType = formatInstrumentLesson(effectiveFeedInstrument);
+    const calendarName = teacherName
+      ? `${lessonType} - ${teacherName}`
+      : `${lessonType} (${first_name})`;
+
     let icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//Campus-Groovelab//Campus Calendar//DE',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      `X-WR-CALNAME:${calendarName}`,
+      `X-WR-CALNAME:${escapeText(calendarName)}`,
+      `NAME:${escapeText(calendarName)}`,
+      'X-WR-CALDESC:Live-Stundenplan der Musikschule. Ausfälle & Termine synchronisieren sich automatisch.',
+      'X-APPLE-CALENDAR-COLOR:#34A853',
+      'COLOR:#34A853',
       'X-PUBLISHED-TTL:PT1H',
       'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
       'X-WR-TIMEZONE:Europe/Berlin',
@@ -605,7 +670,9 @@ Deno.serve(async (req) => {
       return `${y}${m}${r}T${h}${n}${s}`
     }
 
-    const stampStr = formatIcalDate(new Date())
+    // Deterministic timestamp rounded to 15-minute window for RFC 7232 ETag consistency
+    const roundedStampTime = new Date(Math.floor(Date.now() / (15 * 60 * 1000)) * (15 * 60 * 1000))
+    const stampStr = formatIcalDate(roundedStampTime)
 
     // Helper to format ISO Date to YYYYMMDD for all-day events
     const formatAllDayDate = (dateStr: string) => {
@@ -650,34 +717,60 @@ Deno.serve(async (req) => {
         const studentInitial = studentLastName ? ` ${studentLastName[0].toUpperCase()}.` : ''
         const studentName = `${studentFirstName}${studentInitial}`
 
-        const instrumentSuffix = (occ.student && occ.student.instrument) ? ` (${occ.student.instrument})` : ''
+        // 🏛️ 0,1% Goldstandard: Instrument MUSS IMMER an die Lehrkraft und das Fach geknüpft sein (NIEMALS "Musiker"!)
+        const rawTeacherInst = occ.teacher?.instrument || occ.schedule?.teacher?.instrument || (role !== 'student' ? user.instrument : '');
+        const cleanTeacherInst = cleanInstrument(rawTeacherInst);
+        const cleanStudentInst = cleanInstrument(occ.student?.instrument);
+        const effectiveInstrument = cleanTeacherInst || cleanStudentInst || 'Gitarre';
 
-        // Build summary title according to status and role
+        const instrumentSuffix = effectiveInstrument ? ` (${effectiveInstrument})` : '';
+
+        // 🏛️ 0,1% Goldstandard: Typografisch monochrome Exception-Glyphen für Statusabweichungen
+        // Regulärer Unterricht bleibt symbolfrei (maximale visuelle Ruhe / Management by Exception)
+        const isEntfall = occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+        const isReschedule = occ.status === 'pending_reschedule' || occ.status === 'rescheduled';
+
         const prefix = occ.status === 'pending_reschedule'
-          ? '🔄 ÄNDERUNG ANGEFRAGT: '
-          : occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick'
-          ? 'AUSFALL: '
+          ? '↻ Verlegung angefragt: '
+          : occ.status === 'rescheduled'
+          ? '↻ Verlegt: '
+          : isEntfall
+          ? '✕ Entfall: '
           : isCanceled
-          ? '❌ ABGESAGT: '
-          : '🎵 '
+          ? '✕ Abgesagt: '
+          : '';
 
-        let summary = ''
+        let summary = '';
         if (isWorkSafe) {
-          summary = isCanceled ? '❌ AUSFALL: Campus-Groovelab Termin' : '🎵 Campus-Groovelab Termin'
+          summary = isCanceled
+            ? (isEntfall ? '✕ Entfall: Campus-Groovelab Termin' : '✕ Abgesagt: Campus-Groovelab Termin')
+            : isReschedule
+            ? '↻ Verlegt: Campus-Groovelab Termin'
+            : 'Campus-Groovelab Termin';
         } else if (role === 'student') {
-          summary = `${prefix}${studentFirstName}: Musikunterricht bei ${teacherName}${instrumentSuffix}`
+          if (prefix) {
+            summary = `${prefix}Musikunterricht bei ${teacherName}${instrumentSuffix}`;
+          } else {
+            summary = `${studentFirstName}: Musikunterricht bei ${teacherName}${instrumentSuffix}`;
+          }
         } else {
-          summary = `${prefix}Unterricht: ${studentName}${instrumentSuffix}`
+          if (prefix) {
+            summary = `${prefix}${studentName}${instrumentSuffix}`;
+          } else {
+            summary = `Unterricht: ${studentName}${instrumentSuffix}`;
+          }
         }
 
         // Build structured DESCRIPTION
-        let statusDesc = 'Bestätigt 📅'
+        let statusDesc = 'Bestätigt';
         if (occ.status === 'pending_reschedule') {
-          statusDesc = 'Verschiebung angefragt 🔄'
-        } else if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
-          statusDesc = 'Ausfall (Terminabsage)'
+          statusDesc = 'Verschiebung angefragt';
+        } else if (occ.status === 'rescheduled') {
+          statusDesc = 'Termin verlegt';
+        } else if (isEntfall) {
+          statusDesc = 'Entfall (Unterrichtsausfall)';
         } else if (isCanceled) {
-          statusDesc = 'Abgesagt ❌'
+          statusDesc = 'Abgesagt';
         }
 
         let descriptionLines = []
@@ -687,15 +780,15 @@ Deno.serve(async (req) => {
           if (role === 'student') {
             descriptionLines.push(`Schüler: ${studentFirstName}`)
           }
-          if (occ.student && occ.student.instrument) {
-            descriptionLines.push(`Instrument: ${occ.student.instrument}`)
+          if (effectiveInstrument) {
+            descriptionLines.push(`Instrument: ${effectiveInstrument}`)
           }
         }
         descriptionLines.push(`Raum: ${occ.room_name}`)
         if (occ.duration) {
           descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
         }
-        descriptionLines.push('Hinweis: Externe Kalender synchronisieren zeitverzögert. Rechtlich verbindlich bei Ausfall oder Raumwechsel ist stets die Campus-Groovelab App.')
+        descriptionLines.push('Hinweis: Externe Kalender synchronisieren zeitverzögert. Maßgeblich für den tagesaktuellen Unterrichts- und Raumstatus ist stets die Campus-Groovelab App.')
         descriptionLines.push('Plattform: Campus-Groovelab')
         descriptionLines.push('Direktlink: https://campus-groovelab.de/campus/homework')
         
@@ -741,11 +834,12 @@ Deno.serve(async (req) => {
             icsContent.push('DESCRIPTION:Erinnerung: Dein Unterrichtstermin beginnt in 2 Stunden.')
             icsContent.push('END:VALARM')
           } else {
-            const valarmDateStr = occ.date.replace(/-/g, '')
+            // 🏛️ 0,1% Enterprise Goldstandard: RFC 5545 konforme relative Trigger (2h und 30m vor Unterricht)
+            // Schützt vor Zeitzonen- und Daylight-Saving-Parsing-Fehlern in Apple Kalender & Outlook
             icsContent.push('BEGIN:VALARM')
             icsContent.push('ACTION:DISPLAY')
-            icsContent.push(`TRIGGER;VALUE=DATE-TIME;TZID=Europe/Berlin:${valarmDateStr}T080000`)
-            icsContent.push('DESCRIPTION:Erinnerung: Heute ist dein Unterrichtstermin!')
+            icsContent.push('TRIGGER:-PT2H')
+            icsContent.push('DESCRIPTION:Erinnerung: Dein Unterrichtstermin beginnt in 2 Stunden.')
             icsContent.push('END:VALARM')
 
             icsContent.push('BEGIN:VALARM')
@@ -798,7 +892,6 @@ Deno.serve(async (req) => {
 
       // Colors for campus events
       let color = '#e37400'; // Default orange
-      const catLower = (ev.category || '').toLowerCase();
       if (catLower.includes('ferien') || catLower.includes('feiertag')) {
         color = '#8f9099';
         icsContent.push('TRANSP:TRANSPARENT');

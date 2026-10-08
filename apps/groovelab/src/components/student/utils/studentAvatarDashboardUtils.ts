@@ -7,7 +7,7 @@ export const sanitizeTextInput = (text: string | null | undefined): string => {
 };
 
 export const cleanTitle = (t: string | null | undefined): string =>
-  (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+  (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
 // Habit-Building & Kinderschutz Konstanten (DSA Art. 28 Compliance)
 export const MIN_PRACTICE_SECONDS = 180; // 3 Minuten für Flamme/Qualifikation

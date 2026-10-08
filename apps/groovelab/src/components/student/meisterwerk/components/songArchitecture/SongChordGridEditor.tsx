@@ -272,7 +272,7 @@ export const SongChordGridEditor: React.FC<SongChordGridEditorProps> = ({
                   height: '10px',
                   borderRadius: '50%',
                   background: '#16a34a',
-                  border: '2px solid #ffffff',
+                  border: 'none',
                   boxShadow: '0 0 8px rgba(22, 163, 74, 0.6)'
                 }} />
               )}

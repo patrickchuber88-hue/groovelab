@@ -322,7 +322,7 @@ export function GroupedSongCard({
             gap: '6px', 
             boxShadow: '0 8px 16px rgba(245, 158, 11, 0.4)', 
             zIndex: 20,
-            border: '2px solid white'
+            border: 'none'
           }}>
             <Users size={12} fill="white" /> Band Song
           </div>
@@ -846,8 +846,8 @@ export function GroupedSongCard({
                   </div>
                   
                   {isFullyStaffed ? (
-                    <div style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', color: 'white', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)' }}>
-                      <Star size={14} fill="white" /> VOLLSTÄNDIG
+                    <div style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', color: '#0f172a', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)', border: 'none' }}>
+                      <Star size={14} fill="#0f172a" stroke="#0f172a" /> VOLLSTÄNDIG
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>

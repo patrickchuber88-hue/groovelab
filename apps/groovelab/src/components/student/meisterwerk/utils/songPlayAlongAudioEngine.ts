@@ -7,6 +7,9 @@
  */
 
 import { PITCH_CLASSES, getChordNotes } from './musicTheoryEngine';
+import { StudioSampleLibrary } from '../../../../services/audio/StudioSampleLibrary';
+import { PhysicalModelingEngine } from '../../../../services/audio/PhysicalModelingEngine';
+import { StudioKeyboardEngine } from '../../../../services/audio/StudioKeyboardEngine';
 
 export interface AudioMixerState {
   masterVolume: number;     // 0..1
@@ -94,6 +97,9 @@ class SongPlayAlongAudioEngine {
       for (let i = 0; i < bufferSize; i++) {
         data[i] = Math.random() * 2 - 1;
       }
+
+      // Warm up StudioSampleLibrary (Preloads Drums & Melodic Studio Samples)
+      StudioSampleLibrary.warmUp(this.ctx);
     }
 
     if (this.ctx.state === 'suspended') {
@@ -143,113 +149,49 @@ class SongPlayAlongAudioEngine {
   }
 
   /**
-   * Synthesize Kick Drum (Punchy pitch-decay 808 style)
+   * Play Studio Kick Drum (Stereo, Multi-Velocity, Round-Robin)
    */
-  public playKick() {
+  public playKick(volMul = 1.0) {
     if (this.mixerState.isMuted || this.mixerState.drumsMuted || this.mixerState.drumsVolume <= 0) return;
     const ctx = this.initContext();
     if (!ctx || !this.masterGain) return;
 
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    // Frequency sweeps down rapidly: 140 Hz -> 40 Hz
-    osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(42, now + 0.08);
-
-    const volume = this.mixerState.drumsVolume * 0.7;
-    gain.gain.setValueAtTime(volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-
-    osc.start(now);
-    osc.stop(now + 0.25);
+    StudioSampleLibrary.trigger(ctx, 'kick', {
+      velocity: this.mixerState.drumsVolume * volMul * 0.95,
+      destination: this.masterGain
+    });
   }
 
   /**
-   * Synthesize Snare Drum (Bandpassed noise + tone punch)
+   * Play Studio Snare Drum (14" Black Beauty Stereo mit Teppich-Sizzle)
    */
-  public playSnare() {
+  public playSnare(volMul = 1.0) {
     if (this.mixerState.isMuted || this.mixerState.drumsMuted || this.mixerState.drumsVolume <= 0) return;
     const ctx = this.initContext();
-    if (!ctx || !this.masterGain || !this.noiseBuffer) return;
+    if (!ctx || !this.masterGain) return;
 
-    const now = ctx.currentTime;
-
-    // 1. Noise snap
-    const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = this.noiseBuffer;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1600, now);
-    filter.Q.setValueAtTime(1.2, now);
-
-    const noiseGain = ctx.createGain();
-    const volume = this.mixerState.drumsVolume * 0.45;
-    noiseGain.gain.setValueAtTime(volume, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-
-    noiseSource.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
-
-    // 2. Tone body
-    const osc = ctx.createOscillator();
-    const oscGain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(90, now + 0.06);
-
-    oscGain.gain.setValueAtTime(volume * 0.6, now);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-    osc.connect(oscGain);
-    oscGain.connect(this.masterGain);
-
-    noiseSource.start(now);
-    noiseSource.stop(now + 0.18);
-    osc.start(now);
-    osc.stop(now + 0.1);
+    StudioSampleLibrary.trigger(ctx, 'snare', {
+      velocity: this.mixerState.drumsVolume * volMul * 0.90,
+      destination: this.masterGain
+    });
   }
 
   /**
-   * Synthesize Hi-Hat (Crisp high-passed noise pulse)
+   * Play Studio Hi-Hat (Zildjian K-Custom Stereo mit Choke)
    */
-  public playHiHat(isOpen = false) {
+  public playHiHat(isOpen = false, volMul = 1.0) {
     if (this.mixerState.isMuted || this.mixerState.drumsMuted || this.mixerState.drumsVolume <= 0) return;
     const ctx = this.initContext();
-    if (!ctx || !this.masterGain || !this.noiseBuffer) return;
+    if (!ctx || !this.masterGain) return;
 
-    const now = ctx.currentTime;
-    const source = ctx.createBufferSource();
-    source.buffer = this.noiseBuffer;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(7500, now);
-
-    const gain = ctx.createGain();
-    const duration = isOpen ? 0.25 : 0.05;
-    const volume = this.mixerState.drumsVolume * (isOpen ? 0.3 : 0.2);
-
-    gain.gain.setValueAtTime(volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-
-    source.start(now);
-    source.stop(now + duration + 0.02);
+    StudioSampleLibrary.trigger(ctx, isOpen ? 'hatOpen' : 'hatClosed', {
+      velocity: this.mixerState.drumsVolume * volMul * (isOpen ? 0.75 : 0.65),
+      destination: this.masterGain
+    });
   }
 
   /**
-   * Synthesize Sub-Bass Root Note with warm fundamental and sub-sine
+   * Synthesize Studio E-Bass (Extended Karplus-Strong Physical String Model)
    */
   public playBassNote(chordName: string) {
     if (this.mixerState.isMuted || this.mixerState.bassMuted || this.mixerState.bassVolume <= 0) return;
@@ -260,38 +202,24 @@ class SongPlayAlongAudioEngine {
     const pitch = chordInfo.bass ? (PITCH_CLASSES[chordInfo.bass.toUpperCase()] ?? chordInfo.rootPitch) : chordInfo.rootPitch;
     const freq = NOTE_BASE_FREQS[pitch] || 65.41;
 
-    const now = ctx.currentTime;
-    const duration = 0.85;
+    // 0,1% Dry Studio Bass Sample Trigger (Fender Precision) mit Karplus-Strong Waveguide Fallback
+    const sampleNode = StudioSampleLibrary.triggerInstrumentNote(ctx, 'bass', freq, {
+      durationSec: 1.25,
+      velocity: this.mixerState.bassVolume * 0.92,
+      destination: this.masterGain
+    });
+    if (sampleNode) return;
 
-    // 1. Primary body oscillator (triangle)
-    const osc1 = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(freq, now);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(280, now);
-    filter.frequency.exponentialRampToValueAtTime(140, now + duration);
-
-    const volume = this.mixerState.bassVolume * 0.42;
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(volume, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    osc1.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-
-    osc1.start(now);
-    osc1.stop(now + duration + 0.05);
+    PhysicalModelingEngine.playNote(ctx, {
+      pitchHz: freq,
+      durationSec: 1.25,
+      velocity: this.mixerState.bassVolume * 0.92,
+      pluckType: 'electric_bass'
+    }, ctx.currentTime, this.masterGain);
   }
 
   /**
-   * Synthesize Polyphonic Warm VST E-Piano / Studio Rhodes Chord
-   * Uses dual oscillators per voice (triangle body + bell chime overtone)
-   * with dynamic filter sweep and natural musical sustain.
+   * Synthesize Polyphonic Studio Rhodes Mark I Suitcase 73 Chords
    */
   public playChordPad(chordName: string) {
     if (this.mixerState.isMuted || this.mixerState.chordsMuted || this.mixerState.chordsVolume <= 0) return;
@@ -299,61 +227,15 @@ class SongPlayAlongAudioEngine {
     if (!ctx || !this.masterGain) return;
 
     const chordInfo = getChordNotes(chordName);
-    const now = ctx.currentTime;
-    const duration = 1.6;
-    const voiceCount = Math.max(1, chordInfo.pitchClasses.length);
-    const chordVolume = (this.mixerState.chordsVolume * 0.22) / voiceCount;
-
-    chordInfo.pitchClasses.slice(0, 5).forEach((pitch, idx) => {
-      if (!ctx || !this.masterGain) return;
+    const freqs = chordInfo.pitchClasses.slice(0, 5).map((pitch, idx) => {
       const baseFreq = NOTE_CHORD_FREQS[pitch] || 261.63;
-      // Voicing spread: lowest note as root, higher notes placed in musical register
-      const freq = idx === 0 ? baseFreq : baseFreq * (idx >= 3 ? 2 : 1);
+      return idx === 0 ? baseFreq : baseFreq * (idx >= 3 ? 2 : 1);
+    });
 
-      // --- Oscillator 1: Warm Body (Triangle with slight detune) ---
-      const oscBody = ctx.createOscillator();
-      const detuneCents = (idx % 2 === 0 ? 1.5 : -1.5);
-      oscBody.type = 'triangle';
-      oscBody.frequency.setValueAtTime(freq, now);
-      oscBody.detune.setValueAtTime(detuneCents, now);
-
-      // --- Oscillator 2: Bell / Tine Attack Harmonic (Sine at 2x freq) ---
-      const oscTine = ctx.createOscillator();
-      oscTine.type = 'sine';
-      oscTine.frequency.setValueAtTime(freq * 2, now);
-
-      // Tine envelope: quick bright decay (hammer strike chime)
-      const tineGain = ctx.createGain();
-      tineGain.gain.setValueAtTime(0.001, now);
-      tineGain.gain.linearRampToValueAtTime(chordVolume * 0.4, now + 0.008);
-      tineGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
-
-      // Body envelope: natural sustain lingering musically
-      const bodyGain = ctx.createGain();
-      bodyGain.gain.setValueAtTime(0.001, now);
-      bodyGain.gain.linearRampToValueAtTime(chordVolume, now + 0.02);
-      bodyGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-      // Dynamic lowpass filter: bright attack (2400Hz) settling to round tone (850Hz)
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(2400, now);
-      filter.frequency.exponentialRampToValueAtTime(850, now + 0.6);
-
-      // Routing
-      oscBody.connect(bodyGain);
-      oscTine.connect(tineGain);
-
-      bodyGain.connect(filter);
-      tineGain.connect(filter);
-
-      filter.connect(this.masterGain);
-
-      oscBody.start(now);
-      oscTine.start(now);
-
-      oscBody.stop(now + duration + 0.05);
-      oscTine.stop(now + 0.35);
+    StudioKeyboardEngine.playRhodesChord(ctx, freqs, {
+      durationSec: 2.0,
+      velocity: this.mixerState.chordsVolume * 0.88,
+      destination: this.masterGain
     });
   }
 
@@ -427,36 +309,11 @@ class SongPlayAlongAudioEngine {
     const pitchClass = PITCH_CLASSES[clean] ?? 0;
     const baseFreq = NOTE_CHORD_FREQS[pitchClass] || 261.63;
 
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(baseFreq, now);
-
-    // Subtle Rhodes chime overtone
-    const oscChime = ctx.createOscillator();
-    const gainChime = ctx.createGain();
-    oscChime.type = 'triangle';
-    oscChime.frequency.setValueAtTime(baseFreq * 2, now);
-
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.45, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + durationSec);
-
-    gainChime.gain.setValueAtTime(0, now);
-    gainChime.gain.linearRampToValueAtTime(0.18, now + 0.015);
-    gainChime.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-
-    osc.connect(gain);
-    oscChime.connect(gainChime);
-    gain.connect(this.masterGain);
-    gainChime.connect(this.masterGain);
-
-    osc.start(now);
-    oscChime.start(now);
-    osc.stop(now + durationSec + 0.05);
-    oscChime.stop(now + 0.3);
+    StudioKeyboardEngine.playRhodesNote(ctx, baseFreq, {
+      durationSec,
+      velocity: 0.85,
+      destination: this.masterGain
+    });
   }
 
   /**

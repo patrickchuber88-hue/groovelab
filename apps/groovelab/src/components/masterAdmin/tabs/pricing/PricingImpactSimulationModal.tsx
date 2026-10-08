@@ -110,10 +110,10 @@ export const PricingImpactSimulationModal: React.FC<PricingImpactSimulationModal
         <div style={{
           padding: '14px 18px',
           borderRadius: '14px',
-          background: isLifetimeProtected ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#fffbeb',
-          border: `1.5px solid ${isLifetimeProtected ? '#86efac' : '#fde68a'}`,
+          background: isLifetimeProtected ? '#ecfdf5' : '#fffbeb',
+          border: `1.5px solid ${isLifetimeProtected ? '#10b981' : '#fde68a'}`,
           fontSize: '0.82rem',
-          color: isLifetimeProtected ? '#14532d' : '#92400e',
+          color: isLifetimeProtected ? '#065f46' : '#92400e',
           lineHeight: 1.5,
           display: 'flex',
           gap: '12px',
@@ -121,7 +121,7 @@ export const PricingImpactSimulationModal: React.FC<PricingImpactSimulationModal
         }}>
           {isLifetimeProtected ? (
             <>
-              <ShieldCheck size={20} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <ShieldCheck size={20} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div>
                 <strong>100% Lifetime-Bestandsschutz gewahrt:</strong> Die geänderten Tarife gelten ausschließlich als neuer Katalogpreis für zukünftige Neuregistrierungen. Sämtliche bestehenden Musikschulen behalten ihre vertraglichen Sockelpreise und Profilgebühren dauerhaft bei 0,00 {sym} Mehrkosten.
               </div>

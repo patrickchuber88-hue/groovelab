@@ -321,7 +321,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   height: '10px',
                   borderRadius: '50%',
                   background: '#22c55e',
-                  border: '2px solid #ffffff',
+                  border: 'none',
                   boxShadow: '0 0 8px rgba(34, 197, 94, 0.8)'
                 }} />
               </div>

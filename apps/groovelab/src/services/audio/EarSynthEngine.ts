@@ -9,6 +9,8 @@
  * - Sample-accurate timing for intervals, chords, cadences and song anchors
  */
 
+import { StudioKeyboardEngine } from './StudioKeyboardEngine';
+
 export type SoundEngineTimbre = 'rhodes' | 'grand_piano' | 'strings';
 export type IntervalPlaybackMode = 'ascending' | 'descending' | 'harmonic';
 export type ChordPlaybackMode = 'block' | 'arpeggio_up' | 'arpeggio_down';
@@ -111,69 +113,21 @@ export class EarSynthEngine {
     const now = Math.max(ctx.currentTime, startTime);
 
     if (timbre === 'rhodes') {
-      // 🎹 Warmes Rhodes: Sinus + Dreieck + weicher Tine-Anschlag
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const voiceGain = ctx.createGain();
-
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, now);
-
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(freq * 2, now); // 1 Oktave sanfter Oberton
-
-      const attack = 0.02;
-      const decay = duration * 0.5;
-
-      voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(velocity * 0.9, now + attack);
-      voiceGain.gain.exponentialRampToValueAtTime(velocity * 0.45, now + attack + decay);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc1.connect(voiceGain);
-      osc2.connect(voiceGain);
-      voiceGain.connect(this.masterGain);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + duration + 0.05);
-      osc2.stop(now + duration + 0.05);
-
+      // 🎹 0,1% Studio Rhodes Suitcase 73 Mark I
+      StudioKeyboardEngine.playRhodesNote(ctx, freq, {
+        time: now,
+        durationSec: duration,
+        velocity,
+        destination: this.masterGain
+      });
     } else if (timbre === 'grand_piano') {
-      // 🎹 Konzertflügel: Perkussiver Hammer-Anschlag mit dynamischem Tiefpassfilter
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const filter = ctx.createBiquadFilter();
-      const voiceGain = ctx.createGain();
-
-      osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(freq, now);
-
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 3, now); // Quinte-Oberton
-
-      filter.type = 'lowpass';
-      // Dynamische Filteröffnung für natürlichen Klavier-Attack
-      const cutoff = Math.min(10000, Math.max(1200, freq * 4));
-      filter.frequency.setValueAtTime(cutoff * 1.5, now);
-      filter.frequency.exponentialRampToValueAtTime(cutoff * 0.7, now + duration);
-
-      const attack = 0.008;
-      voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(velocity * 1.1, now + attack);
-      voiceGain.gain.exponentialRampToValueAtTime(velocity * 0.4, now + attack + 0.2);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(voiceGain);
-      voiceGain.connect(this.masterGain);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + duration + 0.05);
-      osc2.stop(now + duration + 0.05);
-
+      // 🎹 0,1% Konzertflügel Cantabile mit 3-Chor Saiten-Schwebung
+      StudioKeyboardEngine.playGrandPianoNote(ctx, freq, {
+        time: now,
+        durationSec: duration,
+        velocity,
+        destination: this.masterGain
+      });
     } else {
       // 🎻 Warme Streicher / Strings-Pad: Sägezahn + Tiefpass mit weichem Einblenden
       const osc1 = ctx.createOscillator();
@@ -191,11 +145,14 @@ export class EarSynthEngine {
       filter.frequency.setValueAtTime(2400, now);
       filter.Q.setValueAtTime(2.0, now);
 
-      const attack = 0.08;
+      const attack = Math.min(0.08, duration * 0.2);
+      const release = 0.14;
+      const noteEndTime = now + duration;
+
       voiceGain.gain.setValueAtTime(0.0001, now);
       voiceGain.gain.linearRampToValueAtTime(velocity * 0.75, now + attack);
-      voiceGain.gain.setValueAtTime(velocity * 0.65, now + duration - 0.1);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      voiceGain.gain.setValueAtTime(velocity * 0.68, Math.max(now + attack + 0.01, noteEndTime));
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
       osc1.connect(filter);
       osc2.connect(filter);
@@ -204,8 +161,8 @@ export class EarSynthEngine {
 
       osc1.start(now);
       osc2.start(now);
-      osc1.stop(now + duration + 0.05);
-      osc2.stop(now + duration + 0.05);
+      osc1.stop(noteEndTime + release + 0.02);
+      osc2.stop(noteEndTime + release + 0.02);
     }
   }
 

@@ -422,7 +422,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                 onClick={() => setShowCreateModal(true)}
                 style={{
                   background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                  color: 'white',
+                  color: '#0f172a',
                   border: 'none',
                   padding: '14px 24px',
                   borderRadius: '16px',
@@ -869,7 +869,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                       <button
                         onClick={() => handleAddMember(selectedEnsemble.id)}
                         disabled={!selectedStudentId || !selectedInstrument.trim()}
-                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eab308', color: 'white', fontWeight: 800, cursor: 'pointer', opacity: (!selectedStudentId || !selectedInstrument.trim()) ? 0.5 : 1 }}
+                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eab308', color: '#0f172a', fontWeight: 800, cursor: 'pointer', opacity: (!selectedStudentId || !selectedInstrument.trim()) ? 0.5 : 1 }}
                       >
                         Zuweisen
                       </button>
@@ -926,7 +926,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                                   />
                                   <button
                                     onClick={() => handleUpdateMemberInstrument(mem.id)}
-                                    style={{ border: 'none', background: '#eab308', color: 'white', borderRadius: '6px', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    style={{ border: 'none', background: '#eab308', color: '#0f172a', borderRadius: '6px', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                   >
                                     <Check size={12} />
                                   </button>
@@ -1055,7 +1055,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                   disabled={!newMessageText.trim()}
                   style={{ 
                     background: '#eab308', 
-                    color: 'white', 
+                    color: '#0f172a', 
                     border: 'none', 
                     borderRadius: '14px', 
                     padding: '0 20px', 
@@ -1141,7 +1141,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                     <button
                       onClick={() => handleAddSong(selectedEnsemble.id)}
                       disabled={!selectedSongId}
-                      style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eab308', color: 'white', fontWeight: 800, cursor: 'pointer', opacity: !selectedSongId ? 0.5 : 1 }}
+                      style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eab308', color: '#0f172a', fontWeight: 800, cursor: 'pointer', opacity: !selectedSongId ? 0.5 : 1 }}
                     >
                       Hinzufügen
                     </button>
@@ -1279,7 +1279,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
               </button>
               <button
                 type="submit"
-                style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#eab308', color: 'white', fontWeight: 800, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#eab308', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
               >
                 Gründen
               </button>

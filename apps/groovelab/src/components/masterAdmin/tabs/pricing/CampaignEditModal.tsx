@@ -155,7 +155,7 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
             </div>
           </div>
 
-          <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #86efac', fontSize: '0.76rem', color: '#166534', lineHeight: 1.35 }}>
+          <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #10b981', fontSize: '0.76rem', color: '#065f46', lineHeight: 1.35 }}>
             🛡️ <strong>Bestandsschutz:</strong> Änderungen greifen für künftige Neuregistrierungen. Bereits eingelöste Schulen behalten ihre Konditionen.
           </div>
         </div>

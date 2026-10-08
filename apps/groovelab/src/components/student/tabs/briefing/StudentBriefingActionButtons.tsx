@@ -1,11 +1,14 @@
 import React from 'react';
-import { Calendar, CalendarX, Lock, MessageSquare, Sliders } from 'lucide-react';
+import { Calendar, CalendarX, Lock, MessageSquare, Sliders, RotateCcw } from 'lucide-react';
+
+import { isOccurrenceCancelled, isOccurrenceRescheduled, isOccurrencePendingReschedule } from './studentNextLessonHelper';
 
 export interface StudentBriefingActionButtonsProps {
   isMobile: boolean;
   nextOcc: any;
   lessonText: string;
-  isCanceled: boolean;
+  isCanceled?: boolean;
+  isRescheduled?: boolean;
   isUnlocked: boolean;
   teacherId?: string;
   hasMessage: boolean;
@@ -21,12 +24,14 @@ export interface StudentBriefingActionButtonsProps {
  * 0.1% Enterprise Goldstandard / Autarker Satellit für StudentBriefingTab
  * Bounded Context: Student Campus Briefing / Quick Actions
  * Standards: OWASP ASVS Level 3 / BFSG 2025 / WCAG 2.2 AA / WCAG 2.5.5 Touch Targets (>= 44px)
+ * 3-Farben-Doktrin: Regulär = Grün, Verschoben = Gelb, Ausfall = Rot (Zero Color-Clash, Tone-in-Tone)
  */
 export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtonsProps> = ({
   isMobile,
   nextOcc,
   lessonText,
   isCanceled,
+  isRescheduled,
   isUnlocked,
   teacherId,
   hasMessage,
@@ -50,52 +55,94 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
       }}
     >
       {/* 1. Nächster Unterricht / Status Card */}
-      {nextOcc ? (
-        <button 
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onOpenAppointmentDetail) {
-              onOpenAppointmentDetail(nextOcc);
-            }
-          }}
-          style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            justifyContent: isMobile ? 'center' : 'flex-start',
-            gap: '8px', 
-            background: isCanceled ? '#fee2e2' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-            color: isCanceled ? '#dc2626' : '#15803d', 
-            padding: '10px 16px', 
-            minHeight: '44px', 
-            boxSizing: 'border-box', 
-            borderRadius: '14px', 
-            fontSize: isMusicStandMode ? '0.88rem' : '0.82rem', 
-            fontWeight: 850, 
-            border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1px solid rgba(52, 168, 83, 0.22)',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-            width: isMobile ? '100%' : 'auto',
-            touchAction: 'manipulation'
-          }}
-          className="hover-scale"
-          title="Nächster Unterricht – Klicke für Details & Aktionen"
-          aria-label={isCanceled ? `Abgesagter Unterricht: ${lessonText}` : `Nächster Unterricht: ${lessonText}`}
-        >
-          {isCanceled ? (
-            <>
-              {!isUnlocked ? <Lock size={15} color="currentColor" /> : <CalendarX size={15} color="currentColor" />}
-              <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
-            </>
-          ) : (
-            <>
-              <Calendar size={15} color="currentColor" />
-              <span>Nächster Unterricht: {lessonText}</span>
-            </>
-          )}
-        </button>
-      ) : (
+      {nextOcc ? (() => {
+        const effCancelled = Boolean(isCanceled || isOccurrenceCancelled(nextOcc));
+        const effRescheduled = Boolean(!effCancelled && (isRescheduled || isOccurrenceRescheduled(nextOcc)));
+        const isPendingProposal = Boolean(effRescheduled && isOccurrencePendingReschedule(nextOcc));
+
+        // 🏛️ 0,1% Goldstandard: Tone-in-Tone Unifarben-Doktrin (Zero Color-Clash)
+        let cardBg = 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)';
+        let cardColor = '#15803d';
+        let cardBorder = '1px solid rgba(52, 168, 83, 0.22)';
+        let cardTitle = 'Nächster Unterricht – Klicke für Details & Aktionen';
+        let cardAriaLabel = `Nächster Unterricht: ${lessonText}`;
+
+        if (effCancelled) {
+          // 🔴 Ausfall = Rot
+          cardBg = '#fef2f2';
+          cardColor = '#dc2626';
+          cardBorder = '1px dashed rgba(239, 68, 68, 0.5)';
+          cardTitle = 'Unterricht abgesagt – Klicke für Details oder Reaktivierung';
+          cardAriaLabel = `Abgesagter Unterricht: ${lessonText}`;
+        } else if (effRescheduled) {
+          // 🟡 Verschoben = Gelb / Amber
+          cardBg = isPendingProposal 
+            ? '#fffbeb' 
+            : 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%)';
+          cardColor = '#b45309';
+          cardBorder = isPendingProposal 
+            ? '1.5px dashed #f59e0b' 
+            : '1px solid rgba(245, 158, 11, 0.35)';
+          cardTitle = isPendingProposal 
+            ? 'Terminvorschlag prüfen (Bestätigen oder Ablehnen)' 
+            : 'Verschobener Unterrichtstermin – Klicke für Details';
+          cardAriaLabel = isPendingProposal 
+            ? `Terminvorschlag (Verschoben): ${lessonText}` 
+            : `Verschobener Unterricht: ${lessonText}`;
+        }
+
+        return (
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenAppointmentDetail) {
+                onOpenAppointmentDetail(nextOcc);
+              }
+            }}
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: isMobile ? 'center' : 'flex-start',
+              gap: '8px', 
+              background: cardBg, 
+              color: cardColor, 
+              padding: '10px 16px', 
+              minHeight: '44px', 
+              boxSizing: 'border-box', 
+              borderRadius: '14px', 
+              fontSize: isMusicStandMode ? '0.88rem' : '0.82rem', 
+              fontWeight: 850, 
+              border: cardBorder,
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+              transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+              width: isMobile ? '100%' : 'auto',
+              touchAction: 'manipulation'
+            }}
+            className="hover-scale"
+            title={cardTitle}
+            aria-label={cardAriaLabel}
+          >
+            {effCancelled ? (
+              <>
+                {!isUnlocked ? <Lock size={15} color="currentColor" /> : <CalendarX size={15} color="currentColor" />}
+                <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
+              </>
+            ) : effRescheduled ? (
+              <>
+                <RotateCcw size={15} color="#b45309" strokeWidth={2.4} />
+                <span>Verschoben: {lessonText} {isPendingProposal && <span style={{ fontSize: '0.72rem', opacity: 0.9, fontWeight: 800 }}>(Prüfen &amp; Antworten)</span>}</span>
+              </>
+            ) : (
+              <>
+                <Calendar size={15} color="currentColor" />
+                <span>Nächster Unterricht: {lessonText}</span>
+              </>
+            )}
+          </button>
+        );
+      })() : (
         <div 
           style={{ 
             display: 'inline-flex', 
@@ -143,30 +190,30 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
               alignItems: 'center', 
               justifyContent: 'center',
               gap: '8px', 
-              background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
-              color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
+              background: unreadMsgCount > 0 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasMessage ? '#f8fafc' : '#ffffff'), 
+              color: unreadMsgCount > 0 ? '#ffffff' : (hasMessage ? '#1e293b' : '#334155'), 
               padding: isMusicStandMode ? '10px 18px' : '10px 16px', 
               minHeight: '44px', 
               boxSizing: 'border-box', 
               borderRadius: '14px', 
               fontSize: isMusicStandMode ? '0.88rem' : '0.82rem', 
               fontWeight: 850, 
-              border: unreadMsgCount > 0 ? '1.5px solid #86efac' : '1px solid #cbd5e1', 
+              border: unreadMsgCount > 0 ? 'none' : '1px solid #cbd5e1', 
               cursor: 'pointer',
-              boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
+              boxShadow: unreadMsgCount > 0 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
               width: isMobile ? '100%' : 'auto',
               touchAction: 'manipulation'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
-              e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+              e.currentTarget.style.background = unreadMsgCount > 0 ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : (hasMessage ? '#f1f5f9' : '#f8fafc');
+              e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 14px rgba(16, 185, 129, 0.40)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
-              e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
+              e.currentTarget.style.background = unreadMsgCount > 0 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasMessage ? '#f8fafc' : '#ffffff');
+              e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
             }}
             title="1:1 Shoutbox zum Unterrichtstermin"
             aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}

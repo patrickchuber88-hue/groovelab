@@ -10,6 +10,7 @@ import { playCountInBeep } from '../MeisterwerkAudioPlayers';
 import { SharedAudioEngine } from '../../../../utils/sharedAudioEngine';
 import { cleanSongOrBookTitle, formatHarmonizedAudioTitle } from '../../../../utils/audioNamingHelper';
 import { UniversalLatencyEngine } from '../../../../utils/universalLatencyEngine';
+import { STUDIO_RECORDING_TAIL_DECAY_MS, applyBufferTailFadeOut } from '../../../../utils/audioTailEngine';
 import { getSimulatedNow } from '../../studentDateUtils';
 import { Student } from '../../meisterwerk.types';
 
@@ -85,6 +86,7 @@ export function useMeisterwerkAudioRecording({
   const setIsCountInEnabled: React.Dispatch<React.SetStateAction<boolean>> = (passedSetIsCountInEnabled as React.Dispatch<React.SetStateAction<boolean>>) || setInternalIsCountInEnabled;
 
   const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
+  const [isReleasingAudio, setIsReleasingAudio] = useState<boolean>(false);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [isUploadingAudio, setIsUploadingAudio] = useState<boolean>(false);
   const [activeRecordingSongId, setActiveRecordingSongId] = useState<string | null>(null);
@@ -92,6 +94,7 @@ export function useMeisterwerkAudioRecording({
   const [recordCountInRemaining, setRecordCountInRemaining] = useState<number | null>(null);
   const [recordCountInMode, setRecordCountInMode] = useState<'get_ready' | 'metronome' | null>(null);
   const isPcmCaptureActiveRef = useRef<boolean>(false);
+  const tailDecayTimerRef = useRef<NodeJS.Timeout | number | null>(null);
   const [playAlongCountInRemaining, setPlayAlongCountInRemaining] = useState<number | null>(null);
   const [recordingSavedToast, setRecordingSavedToast] = useState<string | null>(null);
   const [justRecordedAudioUrl, setJustRecordedAudioUrl] = useState<string | null>(null);
@@ -214,17 +217,34 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
       const ctx = getSharedMetronomeAudioCtx();
       if (!ctx) return;
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(accent ? 1600 : 1000, ctx.currentTime);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.05);
+      const now = ctx.currentTime;
+      const primaryOsc = ctx.createOscillator();
+      const snapOsc = ctx.createOscillator();
+      const clickGain = ctx.createGain();
+      const snapGain = ctx.createGain();
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.06);
+      primaryOsc.type = 'sine';
+      primaryOsc.frequency.setValueAtTime(accent ? 1760 : 880, now);
+
+      snapOsc.type = 'triangle';
+      snapOsc.frequency.setValueAtTime(accent ? 3520 : 1760, now);
+
+      clickGain.gain.setValueAtTime(0.0001, now);
+      clickGain.gain.linearRampToValueAtTime(accent ? 0.35 : 0.22, now + 0.0008);
+      clickGain.gain.exponentialRampToValueAtTime(0.00001, now + (accent ? 0.026 : 0.020));
+
+      snapGain.gain.setValueAtTime(accent ? 0.45 : 0.30, now);
+      snapGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.012);
+
+      primaryOsc.connect(clickGain);
+      snapOsc.connect(snapGain);
+      snapGain.connect(clickGain);
+      clickGain.connect(ctx.destination);
+
+      primaryOsc.start(now);
+      snapOsc.start(now);
+      primaryOsc.stop(now + 0.035);
+      snapOsc.stop(now + 0.035);
     } catch (err) {
       console.warn('[AudioRecording] Metronome tick error:', err);
     }
@@ -349,6 +369,8 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
             if (latencyCompensationSec > 0) {
               capturedBuffer = alignAudioBufferToGrid(capturedBuffer, latencyCompensationSec, audioCtx);
             }
+            // 🪄 0,1% DAW Goldstandard: Cos² Soft-Release Fade-Out (35ms) am Puffer-Ende gegen Klicks & Kanten-Cuts
+            applyBufferTailFadeOut(capturedBuffer, 0.035);
             dspDuration = capturedBuffer.duration;
             processedBlob = audioBufferToWavBlob(capturedBuffer, {
               title: overrideLabel || audioLabelRef.current || 'Aufnahme',
@@ -754,7 +776,9 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
     if (isStoppingAudioRef.current) return;
     isStoppingAudioRef.current = true;
-    isPcmCaptureActiveRef.current = false;
+    setIsReleasingAudio(true);
+
+    // ⏱️ Metronom, Klick-Track & Count-In stoppen SOFORT (0 ms Latenz)
     setRecordCountInMode(null);
     cancelActiveRecordCountIn();
     cancelPlayAlongCountIn();
@@ -767,32 +791,44 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
       SharedAudioEngine.stopSessionAudioBypass();
     } catch {}
 
-    const rec = activeRecorder || mediaRecorderRef.current;
-    if (rec && rec.state !== 'inactive') {
-      try {
-        rec.requestData();
-      } catch {}
-      setTimeout(() => {
-        try {
-          if (rec.state !== 'inactive') rec.stop();
-        } catch {}
-        isStoppingAudioRef.current = false;
-      }, 500);
-    } else {
-      isStoppingAudioRef.current = false;
-    }
-
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
-    setIsRecordingAudio(false);
-    setActiveRecordingSongId(null);
+
+    // 🎧 0,1% DAW Goldstandard: Musikalische Ausklingzeit (Tail Decay Buffer)
+    // Mikrofon und verlustfreier PCM-Stream bleiben für STUDIO_RECORDING_TAIL_DECAY_MS (750 ms)
+    // aktiv, um Saiten-, Raum- und Korpusschwingungen natürlich und voll ausklingen zu lassen.
+    if (tailDecayTimerRef.current) {
+      clearTimeout(tailDecayTimerRef.current as any);
+      tailDecayTimerRef.current = null;
+    }
+
+    tailDecayTimerRef.current = setTimeout(() => {
+      isPcmCaptureActiveRef.current = false;
+      const rec = activeRecorder || mediaRecorderRef.current;
+      if (rec && rec.state !== 'inactive') {
+        try {
+          rec.stop();
+        } catch {}
+      }
+      setIsRecordingAudio(false);
+      setIsReleasingAudio(false);
+      setActiveRecordingSongId(null);
+      isStoppingAudioRef.current = false;
+      tailDecayTimerRef.current = null;
+    }, STUDIO_RECORDING_TAIL_DECAY_MS);
   };
 
   const handleRetakeRecordingAudio = () => {
     cancelActiveRecordCountIn();
     cancelPlayAlongCountIn();
+    if (tailDecayTimerRef.current) {
+      clearTimeout(tailDecayTimerRef.current as any);
+      tailDecayTimerRef.current = null;
+    }
+    isPcmCaptureActiveRef.current = false;
+    setIsReleasingAudio(false);
     if (recordingMetronomeIntervalRef.current) {
       clearInterval(recordingMetronomeIntervalRef.current);
       recordingMetronomeIntervalRef.current = null;
@@ -912,6 +948,16 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
       }
     }
   }, [isRecordingAudio, isRecordingMetronomeActive, recordingBpm]);
+
+  // 🧹 Unmount Safety: Tail Decay Timer abbrechen, falls Komponente während des Ausklingens entlädt
+  useEffect(() => {
+    return () => {
+      if (tailDecayTimerRef.current) {
+        clearTimeout(tailDecayTimerRef.current as any);
+        tailDecayTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const toggleFavoriteAudio = (url: string) => {
     setFavoriteAudioUrls(prev => {
@@ -1103,6 +1149,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
 
   return {
     isRecordingAudio,
+    isReleasingAudio,
     audioDuration,
     isUploadingAudio,
     activeRecordingSongId,

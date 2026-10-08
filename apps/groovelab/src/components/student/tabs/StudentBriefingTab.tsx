@@ -28,6 +28,9 @@ import { StudentBriefingSidebarBottomSheet } from './briefing/StudentBriefingSid
 import { StudentBriefingMobileBottomBar } from './briefing/StudentBriefingMobileBottomBar';
 import { deriveActiveHomeworkSummary, deriveJuniorHomeworkSummary } from './briefing/homeworkSummaryHelper';
 import { StudentBriefingActionButtons } from './briefing/StudentBriefingActionButtons';
+import { resolveNextStudentOccurrence } from './briefing/studentNextLessonHelper';
+import { isRescheduleAcknowledged } from '../../../services/studentRescheduleService';
+import { AuthoritativeHomeworkWidget } from '../homework/AuthoritativeHomeworkWidget';
 
 export interface StudentBriefingTabProps {
   studentId: string;
@@ -353,6 +356,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
   const [isXpPulsing, setIsXpPulsing] = useState<boolean>(false);
   const [floatingDepositAmount, setFloatingDepositAmount] = useState<number | null>(null);
   const pendingDepositRef = useRef<{ amount: number; oldVal: number } | null>(null);
+
+  // 🏛️ 0,1% Goldstandard: Reaktiv deterministischer Streak
+  const effectiveStreak = useMemo(() => {
+    const calculated = typeof getDeterministicWeekMetrics === 'function' ? (getDeterministicWeekMetrics()?.calculatedStreak || 0) : 0;
+    return Math.max(avatar?.streak_flame || 0, calculated);
+  }, [avatar?.streak_flame, getDeterministicWeekMetrics]);
 
   // Trigger deposit animation helper
   const triggerDepositAnimation = useCallback((amount: number, fromVal: number, toVal: number) => {
@@ -844,7 +853,53 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
   // 📅 1% Goldstandard: Termin-Aktions & Detail-Modal (Sichere Absage & Shoutbox)
   const [selectedAppointmentForDetail, setSelectedAppointmentForDetail] = useState<any | null>(null);
+  const [rescheduleDecisionModalOcc, setRescheduleDecisionModalOcc] = useState<any | null>(null);
   const [showCancelConfirmStep, setShowCancelConfirmStep] = useState<boolean>(false);
+
+  const handleOpenAppointmentDetail = useCallback((occ: any) => {
+    const studentId = props.studentId || studentUser?.id;
+    const isAck = occ?.student_acknowledged || (studentId && isRescheduleAcknowledged(studentId, occ?.date, occ?.start_time));
+    const isPendingApproval = (occ?.status === 'pending_reschedule' || occ?.status === 'pending_student_approval' || ((occ?.is_moved || occ?.is_rescheduled) && occ?.status !== 'rescheduled_confirmed' && occ?.status !== 'reschedule_rejected' && occ?.status !== 'confirmed')) && !isAck;
+    if (occ && isPendingApproval) {
+      setRescheduleDecisionModalOcc(occ);
+    } else {
+      setSelectedAppointmentForDetail(occ);
+      setShowCancelConfirmStep(false);
+    }
+  }, [props.studentId, studentUser?.id]);
+
+  // 🏛️ 0,1% Goldstandard: Nächster Unterrichtstermin (SSOT synchron mit Termine-Board)
+  const nextLessonInfo = useMemo(() => {
+    return resolveNextStudentOccurrence({
+      scheduleOccurrences,
+      schoolYearOccurrences,
+      briefingData,
+      studentId: props.studentId || studentUser?.id,
+      studentUser
+    });
+  }, [scheduleOccurrences, schoolYearOccurrences, briefingData, props.studentId, studentUser]);
+
+  const handleOpenAppointmentChat = useCallback(() => {
+    if (!nextLessonInfo.teacherId) return;
+    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    const targetDayOfWeek = nextLessonInfo.targetDateStr ? DAYS_DE[new Date(nextLessonInfo.targetDateStr).getDay()] : 'Termin';
+    const formattedDate = nextLessonInfo.targetDateStr ? new Date(nextLessonInfo.targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+    const label = `${targetDayOfWeek} (${formattedDate}), ${nextLessonInfo.timeLabel} Uhr`;
+    const hasToday = Boolean(briefingData?.todayLesson);
+    setAppointmentChatData({
+      teacherId: nextLessonInfo.teacherId,
+      teacher_id: nextLessonInfo.teacherId,
+      teacher: hasToday ? briefingData.todayLesson?.teacher : nextLessonInfo.nextOcc?.teacher,
+      teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextLessonInfo.nextOcc?.teacher_name || nextLessonInfo.nextOcc?.teacher),
+      date: nextLessonInfo.targetDateStr,
+      start_time: nextLessonInfo.timeLabel,
+      label,
+      occurrenceId: nextLessonInfo.finalOccurId,
+      status: nextLessonInfo.nextOcc?.status || (nextLessonInfo.isCanceled ? 'cancelled' : 'scheduled'),
+      isCancelled: nextLessonInfo.isCanceled
+    });
+    setShowAppointmentChat(true);
+  }, [nextLessonInfo, briefingData, setAppointmentChatData, setShowAppointmentChat]);
 
   // 🎧 1% Goldstandard: Aufnahmen-Modal (Studio Audio-Player)
   const [showRecordingsModal, setShowRecordingsModal] = useState<boolean>(false);
@@ -1487,17 +1542,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
                           <span style={{ 
-                            fontSize: (avatar?.streak_flame || 0) === 0 ? '2.1rem' : '2.6rem', 
+                            fontSize: effectiveStreak === 0 ? '2.1rem' : '2.6rem', 
                             fontWeight: 950, 
                             fontFamily: "'Plus Jakarta Sans', sans-serif", 
                             letterSpacing: '-0.02em',
                             color: 'white',
                             lineHeight: 1
                           }}>
-                            {(avatar?.streak_flame || 0) === 0 ? 'Startklar' : (avatar?.streak_flame || 0)}
+                            {effectiveStreak === 0 ? 'Startklar' : effectiveStreak}
                           </span>
                           <span style={{ fontSize: '0.95rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
-                            {(avatar?.streak_flame || 0) === 0 ? 'Tag 1' : ((avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage')}
+                            {effectiveStreak === 0 ? 'Tag 1' : (effectiveStreak === 1 ? 'Tag' : 'Tage')}
                           </span>
                         </div>
                       </div>
@@ -1616,206 +1671,57 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             Schön, dass du da bist! Lass uns Musik machen! 🎵
                           </p>
 
-                          {(() => {
-                            const nextOcc = (scheduleOccurrences || [])[0] || (schoolYearOccurrences || [])[0];
-                            const hasToday = !!briefingData?.todayLesson;
-                            const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
-                            const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
-                            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                            const todayStr = toLocalYYYYMMDD(getSimulatedNow());
-                            const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
-                            const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
-                            const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-                            const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
-                            const finalOccurId = hasToday 
-                              ? (briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
-                              : (nextOcc?.id || `sched-${studentId}`);
-                            const lessonText = hasToday 
-                              ? `Heute, ${briefingData.todayLesson.time} Uhr` 
-                              : (nextOcc ? (() => {
-                                  const d = new Date(nextOcc.date);
-                                  return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
-                                })() : 'Demnächst');
-                            const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
-                            const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
-                            const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
+                          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <StudentBriefingActionButtons
+                              isMobile={isMobile}
+                              nextOcc={nextLessonInfo.nextOcc}
+                              lessonText={nextLessonInfo.lessonText}
+                              isCanceled={nextLessonInfo.isCanceled}
+                              isRescheduled={nextLessonInfo.isRescheduled}
+                              isUnlocked={isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()}
+                              teacherId={nextLessonInfo.teacherId}
+                              hasMessage={checkOccurrenceHasMessages(nextLessonInfo.nextOcc || nextLessonInfo.finalOccurId, nextLessonInfo.targetDateStr)}
+                              unreadMsgCount={getOccurrenceUnreadCount(nextLessonInfo.nextOcc || nextLessonInfo.finalOccurId, nextLessonInfo.targetDateStr)}
+                              isMusicStandMode={isMusicStandMode}
+                              onOpenAppointmentDetail={handleOpenAppointmentDetail}
+                              onOpenChat={handleOpenAppointmentChat}
+                              onOpenToolbox={setShowStudentToolbox ? () => setShowStudentToolbox(true) : undefined}
+                            />
 
-                            return (
-                              <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                {/* 1. Next Lesson Status & Action Button */}
-                                {nextOcc ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedAppointmentForDetail(nextOcc);
-                                      setShowCancelConfirmStep(false);
-                                    }}
-                                    style={{ 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      gap: '8px', 
-                                      background: isCanceled ? '#fee2e2' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
-                                      color: isCanceled ? '#dc2626' : '#2e7d32', 
-                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
-                                      minHeight: isMusicStandMode ? '44px' : '38px', 
-                                      boxSizing: 'border-box', 
-                                      borderRadius: '14px', 
-                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
-                                      fontWeight: 850, 
-                                      border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.5)' : '1.5px solid rgba(52, 168, 83, 0.2)',
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                    }}
-                                    className="hover-scale"
-                                    title="Nächste Musikstunde – Klicke für Details & Aktionen"
-                                  >
-                                    {(() => {
-                                      const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
-                                      if (isCanceled) {
-                                        return (
-                                          <>
-                                            {!isUnlocked ? <Lock size={isMusicStandMode ? 16 : 14} color="#dc2626" /> : <CalendarX size={isMusicStandMode ? 16 : 14} color="#dc2626" />}
-                                            <span>Abgesagt: {lessonText} <span style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 700 }}>(Reaktivieren)</span></span>
-                                          </>
-                                        );
-                                      }
-                                      return (
-                                        <>
-                                          <Calendar size={isMusicStandMode ? 16 : 14} color="#34a853" />
-                                          <span>Nächste Musikstunde: {lessonText}</span>
-                                        </>
-                                      );
-                                    })()}
-                                  </button>
-                                ) : (
-                                  <div style={{ 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    gap: '8px', 
-                                    background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
-                                    color: '#2e7d32', 
-                                    padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
-                                    minHeight: isMusicStandMode ? '44px' : '38px', 
-                                    boxSizing: 'border-box', 
-                                    borderRadius: '14px', 
-                                    fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
-                                    fontWeight: 850, 
-                                    border: '1.5px solid rgba(52, 168, 83, 0.2)'
-                                  }}>
-                                    <Calendar size={isMusicStandMode ? 16 : 14} color="#34a853" />
-                                    <span>Nächste Musikstunde: Demnächst</span>
-                                  </div>
-                                )}
-
-                                {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
-                                {teacherId && (
-                                  <button 
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setAppointmentChatData({
-                                        teacherId, teacher_id: teacherId, teacher: hasToday ? briefingData.todayLesson?.teacher : nextOcc?.teacher, teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextOcc?.teacher_name || nextOcc?.teacher),
-                                        date: targetDateStr,
-                                        start_time: timeLabel,
-                                        label,
-                                        occurrenceId: finalOccurId,
-                                        status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
-                                        isCancelled: isCanceled
-                                      });
-                                      setShowAppointmentChat(true);
-                                    }}
-                                    style={{ 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      gap: '8px', 
-                                      background: unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff'), 
-                                      color: unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#1e293b' : '#334155'), 
-                                      padding: isMusicStandMode ? '10px 20px' : '10px 18px', 
-                                      minHeight: isMusicStandMode ? '48px' : '44px', 
-                                      boxSizing: 'border-box',
-                                      borderRadius: '14px', 
-                                      fontSize: isMusicStandMode ? '0.96rem' : '0.90rem', 
-                                      fontWeight: 900, 
-                                      border: unreadMsgCount > 0 ? '1.5px solid #86efac' : (hasMessage ? '1px solid #cbd5e1' : '1px solid #cbd5e1'), 
-                                      cursor: 'pointer',
-                                      boxShadow: unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
-                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.background = unreadMsgCount > 0 ? '#dcfce7' : (hasMessage ? '#f1f5f9' : '#f8fafc');
-                                      e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 12px rgba(21, 128, 61, 0.22)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.transform = 'none';
-                                      e.currentTarget.style.background = unreadMsgCount > 0 ? '#f0fdf4' : (hasMessage ? '#f8fafc' : '#ffffff');
-                                      e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 2px 8px rgba(21, 128, 61, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
-                                    }}
-                                    title="1:1 Shoutbox zum Unterrichtstermin"
-                                    aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
-                                  >
-                                    <MessageSquare 
-                                      size={isMusicStandMode ? 18 : 17} 
-                                      color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
-                                      fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
-                                    />
-                                    <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? 'Nachricht von Lehrkraft' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft')}</span>
-                                    {unreadMsgCount > 0 && (
-                                      <span style={{
-                                        background: '#15803d',
-                                        color: '#ffffff',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 950,
-                                        padding: '2px 8px',
-                                        borderRadius: '100px',
-                                        letterSpacing: '0.02em',
-                                        boxShadow: '0 2px 6px rgba(21, 128, 61, 0.35)'
-                                      }}>
-                                        {unreadMsgCount === 1 ? '1 neu' : `${unreadMsgCount} neu`}
-                                      </span>
-                                    )}
-                                  </button>
-                                )}
-
-
-                                {/* 4. Wochenfokus / Musik-Stern Badge */}
-                                {weeklyFocusMeta && (
-                                  <button 
-                                    type="button"
-                                    onClick={() => {
-                                      if (handleOpenHomeworkBookWithView) {
-                                        handleOpenHomeworkBookWithView('skillradar');
-                                      }
-                                    }}
-                                    style={{ 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      gap: '8px', 
-                                      background: 'linear-gradient(135deg, #fef3c7 0%, #fefce8 100%)', 
-                                      color: '#854d0e', 
-                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
-                                      minHeight: isMusicStandMode ? '44px' : '38px', 
-                                      boxSizing: 'border-box', 
-                                      borderRadius: '14px', 
-                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
-                                      fontWeight: 850, 
-                                      border: '1.5px solid #fde047',
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)',
-                                      transition: 'all 0.18s ease'
-                                    }}
-                                    className="hover-scale"
-                                    title="Zu deinem Musik-Stern im Aufgabenheft"
-                                  >
-                                    <span style={{ fontSize: '1.05rem' }}>⭐</span>
-                                    <span>Wochenfokus: {weeklyFocusMeta.label}</span>
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })()}
+                            {/* 4. Wochenfokus / Musik-Stern Badge */}
+                            {weeklyFocusMeta && (
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  if (handleOpenHomeworkBookWithView) {
+                                    handleOpenHomeworkBookWithView('skillradar');
+                                  }
+                                }}
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '8px', 
+                                  background: 'linear-gradient(135deg, #fef3c7 0%, #fefce8 100%)', 
+                                  color: '#854d0e', 
+                                  padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
+                                  minHeight: isMusicStandMode ? '44px' : '38px', 
+                                  boxSizing: 'border-box', 
+                                  borderRadius: '14px', 
+                                  fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
+                                  fontWeight: 850, 
+                                  border: '1.5px solid #fde047',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)',
+                                  transition: 'all 0.18s ease'
+                                }}
+                                className="hover-scale"
+                                title="Zu deinem Musik-Stern im Aufgabenheft"
+                              >
+                                <span style={{ fontSize: '1.05rem' }}>⭐</span>
+                                <span>Wochenfokus: {weeklyFocusMeta.label}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1826,7 +1732,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* ========================================================================= */}
                   {(() => {
                     const currentWeekStr = getISOWeek(getSimulatedNow());
-                    const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                    const cleanTitle = (t: string) => (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                     // 1. Gather all active homework books & pages (Memoized 0.1% Goldstandard)
                     const { activeJuniorBooks, activeJuniorSongs } = memoizedJuniorHomework;
@@ -2305,53 +2211,33 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         
                         {/* HELDEN-KARTE 1: MEINE HAUSAUFGABE (mit integriertem Audio-Zugriff & TTS) */}
                         <div 
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Meine Hausaufgabe öffnen"
                           onClick={() => setShowJuniorHomeworkModal(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setShowJuniorHomeworkModal(true);
+                            }
+                          }}
                           style={{
-                            background: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)' : '#ffffff',
-                            borderRadius: '32px',
-                            padding: isMusicStandMode ? '32px' : '26px 20px',
-                            boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 16px 36px rgba(34, 197, 94, 0.16)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
-                            border: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '2px solid #86efac' : '2px solid #e2e8f0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            gap: '20px',
-                            cursor: 'pointer',
-                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                            background: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%)' : '#ffffff',
+                            borderRadius: '32px', padding: isMusicStandMode ? '32px' : '26px 20px',
+                            boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 16px 36px rgba(16, 185, 129, 0.20)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
+                            border: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '2px solid #10b981' : '2px solid #e2e8f0',
+                            display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '20px',
+                            cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                           className="hover-scale"
                         >
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              gap: '8px', 
-                              width: '100%',
-                              flexWrap: 'nowrap' 
-                            }}>
-                              <div style={{
-                                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                                color: '#34a853',
-                                width: isMusicStandMode ? '52px' : '42px',
-                                height: isMusicStandMode ? '52px' : '42px',
-                                borderRadius: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.16)',
-                                flexShrink: 0
-                              }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', width: '100%', flexWrap: 'nowrap' }}>
+                              <div style={{ background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)', color: '#34a853', width: isMusicStandMode ? '52px' : '42px', height: isMusicStandMode ? '52px' : '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.16)', flexShrink: 0 }}>
                                 <BookOpen size={isMusicStandMode ? 26 : 22} />
                               </div>
 
-                              <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '6px', 
-                                flexWrap: 'nowrap',
-                                minWidth: 0 
-                              }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', minWidth: 0 }}>
                                 {/* 3D-TOY-BUTTON FÜR VORLESEN (Hör zu!) */}
                                 {(draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (studentUiLevel === 'junior')) && (
                                   <button
@@ -2449,412 +2335,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                                <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Hausaufgaben
-                                </div>
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  fontSize: isMusicStandMode ? '0.78rem' : '0.74rem',
-                                  fontWeight: 800,
-                                  color: '#16a34a',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
-                                }}>
-                                  <Music size={12} color="#16a34a" strokeWidth={2.4} />
-                                  <span>Dein Wochen-Fahrplan</span>
-                                </div>
-                              </div>
-                              
-                              {/* Lehrwerke (harmonisiert wie im Teen-Widget) */}
-                              {activeJuniorBooks.map((b, idx) => (
-                                <div key={`j-b-${idx}`} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: '8px',
-                                  padding: '10px 14px',
-                                  background: '#ffffff',
-                                  border: '1px solid #f1f5f9',
-                                  boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                  borderRadius: '14px'
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                    <div style={{
-                                      width: '28px',
-                                      height: '28px',
-                                      borderRadius: '8px',
-                                      background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      color: '#e11d48',
-                                      boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
-                                      flexShrink: 0
-                                    }}>
-                                      <BookOpen size={14} strokeWidth={2.4} />
-                                    </div>
-                                    <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                      {b.title}
-                                    </span>
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                    {b.pages.map((pNum: number, pIdx: number) => {
-                                      const taskId = `book-${b.title}-page-${pNum}`;
-                                      const refl = taskReflections[taskId]?.status;
-                                      return (
-                                        <span key={`j-p-${pIdx}`} style={{
-                                          fontSize: '0.82rem',
-                                          fontWeight: 900,
-                                          color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : refl === 'hilfe' ? '#b91c1c' : '#15803d',
-                                          background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : refl === 'hilfe' ? '#fee2e2' : '#dcfce7',
-                                          border: refl === 'super' ? '1px solid #86efac' : refl === 'wackelig' ? '1px solid #fde68a' : refl === 'hilfe' ? '1px solid #fca5a5' : '1px solid #bbf7d0',
-                                          padding: '3px 9px',
-                                          borderRadius: '7px',
-                                          flexShrink: 0,
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px'
-                                        }}>
-                                          <span>S. {pNum}</span>
-                                          {refl === 'super' && <Check size={12} strokeWidth={3} />}
-                                          {refl === 'wackelig' && <AlertTriangle size={12} strokeWidth={2.5} />}
-                                          {refl === 'hilfe' && <HelpCircle size={12} strokeWidth={2.5} />}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-
-                              {/* Songs (harmonisiert wie im Teen-Widget) */}
-                              {activeJuniorSongs.map((s, idx) => {
-                                const songTitle = cleanTitle(s.topic_name || s.title || 'Song');
-                                const taskId = `song-${s.id || s.topic_name || s.title || idx}`;
-                                const refl = taskReflections[taskId]?.status;
-                                const songColor = getSongColor(songTitle);
-                                return (
-                                  <div key={`j-s-${idx}`} style={{
-                                    background: '#ffffff',
-                                    border: '1px solid #f1f5f9',
-                                    boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                    padding: '10px 14px',
-                                    borderRadius: '14px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px'
-                                  }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                      <div style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '8px',
-                                        background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: songColor.text || '#0f172a',
-                                        boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
-                                        flexShrink: 0
-                                      }}>
-                                        <Music size={14} strokeWidth={2.4} />
-                                      </div>
-                                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {songTitle}
-                                      </span>
-                                    </div>
-                                    {refl && (
-                                      <span style={{
-                                        fontSize: '0.74rem',
-                                        fontWeight: 850,
-                                        padding: '3px 8px',
-                                        borderRadius: '100px',
-                                        background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
-                                        color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
-                                        border: refl === 'super' ? '1px solid #86efac' : refl === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
-                                        flexShrink: 0,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}>
-                                        {refl === 'super' ? <Check size={11} strokeWidth={3} /> : refl === 'wackelig' ? <AlertTriangle size={11} strokeWidth={2.5} /> : <HelpCircle size={11} strokeWidth={2.5} />}
-                                        <span>{refl === 'super' ? 'Läuft' : refl === 'wackelig' ? 'Wackelig' : 'Hilfe'}</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {/* Zusätzliche Bemerkung / Notizen (Aufbau wie Wochen-Fahrplan im Aufgaben Board) */}
-                              {generalNotesList && generalNotesList.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {generalNotesList.map((noteItem: string, nIdx: number) => (
-                                    <div key={`j-gn-${nIdx}`} style={{
-                                      background: '#ffffff',
-                                      border: '1px solid #f1f5f9',
-                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                      padding: '10px 14px',
-                                      borderRadius: '14px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}>
-                                      <div style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '8px',
-                                        background: '#dcfce7',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#15803d',
-                                        flexShrink: 0
-                                      }}>
-                                        <FileText size={14} strokeWidth={2.4} />
-                                      </div>
-                                      <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {noteItem}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Frage des Schülers für die Stunde (Gelber Text & Gelbe Kennzeichnung) */}
-                              {(() => {
-                                const displayedStudentQuestion = activeStudentQuestion || studentQuestionText;
-                                if (!displayedStudentQuestion) return null;
-                                return (
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    gap: '8px',
-                                    fontSize: '0.88rem',
-                                    padding: '8px 12px',
-                                    borderRadius: '12px',
-                                    background: '#fffdf0',
-                                    border: '1px solid #fde047',
-                                    boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
-                                  }}>
-                                    <HelpCircle size={15} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
-                                      <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
-                                      <span style={{ 
-                                        color: '#713f12', 
-                                        fontWeight: 700,
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden'
-                                      }}>
-                                        „{displayedStudentQuestion}“
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-
-                              {/* Wenn weder noch */}
-                              {activeJuniorBooks.length === 0 && activeJuniorSongs.length === 0 && (!generalNotesList || generalNotesList.length === 0) && (
-                                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  Keine offenen Aufgaben für diese Woche erfasst
-                                </div>
-                              )}
-                            </div>
-                            {/* Audio-Quickie: In-Place Mini-Player falls Lehreraufnahme vorhanden */}
-                            {audioTracks && audioTracks.length > 0 && (
-                              <div style={{
-                                background: '#f8fafc',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '16px',
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '10px',
-                                marginTop: '4px'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                  <button
-                                    type="button"
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-label={quickieAudioUrl === audioTracks[0].url && quickiePlaying ? "Aufnahme pausieren" : "Aufnahme abspielen"}
-                                    onClick={(e) => { e.stopPropagation(); toggleQuickieAudio(audioTracks[0].url); }}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleQuickieAudio(audioTracks[0].url); } }}
-                                    style={{
-                                      width: '36px',
-                                      height: '36px',
-                                      borderRadius: '50%',
-                                      background: quickieAudioUrl === audioTracks[0].url && quickiePlaying ? '#16a34a' : '#ffffff',
-                                      color: quickieAudioUrl === audioTracks[0].url && quickiePlaying ? '#ffffff' : '#16a34a',
-                                      border: '1.5px solid #bbf7d0',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      flexShrink: 0,
-                                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.15)',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale-mini"
-                                  >
-                                    {quickieAudioUrl === audioTracks[0].url && quickiePlaying ? (
-                                      <Pause size={16} fill="currentColor" />
-                                    ) : (
-                                      <Play size={16} fill="currentColor" style={{ marginLeft: '2px' }} />
-                                    )}
-                                  </button>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                        <Headphones size={12} color="#16a34a" />
-                                        <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                          Vorspiel / Feedback
-                                        </span>
-                                      </div>
-                                      {audioTracks.length > 1 && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenHomeworkBookWithView('document', 'recordings');
-                                          }}
-                                          style={{
-                                            fontSize: '0.68rem',
-                                            fontWeight: 900,
-                                            color: '#15803d',
-                                            background: '#e6f4ea',
-                                            border: '1px solid #bbf7d0',
-                                            borderRadius: '100px',
-                                            padding: '1px 7px',
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '2px',
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                          className="hover-scale-mini"
-                                          title={`${audioTracks.length} Aufnahmen vorhanden - alle im Hausaufgabenheft anzeigen`}
-                                          aria-label={`${audioTracks.length} Aufnahmen vorhanden - alle im Hausaufgabenheft anzeigen`}
-                                        >
-                                          +{audioTracks.length - 1} weitere
-                                        </button>
-                                      )}
-                                    </div>
-                                    <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {audioTracks[0].label || 'Aufnahme deiner Lehrkraft'}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                  {quickieAudioUrl === audioTracks[0].url && quickiePlaying && (
-                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px', paddingRight: '2px' }} aria-hidden="true">
-                                      <span style={{ width: '3px', height: '8px', background: '#16a34a', borderRadius: '4px', animation: 'campusPulseBar 0.6s ease-in-out infinite alternate' }} />
-                                      <span style={{ width: '3px', height: '14px', background: '#16a34a', borderRadius: '4px', animation: 'campusPulseBar 0.4s ease-in-out infinite alternate 0.15s' }} />
-                                      <span style={{ width: '3px', height: '10px', background: '#16a34a', borderRadius: '4px', animation: 'campusPulseBar 0.5s ease-in-out infinite alternate 0.3s' }} />
-                                    </div>
-                                  )}
-                                  <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-                                    {quickieAudioUrl === audioTracks[0].url && quickieCurrentTime > 0 
-                                      ? `${formatQuickieDuration(quickieCurrentTime)} / ${formatQuickieDuration(quickieDuration || audioTracks[0].duration)}`
-                                      : formatQuickieDuration(audioTracks[0].duration)}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 2-Button Action Footer */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '10px' }}>
-                            <button
-                              type="button"
-                              role="button"
-                              tabIndex={0}
-                              aria-label="Hausaufgaben-Übersicht öffnen"
-                              title="Hausaufgaben-Übersicht öffnen"
-                              onClick={(e) => { e.stopPropagation(); setShowJuniorHomeworkModal(true); }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setShowJuniorHomeworkModal(true);
-                                }
-                              }}
-                              style={{
-                                padding: isMusicStandMode ? '16px 14px' : '14px 12px',
-                                minHeight: '48px',
-                                borderRadius: '18px',
-                                border: 'none',
-                                background: 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
-                                color: '#ffffff',
-                                fontSize: isMusicStandMode ? '1.05rem' : '0.96rem',
-                                fontWeight: 950,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.28)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}
-                              className="hover-scale"
-                            >
-                              <BookOpen size={isMusicStandMode ? 18 : 16} style={{ flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Hausaufgaben</span>
-                            </button>
-
-                            {(() => {
-                              const displayedStudentQuestion = activeStudentQuestion || studentQuestionText;
-                              return (
-                                <button
-                                  type="button"
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openQuestionModal();
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      openQuestionModal();
-                                    }
-                                  }}
-                                  style={{
-                                    padding: isMusicStandMode ? '16px 12px' : '14px 10px',
-                                    minHeight: '48px',
-                                    borderRadius: '18px',
-                                    border: displayedStudentQuestion ? 'none' : '1.5px solid #fde047',
-                                    background: displayedStudentQuestion ? '#facc15' : '#fef9c3',
-                                    color: displayedStudentQuestion ? '#0f172a' : '#713f12',
-                                    fontSize: isMusicStandMode ? '1.05rem' : '0.96rem',
-                                    fontWeight: 950,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    whiteSpace: 'nowrap',
-                                    transition: 'all 0.2s',
-                                    boxShadow: displayedStudentQuestion ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none'
-                                  }}
-                                  className="hover-scale"
-                                  title={displayedStudentQuestion ? "Hinterlegte Frage bearbeiten" : "Frage für den Unterricht stellen"}
-                                  aria-label={displayedStudentQuestion ? "Hinterlegte Frage bearbeiten" : "Frage für den Unterricht stellen"}
-                                >
-                                  <HelpCircle size={isMusicStandMode ? 18 : 16} color="currentColor" style={{ flexShrink: 0 }} />
-                                  <span>{displayedStudentQuestion ? 'Frage aktiv' : 'Frage?'}</span>
-                                </button>
-                              );
-                            })()}
+                            <AuthoritativeHomeworkWidget
+                              variant="hero"
+                              studentId={props.studentId || studentUser?.id}
+                              studentUser={studentUser}
+                              localProgress={localProgress}
+                              lehrwerke={lehrwerke}
+                              progressItems={progressItems}
+                              activeSongSkills={activeSongSkills}
+                              assignedCampusSongs={assignedCampusSongs}
+                              isMusicStandMode={isMusicStandMode}
+                              onOpenHomework={() => setShowJuniorHomeworkModal(true)}
+                              onOpenQuestionModal={openQuestionModal}
+                              onOpenRecordings={() => handleOpenHomeworkBookWithView('document', 'recordings')}
+                            />
                           </div>
                         </div>
 
@@ -3172,12 +2666,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             if (nextLockedSticker.category === 'xp') {
                               const target = nextLockedSticker.id === 'xp-sammler' ? 100 : nextLockedSticker.id === 'xp-champion' ? 500 : nextLockedSticker.id === 'xp-meister' ? 1500 : 3500;
                               const prev = nextLockedSticker.id === 'xp-sammler' ? 0 : nextLockedSticker.id === 'xp-champion' ? 100 : nextLockedSticker.id === 'xp-meister' ? 500 : 1500;
-                              return Math.min(100, Math.max(0, Math.round((((avatar?.xp || 0) - prev) / (target - prev)) * 100)));
+                              return Math.min(100, Math.max(0, Math.round((((displayXp || avatar?.xp || 0) - prev) / (target - prev)) * 100)));
                             }
                             if (nextLockedSticker.category === 'streaks') {
                               const target = nextLockedSticker.id === 'dranbleiber' ? 3 : nextLockedSticker.id === 'wochen-held' ? 7 : nextLockedSticker.id === 'streak-koenig' ? 21 : 30;
                               const prev = nextLockedSticker.id === 'dranbleiber' ? 0 : nextLockedSticker.id === 'wochen-held' ? 3 : nextLockedSticker.id === 'streak-koenig' ? 7 : 21;
-                              return Math.min(100, Math.max(0, Math.round((((avatar?.streak_flame || 0) - prev) / (target - prev)) * 100)));
+                              return Math.min(100, Math.max(0, Math.round((((effectiveStreak || 0) - prev) / (target - prev)) * 100)));
                             }
                             if (nextLockedSticker.category === 'songs') {
                               const target = nextLockedSticker.id === 'erster-erfolg' ? 1 : nextLockedSticker.id === 'song-sammler' ? 3 : nextLockedSticker.id === 'repertoire-riese' ? 5 : 10;
@@ -3189,48 +2683,31 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                           return (
                             <div 
+                              role="button"
+                              tabIndex={0}
+                              aria-label="Sticker-Album öffnen"
                               onClick={() => setShowJuniorStickerModal(true)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setShowJuniorStickerModal(true);
+                                }
+                              }}
                               style={{
-                                background: '#ffffff',
-                                borderRadius: '32px',
-                                padding: isMusicStandMode ? '32px' : '28px',
-                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                                border: '2px solid rgba(245, 158, 11, 0.35)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                gap: '20px',
-                                cursor: 'pointer',
-                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                                background: '#ffffff', borderRadius: '32px', padding: isMusicStandMode ? '32px' : '28px',
+                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)', border: '2px solid rgba(245, 158, 11, 0.35)',
+                                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '20px',
+                                cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                               }}
                               className="hover-scale"
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{
-                                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                                    color: '#d97706',
-                                    width: isMusicStandMode ? '64px' : '56px',
-                                    height: isMusicStandMode ? '64px' : '56px',
-                                    borderRadius: '18px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 6px 16px rgba(245, 158, 11, 0.18)'
-                                  }}>
+                                  <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: '#d97706', width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(245, 158, 11, 0.18)' }}>
                                     <Trophy size={isMusicStandMode ? 32 : 28} color="#d97706" />
                                   </div>
 
-                                  <span style={{
-                                    background: '#fef3c7',
-                                    color: '#b45309',
-                                    fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
-                                    fontWeight: 900,
-                                    padding: isMusicStandMode ? '6px 14px' : '5px 12px',
-                                    borderRadius: '100px',
-                                    border: '1px solid #fde68a',
-                                    whiteSpace: 'nowrap'
-                                  }}>
+                                  <span style={{ background: '#fef3c7', color: '#b45309', fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, padding: isMusicStandMode ? '6px 14px' : '5px 12px', borderRadius: '100px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
                                     ★ {unlockedStickersCount} von {totalStickersCount} gesammelt
                                   </span>
                                 </div>
@@ -3369,7 +2846,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* ========================================================================= */}
                   {showJuniorHomeworkModal && (() => {
                     const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, allTeacherNotes, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary() as any;
-                    const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                    const cleanTitle = (t: string) => (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                     const handleTtsToggle = () => {
                       if (isTtsSpeaking && activeTtsKey === 'junior_modal') {
@@ -3759,8 +3236,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             <div
                                               key={`j-page-row-${pNum}`}
                                               style={{
-                                                background: refl === 'super' ? '#f0fdf4' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#f8fafc',
-                                                border: refl === 'super' ? '1.5px solid #86efac' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                                                background: refl === 'super' ? '#ecfdf5' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#f8fafc',
+                                                border: refl === 'super' ? '1.5px solid #10b981' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
                                                 borderRadius: '12px',
                                                 padding: '7px 12px',
                                                 display: 'flex',
@@ -3781,8 +3258,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                                       fontWeight: 900,
                                                       padding: '2px 7px',
                                                       borderRadius: '6px',
-                                                      background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
-                                                      color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
+                                                      background: refl === 'super' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                                      color: refl === 'super' ? '#ffffff' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
                                                       display: 'inline-flex',
                                                       alignItems: 'center',
                                                       gap: '3px'
@@ -3822,8 +3299,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           flexDirection: 'column',
                                           gap: '8px',
                                           padding: '12px 14px',
-                                          background: refl === 'super' ? '#f0fdf4' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#ffffff',
-                                          border: refl === 'super' ? '1.5px solid #86efac' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
+                                          background: refl === 'super' ? '#ecfdf5' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#ffffff',
+                                          border: refl === 'super' ? '1.5px solid #10b981' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
                                           boxShadow: '0 2px 6px -2px rgba(0, 0, 0, 0.04)',
                                           borderRadius: '14px',
                                           transition: 'all 0.15s ease'
@@ -4272,7 +3749,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               type="button"
                               onClick={() => {
                                 setSessionActive(true);
-                                setIsPhoneFlat(true);
                               }}
                               style={{
                                 width: '100%',
@@ -4647,6 +4123,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </div>
 
                                 <div 
+                                  role="slider"
+                                  tabIndex={0}
+                                  aria-label="Audio-Fortschritt"
+                                  aria-valuemin={0}
+                                  aria-valuemax={Math.round(juniorPreviewDuration || juniorRecordDuration || 0)}
+                                  aria-valuenow={Math.round(juniorPreviewCurrentTime)}
+                                  aria-valuetext={`${Math.round(juniorPreviewCurrentTime)} von ${Math.round(juniorPreviewDuration || juniorRecordDuration || 0)} Sekunden`}
                                   onClick={(e) => {
                                     if (juniorPreviewAudioRef.current && (juniorPreviewDuration || juniorRecordDuration)) {
                                       const rect = e.currentTarget.getBoundingClientRect();
@@ -4657,15 +4140,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       setJuniorPreviewCurrentTime(newTime);
                                     }
                                   }}
-                                  style={{
-                                    width: '100%',
-                                    height: '8px',
-                                    background: '#e2e8f0',
-                                    borderRadius: '6px',
-                                    overflow: 'hidden',
-                                    cursor: 'pointer',
-                                    position: 'relative'
+                                  onKeyDown={(e) => {
+                                    const total = juniorPreviewDuration || juniorRecordDuration || 0;
+                                    if (!total || !juniorPreviewAudioRef.current) return;
+                                    const step = Math.max(1, Math.min(5, Math.round(total / 10)));
+                                    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                                      e.preventDefault();
+                                      const nt = Math.min(total, juniorPreviewCurrentTime + step);
+                                      juniorPreviewAudioRef.current.currentTime = nt; setJuniorPreviewCurrentTime(nt);
+                                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                                      e.preventDefault();
+                                      const nt = Math.max(0, juniorPreviewCurrentTime - step);
+                                      juniorPreviewAudioRef.current.currentTime = nt; setJuniorPreviewCurrentTime(nt);
+                                    } else if (e.key === 'Home') {
+                                      e.preventDefault(); juniorPreviewAudioRef.current.currentTime = 0; setJuniorPreviewCurrentTime(0);
+                                    } else if (e.key === 'End') {
+                                      e.preventDefault(); juniorPreviewAudioRef.current.currentTime = total; setJuniorPreviewCurrentTime(total);
+                                    }
                                   }}
+                                  style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
                                 >
                                   <div style={{
                                     width: `${Math.min(100, (juniorPreviewCurrentTime / (juniorPreviewDuration || juniorRecordDuration || 1)) * 100)}%`,
@@ -5279,7 +4772,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                         {(() => {
-                          const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + getExactLogSeconds(log), 0);
+                          const dbSecs = Math.max((fokusLogs || []).reduce((sum, log) => sum + getExactLogSeconds(log), 0), (effectivePracticeMinutes || 0) * 60);
                           const liveSecs = sessionActive ? secondsElapsed : 0;
                           const totalSecs = dbSecs + liveSecs;
                           if (totalSecs > 0 && totalSecs < 60) {
@@ -5357,7 +4850,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          {(avatar?.streak_flame || 0) === 0 ? (
+                          {effectiveStreak === 0 ? (
                             <>
                               <span style={{ 
                                 fontSize: '1.25rem', 
@@ -5381,10 +4874,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 letterSpacing: '-0.02em',
                                 color: 'white'
                               }}>
-                                {avatar?.streak_flame}
+                                {effectiveStreak}
                               </span>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
-                                {avatar?.streak_flame === 1 ? 'Tag' : 'Tage'}
+                                {effectiveStreak === 1 ? 'Tag' : 'Tage'}
                               </span>
                             </>
                           )}
@@ -5543,55 +5036,21 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       })()}
 
                       {(() => {
-                        const nextOcc = (scheduleOccurrences || [])[0] || (schoolYearOccurrences || [])[0];
-                        const hasToday = !!briefingData?.todayLesson;
-                        const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
-                        const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
-                        const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                        const todayStr = toLocalYYYYMMDD(getSimulatedNow());
-                        const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
-                        const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
-                        const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-                        const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
-                        const finalOccurId = hasToday ? (briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) : (nextOcc?.id || `sched-${studentId}`);
-                        const lessonText = hasToday 
-                          ? `Heute, ${briefingData.todayLesson.time} Uhr` 
-                          : (nextOcc ? (() => {
-                              const d = new Date(nextOcc.date);
-                              return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
-                            })() : 'Demnächst');
-                        const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
-                        const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
-                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
-
                         return (
                           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <StudentBriefingActionButtons
                               isMobile={isMobile}
-                              nextOcc={nextOcc}
-                              lessonText={lessonText}
-                              isCanceled={isCanceled}
+                              nextOcc={nextLessonInfo.nextOcc}
+                              lessonText={nextLessonInfo.lessonText}
+                              isCanceled={nextLessonInfo.isCanceled}
+                              isRescheduled={nextLessonInfo.isRescheduled}
                               isUnlocked={isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()}
-                              teacherId={teacherId}
-                              hasMessage={hasMessage}
-                              unreadMsgCount={unreadMsgCount}
+                              teacherId={nextLessonInfo.teacherId}
+                              hasMessage={checkOccurrenceHasMessages(nextLessonInfo.nextOcc || nextLessonInfo.finalOccurId, nextLessonInfo.targetDateStr)}
+                              unreadMsgCount={getOccurrenceUnreadCount(nextLessonInfo.nextOcc || nextLessonInfo.finalOccurId, nextLessonInfo.targetDateStr)}
                               isMusicStandMode={isMusicStandMode}
-                              onOpenAppointmentDetail={(occ) => {
-                                setSelectedAppointmentForDetail(occ);
-                                setShowCancelConfirmStep(false);
-                              }}
-                              onOpenChat={() => {
-                                setAppointmentChatData({
-                                  teacherId, teacher_id: teacherId, teacher: hasToday ? briefingData.todayLesson?.teacher : nextOcc?.teacher, teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextOcc?.teacher_name || nextOcc?.teacher),
-                                  date: targetDateStr,
-                                  start_time: timeLabel,
-                                  label,
-                                  occurrenceId: finalOccurId,
-                                  status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
-                                  isCancelled: isCanceled
-                                });
-                                setShowAppointmentChat(true);
-                              }}
+                              onOpenAppointmentDetail={handleOpenAppointmentDetail}
+                              onOpenChat={handleOpenAppointmentChat}
                               onOpenToolbox={setShowStudentToolbox ? () => setShowStudentToolbox(true) : undefined}
                             />
 
@@ -5608,17 +5067,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '8px',
-                                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                  color: '#166534',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  color: '#ffffff',
                                   padding: '8px 16px',
                                   minHeight: '38px',
                                   boxSizing: 'border-box',
                                   borderRadius: '12px',
                                   fontSize: '0.78rem',
                                   fontWeight: 800,
-                                  border: '1.5px solid #86efac',
+                                  border: 'none',
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.15)',
+                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
                                   transition: 'all 0.18s ease'
                                 }}
                                 className="hover-scale"
@@ -5944,7 +5403,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       }
 
-                      const cleanTitle = (t: string) => (t || '')
+                      const cleanTitle = (t: string) => (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '')
                         .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
                         .replace(/^Linken Park/i, 'Linkin Park');
                       const effectiveId = studentId || studentUser?.id;
@@ -5958,12 +5417,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         for (let i = 1; i < sorted.length; i++) {
                           if (sorted[i] === end + 1) end = sorted[i];
                           else {
-                            ranges.push(start === end ? `${start}` : `${start}–${end}`);
+                            ranges.push(start === end ? `${start}` : `${start}-${end}`);
                             start = sorted[i];
                             end = start;
                           }
                         }
-                        ranges.push(start === end ? `${start}` : `${start}–${end}`);
+                        ranges.push(start === end ? `${start}` : `${start}-${end}`);
                         return `S. ${ranges.join(', ')}`;
                       };
 
@@ -6015,364 +5474,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           justifyContent: 'space-between',
                           gap: '12px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                <div style={{ 
-                                  background: 'rgba(22, 163, 74, 0.12)', 
-                                  color: '#16a34a', 
-                                  width: '34px', 
-                                  height: '34px', 
-                                  borderRadius: '11px', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center',
-                                  flexShrink: 0
-                                }}>
-                                  <BookOpen size={17} strokeWidth={2.2} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                  <h4 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
-                                    Hausaufgaben
-                                  </h4>
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    fontSize: isMusicStandMode ? '0.78rem' : '0.74rem',
-                                    fontWeight: 800,
-                                    color: '#16a34a',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                  }}>
-                                    <Music size={12} color="#16a34a" strokeWidth={2.4} />
-                                    <span>Dein Wochen-Fahrplan</span>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* Audio Indicator Pill beside Title */}
-                              {audioTracks.length > 0 ? (
-                                <div
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => {
-                                    if (handleOpenHomeworkBookWithView) {
-                                      handleOpenHomeworkBookWithView('document', 'recordings');
-                                    } else {
-                                      handleTabChangeLocal('homework_book');
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      if (handleOpenHomeworkBookWithView) {
-                                        handleOpenHomeworkBookWithView('document', 'recordings');
-                                      } else {
-                                        handleTabChangeLocal('homework_book');
-                                      }
-                                    }
-                                  }}
-                                  style={{
-                                    background: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '100px',
-                                    padding: '4px 10px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                                    transition: 'all 0.15s ease',
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0
-                                  }}
-                                  className="hover-scale"
-                                  title="Unterrichtsaufnahmen im Aufgabenheft anhören"
-                                  aria-label="Unterrichtsaufnahmen im Aufgabenheft anhören"
-                                >
-                                  <Headphones size={12} color="#475569" strokeWidth={2.2} />
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#334155' }}>
-                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.62rem', fontWeight: 850, padding: '3px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                  Aktiv
-                                </span>
-                              )}
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {hasActiveHomework ? (
-                                <>
-                                  {formattedActiveBooks.map((item, idx) => {
-                                    const bookGradient = getLehrwerkColor(item.title, lehrwerke);
-                                    return (
-                                      <div key={`teen-book-${idx}`} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '8px',
-                                        padding: '10px 14px',
-                                        background: '#ffffff',
-                                        border: '1px solid #f1f5f9',
-                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                        borderRadius: '14px'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                          <div style={{
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '8px',
-                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: bookGradient.text,
-                                            boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
-                                            flexShrink: 0
-                                          }}>
-                                            <BookOpen size={14} strokeWidth={2.4} />
-                                          </div>
-                                          <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                            {item.title}
-                                          </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                          <span style={{
-                                            fontSize: '0.80rem',
-                                            fontWeight: 850,
-                                            color: '#15803d',
-                                            background: '#dcfce7',
-                                            padding: '3px 10px',
-                                            borderRadius: '99px',
-                                            border: '1px solid #bbf7d0',
-                                            flexShrink: 0
-                                          }}>
-                                            {item.formattedPages || (item.pageNums?.length === 1 ? `S. ${item.pageNums[0]}` : `S. ${item.pageNums.join(', ')}`)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {otherActiveHWItems.map((item, idx) => {
-                                    const songTitle = cleanTitle(item.title || item.topic_name);
-                                    const songColor = getSongColor(songTitle);
-                                    return (
-                                      <div key={`teen-song-${idx}`} style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #f1f5f9',
-                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                        padding: '10px 14px',
-                                        borderRadius: '14px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px'
-                                      }}>
-                                        <div style={{
-                                          width: '28px',
-                                          height: '28px',
-                                          borderRadius: '8px',
-                                          background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: songColor.text || '#0f172a',
-                                          boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
-                                          flexShrink: 0
-                                        }}>
-                                          <Music size={14} strokeWidth={2.4} />
-                                        </div>
-                                        <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {songTitle}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {/* Zusätzliche Bemerkung / Notizen (Aufbau wie Wochen-Fahrplan im Aufgaben Board) */}
-                                  {generalNotesList && generalNotesList.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      {generalNotesList.map((noteItem: string, nIdx: number) => (
-                                        <div key={`teen-gn-${nIdx}`} style={{
-                                          background: '#ffffff',
-                                          border: '1px solid #f1f5f9',
-                                          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                          padding: '10px 14px',
-                                          borderRadius: '14px',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px'
-                                        }}>
-                                          <div style={{
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '8px',
-                                            background: '#dcfce7',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#15803d',
-                                            flexShrink: 0
-                                          }}>
-                                            <FileText size={14} strokeWidth={2.4} />
-                                          </div>
-                                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {noteItem}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Frage des Schülers für die Stunde (Gelber Text & Gelbe Kennzeichnung) */}
-                                  {(() => {
-                                    const displayedTeenQuestion = activeStudentQuestion || studentQuestionText;
-                                    if (!displayedTeenQuestion) return null;
-                                    return (
-                                      <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        fontSize: '0.88rem',
-                                        padding: '8px 12px',
-                                        borderRadius: '12px',
-                                        background: '#fffdf0',
-                                        border: '1px solid #fde047',
-                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
-                                      }}>
-                                        <HelpCircle size={14} style={{ color: '#ca8a04', flexShrink: 0 }} strokeWidth={2.5} />
-                                        <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
-                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#713f12', fontWeight: 700 }}>
-                                          „{displayedTeenQuestion}“
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </>
-                              ) : (
-                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  Keine offenen Aufgaben für diese Woche erfasst
-                                </div>
-                              )}
-                            </div>
-                            {/* Ausgelagertes Aufnahmen-Pill-Button */}
-                            {audioTracks && audioTracks.length > 0 && (
-                              <div style={{ marginTop: '6px' }}>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveRecordingTrack(audioTracks[0]);
-                                    setRecordingsModalTracks(audioTracks);
-                                    setShowRecordingsModal(true);
-                                  }}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '5px 12px',
-                                    borderRadius: '100px',
-                                    background: '#f0fdf4',
-                                    border: '1.5px solid #bbf7d0',
-                                    color: '#15803d',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 850,
-                                    cursor: 'pointer',
-                                    boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale"
-                                  title="Aufnahmen deiner Lehrkraft öffnen"
-                                >
-                                  <Headphones size={13} color="currentColor" />
-                                  <span>{audioTracks.length === 1 ? '1 Aufnahme anhören' : `${audioTracks.length} Aufnahmen anhören`}</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 2-Button Action Footer */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '8px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleTabChangeLocal('homework_book')}
-                              style={{
-                                padding: '10px 14px',
-                                borderRadius: '14px',
-                                border: 'none',
-                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                color: '#ffffff',
-                                fontSize: '0.86rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                transition: 'all 0.2s',
-                                minHeight: '44px',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.28)'
-                              }}
-                              className="hover-scale"
-                              title="Alle Hausaufgaben ansehen"
-                            >
-                              <BookOpen size={15} color="currentColor" style={{ flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Aufgaben ansehen →</span>
-                            </button>
-
-                            {(() => {
-                              const displayedTeenQuestion = activeStudentQuestion || studentQuestionText;
-                              return (
-                                <button
-                                  type="button"
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openQuestionModal();
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      openQuestionModal();
-                                    }
-                                  }}
-                                  style={{
-                                    padding: '10px 14px',
-                                    borderRadius: '14px',
-                                    border: displayedTeenQuestion ? 'none' : '1.5px solid #e2e8f0',
-                                    background: displayedTeenQuestion ? '#facc15' : '#f8fafc',
-                                    color: displayedTeenQuestion ? '#0f172a' : '#475569',
-                                    fontSize: '0.86rem',
-                                    fontWeight: 900,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s',
-                                    minHeight: '44px',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: displayedTeenQuestion ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none'
-                                  }}
-                                  className="hover-scale"
-                                  title={displayedTeenQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
-                                  aria-label={displayedTeenQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
-                                >
-                                  <HelpCircle size={15} color="currentColor" style={{ flexShrink: 0 }} />
-                                  <span>{displayedTeenQuestion ? 'Frage aktiv' : 'Frage?'}</span>
-                                </button>
-                              );
-                            })()}
-                          </div>
+                          <AuthoritativeHomeworkWidget
+                            variant="hero"
+                            studentId={props.studentId || studentUser?.id}
+                            studentUser={studentUser}
+                            localProgress={localProgress}
+                            lehrwerke={lehrwerke}
+                            progressItems={progressItems}
+                            activeSongSkills={activeSongSkills}
+                            assignedCampusSongs={assignedCampusSongs}
+                            isMusicStandMode={isMusicStandMode}
+                            onOpenHomework={() => handleTabChangeLocal('homework_book')}
+                            onOpenQuestionModal={openQuestionModal}
+                            onOpenRecordings={() => handleOpenHomeworkBookWithView ? handleOpenHomeworkBookWithView('document', 'recordings') : handleTabChangeLocal('homework_book')}
+                          />
                         </div>
                       );
                     })()}
@@ -7139,7 +6254,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                           {(() => {
-                            const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + getExactLogSeconds(log), 0);
+                            const dbSecs = Math.max((fokusLogs || []).reduce((sum, log) => sum + getExactLogSeconds(log), 0), (effectivePracticeMinutes || 0) * 60);
                             const liveSecs = sessionActive ? secondsElapsed : 0;
                             const totalSecs = dbSecs + liveSecs;
                             if (totalSecs > 0 && totalSecs < 60) {
@@ -7225,10 +6340,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             letterSpacing: '-0.02em',
                             color: 'white'
                           }}>
-                            {avatar?.streak_flame || 0}
+                            {effectiveStreak === 0 ? 'Startklar' : effectiveStreak}
                           </span>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
-                            {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}
+                            {effectiveStreak === 0 ? 'Tag 1' : (effectiveStreak === 1 ? 'Tag' : 'Tage')}
                           </span>
                         </div>
                       </div>
@@ -7480,55 +6595,21 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       </p>
 
                       {(() => {
-                        const nextOcc = (scheduleOccurrences || [])[0] || (schoolYearOccurrences || [])[0];
-                        const hasToday = !!briefingData?.todayLesson;
-                        const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
-                        const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
-                        const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                        const todayStr = toLocalYYYYMMDD(getSimulatedNow());
-                        const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
-                        const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
-                        const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-                        const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
-                        const finalOccurId = hasToday ? (briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) : (nextOcc?.id || `sched-${studentId}`);
-                        const lessonText = hasToday 
-                          ? `Heute, ${briefingData.todayLesson.time} Uhr` 
-                          : (nextOcc ? (() => {
-                              const d = new Date(nextOcc.date);
-                              return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
-                            })() : 'Demnächst');
-                        const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
-                        const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
-                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
-
                         return (
                           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <StudentBriefingActionButtons
                               isMobile={isMobile}
-                              nextOcc={nextOcc}
-                              lessonText={lessonText}
-                              isCanceled={isCanceled}
+                              nextOcc={nextLessonInfo.nextOcc}
+                              lessonText={nextLessonInfo.lessonText}
+                              isCanceled={nextLessonInfo.isCanceled}
+                              isRescheduled={nextLessonInfo.isRescheduled}
                               isUnlocked={isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()}
-                              teacherId={teacherId}
-                              hasMessage={hasMessage}
-                              unreadMsgCount={unreadMsgCount}
+                              teacherId={nextLessonInfo.teacherId}
+                              hasMessage={checkOccurrenceHasMessages(nextLessonInfo.nextOcc || nextLessonInfo.finalOccurId, nextLessonInfo.targetDateStr)}
+                              unreadMsgCount={getOccurrenceUnreadCount(nextLessonInfo.nextOcc || nextLessonInfo.finalOccurId, nextLessonInfo.targetDateStr)}
                               isMusicStandMode={isMusicStandMode}
-                              onOpenAppointmentDetail={(occ) => {
-                                setSelectedAppointmentForDetail(occ);
-                                setShowCancelConfirmStep(false);
-                              }}
-                              onOpenChat={() => {
-                                setAppointmentChatData({
-                                  teacherId, teacher_id: teacherId, teacher: hasToday ? briefingData.todayLesson?.teacher : nextOcc?.teacher, teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextOcc?.teacher_name || nextOcc?.teacher),
-                                  date: targetDateStr,
-                                  start_time: timeLabel,
-                                  label,
-                                  occurrenceId: finalOccurId,
-                                  status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
-                                  isCancelled: isCanceled
-                                });
-                                setShowAppointmentChat(true);
-                              }}
+                              onOpenAppointmentDetail={handleOpenAppointmentDetail}
+                              onOpenChat={handleOpenAppointmentChat}
                               onOpenToolbox={() => setShowStudentToolbox(true)}
                             />
 
@@ -7897,7 +6978,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       }
 
-                      const cleanTitle = (t: string) => (t || '')
+                      const cleanTitle = (t: string) => (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '')
                         .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
                         .replace(/^Linken Park/i, 'Linkin Park');
                       const effectiveId = studentId || studentUser?.id;
@@ -7911,12 +6992,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         for (let i = 1; i < sorted.length; i++) {
                           if (sorted[i] === end + 1) end = sorted[i];
                           else {
-                            ranges.push(start === end ? `${start}` : `${start}–${end}`);
+                            ranges.push(start === end ? `${start}` : `${start}-${end}`);
                             start = sorted[i];
                             end = start;
                           }
                         }
-                        ranges.push(start === end ? `${start}` : `${start}–${end}`);
+                        ranges.push(start === end ? `${start}` : `${start}-${end}`);
                         return `S. ${ranges.join(', ')}`;
                       };
 
@@ -7968,364 +7049,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           justifyContent: 'space-between',
                           gap: '16px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                <div style={{ 
-                                  background: 'rgba(22, 163, 74, 0.12)', 
-                                  color: '#16a34a', 
-                                  width: '34px', 
-                                  height: '34px', 
-                                  borderRadius: '11px', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center',
-                                  flexShrink: 0
-                                }}>
-                                  <BookOpen size={17} strokeWidth={2.2} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                  <h4 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
-                                    Hausaufgaben
-                                  </h4>
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    fontSize: isMusicStandMode ? '0.78rem' : '0.74rem',
-                                    fontWeight: 800,
-                                    color: '#16a34a',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                  }}>
-                                    <Music size={12} color="#16a34a" strokeWidth={2.4} />
-                                    <span>Dein Wochen-Fahrplan</span>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* Audio Indicator Pill beside Title */}
-                              {audioTracks.length > 0 ? (
-                                <div
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => {
-                                    if (handleOpenHomeworkBookWithView) {
-                                      handleOpenHomeworkBookWithView('document', 'recordings');
-                                    } else {
-                                      handleTabChangeLocal('homework_book');
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      if (handleOpenHomeworkBookWithView) {
-                                        handleOpenHomeworkBookWithView('document', 'recordings');
-                                      } else {
-                                        handleTabChangeLocal('homework_book');
-                                      }
-                                    }
-                                  }}
-                                  style={{
-                                    background: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '100px',
-                                    padding: '4px 10px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                                    transition: 'all 0.15s ease',
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0
-                                  }}
-                                  className="hover-scale"
-                                  title="Unterrichtsaufnahmen im Aufgabenheft anhören"
-                                  aria-label="Unterrichtsaufnahmen im Aufgabenheft anhören"
-                                >
-                                  <Headphones size={12} color="#475569" strokeWidth={2.2} />
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#334155' }}>
-                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.62rem', fontWeight: 850, padding: '3px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                  Aktiv
-                                </span>
-                              )}
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {hasActiveHomework ? (
-                                <>
-                                  {formattedActiveBooks.map((item, idx) => {
-                                    const bookGradient = getLehrwerkColor(item.title, lehrwerke);
-                                    return (
-                                      <div key={`pro-book-${idx}`} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '8px',
-                                        padding: '10px 14px',
-                                        background: '#ffffff',
-                                        border: '1px solid #f1f5f9',
-                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                        borderRadius: '14px'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                          <div style={{
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '8px',
-                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: bookGradient.text,
-                                            boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
-                                            flexShrink: 0
-                                          }}>
-                                            <BookOpen size={14} strokeWidth={2.4} />
-                                          </div>
-                                          <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                            {item.title}
-                                          </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                          <span style={{
-                                            fontSize: '0.80rem',
-                                            fontWeight: 850,
-                                            color: '#15803d',
-                                            background: '#dcfce7',
-                                            padding: '3px 10px',
-                                            borderRadius: '99px',
-                                            border: '1px solid #bbf7d0',
-                                            flexShrink: 0
-                                          }}>
-                                            {item.formattedPages || (item.pageNums?.length === 1 ? `S. ${item.pageNums[0]}` : `S. ${item.pageNums.join(', ')}`)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {otherActiveHWItems.map((item, idx) => {
-                                    const songTitle = cleanTitle(item.title || item.topic_name);
-                                    const songColor = getSongColor(songTitle);
-                                    return (
-                                      <div key={`pro-song-${idx}`} style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #f1f5f9',
-                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                        padding: '10px 14px',
-                                        borderRadius: '14px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px'
-                                      }}>
-                                        <div style={{
-                                          width: '28px',
-                                          height: '28px',
-                                          borderRadius: '8px',
-                                          background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: songColor.text || '#0f172a',
-                                          boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`,
-                                          flexShrink: 0
-                                        }}>
-                                          <Music size={14} strokeWidth={2.4} />
-                                        </div>
-                                        <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {songTitle}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {/* Zusätzliche Bemerkung / Notizen (Aufbau wie Wochen-Fahrplan im Aufgaben Board) */}
-                                  {generalNotesList && generalNotesList.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      {generalNotesList.map((noteItem: string, nIdx: number) => (
-                                        <div key={`pro-gn-${nIdx}`} style={{
-                                          background: '#ffffff',
-                                          border: '1px solid #f1f5f9',
-                                          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                          padding: '10px 14px',
-                                          borderRadius: '14px',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px'
-                                        }}>
-                                          <div style={{
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '8px',
-                                            background: '#dcfce7',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#15803d',
-                                            flexShrink: 0
-                                          }}>
-                                            <FileText size={14} strokeWidth={2.4} />
-                                          </div>
-                                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {noteItem}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Frage des Schülers für die Stunde (Gelber Text & Gelbe Kennzeichnung) */}
-                                  {(() => {
-                                    const displayedProQuestion = activeStudentQuestion || studentQuestionText;
-                                    if (!displayedProQuestion) return null;
-                                    return (
-                                      <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        fontSize: '0.88rem',
-                                        padding: '8px 12px',
-                                        borderRadius: '12px',
-                                        background: '#fffdf0',
-                                        border: '1px solid #fde047',
-                                        boxShadow: '0 1px 3px rgba(250, 204, 21, 0.15)'
-                                      }}>
-                                        <HelpCircle size={14} style={{ color: '#ca8a04', flexShrink: 0 }} strokeWidth={2.5} />
-                                        <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
-                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#713f12', fontWeight: 700 }}>
-                                          „{displayedProQuestion}“
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </>
-                              ) : (
-                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  Keine offenen Aufgaben für diese Woche erfasst
-                                </div>
-                              )}
-                            </div>
-                            {/* Ausgelagertes Aufnahmen-Pill-Button */}
-                            {audioTracks && audioTracks.length > 0 && (
-                              <div style={{ marginTop: '6px' }}>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveRecordingTrack(audioTracks[0]);
-                                    setRecordingsModalTracks(audioTracks);
-                                    setShowRecordingsModal(true);
-                                  }}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '5px 12px',
-                                    borderRadius: '100px',
-                                    background: '#f0fdf4',
-                                    border: '1.5px solid #bbf7d0',
-                                    color: '#15803d',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 850,
-                                    cursor: 'pointer',
-                                    boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale"
-                                  title="Aufnahmen deiner Lehrkraft öffnen"
-                                >
-                                  <Headphones size={13} color="currentColor" />
-                                  <span>{audioTracks.length === 1 ? '1 Aufnahme anhören' : `${audioTracks.length} Aufnahmen anhören`}</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 2-Button Action Footer */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '8px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleTabChangeLocal('homework_book')}
-                              style={{
-                                padding: '10px 14px',
-                                borderRadius: '14px',
-                                border: 'none',
-                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                color: '#ffffff',
-                                fontSize: '0.86rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                transition: 'all 0.2s',
-                                minHeight: '44px',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.28)'
-                              }}
-                              className="hover-scale"
-                              title="Alle Hausaufgaben ansehen"
-                            >
-                              <BookOpen size={15} color="currentColor" style={{ flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Aufgaben ansehen →</span>
-                            </button>
-
-                            {(() => {
-                              const displayedProQuestion = activeStudentQuestion || studentQuestionText;
-                              return (
-                                <button
-                                  type="button"
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openQuestionModal();
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      openQuestionModal();
-                                    }
-                                  }}
-                                  style={{
-                                    padding: '10px 14px',
-                                    borderRadius: '14px',
-                                    border: displayedProQuestion ? 'none' : '1.5px solid #e2e8f0',
-                                    background: displayedProQuestion ? '#facc15' : '#f8fafc',
-                                    color: displayedProQuestion ? '#0f172a' : '#475569',
-                                    fontSize: '0.86rem',
-                                    fontWeight: 900,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s',
-                                    minHeight: '44px',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: displayedProQuestion ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none'
-                                  }}
-                                  className="hover-scale"
-                                  title={displayedProQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
-                                  aria-label={displayedProQuestion ? "Hinterlegte Schülerfrage bearbeiten" : "Frage für die nächste Stunde stellen"}
-                                >
-                                  <HelpCircle size={15} color="currentColor" style={{ flexShrink: 0 }} />
-                                  <span>{displayedProQuestion ? 'Frage aktiv' : 'Frage?'}</span>
-                                </button>
-                              );
-                            })()}
-                          </div>
+                          <AuthoritativeHomeworkWidget
+                            variant="hero"
+                            studentId={props.studentId || studentUser?.id}
+                            studentUser={studentUser}
+                            localProgress={localProgress}
+                            lehrwerke={lehrwerke}
+                            progressItems={progressItems}
+                            activeSongSkills={activeSongSkills}
+                            assignedCampusSongs={assignedCampusSongs}
+                            isMusicStandMode={isMusicStandMode}
+                            onOpenHomework={() => handleTabChangeLocal('homework_book')}
+                            onOpenQuestionModal={openQuestionModal}
+                            onOpenRecordings={() => handleOpenHomeworkBookWithView ? handleOpenHomeworkBookWithView('document', 'recordings') : handleTabChangeLocal('homework_book')}
+                          />
                         </div>
                       );
                     })()}
@@ -8848,7 +7585,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                 scheduleOccurrences, schoolYearOccurrences, isMusicStandMode, getOccRoomName,
                 checkOccurrenceHasMessages, getOccurrenceUnreadCount, setAppointmentChatData, setShowAppointmentChat,
                 handleTriggerConfirmReschedule, handleRejectReschedule, handleAcknowledgeCancellation,
-                onOpenRescheduleBottomSheet, studentFeedTab, setStudentFeedTab, campusFeedAnnouncements,
+                onOpenRescheduleBottomSheet, onOpenAppointmentDetail: handleOpenAppointmentDetail, studentFeedTab, setStudentFeedTab, campusFeedAnnouncements,
                 classFeedPosts, classFeedInteractions, unreadClassFeedCount, studentId,
                 handleReactToPost, handleSubmitClassFeedInteraction, handleOpenContributions,
                 isStudentRescheduleAllowed, classGoals, classWeeklyMins, feedInteractions, effectiveLevel
@@ -8901,6 +7638,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
       <StudentBriefingModalsHub
         showQuestionModal={showQuestionModal} setShowQuestionModal={setShowQuestionModal} questionInput={questionInput} setQuestionInput={setQuestionInput} handleQuestionInputChange={handleQuestionInputChange} isSavingQuestion={isSavingQuestion} handleSaveQuestion={handleSaveQuestion} questionToast={questionToast} isListeningSpeech={isListeningSpeech} toggleSpeechRecognition={toggleSpeechRecognition}
         selectedAppointmentForDetail={selectedAppointmentForDetail} setSelectedAppointmentForDetail={setSelectedAppointmentForDetail} showCancelConfirmStep={showCancelConfirmStep} setShowCancelConfirmStep={setShowCancelConfirmStep} handleTriggerCancelOccurrence={handleTriggerCancelOccurrence} handleTriggerUndoCancelOccurrence={handleTriggerUndoCancelOccurrence} studentUser={studentUser} briefingData={briefingData} studentInstrumentName={studentInstrumentName} setAppointmentChatData={setAppointmentChatData} setShowAppointmentChat={setShowAppointmentChat} showRecordingsModal={showRecordingsModal} setShowRecordingsModal={setShowRecordingsModal} recordingsModalTracks={recordingsModalTracks} activeRecordingTrack={activeRecordingTrack} setActiveRecordingTrack={setActiveRecordingTrack} getJuniorWeeklyHomeworkSummary={getJuniorWeeklyHomeworkSummary} handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView} handleTabChangeLocal={handleTabChangeLocal} studentUiLevel={studentUiLevel}
+        rescheduleDecisionModalOcc={rescheduleDecisionModalOcc} setRescheduleDecisionModalOcc={setRescheduleDecisionModalOcc} handleTriggerConfirmReschedule={handleTriggerConfirmReschedule} handleRejectReschedule={handleRejectReschedule} scheduleOccurrences={scheduleOccurrences} isMobile={isMobile}
       />
       </div>
   );

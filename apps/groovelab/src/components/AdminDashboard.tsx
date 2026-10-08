@@ -6,6 +6,7 @@ import { resolveCampusStudentAvatar, getDefaultMusicianAvatarUrl } from './Studi
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { PasskeyNudgeBanner } from './admin/PasskeyNudgeBanner';
 import { CourtProofExportModal } from './admin/CourtProofExportModal';
+import { AdminStudentsSkeleton } from './admin/AdminStudentsSkeleton';
 
 // Domain Hooks
 import { useAdminDashboardData } from '../hooks/admin/useAdminDashboardData';
@@ -32,6 +33,7 @@ const DeviceSetupScreen = lazy(() => import('./admin/AdminDeviceSetupView').then
 import { AdminModalsMasterHub } from './admin/modals/AdminModalsMasterHub';
 const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal').then(m => ({ default: m.ConfirmDeleteStudentModal })));
 const AdminQRModal = lazy(() => import('./admin/modals/AdminQRModal'));
+const ParentInfoSheetModal = lazy(() => import('./modals/ParentInfoSheetModal').then(m => ({ default: m.ParentInfoSheetModal })));
 const TeacherDashboard = lazy(() => import('./TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
 const CampusSetupScreen = lazy(() => import('./CampusSetupScreen').then(m => ({ default: m.CampusSetupScreen })));
 const ScheduleBoard = lazy(() => import('./ScheduleBoard').then(m => ({ default: m.ScheduleBoard })));
@@ -77,6 +79,7 @@ export function AdminDashboard({
   const {
     activeTab,
     setActiveTab,
+    loading,
     admin,
     setAdmin,
     schoolObj,
@@ -168,6 +171,20 @@ export function AdminDashboard({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const isMobile = windowWidth <= 768;
+
+  // 🏛️ Tier-1 SWR Preload: Pre-warm CampusEventsBoard chunk in browser cache during idle
+  useEffect(() => {
+    const preloadEvents = () => {
+      import('./CampusEventsBoard');
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const handle = (window as any).requestIdleCallback(preloadEvents);
+      return () => (window as any).cancelIdleCallback(handle);
+    } else {
+      const timer = setTimeout(preloadEvents, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const resolveUserAvatarBound = (u: any, platform?: string): string => {
     const isCampus = platform === 'campus' || activePlatform === 'campus';
@@ -359,57 +376,61 @@ export function AdminDashboard({
 
       {/* TAB 2: STUDENTS */}
       {activeTab === 'students' && (
-        <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Schüler-Verwaltung wird geladen...</div>}>
-          <AdminStudentsView
-            activePlatform={activePlatform}
-            admin={admin}
-            userId={userId}
-            schoolObj={schoolObj}
-            students={students}
-            setStudents={setStudents}
-            studentSearch={studentsState.studentSearch}
-            setStudentSearch={studentsState.setStudentSearch}
-            listType={studentsState.listType}
-            setListType={studentsState.setListType}
-            instrumentFilter={studentsState.instrumentFilter}
-            setInstrumentFilter={studentsState.setInstrumentFilter}
-            showAddStudent={studentsState.showAddStudent}
-            setShowAddStudent={studentsState.setShowAddStudent}
-            showBulkAddStudents={studentsState.showBulkAddStudents}
-            setShowBulkAddStudents={studentsState.setShowBulkAddStudents}
-            bulkInput={studentsState.bulkInput}
-            setBulkInput={studentsState.setBulkInput}
-            parsedStudents={studentsState.parsedStudents}
-            setParsedStudents={studentsState.setParsedStudents}
-            defaultInstrumentForBulk={studentsState.defaultInstrumentForBulk}
-            setDefaultInstrumentForBulk={studentsState.setDefaultInstrumentForBulk}
-            isBulkSaving={studentsState.isBulkSaving}
-            setIsBulkSaving={studentsState.setIsBulkSaving}
-            newStudent={studentsState.newStudent}
-            setNewStudent={studentsState.setNewStudent}
-            editingStudent={studentsState.editingStudent}
-            setEditingStudent={studentsState.setEditingStudent}
-            showRealNames={showRealNames}
-            toggleRealNames={toggleRealNames}
-            canManageStudents={true}
-            hasTimetableOnboarding={() => false}
-            windowWidth={windowWidth}
-            isMobile={isMobile}
-            setSelectedStudent={studentsState.setSelectedStudent}
-            setSelectedQRUser={studentsState.setSelectedQRUser}
-            setSelectedTimetableStudent={studentsState.setSelectedTimetableStudent}
-            setSelectedStudentForTageskompass={studentsState.setSelectedStudentForTageskompass}
-            setShowTageskompassModal={studentsState.setShowTageskompassModal}
-            setShowParentInfoSheetModal={studentsState.setShowParentInfoSheetModal}
-            fetchStudentProfile={(student) => studentsState.setSelectedStudent(student)}
-            handleAddStudent={studentsState.handleAddStudent}
-            handleBulkAddSubmit={studentsState.handleBulkAddSubmit}
-            handleDeleteStudent={studentsState.handleDeleteStudent}
-            handleRestoreStudent={studentsState.handleRestoreStudent}
-            handleUpdateStudent={studentsState.handleUpdateStudent}
-            parseBulkInput={studentsState.parseBulkInput}
-            resolveUserAvatar={resolveUserAvatarBound}
-          />
+        <Suspense fallback={<AdminStudentsSkeleton brandColor={brandColor} />}>
+          {loading && students.length === 0 ? (
+            <AdminStudentsSkeleton brandColor={brandColor} />
+          ) : (
+            <AdminStudentsView
+              activePlatform={activePlatform}
+              admin={admin}
+              userId={userId}
+              schoolObj={schoolObj}
+              students={students}
+              setStudents={setStudents}
+              studentSearch={studentsState.studentSearch}
+              setStudentSearch={studentsState.setStudentSearch}
+              listType={studentsState.listType}
+              setListType={studentsState.setListType}
+              instrumentFilter={studentsState.instrumentFilter}
+              setInstrumentFilter={studentsState.setInstrumentFilter}
+              showAddStudent={studentsState.showAddStudent}
+              setShowAddStudent={studentsState.setShowAddStudent}
+              showBulkAddStudents={studentsState.showBulkAddStudents}
+              setShowBulkAddStudents={studentsState.setShowBulkAddStudents}
+              bulkInput={studentsState.bulkInput}
+              setBulkInput={studentsState.setBulkInput}
+              parsedStudents={studentsState.parsedStudents}
+              setParsedStudents={studentsState.setParsedStudents}
+              defaultInstrumentForBulk={studentsState.defaultInstrumentForBulk}
+              setDefaultInstrumentForBulk={studentsState.setDefaultInstrumentForBulk}
+              isBulkSaving={studentsState.isBulkSaving}
+              setIsBulkSaving={studentsState.setIsBulkSaving}
+              newStudent={studentsState.newStudent}
+              setNewStudent={studentsState.setNewStudent}
+              editingStudent={studentsState.editingStudent}
+              setEditingStudent={studentsState.setEditingStudent}
+              showRealNames={showRealNames}
+              toggleRealNames={toggleRealNames}
+              canManageStudents={true}
+              hasTimetableOnboarding={() => false}
+              windowWidth={windowWidth}
+              isMobile={isMobile}
+              setSelectedStudent={studentsState.setSelectedStudent}
+              setSelectedQRUser={studentsState.setSelectedQRUser}
+              setSelectedTimetableStudent={studentsState.setSelectedTimetableStudent}
+              setSelectedStudentForTageskompass={studentsState.setSelectedStudentForTageskompass}
+              setShowTageskompassModal={studentsState.setShowTageskompassModal}
+              setShowParentInfoSheetModal={studentsState.setShowParentInfoSheetModal}
+              fetchStudentProfile={(student) => studentsState.setSelectedStudent(student)}
+              handleAddStudent={studentsState.handleAddStudent}
+              handleBulkAddSubmit={studentsState.handleBulkAddSubmit}
+              handleDeleteStudent={studentsState.handleDeleteStudent}
+              handleRestoreStudent={studentsState.handleRestoreStudent}
+              handleUpdateStudent={studentsState.handleUpdateStudent}
+              parseBulkInput={studentsState.parseBulkInput}
+              resolveUserAvatar={resolveUserAvatarBound}
+            />
+          )}
         </Suspense>
       )}
 
@@ -579,6 +600,15 @@ export function AdminDashboard({
               triggerBatchAddStations={roomsState.triggerBatchAddStations}
               handleDeleteRoom={roomsState.handleDeleteRoom}
               handleDeleteStation={roomsState.handleDeleteStation}
+              onUpdateStationColor={async (stationId: string, newColor: string) => {
+                setStations(prev => prev.map(s => s.id === stationId ? { ...s, color: newColor } : s));
+                const { error } = await supabase.from('stations').update({ color: newColor }).eq('id', stationId);
+                if (error) {
+                  console.error('[AdminDashboard] Error updating station color:', error);
+                  alert('Fehler beim Aktualisieren der Farbe: ' + error.message);
+                }
+              }}
+              supabase={supabase}
               brandColor={brandColor}
             />
           </Suspense>
@@ -586,7 +616,7 @@ export function AdminDashboard({
       )}
 
       {/* TAB 6: SONGS / MEDIATHEK */}
-      {activeTab === 'songs' && (
+      {(activeTab === 'songs' || activeTab === 'mediathek') && (
         <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>{activePlatform === 'campus' ? 'Mediathek wird geladen...' : 'Songs werden geladen...'}</div>}>
           {activePlatform === 'campus' ? (
             <AdminSongsView
@@ -594,6 +624,7 @@ export function AdminDashboard({
               admin={admin}
               userId={userId}
               songs={songs}
+              students={students}
               lehrwerke={songsState.lehrwerke}
               setLehrwerke={songsState.setLehrwerke}
               songSearch={songsState.songSearch}
@@ -636,6 +667,7 @@ export function AdminDashboard({
               handleUpdateSong={songsState.handleUpdateSong}
               handleMediathekTouchStart={songsState.handleMediathekTouchStart}
               handleMediathekTouchEnd={songsState.handleMediathekTouchEnd}
+              handleToggleSongCampusActive={songsState.handleToggleSongCampusActive}
             />
           ) : (
             <GrooveLabSongsView
@@ -856,6 +888,25 @@ export function AdminDashboard({
         onAddMember={bandsState.handleAddMember}
         brandColor={brandColor}
       />
+
+      {/* Personalisierbares Eltern-Informationsblatt (PDF) Modal */}
+      {studentsState.showParentInfoSheetModal && (
+        <Suspense fallback={null}>
+          <ParentInfoSheetModal
+            isOpen={studentsState.showParentInfoSheetModal}
+            onClose={() => studentsState.setShowParentInfoSheetModal(false)}
+            schoolData={{
+              name: schoolObj?.name || admin?.school_name || 'Unsere Musikschule',
+              subdomain: schoolObj?.subdomain || schoolObj?.slug || '',
+              logo_url: schoolObj?.logo_url || '',
+              city: schoolObj?.city || '',
+              student_billing_option: schoolObj?.student_billing_option || 'school_all',
+              email: schoolObj?.email || admin?.email || ''
+            }}
+            activePlatformDefault={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'both'}
+          />
+        </Suspense>
+      )}
 
       {/* Beweissicherer Mandanten-Export Modal (DSGVO Art. 20/28) */}
       {showCourtProofExportModal && (

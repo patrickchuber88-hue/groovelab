@@ -1788,16 +1788,16 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 marginTop: '32px',
                 padding: '24px 28px',
                 borderRadius: '20px',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '1.5px solid #86efac',
-                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.08)',
+                background: '#ecfdf5',
+                border: '1.5px solid #10b981',
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '16px',
                 textAlign: 'left'
               }}>
                 <div style={{
-                  background: '#16a34a',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: '#ffffff',
                   width: '42px',
                   height: '42px',

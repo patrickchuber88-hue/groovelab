@@ -551,20 +551,20 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
-                      background: isAllSelected ? '#e6f4ea' : '#ffffff',
-                      border: isAllSelected ? '1px solid #86efac' : '1px solid #cbd5e1',
-                      color: isAllSelected ? '#166534' : '#1e293b',
+                      background: isAllSelected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                      border: isAllSelected ? 'none' : '1px solid #cbd5e1',
+                      color: isAllSelected ? '#ffffff' : '#1e293b',
                       borderRadius: '10px',
                       padding: '6px 14px',
                       fontSize: '0.8rem',
                       fontWeight: 800,
                       cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                      boxShadow: isAllSelected ? '0 2px 8px rgba(16, 185, 129, 0.28)' : '0 1px 2px rgba(0,0,0,0.04)',
                       transition: 'all 0.15s ease'
                     }}
                     title={isAllSelected ? "Alle Schüler abwählen" : "Alle Schüler auswählen"}
                   >
-                    <CheckSquare size={14} style={{ color: isAllSelected ? '#166534' : '#475569' }} />
+                    <CheckSquare size={14} style={{ color: isAllSelected ? '#ffffff' : '#475569' }} />
                     <span>{isAllSelected ? 'Auswahl aufheben' : 'Alle auswählen'}</span>
                   </button>
                 )}

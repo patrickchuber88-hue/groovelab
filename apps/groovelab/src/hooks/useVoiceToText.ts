@@ -5,6 +5,11 @@ export interface UseVoiceToTextOptions {
   lang?: string;
   onResult?: (text: string) => void;
   onError?: (error: string) => void;
+  autoStopOnSilence?: boolean;
+  silenceTimeoutMs?: number;
+  initialTimeoutMs?: number;
+  maxDurationMs?: number;
+  onAutoStop?: (reason: 'silence' | 'initial_timeout' | 'max_duration') => void;
 }
 
 /**
@@ -49,12 +54,23 @@ export const formatGermanDictation = (text: string): string => {
 /**
  * 🎙️ Universal Web Speech Recognition Hook (0.1% Goldstandard)
  * - Deterministic event.results scanning (prevents compounding interim duplications)
+ * - Dual-threshold Silence Detection (automatic stop when speaking ceases)
  * - Screen WakeLock integration
  * - Automatic visibility & unmount teardown
  * - One-time microphone permission gatekeeper
  */
 export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
-  const { lang = 'de-DE', onResult, onError } = options;
+  const {
+    lang = 'de-DE',
+    onResult,
+    onError,
+    autoStopOnSilence = true,
+    silenceTimeoutMs = 2000,
+    initialTimeoutMs = 6000,
+    maxDurationMs = 60000,
+    onAutoStop
+  } = options;
+
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -65,42 +81,29 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
   const isListeningRef = useRef<boolean>(false);
   const wakeLockRef = useRef<any>(null);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setIsSupported(true);
-      }
+  // Watchdog Timers for 0.1% Silence Auto-Stop
+  const silenceTimerRef = useRef<any>(null);
+  const initialTimerRef = useRef<any>(null);
+  const maxDurationTimerRef = useRef<any>(null);
+  const hasSpokenRef = useRef<boolean>(false);
+
+  const clearAllTimers = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {}
-        setIsListening(false);
-        isListeningRef.current = false;
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {}
-        recognitionRef.current = null;
-      }
-      if (wakeLockRef.current) {
-        try { wakeLockRef.current.release(); } catch (e) {}
-        wakeLockRef.current = null;
-      }
-    };
+    if (initialTimerRef.current) {
+      clearTimeout(initialTimerRef.current);
+      initialTimerRef.current = null;
+    }
+    if (maxDurationTimerRef.current) {
+      clearTimeout(maxDurationTimerRef.current);
+      maxDurationTimerRef.current = null;
+    }
   }, []);
 
   const stopListening = useCallback(() => {
+    clearAllTimers();
     isListeningRef.current = false;
     if (recognitionRef.current) {
       try {
@@ -113,7 +116,65 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       wakeLockRef.current = null;
     }
     setIsListening(false);
-  }, []);
+  }, [clearAllTimers]);
+
+  const triggerAutoStop = useCallback((reason: 'silence' | 'initial_timeout' | 'max_duration') => {
+    // 📳 Taktiles Haptic Feedback (20ms) für mobile Geräte & Tablets (iOS PWA / Android)
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(20); } catch (_) {}
+    }
+    stopListening();
+    if (onAutoStop) {
+      onAutoStop(reason);
+    }
+  }, [stopListening, onAutoStop]);
+
+  const resetSilenceTimer = useCallback(() => {
+    if (!autoStopOnSilence) return;
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+    }
+    silenceTimerRef.current = setTimeout(() => {
+      triggerAutoStop('silence');
+    }, silenceTimeoutMs);
+  }, [autoStopOnSilence, silenceTimeoutMs, triggerAutoStop]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setIsSupported(true);
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && recognitionRef.current) {
+        clearAllTimers();
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+        setIsListening(false);
+        isListeningRef.current = false;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearAllTimers();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+        recognitionRef.current = null;
+      }
+      if (wakeLockRef.current) {
+        try { wakeLockRef.current.release(); } catch (e) {}
+        wakeLockRef.current = null;
+      }
+    };
+  }, [clearAllTimers]);
 
   const resetTranscript = useCallback(() => {
     finalTranscriptRef.current = '';
@@ -151,6 +212,8 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
 
       finalTranscriptRef.current = '';
       setTranscript('');
+      hasSpokenRef.current = false;
+      clearAllTimers();
 
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -162,11 +225,51 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
         setIsListening(true);
         isListeningRef.current = true;
         setError(null);
+
+        // ⏱️ Max Session Ceiling Timer
+        if (maxDurationMs > 0) {
+          maxDurationTimerRef.current = setTimeout(() => {
+            triggerAutoStop('max_duration');
+          }, maxDurationMs);
+        }
+
+        // ⏱️ Initial Inactivity Watchdog
+        if (autoStopOnSilence && initialTimeoutMs > 0) {
+          initialTimerRef.current = setTimeout(() => {
+            if (!hasSpokenRef.current) {
+              triggerAutoStop('initial_timeout');
+            }
+          }, initialTimeoutMs);
+        }
+      };
+
+      recognition.onspeechstart = () => {
+        hasSpokenRef.current = true;
+        if (initialTimerRef.current) {
+          clearTimeout(initialTimerRef.current);
+          initialTimerRef.current = null;
+        }
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      };
+
+      recognition.onspeechend = () => {
+        if (hasSpokenRef.current) {
+          resetSilenceTimer();
+        }
       };
 
       // 🛡️ ZERO-DUPLICATION RESULT PARSER (0.1% Goldstandard)
       // Iterates through full event.results list to reconstruct exact state
       recognition.onresult = (event: any) => {
+        hasSpokenRef.current = true;
+        if (initialTimerRef.current) {
+          clearTimeout(initialTimerRef.current);
+          initialTimerRef.current = null;
+        }
+
         let finalStr = '';
         let interimStr = '';
 
@@ -186,6 +289,9 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
 
         setTranscript(formatted);
         if (onResult) onResult(formatted);
+
+        // 🛑 Silence Watchdog: Debounce reset on every speech token
+        resetSilenceTimer();
       };
 
       recognition.onerror = (event: any) => {
@@ -200,6 +306,7 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       };
 
       recognition.onend = () => {
+        clearAllTimers();
         setIsListening(false);
         isListeningRef.current = false;
         if (wakeLockRef.current) {
@@ -212,6 +319,7 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       recognition.start();
     } catch (err: any) {
       console.error('[useVoiceToText] Failed to start:', err);
+      clearAllTimers();
       setError('Mikrofon konnte nicht gestartet werden.');
       setIsListening(false);
       isListeningRef.current = false;
@@ -220,7 +328,17 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
         wakeLockRef.current = null;
       }
     }
-  }, [lang, onResult, onError]);
+  }, [
+    lang,
+    onResult,
+    onError,
+    autoStopOnSilence,
+    initialTimeoutMs,
+    maxDurationMs,
+    clearAllTimers,
+    triggerAutoStop,
+    resetSilenceTimer
+  ]);
 
   const toggleListening = useCallback(async () => {
     if (isListeningRef.current) {
@@ -250,12 +368,17 @@ export interface UseDictationInputOptions {
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error: string) => void;
+  autoStopOnSilence?: boolean;
+  silenceTimeoutMs?: number;
+  initialTimeoutMs?: number;
+  maxDurationMs?: number;
+  onAutoStop?: (reason: 'silence' | 'initial_timeout' | 'max_duration') => void;
 }
 
 /**
  * 🎯 0.1% Goldstandard Input-Binding Dictation Hook
  * Connects any input or textarea state directly to the dictation engine.
- * Guarantees zero text duplication, preserves prior typed content, and formats German punctuation.
+ * Guarantees zero text duplication, preserves prior typed content, and automatically stops on silence.
  */
 export const useDictationInput = ({
   value,
@@ -263,11 +386,25 @@ export const useDictationInput = ({
   lang = 'de-DE',
   onStart,
   onEnd,
-  onError
+  onError,
+  autoStopOnSilence = true,
+  silenceTimeoutMs = 2000,
+  initialTimeoutMs = 6000,
+  maxDurationMs = 60000,
+  onAutoStop
 }: UseDictationInputOptions) => {
   const baseTextRef = useRef<string>('');
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
+
+  const handleAutoStop = useCallback((reason: 'silence' | 'initial_timeout' | 'max_duration') => {
+    baseTextRef.current = '';
+    if (onAutoStop) onAutoStop(reason);
+    if (onEndRef.current) onEndRef.current();
+  }, [onAutoStop]);
 
   const {
     isListening,
@@ -278,6 +415,11 @@ export const useDictationInput = ({
     resetTranscript
   } = useVoiceToText({
     lang,
+    autoStopOnSilence,
+    silenceTimeoutMs,
+    initialTimeoutMs,
+    maxDurationMs,
+    onAutoStop: handleAutoStop,
     onResult: (liveFormattedSpoken) => {
       const base = baseTextRef.current;
       const cleanSpoken = liveFormattedSpoken.trim();
@@ -289,25 +431,29 @@ export const useDictationInput = ({
     }
   });
 
+  const stopListeningWrapper = useCallback(() => {
+    stopListening();
+    baseTextRef.current = '';
+    if (onEndRef.current) onEndRef.current();
+  }, [stopListening]);
+
   const toggleListening = useCallback(async () => {
     if (isListening) {
-      stopListening();
-      baseTextRef.current = '';
-      if (onEnd) onEnd();
+      stopListeningWrapper();
     } else {
       baseTextRef.current = (value || '').trim();
       resetTranscript();
       if (onStart) onStart();
       await startListening();
     }
-  }, [isListening, value, startListening, stopListening, resetTranscript, onStart, onEnd]);
+  }, [isListening, value, startListening, stopListeningWrapper, resetTranscript, onStart]);
 
   return {
     isListening,
     isSupported,
     error,
     toggleListening,
-    stopListening,
+    stopListening: stopListeningWrapper,
     startListening: useCallback(async () => {
       baseTextRef.current = (value || '').trim();
       resetTranscript();

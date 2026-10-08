@@ -264,7 +264,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                   aria-label={`Campus-ID ${resolvedCampusId}, klicken zum Kopieren`}
                 >
                   <span>ID: {resolvedCampusId}</span>
-                  {copiedCampusId ? <Check size={12} color="#86efac" /> : <Copy size={12} color="#ffffff" />}
+                  {copiedCampusId ? <Check size={12} color="#10b981" /> : <Copy size={12} color="#ffffff" />}
                 </span>
               </div>
 
@@ -593,7 +593,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                            border: '1.5px solid #ffffff'
+                            border: 'none'
                           }}>
                             <Lock size={10} strokeWidth={2.5} />
                           </div>

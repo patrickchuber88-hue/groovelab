@@ -1796,9 +1796,9 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                           padding: '6px 8px',
                           fontSize: '0.72rem',
                           fontWeight: 800,
-                          background: '#f0fdf4',
-                          color: '#16a34a',
-                          border: '1px solid #bbf7d0',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: '#ffffff',
+                          border: 'none',
                           borderRadius: '8px',
                           cursor: 'pointer',
                           display: 'flex',
@@ -1917,7 +1917,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                   fontWeight: 850,
                   background: badgeBg || '#f1f5f9',
                   color: badgeColor || '#475569',
-                  border: badgeBorder || (isSharedWithTeacher ? '1px solid #86efac' : '1.5px solid #cbd5e1'),
+                  border: badgeBorder || (isSharedWithTeacher ? '1px solid #10b981' : '1.5px solid #cbd5e1'),
                   padding: '2.5px 8px',
                   borderRadius: '100px',
                   whiteSpace: 'nowrap',
@@ -2153,13 +2153,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           onClick={toggleLooping}
           style={{
             border: isLooping 
-              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #16a34a') 
+              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #10b981') 
               : '1px solid #cbd5e1',
             background: isLooping 
-              ? (isIndigoPurple ? '#f3e8ff' : '#dcfce7') 
+              ? (isIndigoPurple ? '#f3e8ff' : '#ecfdf5') 
               : '#ffffff',
             color: isLooping 
-              ? (isIndigoPurple ? '#6d28d9' : '#15803d') 
+              ? (isIndigoPurple ? '#6d28d9' : '#059669') 
               : '#64748b',
             height: isMobile ? '30px' : '34px',
             width: isMobile ? '30px' : '34px',
@@ -2213,13 +2213,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           }}
           style={{
             border: countInActive 
-              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #16a34a') 
+              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #10b981') 
               : '1px solid #cbd5e1',
             background: countInActive 
-              ? (isIndigoPurple ? '#f3e8ff' : '#dcfce7') 
+              ? (isIndigoPurple ? '#f3e8ff' : '#ecfdf5') 
               : '#ffffff',
             color: countInActive 
-              ? (isIndigoPurple ? '#6d28d9' : '#15803d') 
+              ? (isIndigoPurple ? '#6d28d9' : '#059669') 
               : '#64748b',
             height: isMobile ? '30px' : '34px',
             width: isMobile ? '30px' : '34px',
@@ -2251,13 +2251,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           aria-label={`Wiedergabegeschwindigkeit ${getPlaybackRateLabel(playbackRate, effectiveUiLevel)}`}
           style={{
             border: playbackRate !== 1 
-              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #16a34a') 
+              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #10b981') 
               : '1px solid #cbd5e1',
             background: playbackRate !== 1 
-              ? (isIndigoPurple ? '#f3e8ff' : '#dcfce7') 
+              ? (isIndigoPurple ? '#f3e8ff' : '#ecfdf5') 
               : '#ffffff',
             color: playbackRate !== 1 
-              ? (isIndigoPurple ? '#6d28d9' : '#15803d') 
+              ? (isIndigoPurple ? '#6d28d9' : '#059669') 
               : '#64748b',
             fontSize: isMobile ? '0.74rem' : '0.78rem',
             fontWeight: 850,
@@ -2327,13 +2327,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           }}
           style={{
             border: isToolsOpen 
-              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #16a34a') 
+              ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #10b981') 
               : '1px solid #cbd5e1',
             background: isToolsOpen 
-              ? (isIndigoPurple ? '#f3e8ff' : '#dcfce7') 
+              ? (isIndigoPurple ? '#f3e8ff' : '#ecfdf5') 
               : '#ffffff',
             color: isToolsOpen 
-              ? (isIndigoPurple ? '#6d28d9' : '#15803d') 
+              ? (isIndigoPurple ? '#6d28d9' : '#059669') 
               : '#64748b',
             height: isMobile ? '30px' : '34px',
             width: isMobile ? '30px' : '34px',
@@ -2361,14 +2361,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     <div
       style={{
         background: isPlaying
-          ? (isShared ? "#dcfce7" : (isIndigoPurple ? "#faf5ff" : "#f0fdf4"))
+          ? (isShared ? "#ecfdf5" : (isIndigoPurple ? "#faf5ff" : "#ecfdf5"))
           : (isShared ? "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)" : "#ffffff"),
         borderRadius: "16px",
         border: isPlaying
-          ? (isShared ? "1.5px solid #22c55e" : (isIndigoPurple ? "1.5px solid #c4b5fd" : "1.5px solid #86efac"))
+          ? (isShared ? "1.5px solid #10b981" : (isIndigoPurple ? "1.5px solid #c4b5fd" : "1.5px solid #10b981"))
           : isHero
-            ? (isIndigoPurple ? "2px solid #a855f7" : "2px solid #22c55e")
-            : (isShared ? "1.5px solid #86efac" : "1px solid #e2e8f0"),
+            ? (isIndigoPurple ? "2px solid #a855f7" : "2px solid #10b981")
+            : (isShared ? "1.5px solid #10b981" : "1px solid #e2e8f0"),
         padding: isMobile ? "8px 10px" : "8px 12px",
         width: "100%",
         boxShadow: isPlaying

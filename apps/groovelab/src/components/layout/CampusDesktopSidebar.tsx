@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { CampusSidebarRailItem } from './CampusSidebarRailItem';
 import { CampusSidebarUserHub } from './CampusSidebarUserHub';
+import { CampusRibbonNoteIcon } from '../CampusGroovelabBrand';
 import { StudioAvatar } from '../StudioAvatar';
 import { formatTeacherFullName } from '../../utils/nameHelper';
 
@@ -207,7 +208,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               padding: '0 12px',
               borderRadius: '9999px',
               background: '#fef2f2',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
+              border: 'none',
               color: '#b91c1c',
               fontWeight: 750,
               fontSize: '0.78rem',
@@ -317,7 +318,6 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               <GraduationCap 
                 size={18} 
                 color={activePlatform === 'campus' ? '#ffffff' : 'rgba(52, 168, 83, 0.85)'} 
-                strokeWidth={2.4} 
               />
               <span>Campus</span>
             </button>
@@ -368,10 +368,9 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               className="hover-scale-mini"
               title="Zu GrooveLab wechseln"
             >
-              <Music 
-                size={17} 
+              <CampusRibbonNoteIcon 
+                size={18} 
                 color={activePlatform === 'groovelab' ? '#0f172a' : 'rgba(202, 138, 4, 0.85)'} 
-                strokeWidth={2.4} 
               />
               <span>GrooveLab</span>
             </button>
@@ -390,7 +389,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   justifyContent: 'center',
                   boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)'
                 }}>
-                  <GraduationCap size={24} color="#34a853" strokeWidth={3} />
+                  <GraduationCap size={24} color="#34a853" />
                 </div>
                 <div style={{ 
                   fontSize: '1.5rem', 
@@ -411,7 +410,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   justifyContent: 'center',
                   boxShadow: '0 4px 12px rgba(234, 179, 8, 0.1)'
                 }}>
-                  <Music size={24} color="#eab308" strokeWidth={3} />
+                  <CampusRibbonNoteIcon size={24} color="#eab308" />
                 </div>
                 <div style={{ 
                   fontSize: '1.5rem', 
@@ -515,18 +514,18 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                     height: '22px',
                     minWidth: '22px',
                     borderRadius: '8px',
-                    background: isAllowed ? '#dcfce7' : '#f1f5f9',
-                    color: isAllowed ? '#16a34a' : '#64748b',
-                    border: isAllowed ? '1px solid #86efac' : '1px solid #cbd5e1',
+                    background: isAllowed ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                    color: isAllowed ? '#ffffff' : '#64748b',
+                    border: isAllowed ? 'none' : '1px solid #cbd5e1',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     flexShrink: 0,
-                    boxShadow: isAllowed ? '0 1px 3px rgba(22, 163, 74, 0.12)' : 'none',
+                    boxShadow: isAllowed ? '0 1px 4px rgba(16, 185, 129, 0.25)' : 'none',
                     outline: 'none'
                   }}
                   className="hover-scale"
                 >
-                  {isAllowed ? <Check size={13} strokeWidth={3} /> : <Lock size={12} strokeWidth={2.5} />}
+                  {isAllowed ? <Check size={13} strokeWidth={3} color="#ffffff" /> : <Lock size={12} strokeWidth={2.5} />}
                 </span>
               );
             };
@@ -572,6 +571,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                     isCollapsed={isCollapsed}
                     platform={activePlatform}
                     onClick={() => setActiveStudentTab('events')}
+                    onMouseEnter={() => { import('../CampusEventsBoard'); }}
                     rightSlot={renderParentStatusPill('events')}
                     style={{ opacity: parentUnlocked && !isBoardAllowedForChild('events') ? 0.72 : 1 }}
                   />
@@ -730,6 +730,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 isCollapsed={isCollapsed}
                 platform={activePlatform}
                 onClick={() => setActiveStudentTab('events')}
+                onMouseEnter={() => { import('../CampusEventsBoard'); }}
               />
               <CampusSidebarRailItem
                 icon={<Mail size={20} />}

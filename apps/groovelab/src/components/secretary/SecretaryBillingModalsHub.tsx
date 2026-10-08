@@ -1,9 +1,8 @@
 import React, { Suspense, lazy } from 'react';
 import { 
-  Check, X, CheckCircle, FileText, Download, HardDrive, 
-  Info, Sparkles, RefreshCw, ShieldCheck, Clock, Search,
-  Cloud, Zap, Rocket, Crown, Database, CheckCircle2, Copy
+  Check, X, CheckCircle, FileText, Download, HardDrive, Info, Sparkles, RefreshCw, ShieldCheck, Clock, Search, Cloud, Zap, Rocket, Crown, Database, CheckCircle2, Copy
 } from 'lucide-react';
+import { useModalA11y } from '../../hooks/useModalA11y';
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../../utils/epcGiroCode';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../domain/pricingEngine';
 import { cleanPdfText } from '../../utils/pdfTypographyEngine';
@@ -225,6 +224,21 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
   setHasGroovelabSub,
   downloadUpgradeConfirmationPdf
 }) => {
+  const handleCloseActiveBillingModal = () => {
+    if (showChangeTariffModal) setShowChangeTariffModal(false);
+    else if (showModuleUpgradeModal) setShowModuleUpgradeModal(false);
+    else if (showSwitchBillingModelModal) setShowSwitchBillingModelModal(false);
+    else if (showCancelModal) setShowCancelModal(false);
+    else if (showStorageTerminationModal) setShowStorageTerminationModal(false);
+    else if (selectedInvoice) setSelectedInvoice(null);
+    else if (showStorageManagerModal) setShowStorageManagerModal(false);
+  };
+  const isAnyBillingModalOpen = Boolean(
+    showChangeTariffModal || showModuleUpgradeModal || showSwitchBillingModelModal ||
+    showCancelModal || showStorageTerminationModal || selectedInvoice || showStorageManagerModal
+  );
+  const billingModalRef = useModalA11y(isAnyBillingModalOpen, handleCloseActiveBillingModal);
+
   return (
     <>
       {/* Modal for scheduled billing option change */}
@@ -233,23 +247,11 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
           role="dialog"
           aria-modal="true"
           aria-labelledby="tariff-change-modal-title"
+          ref={billingModalRef}
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowChangeTariffModal(false);
           }}
-          style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px'
-        }}>
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{
             background: '#ffffff',
             borderRadius: '24px',
@@ -379,23 +381,11 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
           role="dialog"
           aria-modal="true"
           aria-labelledby="active-students-modal-title"
+          ref={billingModalRef}
           onClick={(e) => {
             if (e.target === e.currentTarget) setActiveStudentsModalList(null);
           }}
-          style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '20px'
-        }}>
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '20px' }}>
           <div style={{
             background: '#ffffff',
             borderRadius: '24px',
@@ -770,21 +760,8 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
             role="dialog"
             aria-modal="true"
             aria-labelledby="switch-billing-title"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(15, 23, 42, 0.65)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 99999,
-              padding: '20px'
-            }}
+            ref={billingModalRef}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '20px' }}
             onClick={() => setShowSwitchBillingModelModal(false)}
           >
             <div
@@ -830,7 +807,17 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 {/* Option 1: Eltern-Direktabrechnung */}
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedSwitchTargetPayer === 'student'}
+                  aria-label="Eltern-Direktabrechnung auswählen"
                   onClick={() => setSelectedSwitchTargetPayer('student')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedSwitchTargetPayer('student');
+                    }
+                  }}
                   style={{
                     border: '2px solid',
                     borderColor: selectedSwitchTargetPayer === 'student' ? '#0284c7' : '#e2e8f0',
@@ -878,7 +865,17 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
 
                 {/* Option 2: Sammelzahler */}
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedSwitchTargetPayer === 'school'}
+                  aria-label="Sammelzahler auswählen"
                   onClick={() => setSelectedSwitchTargetPayer('school')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedSwitchTargetPayer('school');
+                    }
+                  }}
                   style={{
                     border: '2px solid',
                     borderColor: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : '#e2e8f0',
@@ -950,8 +947,8 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               {/* Live Savings Calculator Banner (when switching from school to student) */}
               {selectedSwitchTargetPayer === 'student' && billingPayer === 'school' && (
                 <div style={{
-                  background: 'linear-gradient(135deg, #ecfdf5 0%, #dcfce7 100%)',
-                  border: '1.5px solid #86efac',
+                  background: '#ecfdf5',
+                  border: '1.5px solid #10b981',
                   borderRadius: '16px',
                   padding: '16px 20px',
                   display: 'flex',
@@ -1118,20 +1115,8 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
             role="dialog"
             aria-modal="true"
             aria-labelledby="storage-manager-title"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(15, 23, 42, 0.6)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 99999,
-              padding: '20px'
-            }}
+            ref={billingModalRef}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '20px' }}
             onClick={() => setShowStorageManagerModal(false)}
           >
             <div
@@ -1474,9 +1459,9 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
 
               {/* 📋 Gesetzliche Vorab-Zusammenfassung & Bestellübersicht (§ 312j BGB) */}
               <div style={{
-                background: selectedStorageAddonGb > activeBookedGb ? '#f0fdf4' : (selectedStorageAddonGb < activeBookedGb ? '#fefce8' : '#f8fafc'),
+                background: selectedStorageAddonGb > activeBookedGb ? '#ecfdf5' : (selectedStorageAddonGb < activeBookedGb ? '#fefce8' : '#f8fafc'),
                 border: '1.5px solid',
-                borderColor: selectedStorageAddonGb > activeBookedGb ? '#86efac' : (selectedStorageAddonGb < activeBookedGb ? '#fde047' : '#e2e8f0'),
+                borderColor: selectedStorageAddonGb > activeBookedGb ? '#10b981' : (selectedStorageAddonGb < activeBookedGb ? '#fde047' : '#e2e8f0'),
                 borderRadius: '16px',
                 padding: '14px 18px',
                 display: 'flex',

@@ -463,3 +463,7 @@ export class RealtimePitchStream {
     return this.isRunning;
   }
 }
+
+// Autoritativer Rückwärtskompatibilitäts-Export für MicroScore & Alt-Aufrufer
+export { evaluatePitchMatch as calculatePitchMatchScore };
+export { RealtimePitchStream as YinPitchTracker };

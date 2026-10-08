@@ -95,15 +95,16 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {sticker.isUnlocked ? (
             <span style={{
-              background: '#dcfce7',
-              color: '#15803d',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
               fontSize: '0.8rem',
               fontWeight: 900,
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
               padding: '6px 16px',
               borderRadius: '100px',
-              border: '1.5px solid #86efac',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.28)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px'
@@ -131,8 +132,8 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
 
           {/* Rarity Pill */}
           <span style={{
-            background: sticker.rarity === 'legendary' ? '#fef3c7' : sticker.rarity === 'epic' ? '#f3e8ff' : sticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
-            color: sticker.rarity === 'legendary' ? '#b45309' : sticker.rarity === 'epic' ? '#7e22ce' : sticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
+            background: sticker.rarity === 'legendary' ? '#fef3c7' : sticker.rarity === 'epic' ? '#f3e8ff' : sticker.rarity === 'rare' ? '#eff6ff' : '#ecfdf5',
+            color: sticker.rarity === 'legendary' ? '#b45309' : sticker.rarity === 'epic' ? '#7e22ce' : sticker.rarity === 'rare' ? '#1d4ed8' : '#059669',
             fontSize: '0.8rem',
             fontWeight: 900,
             textTransform: 'uppercase',
@@ -221,7 +222,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 4px 12px rgba(217, 119, 6, 0.45)',
-                border: '2.5px solid #ffffff',
+                border: 'none',
                 pointerEvents: 'none'
               }}
               title="Noch gesperrt"
@@ -255,8 +256,8 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
         {/* Open, Borderless Progress / Achievement Flow */}
         <div style={{ textAlign: 'center', padding: '4px 8px' }}>
           {sticker.isUnlocked ? (
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#15803d', fontWeight: 800, fontSize: '0.94rem' }}>
-              <Check size={16} color="#15803d" />
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#059669', fontWeight: 800, fontSize: '0.94rem' }}>
+              <Check size={16} color="#10b981" />
               <span>Glückwunsch! Du besitzt diesen Sticker bereits!</span>
             </div>
           ) : (

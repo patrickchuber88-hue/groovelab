@@ -22,6 +22,11 @@ import { useTeacherModalStates } from './teacher/hooks/useTeacherModalStates';
 import { TeacherBriefingTab } from './teacher/tabs/TeacherBriefingTab';
 import { TeacherCoachesTab } from './teacher/tabs/TeacherCoachesTab';
 import { TeacherModalsHub } from './teacher/modals/TeacherModalsHub';
+import { TeacherUnifiedMediaLibraryModal } from './teacher/mediathek/TeacherUnifiedMediaLibraryModal';
+import { AbsenceGracePeriodBanner } from './teacher/absence/AbsenceGracePeriodBanner';
+import { TeacherRoomCollisionDecisionModal } from './teacher/modals/TeacherRoomCollisionDecisionModal';
+import { SmartRoomSwappingService, RoomCollisionRecord } from '../services/room/smartRoomSwappingService';
+import { supabase } from '../lib/supabase';
 
 // Lazy Loaded Tabs (⚡ 0ms Instant Chunk Preload)
 const teacherLiveViewChunk = import('./teacher/TeacherLiveView');
@@ -89,6 +94,7 @@ export function TeacherDashboard({
   const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   const [containerWidth, setContainerWidth] = useState(1000);
   const isMobileDevice = windowWidth <= 768;
+  const [showMediaLibraryModal, setShowMediaLibraryModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -316,6 +322,53 @@ export function TeacherDashboard({
     }
   }, [sidebarNotificationsCount, onSidebarNotificationsChange]);
 
+  // 🚪 0,1% Goldstandard: Reaktivierungs-Kollision für Kollege B
+  const [activeTeacherBCollision, setActiveTeacherBCollision] = useState<RoomCollisionRecord | null>(null);
+
+  useEffect(() => {
+    const schoolId = data.teacher?.school_id || data.schoolData?.id;
+    if (!schoolId || !userId) return;
+
+    const checkCollisions = () => {
+      const collisions = SmartRoomSwappingService.getCollisions(schoolId);
+      const myCollision = collisions.find(c => c.teacherB.id === userId && c.status === 'moved_under_review');
+      setActiveTeacherBCollision(myCollision || null);
+    };
+
+    checkCollisions();
+    window.addEventListener('campus_room_collision_detected', checkCollisions);
+    window.addEventListener('campus_room_collision_updated', checkCollisions);
+    return () => {
+      window.removeEventListener('campus_room_collision_detected', checkCollisions);
+      window.removeEventListener('campus_room_collision_updated', checkCollisions);
+    };
+  }, [userId, data.teacher?.school_id, data.schoolData?.id]);
+
+  const handleAcceptCollisionRoom = useCallback((colId: string) => {
+    const schoolId = data.teacher?.school_id || data.schoolData?.id;
+    if (schoolId) {
+      SmartRoomSwappingService.updateCollisionStatus(schoolId, colId, 'accepted_by_teacher_b');
+      setActiveTeacherBCollision(null);
+    }
+  }, [data.teacher?.school_id, data.schoolData?.id]);
+
+  const handleSelectAlternativeCollisionRoom = useCallback(async (colId: string, newRoomId: string, newRoomName: string) => {
+    const schoolId = data.teacher?.school_id || data.schoolData?.id;
+    if (schoolId) {
+      SmartRoomSwappingService.updateCollisionStatus(schoolId, colId, 'reallocated_by_teacher_b', { id: newRoomId, name: newRoomName });
+      try {
+        await supabase
+          .from('room_bookings')
+          .update({ room_id: newRoomId, notes: `[Reallocated by Teacher B] Neu gewählt: ${newRoomName}` })
+          .eq('teacher_id', userId)
+          .eq('school_id', schoolId);
+      } catch (e) {
+        console.warn('Booking update warning:', e);
+      }
+      setActiveTeacherBCollision(null);
+    }
+  }, [data.teacher?.school_id, data.schoolData?.id, userId]);
+
   // Guided Tour
   const tourSteps = useMemo<TourStep[]>(() => {
     switch(activeTab) {
@@ -437,6 +490,7 @@ export function TeacherDashboard({
           toggleRealNames={students.toggleRealNames}
           onOpenCommandPalette={() => setShowCommandPalette(true)}
           teacher={data.teacher}
+          onOpenMediaLibrary={() => setShowMediaLibraryModal(true)}
         />
       )}
 
@@ -449,6 +503,14 @@ export function TeacherDashboard({
         padding: hideHeader ? '8px 16px 24px 16px' : '24px 24px 80px 24px',
         boxSizing: 'border-box'
       }}>
+        {/* ⏳ 0,1% Goldstandard: 15-Minuten-Grace-Period Banner für Lehrkraft */}
+        <AbsenceGracePeriodBanner
+          pendingAbsence={absence.pendingAbsence}
+          onUndo={absence.handleUndoPendingAbsence}
+          onDispatchNow={absence.handleDispatchPendingAbsenceNow}
+          isSubmitting={absence.submittingAbsence}
+        />
+
         {activeTab === 'briefing' ? (
           <TeacherBriefingTab
             userId={userId}
@@ -860,6 +922,29 @@ export function TeacherDashboard({
         startTour={startTour}
         TourComponent={TourComponent}
       />
+
+      {showMediaLibraryModal && (
+        <TeacherUnifiedMediaLibraryModal
+          isOpen={showMediaLibraryModal}
+          onClose={() => setShowMediaLibraryModal(false)}
+          teacher={data.teacher}
+          allStudents={students.allStudents}
+          schoolId={data.schoolData?.id}
+          showRealNames={students.showRealNames}
+        />
+      )}
+
+      {/* 🚪 0,1% Goldstandard: Kollisions-Auswahl-Modal für Kollege B */}
+      {activeTeacherBCollision && (
+        <TeacherRoomCollisionDecisionModal
+          isOpen={!!activeTeacherBCollision}
+          collision={activeTeacherBCollision}
+          availableRooms={data.rooms || []}
+          onAcceptSuggestedRoom={handleAcceptCollisionRoom}
+          onSelectAlternativeRoom={handleSelectAlternativeCollisionRoom}
+          onClose={() => setActiveTeacherBCollision(null)}
+        />
+      )}
     </div>
   );
 }

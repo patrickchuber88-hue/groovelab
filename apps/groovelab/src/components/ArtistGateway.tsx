@@ -410,8 +410,8 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                           justifyContent: 'center',
                           fontWeight: 950,
                           fontSize: '13px',
-                          boxShadow: '0 4px 14px rgba(234, 179, 8, 0.6)',
-                          border: '2px solid #0f172a',
+                          boxShadow: '0 4px 14px rgba(234, 179, 8, 0.45)',
+                          border: 'none',
                           zIndex: 10
                         }}
                       >

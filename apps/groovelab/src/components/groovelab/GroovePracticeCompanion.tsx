@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X, Minus, Plus, Bell, Maximize2, Minimize2, Flame, Timer, Drum, Guitar, Music2 } from 'lucide-react';
-import { ACOUSTIC_STUDIO_SAMPLES } from './AcousticDrumSamples';
+import { StudioSampleLibrary } from '../../services/audio/StudioSampleLibrary';
 import { storeBlob } from '../../utils/blobStorage';
 import { 
   processPureRawBlob, 
@@ -164,10 +164,10 @@ const playChimeTone = (ctx: AudioContext, time: number) => {
   } catch (_) {}
 };
 
-// 🥁 High-Fidelity Studio Acoustic Drum Samples Decoders
-export const renderRimBuffer = (ctx: BaseAudioContext): AudioBuffer => decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.rim);
-export const renderRideBuffer = (ctx: BaseAudioContext): AudioBuffer => decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.ride);
-export const renderShakerBuffer = (ctx: BaseAudioContext, forward = true): AudioBuffer => decodeBase64Wav(ctx, forward ? ACOUSTIC_STUDIO_SAMPLES.shakerFwd : ACOUSTIC_STUDIO_SAMPLES.shakerBack);
+// 🥁 High-Fidelity Studio Acoustic Drum Samples Decoders (0,1% Goldstandard)
+export const renderRimBuffer = (ctx: BaseAudioContext): AudioBuffer => StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'rim', 'medium', 0);
+export const renderRideBuffer = (ctx: BaseAudioContext): AudioBuffer => StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'ride', 'medium', 0);
+export const renderShakerBuffer = (ctx: BaseAudioContext, forward = true): AudioBuffer => StudioSampleLibrary.getOrCreateStereoBuffer(ctx, forward ? 'shakerFwd' : 'shakerBack', 'medium', 0);
 
 
 // 🎛️ IN-THE-BOX DIRECT-STEM BACKING-BEAT MIXER (PDC Phase-Locked & EBU R128 Mastered)
@@ -217,11 +217,11 @@ async function mixMicWithDirectBackingBeat(
 
     // Decode sample buffers on offlineCtx + Physical Acoustic Modeling
     const kitBuffers: Record<string, AudioBuffer> = {
-      kick: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.kick),
-      snare: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.snare),
-      hatClosed: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.hatClosed),
-      hatOpen: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.hatOpen),
-      click: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.click),
+      kick: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'kick', 'medium', 0),
+      snare: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'snare', 'medium', 0),
+      hatClosed: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'hatClosed', 'medium', 0),
+      hatOpen: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'hatOpen', 'medium', 0),
+      click: StudioSampleLibrary.getOrCreateStereoBuffer(offlineCtx, 'rim', 'medium', 0),
       rim: renderRimBuffer(offlineCtx),
       ride: renderRideBuffer(offlineCtx),
       shakerFwd: renderShakerBuffer(offlineCtx, true),
@@ -1192,12 +1192,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       return sampleBufferCacheRef.current[genre];
     }
 
-    // Decode REAL Studio Recorded PCM WAV Samples & Sterile Quartz Digital Metronome Click
-    const kickBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.kick);
-    const snareBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.snare);
-    const hatClosedBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.hatClosed);
-    const hatOpenBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.hatOpen);
-    const clickBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.click);
+    // High-Resolution 0,1% Studio Stereo Acoustic Drum Samples
+    const kickBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'kick', 'medium', 0);
+    const snareBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'snare', 'medium', 0);
+    const hatClosedBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatClosed', 'medium', 0);
+    const hatOpenBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'hatOpen', 'medium', 0);
+    const clickBuf = StudioSampleLibrary.getOrCreateStereoBuffer(ctx, 'rim', 'medium', 0);
 
     const kitBuffers: Record<string, AudioBuffer> = {
       kick: kickBuf,
@@ -2576,7 +2576,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           alignItems: 'center',
           gap: '8px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-          border: '1px solid #facc15',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           animation: 'fadeIn 0.3s ease-out'
         }}>
           <span style={{ fontSize: '1rem' }}>🎉</span>
@@ -3188,8 +3188,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <div style={{
               padding: '16px',
               borderRadius: '16px',
-              background: muteBarActive ? '#f0fdf4' : '#f8fafc',
-              border: muteBarActive ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+              background: muteBarActive ? '#ecfdf5' : '#f8fafc',
+              border: muteBarActive ? '1.5px solid #10b981' : '1px solid #e2e8f0',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
@@ -3199,10 +3199,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.2rem' }}>🧠</span>
                   <div>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#166534', display: 'block' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: muteBarActive ? '#065f46' : '#1e293b', display: 'block' }}>
                       Stummtakt-Training (Innere Uhr)
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.68rem', color: muteBarActive ? '#059669' : '#64748b', fontWeight: 600 }}>
                       Mutet Takte für Timing-Training im Kopf
                     </span>
                   </div>
@@ -3245,15 +3245,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         style={{
                           padding: '10px 8px',
                           borderRadius: '10px',
-                          border: isSel ? '2px solid #16a34a' : '1px solid #cbd5e1',
-                          background: isSel ? '#dcfce7' : '#ffffff',
-                          color: isSel ? '#166534' : '#475569',
+                          border: isSel ? 'none' : '1px solid #cbd5e1',
+                          background: isSel ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                          color: isSel ? '#ffffff' : '#475569',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           gap: '2px',
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSel ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
                         }}
                       >
                         <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>{item.label}</span>
@@ -3525,7 +3526,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     height: '64px',
                     borderRadius: '50%',
                     background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                    border: '2px solid #eab308',
+                    border: 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',

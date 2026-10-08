@@ -7,6 +7,8 @@
  * - Full backward compatibility with Safari (AAC/MP4) and legacy browsers.
  */
 
+import { acquireAudioLease, releaseAudioLease, safeDecodeAudioData } from '../services/audio/audioContextPool';
+
 export interface StudioAudioConfig {
   mimeType: string;
   audioBitsPerSecond: number;
@@ -76,56 +78,60 @@ export async function optimizeAudioForUpload(
     return { blob, mimeType: blob.type || 'audio/webm', fileNameExt: ext };
   }
 
-  // 2. Transcode if AudioContext is available
+  // 2. Transcode using shared AudioContext pool
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) {
+    const audioCtx = await acquireAudioLease('audio-transcoder');
+    if (!audioCtx) {
       return { blob, mimeType: blob.type || 'audio/wav', fileNameExt: 'wav' };
     }
 
-    const audioCtx = new AudioContextClass();
-    const arrayBuffer = await blob.arrayBuffer();
-    const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const decodedBuffer = await safeDecodeAudioData(arrayBuffer);
 
-    // If MediaRecorder + MediaStreamDestination is supported, record into 192 kbit/s Opus
-    if (typeof MediaRecorder !== 'undefined' && audioCtx.createMediaStreamDestination) {
-      const config = getStudioAudioConfig(effectiveTresor);
-      const destination = audioCtx.createMediaStreamDestination();
-      const source = audioCtx.createBufferSource();
-      source.buffer = decodedBuffer;
-      source.connect(destination);
+      // If MediaRecorder + MediaStreamDestination is supported, record into 192 kbit/s Opus
+      if (typeof MediaRecorder !== 'undefined' && audioCtx.createMediaStreamDestination) {
+        const config = getStudioAudioConfig(effectiveTresor);
+        const destination = audioCtx.createMediaStreamDestination();
+        const source = audioCtx.createBufferSource();
+        source.buffer = decodedBuffer;
+        source.connect(destination);
 
-      const recorder = config.mimeType 
-        ? new MediaRecorder(destination.stream, { mimeType: config.mimeType, audioBitsPerSecond: config.audioBitsPerSecond })
-        : new MediaRecorder(destination.stream, { audioBitsPerSecond: config.audioBitsPerSecond });
+        const recorder = config.mimeType 
+          ? new MediaRecorder(destination.stream, { mimeType: config.mimeType, audioBitsPerSecond: config.audioBitsPerSecond })
+          : new MediaRecorder(destination.stream, { audioBitsPerSecond: config.audioBitsPerSecond });
 
-      const chunks: BlobPart[] = [];
-      const recordingPromise = new Promise<Blob>((resolve) => {
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) chunks.push(e.data);
+        const chunks: BlobPart[] = [];
+        const recordingPromise = new Promise<Blob>((resolve) => {
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+          };
+          recorder.onstop = () => {
+            resolve(new Blob(chunks, { type: config.mimeType || 'audio/webm' }));
+          };
+        });
+
+        recorder.start();
+        source.start();
+
+        // Stop recorder once source buffer finishes playing
+        source.onended = () => {
+          try {
+            if (recorder.state === 'recording') {
+              recorder.stop();
+            }
+          } catch {}
         };
-        recorder.onstop = () => {
-          resolve(new Blob(chunks, { type: config.mimeType || 'audio/webm' }));
-        };
-      });
 
-      recorder.start();
-      source.start();
-
-      // Fast render by closing context after playback duration
-      source.onended = () => {
-        recorder.stop();
-        audioCtx.close().catch(() => {});
-      };
-
-      const compressedBlob = await recordingPromise;
-      if (compressedBlob && compressedBlob.size > 0 && compressedBlob.size < blob.size) {
-        const ext = config.mimeType.includes('mp4') ? 'mp4' : 'webm';
-        return { blob: compressedBlob, mimeType: config.mimeType || 'audio/webm', fileNameExt: ext };
+        const compressedBlob = await recordingPromise;
+        if (compressedBlob && compressedBlob.size > 0 && compressedBlob.size < blob.size) {
+          const ext = config.mimeType.includes('mp4') ? 'mp4' : 'webm';
+          return { blob: compressedBlob, mimeType: config.mimeType || 'audio/webm', fileNameExt: ext };
+        }
       }
+    } finally {
+      releaseAudioLease('audio-transcoder');
     }
-
-    await audioCtx.close().catch(() => {});
   } catch (err) {
     console.warn('[AudioTranscoder] Fallback to original audio due to transcode error:', err);
   }

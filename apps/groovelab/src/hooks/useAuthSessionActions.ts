@@ -233,6 +233,7 @@ export function useAuthSessionActions({
       localStorage.removeItem('groovelab_user_id');
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
+      sessionStorage.removeItem('cg_sponsor_session_shown');
 
       await scrubSharedDeviceCache();
       window.location.replace(getRedirectUrl());
@@ -271,6 +272,7 @@ export function useAuthSessionActions({
       localStorage.removeItem('gl_active_session_lease_id');
       sessionStorage.removeItem('gl_global_device_key');
       localStorage.removeItem('gl_global_device_key');
+      sessionStorage.removeItem('cg_sponsor_session_shown');
 
       // If the device has a coupled station (not general uncoupled kiosk), do not pass kiosk_room_id
       // to avoid triggering auto-bootstrap on load which would overwrite the coupled station.
@@ -313,10 +315,11 @@ export function useAuthSessionActions({
     sessionStorage.removeItem('gl_global_device_key');
     localStorage.removeItem('gl_global_device_key');
     try {
+      sessionStorage.removeItem('cg_sponsor_session_shown');
       const keysToRemove: string[] = [];
       for (let i = 0; i < sessionStorage.length; i++) {
         const k = sessionStorage.key(i);
-        if (k && k.startsWith('cg_sponsor_shown_')) {
+        if (k && (k.startsWith('cg_sponsor_shown_') || k === 'cg_sponsor_session_shown')) {
           keysToRemove.push(k);
         }
       }
@@ -349,10 +352,11 @@ export function useAuthSessionActions({
       sessionStorage.setItem('groovelab_user_id', userId);
       // 🏛️ 0,1% Goldstandard: Reset des Bildungsförderer-Ingress Flags für die neue Anmeldesitzung
       try {
+        sessionStorage.removeItem('cg_sponsor_session_shown');
         const keysToRemove: string[] = [];
         for (let i = 0; i < sessionStorage.length; i++) {
           const k = sessionStorage.key(i);
-          if (k && k.startsWith('cg_sponsor_shown_')) {
+          if (k && (k.startsWith('cg_sponsor_shown_') || k === 'cg_sponsor_session_shown')) {
             keysToRemove.push(k);
           }
         }

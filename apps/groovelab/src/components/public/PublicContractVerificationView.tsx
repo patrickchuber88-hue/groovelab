@@ -310,21 +310,21 @@ export const PublicContractVerificationView: React.FC = () => {
             <>
               {/* Official Seal Banner */}
               <div className="print-card" style={{
-                backgroundColor: '#f0fdf4',
-                border: '2px solid #86efac',
+                backgroundColor: '#ecfdf5',
+                border: '2px solid #10b981',
                 borderRadius: '20px',
                 padding: '24px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '18px',
-                boxShadow: '0 4px 16px rgba(22, 101, 52, 0.06)'
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)'
               }}>
                 <div style={{
                   width: '56px',
                   height: '56px',
                   minWidth: '56px',
                   borderRadius: '50%',
-                  backgroundColor: '#15803d',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
@@ -378,8 +378,8 @@ export const PublicContractVerificationView: React.FC = () => {
                   </div>
                   <span style={{
                     fontSize: '0.70rem',
-                    color: '#15803d',
-                    backgroundColor: '#dcfce7',
+                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     padding: '2px 8px',
                     borderRadius: '6px',
                     fontWeight: 800

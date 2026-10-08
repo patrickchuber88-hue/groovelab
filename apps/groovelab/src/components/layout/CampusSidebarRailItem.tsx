@@ -10,6 +10,7 @@ export interface CampusSidebarRailItemProps {
   badgeCount?: number;
   hasPulseDot?: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
   rightSlot?: React.ReactNode;
   disabled?: boolean;
   className?: string;
@@ -34,6 +35,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
   badgeCount = 0,
   hasPulseDot = false,
   onClick,
+  onMouseEnter,
   rightSlot,
   disabled = false,
   className = '',
@@ -104,7 +106,10 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
           width: '100%',
           margin: '2px 0'
         }}
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => {
+          setIsHovered(true);
+          onMouseEnter?.();
+        }}
         onMouseLeave={() => setIsHovered(false)}
       >
         <button
@@ -174,7 +179,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
-                border: '1.5px solid #ffffff',
+                border: 'none',
                 pointerEvents: 'none',
                 boxSizing: 'border-box'
               }}
@@ -255,6 +260,7 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
       type="button"
       id={id}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
       disabled={disabled}
       aria-label={label}
       aria-current={isActive ? 'page' : undefined}

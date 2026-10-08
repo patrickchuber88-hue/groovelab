@@ -37,6 +37,7 @@ export interface BuildStudentBriefingParams {
   handleOpenHomeworkBookWithView: (...args: any[]) => void;
   totalPracticeMinutes?: number;
   unifiedStickersMap?: Record<string, any>;
+  songStats?: { assignedCount: number; masteredCount: number; activeCount: number };
 }
 
 export function buildStudentBriefingProps(params: BuildStudentBriefingParams): StudentBriefingTabProps {
@@ -172,7 +173,7 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     showJuniorTimerModal: false,
     isJuniorPadActive: false,
     setIsJuniorPadActive: () => {},
-    songStats: { masteredCount: 0 },
+    songStats: params.songStats || { assignedCount: 0, masteredCount: 0, activeCount: 0 },
     songs: assignedCampusSongs,
     assignedCampusSongs,
     startJuniorRecordingFlow: practice.startJuniorRecordingFlow,

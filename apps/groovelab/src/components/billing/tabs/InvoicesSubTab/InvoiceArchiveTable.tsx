@@ -178,9 +178,9 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
                   transition: 'all 0.15s ease-in-out'
                 }}
                 onMouseOver={(e: any) => { 
-                  e.currentTarget.style.background = '#f0fdf4'; 
-                  e.currentTarget.style.color = '#15803d';
-                  e.currentTarget.style.borderColor = '#86efac';
+                  e.currentTarget.style.background = '#ecfdf5'; 
+                  e.currentTarget.style.color = '#059669';
+                  e.currentTarget.style.borderColor = '#10b981';
                 }}
                 onMouseOut={(e: any) => { 
                   e.currentTarget.style.background = '#ffffff'; 

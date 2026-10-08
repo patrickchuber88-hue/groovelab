@@ -391,8 +391,8 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
                   type="button"
                   onClick={toggleActiveBoard}
                   style={{
-                    background: allowed ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)',
-                    border: allowed ? '1px solid #86efac' : '1px solid #fca5a5',
+                    background: allowed ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)',
+                    border: allowed ? '1px solid #10b981' : '1px solid #fca5a5',
                     color: '#ffffff',
                     padding: '3px 10px',
                     borderRadius: '100px',
@@ -528,6 +528,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           <ErrorBoundary>
             <Suspense fallback={<DashboardLoader />}>
               <StudentAvatarDashboard 
+                key={user.id}
                 studentId={user.id} 
                 initialUser={user}
                 parentActiveTab={activeStudentTab}
@@ -611,7 +612,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
               activeWorkspace={activeWorkspace || (user.role === 'teacher' ? 'teacher' : undefined)}
               userRole={user.role}
               onLogout={handleLogout} 
-              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
+              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'mediathek', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? (activeStudentTab === 'mediathek' ? 'songs' : activeStudentTab) : undefined}
               activePlatform={activePlatform as any}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
               onSwitchPlatform={(platform) => setActivePlatform(platform)}

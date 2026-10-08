@@ -135,9 +135,18 @@ import { dedupeQuery } from '../utils/dedupeQuery';
 const inMemoryRoster = new Map<string, { timestamp: number; data: RosterStudent[] }>();
 const ROSTER_CACHE_TTL_MS = 20 * 1000; // 20 seconds fast in-memory TTL
 
+export interface FetchSchoolRosterOptions {
+  includePending?: boolean;
+  teacherId?: string;
+}
+
 export function invalidateSchoolRosterCache(schoolId?: string): void {
   if (schoolId) {
-    inMemoryRoster.delete(schoolId);
+    for (const key of inMemoryRoster.keys()) {
+      if (key.startsWith(schoolId)) {
+        inMemoryRoster.delete(key);
+      }
+    }
   } else {
     inMemoryRoster.clear();
   }
@@ -174,17 +183,25 @@ export const ROSTER_STUDENT_PROJECTION = [
  * Fetches and resolves the complete, authoritative student roster for a music school.
  * Merges registered `users` and decrypted `pending_students_decrypted` without duplicates or phantom stubs.
  */
-export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, force = false): Promise<RosterStudent[]> {
+export async function fetchSchoolRoster(
+  schoolId: string,
+  supabaseClient: any,
+  force = false,
+  options?: FetchSchoolRosterOptions
+): Promise<RosterStudent[]> {
   if (!schoolId || !supabaseClient) return [];
 
-  if (!force && inMemoryRoster.has(schoolId)) {
-    const cached = inMemoryRoster.get(schoolId)!;
+  const includePending = options?.includePending !== false;
+  const cacheKey = `${schoolId}_${includePending ? 'all' : 'reg'}${options?.teacherId ? `_${options.teacherId}` : ''}`;
+
+  if (!force && inMemoryRoster.has(cacheKey)) {
+    const cached = inMemoryRoster.get(cacheKey)!;
     if (Date.now() - cached.timestamp < ROSTER_CACHE_TTL_MS) {
       return cached.data;
     }
   }
 
-  return dedupeQuery(`school_roster_${schoolId}`, async () => {
+  return dedupeQuery(`school_roster_${cacheKey}`, async () => {
     // 1. Fetch registered students AND school teachers in parallel
     let regUsers: DbUserRosterRecord[] = [];
     let teachers: DbTeacherRosterRecord[] = [];
@@ -260,64 +277,72 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
       registeredStudents.map(s => normalizeStudentKey(s.first_name, s.last_name))
     );
 
-    // 2. Fetch pending student invitations
+    // 2. Fetch pending student invitations (skip expensive PGP decryption if includePending is false)
     let pendingMapped: RosterStudent[] = [];
-    try {
-      const { data: pendingData, error: pError } = await supabaseClient
-        .from('pending_students_decrypted')
-        .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-        .eq('school_id', schoolId);
+    if (includePending) {
+      try {
+        let pendingQuery = supabaseClient
+          .from('pending_students_decrypted')
+          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+          .eq('school_id', schoolId);
 
-      if (!pError && pendingData) {
-        const seenPendingNormNames = new Set<string>();
+        if (options?.teacherId) {
+          pendingQuery = pendingQuery.eq('teacher_id', options.teacherId);
+        }
 
-        pendingMapped = (pendingData as DbPendingStudentDecrypted[])
-          .filter((ps: DbPendingStudentDecrypted) => {
-            if (!ps) return false;
-            const fName = (ps.first_name || '').trim();
-            const lName = (ps.last_name || '').trim();
-            if (isTestOrGenericStudent(fName, lName)) return false;
-            if (regIds.has(ps.id)) return false;
-            const nameKey = normalizeStudentKey(fName, lName);
-            if (nameKey !== '_' && registeredNormNames.has(nameKey)) return false;
-            if (nameKey !== '_') {
-              if (seenPendingNormNames.has(nameKey)) return false;
-              seenPendingNormNames.add(nameKey);
-            }
-            return true;
-          })
-          .map((ps: DbPendingStudentDecrypted) => {
-            const assignedTeacher = ps.teacher_id ? teacherMap.get(ps.teacher_id) : null;
-            const effectiveInst = getEffectiveInstrument(ps, assignedTeacher);
-            const finalInst = (!isGenericInstrument(ps.instrument) && ps.instrument) ? ps.instrument : (effectiveInst || 'Gitarre');
-            return {
-              id: ps.id,
-              school_id: ps.school_id,
-              teacher_id: ps.teacher_id ?? null,
-              teacher: assignedTeacher,
-              role: 'student' as const,
-              first_name: (ps.first_name || '').trim(),
-              last_name: ps.last_name || '',
-              instrument: finalInst,
-              resolved_instrument: finalInst,
-              is_active: false,
-              is_campus_active: false,
-              is_groovelab_active: false,
-              status: 'inactive',
-              isPendingOnboarding: true,
-              day_of_birth: ps.day_of_birth || null,
-              ausweis_nummer: 'Ausstehend (Onboarding)',
-              created_at: ps.created_at || new Date().toISOString()
-            };
-          });
+        const { data: pendingData, error: pError } = await pendingQuery;
+
+        if (!pError && pendingData) {
+          const seenPendingNormNames = new Set<string>();
+
+          pendingMapped = (pendingData as DbPendingStudentDecrypted[])
+            .filter((ps: DbPendingStudentDecrypted) => {
+              if (!ps) return false;
+              const fName = (ps.first_name || '').trim();
+              const lName = (ps.last_name || '').trim();
+              if (isTestOrGenericStudent(fName, lName)) return false;
+              if (regIds.has(ps.id)) return false;
+              const nameKey = normalizeStudentKey(fName, lName);
+              if (nameKey !== '_' && registeredNormNames.has(nameKey)) return false;
+              if (nameKey !== '_') {
+                if (seenPendingNormNames.has(nameKey)) return false;
+                seenPendingNormNames.add(nameKey);
+              }
+              return true;
+            })
+            .map((ps: DbPendingStudentDecrypted) => {
+              const assignedTeacher = ps.teacher_id ? teacherMap.get(ps.teacher_id) : null;
+              const effectiveInst = getEffectiveInstrument(ps, assignedTeacher);
+              const finalInst = (!isGenericInstrument(ps.instrument) && ps.instrument) ? ps.instrument : (effectiveInst || 'Gitarre');
+              return {
+                id: ps.id,
+                school_id: ps.school_id,
+                teacher_id: ps.teacher_id ?? null,
+                teacher: assignedTeacher,
+                role: 'student' as const,
+                first_name: (ps.first_name || '').trim(),
+                last_name: ps.last_name || '',
+                instrument: finalInst,
+                resolved_instrument: finalInst,
+                is_active: false,
+                is_campus_active: false,
+                is_groovelab_active: false,
+                status: 'inactive',
+                isPendingOnboarding: true,
+                day_of_birth: ps.day_of_birth || null,
+                ausweis_nummer: 'Ausstehend (Onboarding)',
+                created_at: ps.created_at || new Date().toISOString()
+              };
+            });
+        }
+      } catch (err) {
+        console.warn('[StudentRosterService] Pending students fetch warning:', err);
       }
-    } catch (err) {
-      console.warn('[StudentRosterService] Pending students fetch warning:', err);
     }
 
     // 3. Deduplicate and return authoritative roster
     const roster = deduplicateRoster([...registeredStudents, ...pendingMapped]);
-    inMemoryRoster.set(schoolId, { timestamp: Date.now(), data: roster });
+    inMemoryRoster.set(cacheKey, { timestamp: Date.now(), data: roster });
     return roster;
   });
 }

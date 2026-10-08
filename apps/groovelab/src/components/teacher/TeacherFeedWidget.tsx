@@ -153,15 +153,15 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
 
               let cardBg = '#f8fafc';
               let cardBorder = '1px solid #e2e8f0';
-              let dateHeaderBg = '#34a853';
+              let dateHeaderBg = '#10b981';
               let iconComponent: React.ReactNode = <Check size={11} strokeWidth={2.5} />;
-              let iconBg = '#dcfce7';
-              let iconColor = '#166534';
-              let iconBorder = '1px solid #86efac';
+              let iconBg = '#ecfdf5';
+              let iconColor = '#059669';
+              let iconBorder = '1px solid #10b981';
               let textColor = '#0f172a';
               let subTextColor = '#64748b';
               let commentButtonBg = '#ffffff';
-              let commentButtonColor = '#34a853';
+              let commentButtonColor = '#10b981';
 
               const rName = b.room_override_name || b.roomOverrideName || ((b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : (b.room || b.raum || '')));
               const defaultRoomName = b.schedules?.rooms?.name || b.schedules?.room?.name || b.original_room_name || b.originalRoomName || b.template_room_name;
@@ -215,17 +215,17 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                   iconBorder = '1px solid #ddd6fe';
                 }
               } else if (isReactivated) {
-                dateHeaderBg = '#34a853';
+                dateHeaderBg = '#10b981';
                 iconComponent = <Check size={11} strokeWidth={2.5} />;
-                iconBg = '#dcfce7';
-                iconColor = '#166534';
-                iconBorder = '1px solid #86efac';
-                textColor = '#166534';
-                subTextColor = '#15803d';
+                iconBg = '#ecfdf5';
+                iconColor = '#059669';
+                iconBorder = '1px solid #10b981';
+                textColor = '#065f46';
+                subTextColor = '#059669';
                 commentButtonBg = '#ffffff';
-                commentButtonColor = '#34a853';
-                cardBg = '#f0fdf4';
-                cardBorder = '1.5px solid #86efac';
+                commentButtonColor = '#10b981';
+                cardBg = '#ecfdf5';
+                cardBorder = '1.5px solid #10b981';
               } else if (isRescheduled) {
                 if (isGroup) {
                   dateHeaderBg = '#0284c7';
@@ -238,9 +238,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     cardBg = '#f0f9ff';
                     cardBorder = '1.5px solid #0284c7';
                     iconComponent = <Check size={11} strokeWidth={2.5} />;
-                    iconBg = '#dcfce7';
-                    iconColor = '#15803d';
-                    iconBorder = '1px solid #86efac';
+                    iconBg = '#ecfdf5';
+                    iconColor = '#059669';
+                    iconBorder = '1px solid #10b981';
                   } else {
                     cardBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
                     cardBorder = '1.5px dashed #0284c7';
@@ -260,9 +260,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     cardBg = '#fffbeb';
                     cardBorder = '1.5px solid #eab308';
                     iconComponent = <Check size={11} strokeWidth={2.5} />;
-                    iconBg = '#dcfce7';
-                    iconColor = '#15803d';
-                    iconBorder = '1px solid #86efac';
+                    iconBg = '#ecfdf5';
+                    iconColor = '#059669';
+                    iconBorder = '1px solid #10b981';
                   } else {
                     cardBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
                     cardBorder = '1.5px dashed #eab308';

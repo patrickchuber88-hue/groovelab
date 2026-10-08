@@ -1850,7 +1850,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                   strokeDasharray = '5 3';
                   opacity = 0.92;
                 } else if (route.isMastered) {
-                  stroke = '#86efac';
+                  stroke = '#10b981';
                   strokeWidth = 1.0;
                   strokeDasharray = '3 3';
                   opacity = 0.35;

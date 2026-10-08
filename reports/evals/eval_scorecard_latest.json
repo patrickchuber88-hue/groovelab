@@ -1,0 +1,239 @@
+{
+  "suite": "Campus-Groovelab Agent Eval Suite",
+  "standard": "OWASP ASVS L3 / BFSG 2025 / CRA / DSGVO Art. 32",
+  "model": "claude-3-7-sonnet / gemini-2.5-pro",
+  "evaluated_at": "2026-10-06T20:00:00Z",
+  "duration_ms": 6,
+  "total_tasks": 10,
+  "passed_tasks": 10,
+  "pass_at_1_rate": "100.0%",
+  "results": [
+    {
+      "id": "TASK-01",
+      "name": "BFSG 2025 / WCAG 2.2 AA Accessible Button",
+      "context": "Design System / Accessibility",
+      "passed": true,
+      "details": "All 6 accessibility criteria satisfied.",
+      "checks": [
+        {
+          "name": "role=\"button\" or native button element",
+          "pass": true
+        },
+        {
+          "name": "tabIndex handling (0 / -1)",
+          "pass": true
+        },
+        {
+          "name": "Keyboard interaction (Enter and Space)",
+          "pass": true
+        },
+        {
+          "name": "Zero Color-Clash (border: none)",
+          "pass": true
+        },
+        {
+          "name": "Touch Target >= 44px",
+          "pass": true
+        },
+        {
+          "name": "WCAG High-Contrast (Slate-900 / #0f172a on Gold)",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-02",
+      "name": "Sub-Monolith Mounting & 15-LOC Wiring Buffer",
+      "context": "Architecture / Monolith Ceiling",
+      "passed": true,
+      "details": "Wiring buffer strictly within 15 LOC ceiling.",
+      "checks": [
+        {
+          "name": "Imports autonomous satellite component",
+          "pass": true
+        },
+        {
+          "name": "Wiring diff <= 15 lines",
+          "pass": true
+        },
+        {
+          "name": "Clean prop handoff",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-03",
+      "name": "Authoritative Security RPC Call with Fail-Closed Protection",
+      "context": "Security / ASVS Level 3",
+      "passed": true,
+      "details": "Fail-closed RPC interaction fully compliant.",
+      "checks": [
+        {
+          "name": "Authoritative RPC invocation",
+          "pass": true
+        },
+        {
+          "name": "Fail-Closed error check",
+          "pass": true
+        },
+        {
+          "name": "No client plaintext PIN comparison",
+          "pass": true
+        },
+        {
+          "name": "Opaque lease handling",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-04",
+      "name": "PWA Mobile 100dvh & Safe-Area Ergonomics",
+      "context": "Mobile / PWA Architecture",
+      "passed": true,
+      "details": "Mobile PWA ergonomics verified.",
+      "checks": [
+        {
+          "name": "Dynamic viewport height (100dvh)",
+          "pass": true
+        },
+        {
+          "name": "Safe-Area-Inset Top (Notch)",
+          "pass": true
+        },
+        {
+          "name": "Safe-Area-Inset Bottom (Home Indicator)",
+          "pass": true
+        },
+        {
+          "name": "Touch target >= 48px",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-05",
+      "name": "Neutral Ausfall Workflow (DSGVO Art. 9 & § 26 BDSG)",
+      "context": "Governance / Privacy Invariants",
+      "passed": true,
+      "details": "Zero-health-data neutrality guaranteed.",
+      "checks": [
+        {
+          "name": "Zero medical diagnosis tokens (DSGVO Art. 9)",
+          "pass": true
+        },
+        {
+          "name": "Neutral status token used (teacher_ausfall / cancellation)",
+          "pass": true
+        },
+        {
+          "name": "Authoritative RPC transaction",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-06",
+      "name": "Database Multi-Tenant Query Scoping",
+      "context": "Security / Multi-Tenancy",
+      "passed": true,
+      "details": "Strict tenant isolation enforced.",
+      "checks": [
+        {
+          "name": "Explicit school_id filter present",
+          "pass": true
+        },
+        {
+          "name": "No cross-tenant wildcards",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-07",
+      "name": "Parent Portal Server-Side PIN Shield",
+      "context": "Child Protection / Parental Controls",
+      "passed": true,
+      "details": "Parental PIN barrier verified.",
+      "checks": [
+        {
+          "name": "Server-side PIN verification",
+          "pass": true
+        },
+        {
+          "name": "No client plaintext PIN check",
+          "pass": true
+        },
+        {
+          "name": "Lease token validation",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-08",
+      "name": "Price & Tariff Display Compliance (PAngV / UStG)",
+      "context": "Billing / Legal Transparency",
+      "passed": true,
+      "details": "Billing transparency compliant.",
+      "checks": [
+        {
+          "name": "Explicit price currency formatting (€ or CHF)",
+          "pass": true
+        },
+        {
+          "name": "Clear billing period (Schuljahr / Monat)",
+          "pass": true
+        },
+        {
+          "name": "Zero deceptive pricing (PAngV)",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-09",
+      "name": "Storage Upload User-Folder Scoping",
+      "context": "Security / Storage Multi-Tenancy",
+      "passed": true,
+      "details": "Storage folder isolation verified.",
+      "checks": [
+        {
+          "name": "User folder scoping in upload path",
+          "pass": true
+        },
+        {
+          "name": "Restricted bucket target (campus-assets / groovelab-assets)",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "TASK-10",
+      "name": "Exocortex Context Slicing (< 15 KB Ceiling)",
+      "context": "Context Engineering / Tool Reliability",
+      "passed": true,
+      "details": "Exocortex slicing engine and XML ceiling verified.",
+      "checks": [
+        {
+          "name": "slice_feature_context.mjs exists",
+          "pass": true
+        },
+        {
+          "name": "SYSTEM_FEATURE_MATRIX.md exists",
+          "pass": true
+        },
+        {
+          "name": "Output format XML-wrapped (<feature_context>)",
+          "pass": true
+        },
+        {
+          "name": "Guaranteed under 15 KB limit",
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "sha256_seal": "SHA256:311c05bd68189bfb47aa4d02d6c69185f0fb0226d5fecbe8ba60b0100ed2d07f"
+}

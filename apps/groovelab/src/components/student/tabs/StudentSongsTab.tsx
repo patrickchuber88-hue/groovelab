@@ -29,6 +29,8 @@ export interface StudentSongsTabProps {
 export const cleanCanonicalSongTitle = (rawTitle?: string): string => {
   if (!rawTitle) return 'Unbekannter Song';
   return rawTitle
+    .replace(/^campus[- ]song\s*[-–:]\s*/i, '')
+    .replace(/^campus[- ]song\s+/i, '')
     .replace(/\s*\((?:gitarre|guitar|bass|drums|schlagzeug|klavier|piano|gesang|vocals|lead|arrangement|song|playback|text|audio)[^)]*\)/gi, '')
     .replace(/\s*-\s*(?:gitarre|guitar|bass|drums|schlagzeug|klavier|piano|gesang)/gi, '')
     .trim() || rawTitle.trim();
@@ -42,6 +44,7 @@ export const cleanCanonicalArtistName = (rawArtist?: string): string => {
     .replace(/\s*-\s*(?:text|lyrics|gesang|vocals).*/gi, '')
     .trim();
   const lower = clean.toLowerCase();
+  if (lower === 'campus-song' || lower === 'campus song') return '';
   if (lower === 'linken park') return 'Linkin Park';
   if (lower === 'acdc' || lower === 'ac dc' || lower === 'ac/dc') return 'AC/DC';
   return clean || 'Unbekannt';

@@ -101,6 +101,12 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
+        banner: `/*! 
+ * Campus-Groovelab (c) 2026. All rights reserved.
+ * PROPRIETARY AND CONFIDENTIAL SOURCE CODE.
+ * Protected under UrhG §§ 69a ff. and GeschGehG § 2.
+ * Reverse engineering, decompilation, scraping, disassembling or unauthorized extraction is strictly prohibited.
+ */`,
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
             if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/') || id.includes('react-use')) {

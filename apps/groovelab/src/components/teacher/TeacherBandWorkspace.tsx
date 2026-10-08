@@ -392,7 +392,7 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
                                                   alt={member.first_name ? `${member.first_name} ${member.last_name || ''}` : "Bandmitglied"} 
                                                 />
                                                 {member.isMastered && (
-                                                  <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                  <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', zIndex: 10 }}>
                                                     <Check size={12} strokeWidth={4} />
                                                   </div>
                                                 )}

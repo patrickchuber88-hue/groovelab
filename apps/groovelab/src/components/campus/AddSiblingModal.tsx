@@ -441,8 +441,8 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
                 borderRadius: '24px',
                 overflow: 'hidden',
                 background: '#0f172a',
-                border: '3px solid #0284c7',
-                boxShadow: '0 12px 30px -4px rgba(2, 132, 199, 0.3)',
+                border: '2px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'

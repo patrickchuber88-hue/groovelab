@@ -31,6 +31,7 @@ export interface TeacherHomeworkAssignModalProps {
   currentLehrwerke?: any[];
   currentSongs?: any[];
   currentAudios?: any[];
+  currentMicroScores?: any[];
   onSuccess?: (assignedCount: number, studentNames: string[]) => void;
 }
 
@@ -46,6 +47,7 @@ export const TeacherHomeworkAssignModal: React.FC<TeacherHomeworkAssignModalProp
   currentLehrwerke = [],
   currentSongs = [],
   currentAudios = [],
+  currentMicroScores = [],
   onSuccess
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +56,7 @@ export const TeacherHomeworkAssignModal: React.FC<TeacherHomeworkAssignModalProp
   const [includeLehrwerke, setIncludeLehrwerke] = useState(true);
   const [includeSongs, setIncludeSongs] = useState(true);
   const [includeAudios, setIncludeAudios] = useState(true);
+  const [includeMicroScores, setIncludeMicroScores] = useState(true);
   const [targetWeekOffset, setTargetWeekOffset] = useState<0 | 1>(0); // 0 = this week, 1 = next week
   const [appendMode, setAppendMode] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -158,13 +161,19 @@ export const TeacherHomeworkAssignModal: React.FC<TeacherHomeworkAssignModalProp
       setErrorMessage(null);
 
       const targetStudentIdsArr = Array.from(selectedStudentIds);
+      let finalNotes = includeNotes ? currentNotesContent : '';
+      if (includeMicroScores && currentMicroScores && currentMicroScores.length > 0) {
+        const msTokens = currentMicroScores.map(m => typeof m === 'string' ? m : (m.rawToken || `MICROSCORE:${JSON.stringify(m.snippet || m)}`));
+        finalNotes = finalNotes ? `${finalNotes}\n\n${msTokens.join('\n\n')}` : msTokens.join('\n\n');
+      }
+
       const res = await assignTeacherHomeworkToStudents({
         teacherId,
         schoolId,
         targetStudentIds: targetStudentIdsArr,
         targetWeekIso: computedTargetWeekIso,
         topicName: `Hausaufgabe KW ${computedTargetWeekNum}`,
-        notesContent: includeNotes ? currentNotesContent : '',
+        notesContent: finalNotes,
         lehrwerke: includeLehrwerke ? currentLehrwerke : [],
         songs: includeSongs ? currentSongs : [],
         audios: includeAudios ? currentAudios : [],
@@ -458,6 +467,30 @@ export const TeacherHomeworkAssignModal: React.FC<TeacherHomeworkAssignModalProp
                 <Mic size={15} />
                 <span>Audio ({currentAudios.length})</span>
               </button>
+
+              {currentMicroScores && currentMicroScores.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIncludeMicroScores(!includeMicroScores)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    border: includeMicroScores ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    background: includeMicroScores ? '#ecfdf5' : '#ffffff',
+                    color: includeMicroScores ? '#065f46' : '#64748b',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {includeMicroScores ? <CheckSquare size={16} color="#10b981" /> : <Square size={16} />}
+                  <Music size={15} />
+                  <span>Schnipsel ({currentMicroScores.length})</span>
+                </button>
+              )}
             </div>
           </div>
 

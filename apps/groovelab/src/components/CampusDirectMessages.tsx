@@ -75,6 +75,7 @@ import { CampusTopicComposer } from './CampusTopicComposer';
 import { logSecurityEvent } from '../services/auditLogService';
 import { primeDecryptedCache } from '../lib/security/messageCrypto';
 import { CompactAppointmentEventCard, parseLocalDate, extractOccurrenceDateFromMessage } from './messages/CompactAppointmentEventCard';
+import { CampusUnifiedChatMessage } from './messages/CampusUnifiedChatMessage';
 import { playChatMessageSentSound, triggerChatHapticFeedback } from '../utils/chatSoundAndHaptics';
 
 const GROUP_ICON_MAP: Record<string, any> = {
@@ -252,7 +253,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '2px solid white',
+            border: 'none',
             boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)',
             zIndex: 2
           }}>
@@ -326,7 +327,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
             height: `${cornerBadgeSize}px`,
             borderRadius: '50%',
             background: '#15803d',
-            border: '1.5px solid #ffffff',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -347,7 +348,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
             height: `${cornerBadgeSize}px`,
             borderRadius: '50%',
             background: '#1d4ed8',
-            border: '1.5px solid #ffffff',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -367,7 +368,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
             height: '12px',
             borderRadius: '50%',
             background: isQuietHours ? '#f59e0b' : '#22c55e',
-            border: '2px solid #ffffff',
+            border: 'none',
             boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
             zIndex: 2
           }} 
@@ -391,7 +392,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: '2px solid white',
+          border: 'none',
           boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)',
           zIndex: 3
         }}>
@@ -866,28 +867,30 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         const studentMap = new Map<string, any>();
 
         if (isAdminOrSecretary) {
-          // Admins & Secretariats see all students in their school
+          // 0,1% Goldstandard: Instant Seed from schoolUsers
+          (schoolUsers || []).forEach((u: any) => {
+            if (u && u.id && u.id !== teacherId && (u.role === 'student' || (!u.role && !u.is_teacher))) {
+              studentMap.set(u.id, u);
+            }
+          });
+
           let targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
           if (!targetSchoolId && typeof window !== 'undefined') {
             targetSchoolId = sessionStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_school_id');
           }
 
           let query = supabase.from('users').select('*').eq('role', 'student').order('first_name');
-          if (targetSchoolId) {
-            query = query.eq('school_id', targetSchoolId);
-          }
-          const { data: schoolStudents } = await query;
-          (schoolStudents || []).forEach(u => {
-            if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
-          });
-
-          // Also add pending students for the school
           let pQuery = supabase.from('pending_students_decrypted').select('*');
           if (targetSchoolId) {
+            query = query.eq('school_id', targetSchoolId);
             pQuery = pQuery.eq('school_id', targetSchoolId);
           }
-          const { data: pStudents } = await pQuery;
-          (pStudents || []).forEach(p => {
+
+          const [schoolStudentsRes, pStudentsRes] = await Promise.all([query, pQuery]);
+          (schoolStudentsRes.data || []).forEach((u: any) => {
+            if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+          });
+          (pStudentsRes.data || []).forEach((p: any) => {
             if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
               studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
             }
@@ -896,83 +899,65 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           // Teachers ONLY see their strictly assigned students!
           const assignedStudentIds = new Set<string>();
 
-          // 1. Fetch student_ids from schedules where teacher_id = teacherId
-          try {
-            const { data: scheds, error: sErr } = await supabase
-              .from('schedules')
-              .select('student_id, teacher_id')
-              .eq('teacher_id', teacherId);
-            if (sErr) console.error('[CampusDirectMessages] error fetching schedules:', sErr);
-            (scheds || []).forEach(sc => {
-              if (sc.student_id) assignedStudentIds.add(sc.student_id);
-            });
-          } catch (e) {
-            console.error('[CampusDirectMessages] catch error fetching schedules:', e);
-          }
-
-          // 2. Direct teacher_id assignment in users table
-          try {
-            const { data: byTeacher } = await supabase
-              .from('users')
-              .select('*')
-              .eq('teacher_id', teacherId);
-            (byTeacher || []).forEach(u => {
-              if (u && u.id && u.id !== teacherId) {
-                assignedStudentIds.add(u.id);
-                studentMap.set(u.id, u);
-              }
-            });
-          } catch (e) {}
-
-          // 3. Fetch users for assignedStudentIds from schedules if not already in studentMap
-          if (assignedStudentIds.size > 0) {
-            try {
-              const idsArr = Array.from(assignedStudentIds);
-              const { data: schedUsers } = await supabase
-                .from('users')
-                .select('*')
-                .in('id', idsArr);
-              (schedUsers || []).forEach(u => {
-                if (u && u.id && u.id !== teacherId) {
-                  studentMap.set(u.id, u);
-                }
-              });
-            } catch (e) {}
-          }
-
-          // 4. Pending students assigned to this teacher or created by this teacher
-          try {
-            const { data: pByTeacher } = await supabase
-              .from('pending_students_decrypted')
-              .select('*')
-              .or(`teacher_id.eq.${teacherId},created_by.eq.${teacherId}`);
-            (pByTeacher || []).forEach(p => {
-              if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
-                studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
-              }
-            });
-          } catch (e) {}
-
-          // 5. Also check schoolUsers prop passed from parent
+          // 0,1% Goldstandard: Instant seed from schoolUsers and campusMessages (<1ms)
           (schoolUsers || []).forEach((su: any) => {
-            if (su && su.id && su.id !== teacherId) {
-              if (su.teacher_id === teacherId || assignedStudentIds.has(su.id)) {
-                studentMap.set(su.id, su);
-              }
+            if (su && su.id && su.id !== teacherId && su.teacher_id === teacherId) {
+              assignedStudentIds.add(su.id);
+              studentMap.set(su.id, su);
             }
           });
-
-          // 6. Students who have existing messages with this teacher
           if (campusMessages && campusMessages.length > 0) {
             campusMessages.forEach((m: any) => {
               const partnerId = m.sender_id === teacherId ? m.recipient_id : m.sender_id;
               if (partnerId && partnerId !== teacherId && !studentMap.has(partnerId)) {
-                const existingInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
-                if (existingInSchool) {
-                  studentMap.set(partnerId, existingInSchool);
-                }
+                const match = (schoolUsers || []).find((su: any) => su.id === partnerId);
+                if (match) studentMap.set(partnerId, match);
               }
             });
+          }
+
+          // Single-flight parallel fetch for schedules, direct users and pending students
+          const [schedsRes, byTeacherRes, pByTeacherRes] = await Promise.all([
+            supabase.from('schedules').select('student_id, teacher_id').eq('teacher_id', teacherId),
+            supabase.from('users').select('*').eq('teacher_id', teacherId),
+            supabase.from('pending_students_decrypted').select('*').or(`teacher_id.eq.${teacherId},created_by.eq.${teacherId}`)
+          ]);
+
+          (schedsRes?.data || []).forEach((sc: any) => {
+            if (sc.student_id) assignedStudentIds.add(sc.student_id);
+          });
+          (byTeacherRes?.data || []).forEach((u: any) => {
+            if (u && u.id && u.id !== teacherId) {
+              assignedStudentIds.add(u.id);
+              studentMap.set(u.id, u);
+            }
+          });
+          (pByTeacherRes?.data || []).forEach((p: any) => {
+            if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
+              studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
+            }
+          });
+
+          // Resolve remaining assigned student IDs from schoolUsers or minimal query
+          const missingIds: string[] = [];
+          assignedStudentIds.forEach(id => {
+            if (!studentMap.has(id)) {
+              const fromSchool = (schoolUsers || []).find((su: any) => su.id === id);
+              if (fromSchool) {
+                studentMap.set(id, fromSchool);
+              } else {
+                missingIds.push(id);
+              }
+            }
+          });
+
+          if (missingIds.length > 0) {
+            try {
+              const { data: schedUsers } = await supabase.from('users').select('*').in('id', missingIds);
+              (schedUsers || []).forEach((u: any) => {
+                if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+              });
+            } catch (e) {}
           }
         }
 
@@ -4291,9 +4276,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             } else if (isReactivated) {
                               badgeIcon = <RotateCcw size={11} strokeWidth={2.5} />;
                               badgeLabel = 'Termin reaktiviert (Planmäßig)';
-                              badgeBg = '#dcfce7';
-                              badgeColor = '#15803d';
-                              badgeBorder = '1px solid #86efac';
+                              badgeBg = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                              badgeColor = '#ffffff';
+                              badgeBorder = 'none';
                             } else if (stammterminText) {
                               badgeIcon = <Clock size={11} strokeWidth={2.5} />;
                               badgeLabel = 'Termin verschoben';
@@ -4572,265 +4557,43 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 }
 
                 return displayedMessages.map((msg, idx) => {
-                  const effectiveUserId = currentUserId || user?.id;
-                  const isSelf = msg.sender_id === effectiveUserId;
-                  const isSys = isSystemMessage(msg);
-
-                  const msgDate = new Date(msg.created_at);
                   const prevMsg = idx > 0 ? displayedMessages[idx - 1] : null;
-                  const prevMsgDate = prevMsg ? new Date(prevMsg.created_at) : null;
-                  
-                  const isNewDay = !prevMsgDate || msgDate.toDateString() !== prevMsgDate.toDateString();
-                  const isContinuation = prevMsg && !isNewDay && prevMsg.sender_id === msg.sender_id && (msgDate.getTime() - prevMsgDate.getTime() < 5 * 60 * 1000);
-
-                  // Date label formatting
-                  const todayObj = new Date();
-                  const yesterdayObj = new Date();
-                  yesterdayObj.setDate(todayObj.getDate() - 1);
-                  let dateLabel = '';
-                  if (msgDate.toDateString() === todayObj.toDateString()) {
-                    dateLabel = 'Heute';
-                  } else if (msgDate.toDateString() === yesterdayObj.toDateString()) {
-                    dateLabel = 'Gestern';
-                  } else {
-                    dateLabel = msgDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-                  }
-
-                  if (isSys) {
-                    const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
-                    const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
-                    const isSuperseded = Boolean(laterSysMsg);
-
-                    // Find matching occurrence even in 'all' view
-                    const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
-                      (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
-                      (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
-                    );
-
-                    return (
-                      <React.Fragment key={msg.id || `sys-${idx}`}>
-                        {idx === 0 && pedagogicalTrustBanner}
-                        {isNewDay && (
-                          <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '14px 0 8px 0' }}>
-                            <span style={{
-                              fontSize: '0.68rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0',
-                              padding: '3px 12px', borderRadius: '100px', letterSpacing: '0.01em', boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                            }}>
-                              {dateLabel}
-                            </span>
-                          </div>
-                        )}
-                        <CompactAppointmentEventCard 
-                          msg={msg} 
-                          selectedRecipient={selectedRecipient}
-                          onSendMessage={onSendMessage}
-                          isSuperseded={isSuperseded}
-                          currentOcc={matchedOcc}
-                          onNavigateToSchedule={onNavigateToSchedule}
-                          currentUserId={effectiveUserId}
-                          currentUserRole={user?.role}
-                          isSender={isSelf}
-                        />
-                      </React.Fragment>
-                    );
-                  }
-
-                  const timeStr = msgDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-
-                  // Group Chat: resolve individual sender information
+                  const effectiveUserId = currentUserId || user?.id;
                   const senderUser = selectedRecipient?.is_group
                     ? (allKnownUsersMap.get(msg.sender_id) || { id: msg.sender_id, first_name: 'Mitglied', last_name: '', role: 'student' })
                     : selectedRecipient;
 
-                  const isSenderTeacher = (senderUser?.role || '').toLowerCase() === 'teacher' ||
-                    (Array.isArray(senderUser?.roles) && senderUser.roles.includes('teacher'));
+                  const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
+                  const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
+                  const isSuperseded = Boolean(laterSysMsg);
+
+                  // Find matching occurrence even in 'all' view
+                  const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
+                    (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
+                    (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
+                  );
+
+                  const occContext = (activeSubTab === 'all' || activeSubTab === 'general') ? getMessageOccurrenceContext(msg) : null;
 
                   return (
-                    <React.Fragment key={msg.id || `msg-${idx}`}>
-                      {idx === 0 && pedagogicalTrustBanner}
-                      {/* Natural Date Separator Badge */}
-                      {isNewDay && (
-                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '14px 0 8px 0' }}>
-                          <span style={{
-                            fontSize: '0.68rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0',
-                            padding: '3px 12px', borderRadius: '100px', letterSpacing: '0.01em', boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                          }}>
-                            {dateLabel}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Natural Message Bubble Row */}
-                      <div 
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          gap: '8px',
-                          width: '100%',
-                          justifyContent: isSelf ? 'flex-end' : 'flex-start',
-                          marginTop: isContinuation ? '3px' : '10px'
-                        }}
-                      >
-                        {/* Avatar on the left for incoming messages (only on initial message of cluster) */}
-                        {!isSelf && (
-                          !isContinuation ? (
-                            <CampusDynamicAvatar
-                              user={{ ...senderUser, sender_role: msg.sender_role }}
-                              size={32}
-                              style={{ marginBottom: '2px' }}
-                              customGradient={studentRosterColorMap.get(senderUser?.id || msg.sender_id)}
-                            />
-                          ) : (
-                            <div style={{ width: '32px', flexShrink: 0 }} />
-                          )
-                        )}
-
-                        {/* Chat Bubble with natural sizing, sender name, and inline metadata */}
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start', maxWidth: isMobile ? '80%' : '68%' }}>
-                          {/* Sender Name & Role Badges above incoming bubble */}
-                          {!isSelf && (!isContinuation || (msg.sender_role === 'parent' && prevMsg?.sender_role !== 'parent')) && (
-                            <div style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              color: isSenderTeacher ? '#15803d' : (msg.sender_role === 'parent' ? '#1d4ed8' : '#475569'),
-                              marginBottom: '3px',
-                              marginLeft: '4px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}>
-                              <span>{formatStudentDisplayName(senderUser)}</span>
-                              {isSenderTeacher && (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '1px 6px',
-                                  borderRadius: '6px',
-                                  background: '#f0fdf4',
-                                  border: '1px solid #bbf7d0',
-                                  color: '#15803d',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 800,
-                                  lineHeight: 1
-                                }}>
-                                  <GraduationCap size={10} color="#15803d" strokeWidth={2.4} />
-                                  <span>Lehrkraft</span>
-                                </span>
-                              )}
-                              {msg.sender_role === 'parent' && (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '1px 6px',
-                                  borderRadius: '6px',
-                                  background: '#eff6ff',
-                                  border: '1px solid #dbeafe',
-                                  color: '#1d4ed8',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 800,
-                                  lineHeight: 1
-                                }}>
-                                  <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
-                                  <span>Eltern</span>
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Appointment context tag pill if in 'all' view */}
-                          {(activeSubTab === 'all' || activeSubTab === 'general') && (() => {
-                            const msgCtx = getMessageOccurrenceContext(msg);
-                            if (!msgCtx || isContinuation) return null;
-                            return (
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '0.66rem',
-                                fontWeight: 750,
-                                color: '#15803d',
-                                background: '#f0fdf4',
-                                border: '1px solid #bbf7d0',
-                                borderRadius: '100px',
-                                padding: '2px 9px',
-                                marginBottom: '4px',
-                                alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                              }}>
-                                <Calendar size={10} color="#15803d" />
-                                <span>{msgCtx.label}</span>
-                              </div>
-                            );
-                          })()}
-
-                          <div 
-                            style={{
-                              padding: '11px 16px 8px 16px',
-                              borderRadius: isSelf 
-                                ? (isContinuation ? '18px 6px 6px 18px' : '18px 18px 4px 18px')
-                                : (isContinuation ? '6px 18px 18px 6px' : '18px 18px 18px 4px'),
-                              background: isSelf ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' : '#ffffff',
-                              color: isSelf ? '#ffffff' : '#0f172a',
-                              boxShadow: isSelf ? '0 2px 8px rgba(21, 128, 61, 0.22)' : '0 2px 6px rgba(0,0,0,0.04)',
-                              border: isSelf ? 'none' : '1px solid #e2e8f0',
-                              fontSize: '0.95rem',
-                              lineHeight: '1.45',
-                              wordBreak: 'break-word',
-                              whiteSpace: 'pre-wrap'
-                            }}
-                          >
-                            <div>{cleanChatMessageContent(msg.content)}</div>
-
-                            {/* Time, Read Status & Report Flag inside the bubble */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'flex-end',
-                              gap: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: 650,
-                              color: isSelf ? 'rgba(255, 255, 255, 0.85)' : '#64748b',
-                              marginTop: '6px',
-                              lineHeight: 1
-                            }}>
-                              <span>{timeStr}</span>
-                              {isSelf && (
-                                <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                  <CheckCheck size={14} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
-                                </div>
-                              )}
-                              {Boolean(selectedRecipient?.is_group) && !isSelf && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleInitiateReport(msg);
-                                  }}
-                                  title="Nachricht vertraulich melden"
-                                  aria-label="Nachricht vertraulich melden"
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    padding: '2px',
-                                    cursor: 'pointer',
-                                    color: '#94a3b8',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    marginLeft: '4px'
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
-                                >
-                                  <Flag size={11} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </React.Fragment>
+                    <CampusUnifiedChatMessage
+                      key={msg.id || `msg-${idx}`}
+                      msg={msg}
+                      prevMsg={prevMsg}
+                      currentUserId={effectiveUserId}
+                      currentUserRole={user?.role}
+                      senderUser={senderUser}
+                      isGroup={Boolean(selectedRecipient?.is_group)}
+                      isMobile={isMobile}
+                      onSendMessage={onSendMessage}
+                      onNavigateToSchedule={onNavigateToSchedule}
+                      onInitiateReport={handleInitiateReport}
+                      customGradient={studentRosterColorMap.get(senderUser?.id || msg.sender_id)}
+                      pedagogicalBanner={idx === 0 ? pedagogicalTrustBanner : undefined}
+                      currentOcc={matchedOcc}
+                      isSuperseded={isSuperseded}
+                      appointmentContextLabel={occContext?.label}
+                    />
                   );
                 });
               })()}
@@ -5041,9 +4804,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           }}
                           className="hover-scale"
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#86efac';
-                            e.currentTarget.style.background = '#f0fdf4';
-                            e.currentTarget.style.color = '#15803d';
+                            e.currentTarget.style.borderColor = '#10b981';
+                            e.currentTarget.style.background = '#ecfdf5';
+                            e.currentTarget.style.color = '#059669';
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = '#e2e8f0';
@@ -5051,7 +4814,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             e.currentTarget.style.color = '#334155';
                           }}
                         >
-                          <chip.icon size={12} strokeWidth={2.4} color="#15803d" style={{ flexShrink: 0 }} />
+                          <chip.icon size={12} strokeWidth={2.4} color="#10b981" style={{ flexShrink: 0 }} />
                           <span>{chip.label}</span>
                         </button>
                       ))}

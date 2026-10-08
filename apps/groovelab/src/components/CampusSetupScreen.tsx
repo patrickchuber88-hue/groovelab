@@ -867,8 +867,8 @@ export function CampusSetupScreen({
 
                     {/* DSB Freigabepaket Download Card */}
                     <div style={{ 
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', 
-                      border: '1.5px solid #86efac', 
+                      background: '#ecfdf5', 
+                      border: '1.5px solid #10b981', 
                       borderRadius: '16px', 
                       padding: '16px', 
                       display: 'flex', 
@@ -878,8 +878,8 @@ export function CampusSetupScreen({
                       marginTop: '8px'
                     }}>
                       <div style={{ flex: 1 }}>
-                        <strong style={{ fontSize: '0.86rem', color: '#166534', display: 'block', marginBottom: '2px' }}>📄 DSB-Freigabepaket (Für städtische Träger &amp; Kommunen)</strong>
-                        <span style={{ fontSize: '0.74rem', color: '#15803d', display: 'block' }}>Vorgefertigtes Freigabe-Dossier inkl. Muster-DSFA (Art. 35 DSGVO), TOM-Datenblatt (Art. 32 DSGVO) &amp; AVV-Bestätigung (Art. 28 DSGVO) als PDF.</span>
+                        <strong style={{ fontSize: '0.86rem', color: '#065f46', display: 'block', marginBottom: '2px' }}>📄 DSB-Freigabepaket (Für städtische Träger &amp; Kommunen)</strong>
+                        <span style={{ fontSize: '0.74rem', color: '#047857', display: 'block' }}>Vorgefertigtes Freigabe-Dossier inkl. Muster-DSFA (Art. 35 DSGVO), TOM-Datenblatt (Art. 32 DSGVO) &amp; AVV-Bestätigung (Art. 28 DSGVO) als PDF.</span>
                       </div>
                       <button 
                         onClick={async () => {

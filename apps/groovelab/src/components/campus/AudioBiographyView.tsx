@@ -1380,22 +1380,28 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             const wetChanged = updatedData.reverbWetMix !== editTrackModal.track.reverbWetMix;
             if (roomChanged || wetChanged) {
               try {
-                let rawBlob: any = await getBlob(`campus_audio_${updatedData.trackId}_raw`);
-                if (!rawBlob && editTrackModal.track.audioUrl) {
-                  const resp = await fetch(editTrackModal.track.audioUrl);
-                  rawBlob = await resp.blob();
+                let masterBlobToSave: any = updatedData.remasteredBlob;
+                if (!masterBlobToSave) {
+                  let rawBlob: any = await getBlob(`campus_audio_${updatedData.trackId}_raw`);
+                  if (!rawBlob && editTrackModal.track.audioUrl) {
+                    const resp = await fetch(editTrackModal.track.audioUrl);
+                    rawBlob = await resp.blob();
+                  }
+                  if (rawBlob && rawBlob instanceof Blob) {
+                    const reMasterRes = await processStudioMastering(
+                      rawBlob, 
+                      editTrackModal.track.duration || 30, 
+                      {
+                        instrumentFamily: student?.instrument || student?.main_instrument,
+                        reverbRoom: updatedData.reverbRoomType,
+                        reverbWetMix: updatedData.reverbWetMix
+                      }
+                    );
+                    masterBlobToSave = reMasterRes.masteredBlob;
+                  }
                 }
-                if (rawBlob && rawBlob instanceof Blob) {
-                  const reMasterRes = await processStudioMastering(
-                    rawBlob, 
-                    editTrackModal.track.duration || 30, 
-                    {
-                      instrumentFamily: student?.instrument || student?.main_instrument,
-                      reverbRoom: updatedData.reverbRoomType,
-                      reverbWetMix: updatedData.reverbWetMix
-                    }
-                  );
-                  await storeBlob(`campus_audio_${updatedData.trackId}_master`, reMasterRes.masteredBlob);
+                if (masterBlobToSave && masterBlobToSave instanceof Blob) {
+                  await storeBlob(`campus_audio_${updatedData.trackId}_master`, masterBlobToSave);
 
                   try {
                     const targetSchoolId = 
@@ -1409,7 +1415,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       sessionStorage.getItem('groovelab_ghost_school_id') ||
                       'global';
 
-                    const masterExt = reMasterRes.masteredBlob.type.includes('wav') ? 'wav' : 'webm';
+                    const masterExt = masterBlobToSave.type.includes('wav') ? 'wav' : 'webm';
                     const masterPath = buildCanonicalAudioStoragePath({
                       schoolId: targetSchoolId,
                       studentId,
@@ -1418,10 +1424,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       extension: masterExt
                     });
 
-                    await supabase.storage.from('campus-assets').upload(masterPath, reMasterRes.masteredBlob, { upsert: true });
+                    await supabase.storage.from('campus-assets').upload(masterPath, masterBlobToSave, { upsert: true });
                     newMasterUrl = await getSecureAudioUrl(masterPath);
                   } catch {
-                    newMasterUrl = URL.createObjectURL(reMasterRes.masteredBlob);
+                    newMasterUrl = URL.createObjectURL(masterBlobToSave);
                   }
                 }
               } catch (err) {

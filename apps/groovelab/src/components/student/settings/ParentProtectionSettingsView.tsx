@@ -213,12 +213,12 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
     return {
       isHighlighted,
       style: {
-        background: isHighlighted ? (isNewlyActivated ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
+        background: isHighlighted ? (isNewlyActivated ? '#ecfdf5' : '#fef2f2') : '#f8fafc',
         border: isHighlighted 
-          ? (isNewlyActivated ? '1.5px solid #86efac' : '1.5px solid #fca5a5') 
+          ? (isNewlyActivated ? '1.5px solid #10b981' : '1.5px solid #fca5a5') 
           : '1px solid #e2e8f0',
         boxShadow: isHighlighted 
-          ? (isNewlyActivated ? '0 0 14px rgba(22, 163, 74, 0.22)' : '0 0 14px rgba(220, 38, 38, 0.22)') 
+          ? (isNewlyActivated ? '0 0 14px rgba(16, 185, 129, 0.22)' : '0 0 14px rgba(220, 38, 38, 0.22)') 
           : 'none',
         transition: 'all 0.4s ease'
       },
@@ -228,9 +228,9 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           fontWeight: 800,
           padding: '2px 8px',
           borderRadius: '6px',
-          background: isNewlyActivated ? '#dcfce7' : '#fee2e2',
-          color: isNewlyActivated ? '#15803d' : '#b91c1c',
-          border: isNewlyActivated ? '1px solid #86efac' : '1px solid #fca5a5',
+          background: isNewlyActivated ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fee2e2',
+          color: isNewlyActivated ? '#ffffff' : '#b91c1c',
+          border: isNewlyActivated ? 'none' : '1px solid #fca5a5',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px'
@@ -267,25 +267,26 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
         borderRadius: '18px',
         padding: '14px 18px',
-        border: '1.5px solid #86efac',
+        border: '1.5px solid #10b981',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: '12px',
         flexWrap: 'wrap',
-        boxShadow: '0 4px 14px rgba(22, 163, 74, 0.08)'
+        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.12)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
             width: '36px',
             height: '36px',
             borderRadius: '12px',
-            background: '#16a34a',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexShrink: 0
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
           }}>
             <ShieldCheck size={20} />
           </div>
@@ -296,8 +297,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
                 <span style={{
                   fontSize: '0.72rem',
                   fontWeight: 700,
-                  background: 'rgba(22, 163, 74, 0.15)',
-                  color: '#15803d',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#047857',
                   padding: '2px 8px',
                   borderRadius: '20px'
                 }}>
@@ -317,12 +318,12 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             onClick={onLockSession}
             style={{
               background: '#ffffff',
-              border: '1px solid #86efac',
+              border: '1.5px solid #10b981',
               borderRadius: '10px',
               padding: '7px 14px',
               fontSize: '0.76rem',
               fontWeight: 800,
-              color: '#15803d',
+              color: '#059669',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -404,7 +405,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
           borderRadius: '20px',
           padding: '16px 18px',
-          border: '1.5px solid #86efac',
+          border: '1.5px solid #10b981',
           display: 'flex',
           flexDirection: 'column',
           gap: '10px',
@@ -819,8 +820,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           borderRadius: '16px',
           cursor: 'pointer',
           ...(hlTeacherAudio.isHighlighted ? hlTeacherAudio.style : {
-            background: curTeacherAudio ? '#f0fdf4' : '#f8fafc',
-            border: curTeacherAudio ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+            background: curTeacherAudio ? '#ecfdf5' : '#f8fafc',
+            border: curTeacherAudio ? '1.5px solid #10b981' : '1px solid #e2e8f0',
             transition: 'all 0.2s ease'
           })
         }}>

@@ -172,13 +172,37 @@ export async function resolvePlayableAudioSource(
         `audio/${trimmed}`,
         `campus-recordings/${trimmed}`
       ];
-      for (const cPath of candidatePaths) {
-        try {
-          const signed = await getSecureAudioUrl(cPath, bucket, expiresInSeconds);
-          if (signed) {
-            return { src: signed, isBlobUrl: false };
-          }
-        } catch {}
+
+      // 🛡️ Forensic 0,1% Hierarchical Path Match:
+      // Pattern: campus_blob_<studentId>_<timestamp>.<ext>
+      const blobMatch = trimmed.match(/^campus_blob_([^_]+)_(\d+)\.(.+)$/);
+      if (blobMatch) {
+        const [, sId, ts, ext] = blobMatch;
+        const currentSchoolId = typeof window !== 'undefined'
+          ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || 'global')
+          : 'global';
+        const schoolCandidates = Array.from(new Set([currentSchoolId, 'global']));
+        for (const scId of schoolCandidates) {
+          candidatePaths.push(
+            `schools/${scId}/students/${sId}/recordings/rec_${ts}.${ext}`,
+            `schools/${scId}/students/${sId}/recordings/${trimmed}`,
+            `schools/${scId}/students/${sId}/recordings/${baseKey}`,
+            `schools/${scId}/recordings/rec_${ts}.${ext}`,
+            `schools/${scId}/recordings/${trimmed}`
+          );
+        }
+      }
+
+      const bucketCandidates = [bucket, bucket === 'campus-assets' ? 'groovelab-assets' : 'campus-assets'];
+      for (const targetBucket of bucketCandidates) {
+        for (const cPath of candidatePaths) {
+          try {
+            const signed = await getSecureAudioUrl(cPath, targetBucket, expiresInSeconds);
+            if (signed && signed !== cPath) {
+              return { src: signed, isBlobUrl: false };
+            }
+          } catch {}
+        }
       }
     } catch (blobErr) {
       console.warn('[AudioStorageHelper] Binary blob DB lookup error:', trimmed, blobErr);
@@ -189,6 +213,7 @@ export async function resolvePlayableAudioSource(
   if (
     trimmed.startsWith('schools/') ||
     trimmed.includes('/storage/v1/object/') ||
+    trimmed.includes('/storage/v1/') ||
     trimmed.startsWith('recordings/') ||
     trimmed.startsWith('audio/')
   ) {

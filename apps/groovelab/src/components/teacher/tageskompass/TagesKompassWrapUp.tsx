@@ -82,9 +82,9 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
           style={{
             fontSize: '0.70rem',
             fontWeight: 800,
-            color: hasUnfinished ? '#c2410c' : '#15803d',
-            background: hasUnfinished ? '#ffedd5' : '#dcfce7',
-            border: `1px solid ${hasUnfinished ? '#fed7aa' : '#bbf7d0'}`,
+            color: hasUnfinished ? '#854d0e' : '#15803d',
+            background: hasUnfinished ? '#ffffff' : '#dcfce7',
+            border: `1px solid ${hasUnfinished ? '#facc15' : '#bbf7d0'}`,
             padding: '3px 10px',
             borderRadius: '100px',
             display: 'inline-flex',
@@ -94,7 +94,7 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
         >
           {hasUnfinished ? (
             <>
-              <AlertTriangle size={12} color="#c2410c" />
+              <AlertTriangle size={12} color="#ca8a04" />
               <span>{unfinishedStudents.length} {unfinishedStudents.length === 1 ? 'OFFENE HAUSAUFGABE' : 'OFFENE HAUSAUFGABEN'}</span>
             </>
           ) : (
@@ -110,8 +110,8 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
       {hasUnfinished ? (
         <div 
           style={{
-            background: '#fff7ed',
-            border: '1.5px solid #fed7aa',
+            background: '#ffffff',
+            border: '1.5px solid #facc15',
             borderRadius: '18px',
             padding: '14px 16px',
             display: 'flex',
@@ -120,10 +120,10 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e', textTransform: 'uppercase' }}>
               Noch keine Hausaufgabe erfasst für:
             </span>
-            <span style={{ fontSize: '0.70rem', fontWeight: 600, color: '#c2410c' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 600, color: '#854d0e' }}>
               Kurz 5s-Sprachmemo oder Notiz nachtragen
             </span>
           </div>
@@ -144,9 +144,9 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: isSelected ? '#ea580c' : '#ffffff',
-                    color: isSelected ? '#ffffff' : '#9a3412',
-                    border: isSelected ? '1.5px solid #ea580c' : '1px solid #fed7aa',
+                    background: isSelected ? '#facc15' : '#ffffff',
+                    color: isSelected ? '#0f172a' : '#854d0e',
+                    border: isSelected ? '1.5px solid #ca8a04' : '1px solid #facc15',
                     padding: '6px 12px',
                     borderRadius: '10px',
                     fontSize: '0.80rem',
@@ -169,6 +169,8 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
               <TagesKompassSmartInput
                 studentId={activeCatchUpStudentId}
                 studentName={formatTagesKompassStudentName(activeStudentObj)}
+                studentInstrument={activeStudentObj?.instrument}
+                schoolId={teacher?.school_id}
                 isSaving={isSaving}
                 onSaveText={handleSaveText}
                 onSaveAudio={handleSaveAudio}
@@ -185,17 +187,17 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
                     width: '100%',
                     marginTop: '6px',
                     background: 'transparent',
-                    border: '1px dashed #fed7aa',
+                    border: '1px dashed #facc15',
                     borderRadius: '10px',
                     padding: '6px 10px',
                     fontSize: '0.74rem',
                     fontWeight: 800,
-                    color: '#9a3412',
+                    color: '#854d0e',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Zap size={12} color="#c2410c" />
+                  <Zap size={12} color="#ca8a04" />
                   <span>Im Schnellmodal (mit Metronom & Didaktik-Chips) öffnen</span>
                 </button>
               )}

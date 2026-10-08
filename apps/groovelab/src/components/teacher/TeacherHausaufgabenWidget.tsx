@@ -6,6 +6,7 @@ import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
 import {
   parseHomeworkNotesPayload,
   buildHomeworkNotesPayload,
+  deleteCurrentHomeworkAuthoritative,
   isPureDidacticNote,
   sanitizeDidacticText
 } from '../../utils/homeworkSnapshotHelper';
@@ -219,12 +220,28 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
       }
     };
 
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        bc = new BroadcastChannel('campus_homework_bus');
+        bc.onmessage = (event) => {
+          const updatedStudentId = event.data?.studentId;
+          if (updatedStudentId && (updatedStudentId === activeStudent?.id || updatedStudentId === prep?.studentId)) {
+            handleHwUpdate({ detail: { studentId: updatedStudentId } });
+          }
+        };
+      } catch {}
+    }
+
     if (typeof window !== 'undefined') {
       window.addEventListener('campus_homework_updated', handleHwUpdate);
       window.addEventListener('campus_homework_notes_updated', handleHwUpdate);
       window.addEventListener('homework-updated', handleHwUpdate);
     }
     return () => {
+      if (bc) {
+        try { bc.close(); } catch {}
+      }
       if (typeof window !== 'undefined') {
         window.removeEventListener('campus_homework_updated', handleHwUpdate);
         window.removeEventListener('campus_homework_notes_updated', handleHwUpdate);
@@ -299,8 +316,15 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   }, []);
 
   const handleSaveQuickHomework = async (currentPrep: any, customNote?: string) => {
-    const textToSave = sanitizeDidacticText(customNote || quickHomeworkText);
-    if (!textToSave || !currentPrep?.studentId) return;
+    const rawInput = (customNote || quickHomeworkText).trim();
+    if (!rawInput || !currentPrep?.studentId) return;
+
+    const isMicroScore = rawInput.startsWith('MICROSCORE:');
+    const isAudio = rawInput.startsWith('AUDIO:');
+    const isLoop = rawInput.startsWith('LOOP:');
+    const textToSave = (isMicroScore || isAudio || isLoop) ? rawInput : sanitizeDidacticText(rawInput);
+    if (!textToSave) return;
+
     setIsSavingQuickHw(true);
     try {
       const curWkNum = currentPrep.currentWeekNum;
@@ -326,17 +350,34 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
         ? [...currentPrep.currentWeekNotes]
         : [];
 
-      const newDidacticNotes = existingPayload && existingPayload.didacticNotes.length > 0
-        ? [...existingPayload.didacticNotes, textToSave]
-        : [...currentNotes.filter(isPureDidacticNote), textToSave];
+      const existingMicroScores = existingPayload?.microScores?.map(m => m.rawToken) || [];
+      const newMicroScores = isMicroScore ? [...existingMicroScores, rawInput] : existingMicroScores;
 
-      // Build canonical payload preserving snapshots and audios
+      const existingAudioTokens = existingPayload?.audioItems?.map(a => a.rawToken) || currentNotes.filter((n: string) => typeof n === 'string' && n.startsWith('AUDIO:'));
+      let newAudioTokens = existingAudioTokens;
+      if (isAudio) {
+        const incomingUrl = rawInput.replace('AUDIO:', '').split('|')[0]?.replace(/^["']|["']$/g, '').trim();
+        const filteredTokens = existingAudioTokens.filter((tok: string) => {
+          const tokUrl = tok.replace('AUDIO:', '').split('|')[0]?.replace(/^["']|["']$/g, '').trim();
+          return tokUrl !== incomingUrl;
+        });
+        newAudioTokens = [...filteredTokens, rawInput];
+      }
+
+      const newDidacticNotes = (!isMicroScore && !isAudio && !isLoop)
+        ? (existingPayload && existingPayload.didacticNotes.length > 0
+            ? [...existingPayload.didacticNotes, textToSave]
+            : [...currentNotes.filter(isPureDidacticNote), textToSave])
+        : (existingPayload?.didacticNotes || currentNotes.filter(isPureDidacticNote));
+
+      // Build canonical payload preserving snapshots, audios and microscores
       const notesJson = buildHomeworkNotesPayload({
         didacticNotes: newDidacticNotes,
         rawSnapshotLwToken: existingPayload?.rawSnapshotLwToken || currentPrep.currentRawSnapshotLwToken || currentPrep.rawSnapshotLwToken,
         rawSnapshotSongsToken: existingPayload?.rawSnapshotSongsToken || currentPrep.currentRawSnapshotSongsToken || currentPrep.rawSnapshotSongsToken,
-        audioTokens: existingPayload?.audioItems.map(a => a.rawToken) || currentNotes.filter((n: string) => typeof n === 'string' && n.startsWith('AUDIO:')),
-        loopTokens: existingPayload?.loopItems.map(l => l.rawToken) || currentNotes.filter((n: string) => typeof n === 'string' && n.startsWith('LOOP:'))
+        audioTokens: newAudioTokens,
+        loopTokens: existingPayload?.loopItems?.map(l => l.rawToken) || currentNotes.filter((n: string) => typeof n === 'string' && n.startsWith('LOOP:')),
+        microScores: newMicroScores
       });
 
       if (existingRows && existingRows.length > 0) {
@@ -367,9 +408,24 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
 
       setDynamicPrepMirror((prev: any) => {
         if (!prev) return prev;
+        const prevList = prev.currentWeekNotes || [];
+        if (isAudio) {
+          const incomingUrl = rawInput.replace('AUDIO:', '').split('|')[0]?.replace(/^["']|["']$/g, '').trim();
+          const cleanPrev = prevList.filter((n: string) => {
+            if (typeof n === 'string' && n.startsWith('AUDIO:')) {
+              const u = n.replace('AUDIO:', '').split('|')[0]?.replace(/^["']|["']$/g, '').trim();
+              return u !== incomingUrl;
+            }
+            return true;
+          });
+          return {
+            ...prev,
+            currentWeekNotes: [...cleanPrev, textToSave]
+          };
+        }
         return {
           ...prev,
-          currentWeekNotes: [...(prev.currentWeekNotes || []), textToSave]
+          currentWeekNotes: [...prevList, textToSave]
         };
       });
 
@@ -390,6 +446,107 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
       alert('Fehler beim Speichern der Schnell-Hausaufgabe: ' + (err?.message || err));
     } finally {
       setIsSavingQuickHw(false);
+    }
+  };
+
+  const handleDeleteHomework = async (currentPrep: any) => {
+    if (!currentPrep?.studentId) return;
+    const sId = currentPrep.studentId;
+    const curWkNum = currentPrep.currentWeekNum;
+
+    try {
+      await deleteCurrentHomeworkAuthoritative(sId, curWkNum);
+
+      setDynamicPrepMirror((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentWeekNotes: [],
+          currentWeekItems: [],
+          parsedCurrentLehrwerke: [],
+          parsedCurrentSongs: [],
+          rawSnapshotLwToken: undefined,
+          rawSnapshotSongsToken: undefined
+        };
+      });
+    } catch (err: any) {
+      console.error('[handleDeleteHomework] Error deleting homework:', err);
+      alert('Fehler beim Löschen der Hausaufgabe: ' + (err?.message || err));
+    }
+  };
+
+  const handleDeleteAudioTrack = async (currentPrep: any, trackUrl: string) => {
+    if (!currentPrep?.studentId || !trackUrl) return;
+    try {
+      const curWkNum = currentPrep.currentWeekNum;
+      if (!curWkNum) return;
+
+      const { data: existingRows } = await supabase
+        .from('progress_matrix')
+        .select('id, homework_notes')
+        .eq('student_id', currentPrep.studentId)
+        .eq('topic_name', `Hausaufgabe KW ${curWkNum}`)
+        .limit(1);
+
+      const existingPayload = existingRows?.[0]?.homework_notes
+        ? parseHomeworkNotesPayload(existingRows[0].homework_notes)
+        : null;
+
+      const currentNotes = Array.isArray(currentPrep.currentWeekNotes)
+        ? [...currentPrep.currentWeekNotes]
+        : [];
+
+      const remainingAudioTokens = (existingPayload?.audioItems || [])
+        .filter(a => a.url !== trackUrl && !a.rawToken.includes(trackUrl))
+        .map(a => a.rawToken);
+
+      const remainingCurrentNotes = currentNotes.filter((n: string) => {
+        if (typeof n !== 'string') return true;
+        if (n.startsWith('AUDIO:')) {
+          const u = n.replace('AUDIO:', '').split('|')[0]?.replace(/^["']|["']$/g, '').trim();
+          return u !== trackUrl && !n.includes(trackUrl);
+        }
+        return true;
+      });
+
+      const notesJson = buildHomeworkNotesPayload({
+        didacticNotes: existingPayload?.didacticNotes || currentNotes.filter(isPureDidacticNote),
+        rawSnapshotLwToken: existingPayload?.rawSnapshotLwToken || currentPrep.currentRawSnapshotLwToken || currentPrep.rawSnapshotLwToken,
+        rawSnapshotSongsToken: existingPayload?.rawSnapshotSongsToken || currentPrep.currentRawSnapshotSongsToken || currentPrep.rawSnapshotSongsToken,
+        audioTokens: remainingAudioTokens,
+        loopTokens: existingPayload?.loopItems?.map(l => l.rawToken) || currentNotes.filter((n: string) => typeof n === 'string' && n.startsWith('LOOP:')),
+        microScores: existingPayload?.microScores?.map(m => m.rawToken) || []
+      });
+
+      if (existingRows && existingRows.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({
+            homework_notes: notesJson,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRows[0].id);
+      }
+
+      setDynamicPrepMirror((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentWeekNotes: remainingCurrentNotes
+        };
+      });
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`campus_homework_notes_${currentPrep.studentId}`, notesJson);
+        } catch {}
+        window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: currentPrep.studentId } }));
+        window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', { detail: { studentId: currentPrep.studentId } }));
+        window.dispatchEvent(new CustomEvent('groovelab_student_prep_updated', { detail: { studentId: currentPrep.studentId } }));
+        window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: currentPrep.studentId } }));
+      }
+    } catch (err) {
+      console.error('[handleDeleteAudioTrack] Error deleting audio track:', err);
     }
   };
 
@@ -652,6 +809,8 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
         playingAudioUrl={playingAudioUrl}
         onTogglePlayAudio={handleTogglePlayAudio}
         onSaveQuickHomework={handleSaveQuickHomework}
+        onDeleteHomework={handleDeleteHomework}
+        onDeleteAudioTrack={handleDeleteAudioTrack}
         onSaveCatchUpHomework={async (studentId, textOrAudio) => {
           const fakePrep = {
             studentId,

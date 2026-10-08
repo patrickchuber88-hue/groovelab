@@ -24,8 +24,7 @@ import {
   Layers
 } from 'lucide-react';
 import { UserNote, maskStudentName } from '../../../../services/notesService';
-import { useVoiceToText } from '../../../../hooks/useVoiceToText';
-import { capitalizeFirstLetter } from '../../../../utils/nameHelper';
+import { useDictationInput } from '../../../../hooks/useVoiceToText';
 import { generateTeacherNotesDailyPlanPDF } from '../../../../utils/pdfGenerator';
 
 export interface TeacherNotesBoardViewProps {
@@ -195,23 +194,18 @@ export const TeacherNotesBoardView: React.FC<TeacherNotesBoardViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // 🎙️ 0.1% Goldstandard Dictation (Silence Auto-Stop & Zero Duplication)
   const {
     isListening,
-    transcript,
     startListening,
     stopListening,
     isSupported: isSpeechSupported
-  } = useVoiceToText();
-
-  useEffect(() => {
-    if (transcript) {
-      setInputText(prev => {
-        const clean = prev.trim();
-        const addition = capitalizeFirstLetter(transcript);
-        return clean ? `${clean} ${addition}` : addition;
-      });
-    }
-  }, [transcript]);
+  } = useDictationInput({
+    value: inputText,
+    onChange: setInputText,
+    autoStopOnSilence: true,
+    silenceTimeoutMs: 2000
+  });
 
   const handleCreateCurrentNote = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();

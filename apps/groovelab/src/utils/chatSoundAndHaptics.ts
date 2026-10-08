@@ -8,23 +8,10 @@
  * - Non-intrusive haptic vibration for mobile touch devices.
  */
 
-let sharedAudioCtx: AudioContext | null = null;
+import { getSharedAudioContext } from '../services/audio/audioContextPool';
 
 function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return null;
-    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-      sharedAudioCtx = new AudioContextClass();
-    }
-    if (sharedAudioCtx.state === 'suspended') {
-      sharedAudioCtx.resume().catch(() => {});
-    }
-    return sharedAudioCtx;
-  } catch {
-    return null;
-  }
+  return getSharedAudioContext();
 }
 
 /**

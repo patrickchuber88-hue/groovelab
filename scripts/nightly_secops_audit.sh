@@ -40,11 +40,18 @@ else
 fi
 
 # 3. Check Disk Space & DB Volume Health
-DISK_USAGE=$(df -h /mnt/supabase_data | awk 'NR==2 {print $5}' | tr -d '%')
+CHECK_MOUNT="/mnt/cloud-volume"
+if [ ! -d "$CHECK_MOUNT" ]; then
+    CHECK_MOUNT="/mnt/supabase_data"
+fi
+if [ ! -d "$CHECK_MOUNT" ]; then
+    CHECK_MOUNT="/"
+fi
+DISK_USAGE=$(df -h "$CHECK_MOUNT" | awk 'NR==2 {print $5}' | tr -d '%')
 if [ "$DISK_USAGE" -gt 85 ]; then
-    echo "⚠️  Disk usage warning: /mnt/supabase_data is at ${DISK_USAGE}% capacity."
+    echo "⚠️  Disk usage warning: $CHECK_MOUNT is at ${DISK_USAGE}% capacity."
 else
-    echo "  ✓ Storage Health: /mnt/supabase_data capacity at ${DISK_USAGE}% (Normal)."
+    echo "  ✓ Storage Health: $CHECK_MOUNT capacity at ${DISK_USAGE}% (Normal)."
 fi
 
 if [ "$FAILED_COUNT" -eq 0 ]; then

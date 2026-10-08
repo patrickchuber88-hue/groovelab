@@ -303,9 +303,9 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                   Auftragsverarbeitungsvertrag (AVV)
                 </h3>
                 <span style={{
-                  background: '#dcfce7',
-                  color: '#15803d',
-                  border: '1px solid #86efac',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  border: 'none',
                   padding: '2px 8px',
                   borderRadius: '100px',
                   fontSize: '0.64rem',
@@ -615,8 +615,8 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
         }}>
           {signedSuccess || school?.avv_signed_at ? (
             <div style={{
-              background: '#f0fdf4',
-              border: '1.5px solid #bbf7d0',
+              background: '#ecfdf5',
+              border: '1.5px solid #10b981',
               padding: '14px 18px',
               borderRadius: '16px',
               display: 'flex',
@@ -626,12 +626,12 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               gap: '12px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <CheckCircle2 size={26} color="#166534" />
+                <CheckCircle2 size={26} color="#10b981" />
                 <div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#166534' }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#065f46' }}>
                     AVV rechtsgültig digital unterzeichnet
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#059669', marginTop: '2px' }}>
                     Gezeichnet durch: <strong>{school?.avv_signee_name || signeeName}</strong> am {new Date(school?.avv_signed_at || Date.now()).toLocaleDateString('de-DE')}
                   </div>
                   <div style={{ fontSize: '0.66rem', color: '#166534', fontFamily: 'monospace', marginTop: '2px', opacity: 0.85, wordBreak: 'break-all' }}>
@@ -682,11 +682,11 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
-                  Name des/der Vertretungsberechtigten (z. B. Schulleitung):
+                  Name des/der Vertretungsberechtigten (z. B. Schulleitung / Verwaltung / Trägervertretung):
                 </label>
                 <input
                   type="text"
-                  placeholder="z. B. Dr. Maria Musterfrau (Schulleitung)"
+                  placeholder="z. B. Dr. Maria Musterfrau (Schulleitung / im Auftrag des Trägers)"
                   value={signeeName}
                   onChange={(e) => setSigneeName(e.target.value)}
                   onKeyDown={(e) => {

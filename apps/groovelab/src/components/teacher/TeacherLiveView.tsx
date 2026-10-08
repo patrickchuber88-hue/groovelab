@@ -270,7 +270,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', height: '100%', width: '100%', paddingTop: '12px' }}>
-      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Music size={14} /> {inst}
       </div>
       
@@ -494,7 +494,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name || ''}</div>
-                <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer iPad'}</div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer iPad'}</div>
                 {viewMode === 'admin' && isSelf && onSelfCheckout ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); onSelfCheckout(); }}
@@ -1146,7 +1146,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           Coaches vor Ort
                         </div>
                         {coaches.filter(Boolean).length === 0 ? (
-                          <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, fontStyle: 'italic', paddingLeft: '4px' }}>
+                          <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, fontStyle: 'italic', paddingLeft: '4px' }}>
                             Keine Coaches vor Ort eingeloggt
                           </div>
                         ) : (
@@ -1174,7 +1174,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.75rem', lineHeight: 1.1 }}>{coachName}</span>
-                                    <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>{c.session?.stations?.name || 'Lehrer iPad'}</span>
+                                    <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>{c.session?.stations?.name || 'Lehrer iPad'}</span>
                                   </div>
                                   {viewMode === 'admin' && (
                                     <button
@@ -1266,7 +1266,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
 
                               {/* Station Instrument Icon & Name info */}
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, paddingLeft: '4px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                   <Music size={12} style={{ color: instColor }} />
                                   <span>{station.instrument || 'Tablet'}</span>
                                   <span style={{ color: '#cbd5e1' }}>•</span>
@@ -2749,7 +2749,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 <div style={{ 
                                   fontSize: '0.7rem', 
                                   fontWeight: 800, 
-                                  color: '#94a3b8', 
+                                  color: '#64748b', 
                                   textTransform: 'uppercase', 
                                   letterSpacing: '0.05em'
                                 }}>
@@ -2824,7 +2824,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                       <span style={{ 
                                         fontSize: '0.55rem', 
                                         fontWeight: 800, 
-                                        color: '#94a3b8', 
+                                        color: '#64748b', 
                                         marginTop: '1px' 
                                       }}>
                                         Frei
@@ -2870,7 +2870,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                        borderRadius: '12px',
                                        fontSize: '0.8rem',
                                        fontWeight: 900,
-                                       color: 'white',
+                                       color: '#0f172a',
                                        cursor: 'pointer',
                                        display: 'flex',
                                        alignItems: 'center',
@@ -2916,7 +2916,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', color: '#94a3b8' }}>
                       <Hourglass size={32} />
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       Keine passenden<br/>Formationen
                     </div>
                   </div>
@@ -3040,7 +3040,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '32px 20px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700 }}>
+                  <div style={{ textAlign: 'center', padding: '32px 20px', color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>
                      Keine neuen Nachrichten
                   </div>
                 )}
@@ -3235,7 +3235,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 ) : (
                   <div style={{ textAlign: 'center', padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                     <div style={{ color: '#fcd34d' }}><Zap size={32} fill="#fcd34d" /></div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, lineHeight: 1.4 }}>Keine offenen Challenges. Alles unter Kontrolle!</div>
                   </div>
                 )}
               </div>
@@ -3534,7 +3534,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               height: '6px', 
                               borderRadius: '50%', 
                               background: '#34a853',
-                              border: '1px solid rgba(255,255,255,0.2)',
+                              border: 'none',
                               marginTop: '3px'
                             }} />
                           )}

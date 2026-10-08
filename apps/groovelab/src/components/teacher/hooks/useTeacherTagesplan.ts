@@ -704,6 +704,7 @@ export function useTeacherTagesplan({
 
     window.addEventListener('groovelab_simulated_date_changed', handleSync);
     window.addEventListener('groovelab_schedule_changed', handleSync);
+    window.addEventListener('campus_schedule_sync', handleSync);
     window.addEventListener('groovelab_chat_updated', handleSync);
     window.addEventListener('refresh-bookings', handleSync);
     window.addEventListener('storage', handleSync);
@@ -717,11 +718,19 @@ export function useTeacherTagesplan({
       }, () => {
         loadBriefingTimeline();
       })
+      .on('postgres_changes', {
+        schema: 'public',
+        event: '*',
+        table: 'schedule_occurrences'
+      }, () => {
+        loadBriefingTimeline();
+      })
       .subscribe() : null;
 
     return () => {
       window.removeEventListener('groovelab_simulated_date_changed', handleSync);
       window.removeEventListener('groovelab_schedule_changed', handleSync);
+      window.removeEventListener('campus_schedule_sync', handleSync);
       window.removeEventListener('groovelab_chat_updated', handleSync);
       window.removeEventListener('refresh-bookings', handleSync);
       window.removeEventListener('storage', handleSync);

@@ -2,7 +2,7 @@
 > **Klassifizierung:** Autoritatives Finanz-, Rechts- & Rechnungs-Regelwerk (Single Source of Truth)  
 > **Status:** Verbindlich für alle UI-Views, Rechnungs-PDFs, Onboarding-Wizards und Abrechnungs-RPCs  
 > **Plattformbezeichnung:** Ausnahmslos **Campus-Groovelab** (mit Doppel-'o')  
-> **Letzte Aktualisierung:** 2026-09-17
+> **Letzte Aktualisierung:** 2026-10-06 (Release 2026.6 – B2B-Netto-Standard & Organ-Governance)
 
 ---
 
@@ -24,6 +24,9 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
 | **GrooveLab Modul** | **9,90 € / Mo.** | **CHF 14.90 / Mo.** | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine (inkl. 10 GB Audio-Tresor) |
 | **Kombi-Vorteil Bundle** | **19,90 € / Mo.** | **CHF 29.90 / Mo.** | Beide Module vollständig gebucht (**4,90 € bzw. CHF 4.90 / Mo. Ersparnis** gegenüber Einzelsumme) |
 | **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Pro aktivem Administrator-, Schulleiter- oder Lehrer-Profil |
+
+> 🏛️ **B2B-Steuer-Axiom (Release 2026.6):**  
+> Alle B2B-Preise verstehen sich als **Netto-Preise**. Solange die Kleinunternehmerregelung (§ 19 UStG) angewendet wird, wird keine Umsatzsteuer berechnet. Bei Übergang zur Regelbesteuerung wird die gesetzliche USt (19 %) ordnungsgemäß auf den Nettopreis aufgeschlagen und ausgewiesen. Schüler-Direktabrechnungen (B2C, Modell B) bleiben hiervon unberührt und verstehen sich als Endpreise.
 
 ---
 

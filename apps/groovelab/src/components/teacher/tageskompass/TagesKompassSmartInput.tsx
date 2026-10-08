@@ -1,26 +1,38 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Send, Loader2, Volume2, Check } from 'lucide-react';
+import { Mic, Square, Send, Loader2, Volume2, Check, Music, Sparkles, Plus } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
-import { acquireAudioStream, releaseAudioStream } from '../../../services/audioPermissionService';
+import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream } from '../../../services/audioPermissionService';
 import { processPureRawBlob } from '../../../utils/audioMasteringEngine';
+import { fixWebmDuration } from '../../../utils/webmDurationPatcher';
 import { saveOfflineAudioRecord } from '../../../utils/offlineAudioVault';
 import { formatTagesKompassStudentName } from './types';
+import { MicroScoreStudioModal } from '../../student/meisterwerk/microscore/MicroScoreStudioModal';
+import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
+import { fetchSchoolTextbausteine, TEXTBAUSTEINE_THEMES, DidacticTextbaustein } from '../../../services/textbausteineService';
+import { fetchTeacherScoreSnippets, saveTeacherScoreSnippet } from '../../../services/teacherScoreSnippetService';
+import { VdmScoreSnippetFolderDrawer } from './VdmScoreSnippetFolderDrawer';
 
 interface TagesKompassSmartInputProps {
   studentId: string;
   studentName?: string;
+  studentInstrument?: string;
+  schoolId?: string;
   isSaving?: boolean;
   onSaveText: (text: string) => Promise<void>;
   onSaveAudio: (audioUrl: string, durationSec: number) => Promise<void>;
+  onSaveSnippet?: (snippet: MicroScoreSnippet) => Promise<void>;
   disabled?: boolean;
 }
 
 export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
   studentId,
   studentName = 'Schüler',
+  studentInstrument,
+  schoolId,
   isSaving = false,
   onSaveText,
   onSaveAudio,
+  onSaveSnippet,
   disabled = false
 }) => {
   const maskedStudentName = formatTagesKompassStudentName(null, studentName);
@@ -28,11 +40,62 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
+  const [isScoreDrawerOpen, setIsScoreDrawerOpen] = useState(false);
+  const [scoreSnippets, setScoreSnippets] = useState<MicroScoreSnippet[]>([]);
+  const [isSchnelltextOpen, setIsSchnelltextOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'rhythm' | 'technique' | 'performance'>('all');
+  const [textbausteine, setTextbausteine] = useState<DidacticTextbaustein[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      const items = await fetchSchoolTextbausteine(schoolId);
+      if (isMounted) setTextbausteine(items);
+      const snips = await fetchTeacherScoreSnippets('current', schoolId);
+      if (isMounted) setScoreSnippets(snips);
+    };
+    load();
+
+    const handleUpdate = () => {
+      load();
+    };
+    window.addEventListener('campus_textbausteine_updated', handleUpdate);
+    window.addEventListener('campus_score_snippets_updated', handleUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('campus_textbausteine_updated', handleUpdate);
+      window.removeEventListener('campus_score_snippets_updated', handleUpdate);
+    };
+  }, [schoolId]);
+
+  const handleSelectTextbaustein = (item: DidacticTextbaustein) => {
+    setText(prev => {
+      const trimmed = prev.trim();
+      if (!trimmed) return item.text;
+      if (trimmed.includes(item.text)) return trimmed;
+      return `${trimmed} • ${item.text}`;
+    });
+  };
+
+  const handleSaveSnippet = async (snippet: MicroScoreSnippet) => {
+    setIsScoreModalOpen(false);
+    if (schoolId) {
+      await saveTeacherScoreSnippet('current', schoolId, snippet);
+      setScoreSnippets(prev => [snippet, ...prev]);
+    }
+    if (onSaveSnippet) {
+      await onSaveSnippet(snippet);
+    } else {
+      await onSaveText(`MICROSCORE:${JSON.stringify(snippet)}`);
+    }
+  };
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<any>(null);
+  const hasFiredOnStopRef = useRef<boolean>(false);
 
   useEffect(() => {
     return () => {
@@ -57,8 +120,10 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
     if (isRecording || isSaving || disabled) return;
     try {
       const stream = await acquireAudioStream();
+      await stabilizeAudioStream(stream, 400);
       audioStreamRef.current = stream;
       audioChunksRef.current = [];
+      hasFiredOnStopRef.current = false;
 
       let mimeType = '';
       if (typeof MediaRecorder !== 'undefined') {
@@ -67,7 +132,9 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
         else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
       }
 
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: 256000 };
+      if (mimeType) recorderOptions.mimeType = mimeType;
+      const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -77,12 +144,15 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
       };
 
       recorder.onstop = async () => {
+        if (hasFiredOnStopRef.current) return;
+        hasFiredOnStopRef.current = true;
         setIsProcessingAudio(true);
         try {
           const rawBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
           let finalBlob: Blob = rawBlob;
           try {
-            const mastered = await processPureRawBlob(rawBlob);
+            const durationFixed = await fixWebmDuration(rawBlob, recordSeconds || 1);
+            const mastered = await processPureRawBlob(durationFixed);
             if (mastered?.processedBlob) {
               finalBlob = mastered.processedBlob;
             }
@@ -146,7 +216,11 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
     }
     setIsRecording(false);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.warn('[SmartInput] Notice stopping recorder:', err);
+      }
     }
   };
 
@@ -273,6 +347,56 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
           />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* 1-Click Schnipsel Button */}
+            <button
+              type="button"
+              onClick={() => setIsScoreDrawerOpen(prev => !prev)}
+              disabled={isSaving || disabled}
+              title={`Notenschnipsel aus Mediathek wählen oder neu erstellen`}
+              aria-label={`Notenschnipsel aus Mediathek wählen oder neu erstellen`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                border: isScoreDrawerOpen ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                background: isScoreDrawerOpen ? '#0f172a' : '#ffffff',
+                color: isScoreDrawerOpen ? '#ffffff' : '#0f172a',
+                cursor: isSaving || disabled ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+            >
+              <Music size={16} />
+            </button>
+
+            {/* 1-Click Schnelltext Button */}
+            <button
+              type="button"
+              onClick={() => setIsSchnelltextOpen(prev => !prev)}
+              disabled={isSaving || disabled}
+              title="Didaktische Schnelltext-Bausteine einblenden"
+              aria-label="Didaktische Schnelltext-Bausteine einblenden"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                border: isSchnelltextOpen ? '1px solid #f59e0b' : '1px solid #cbd5e1',
+                background: isSchnelltextOpen ? '#fef3c7' : '#ffffff',
+                color: isSchnelltextOpen ? '#b45309' : '#0f172a',
+                cursor: isSaving || disabled ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+            >
+              <Sparkles size={16} />
+            </button>
+
             {/* 1-Click Sprachmemo Mic Button */}
             <button
               type="button"
@@ -321,6 +445,125 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
             </button>
           </div>
         </form>
+      )}
+
+      {/* VdM-Notenschnipsel Ordner-Drawer (0,1% Goldstandard) */}
+      <VdmScoreSnippetFolderDrawer
+        isOpen={isScoreDrawerOpen && !isRecording}
+        onClose={() => setIsScoreDrawerOpen(false)}
+        studentInstrument={studentInstrument}
+        snippets={scoreSnippets}
+        onSelectSnippet={async (snip) => {
+          setIsScoreDrawerOpen(false);
+          await onSaveText(`MICROSCORE:${JSON.stringify(snip)}`);
+        }}
+        onOpenCreateNew={() => {
+          setIsScoreDrawerOpen(false);
+          setIsScoreModalOpen(true);
+        }}
+      />
+
+      {/* Didaktische Schnelltexte Drawer */}
+      {isSchnelltextOpen && !isRecording && (
+        <div 
+          style={{
+            marginTop: '8px',
+            padding: '10px 12px',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '14px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            animation: 'fadeIn 0.15s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={12} color="#f59e0b" />
+              <span>Schnelltext-Vorlagen</span>
+            </span>
+            <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }} className="hide-scrollbar">
+              {[
+                { id: 'all', label: 'Alle' },
+                { id: 'rhythm', label: '🥁 Rhythmus' },
+                { id: 'technique', label: '🎹 Technik' },
+                { id: 'performance', label: '🎭 Ausdruck' }
+              ].map(cat => {
+                const isCatActive = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id as any)}
+                    style={{
+                      background: isCatActive ? '#0f172a' : '#f1f5f9',
+                      color: isCatActive ? '#ffffff' : '#64748b',
+                      border: 'none',
+                      borderRadius: '100px',
+                      padding: '3px 9px',
+                      fontSize: '0.70rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }} className="hide-scrollbar">
+            {(selectedCategory === 'all' ? textbausteine : textbausteine.filter(b => b.category === selectedCategory)).map(item => {
+              const theme = TEXTBAUSTEINE_THEMES[item.category] || TEXTBAUSTEINE_THEMES.technique;
+              const isAlreadyInText = text.includes(item.text);
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectTextbaustein(item)}
+                  style={{
+                    flexShrink: 0,
+                    background: isAlreadyInText ? theme.badgeBg : theme.bg,
+                    color: theme.text,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '100px',
+                    padding: '4px 11px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                  title={item.text}
+                >
+                  {isAlreadyInText && <Check size={11} strokeWidth={3} />}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Autarkes Micro-Score Studio Modal */}
+      {isScoreModalOpen && (
+        <MicroScoreStudioModal
+          isOpen={isScoreModalOpen}
+          onClose={() => setIsScoreModalOpen(false)}
+          studentId={studentId}
+          taskTitle={`Übung ${maskedStudentName}`}
+          defaultInstrument={studentInstrument}
+          onSaveSnippet={handleSaveSnippet}
+        />
       )}
     </div>
   );

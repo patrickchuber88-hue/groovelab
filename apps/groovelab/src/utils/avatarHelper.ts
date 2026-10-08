@@ -1,5 +1,19 @@
-import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from '../components/StudioAvatar';
-export { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar };
+import { 
+  getInstrumentAvatarUrl, 
+  getDefaultMusicianAvatarUrl, 
+  resolveCampusStudentAvatar,
+  resolveGrooveLabStudentAvatar,
+  resolveGrooveLabTeacherAvatar,
+  isInstrumentAvatar
+} from '../components/StudioAvatar';
+export { 
+  getInstrumentAvatarUrl, 
+  getDefaultMusicianAvatarUrl, 
+  resolveCampusStudentAvatar,
+  resolveGrooveLabStudentAvatar,
+  resolveGrooveLabTeacherAvatar,
+  isInstrumentAvatar
+};
 
 export const formatStudentDisplayName = (firstName?: string | null, lastName?: string | null, fallbackId?: string | null): string => {
   const first = String(firstName || '').replace(/^Unterricht:\s*/i, '').trim();

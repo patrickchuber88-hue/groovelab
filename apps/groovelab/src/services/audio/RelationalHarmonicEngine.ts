@@ -20,6 +20,8 @@
  * - Warm Rhodes (Sine fundamental + Triangle harmonic) solo tone preview synthesizer
  */
 
+import { StudioKeyboardEngine } from './StudioKeyboardEngine';
+
 export type DidacticUiLevel = 'junior' | 'teen' | 'pro';
 
 export interface BarHarmonicInfo {
@@ -1524,11 +1526,11 @@ export class RelationalHarmonicEngine {
   }
 
   /**
-   * Sound preview synthesizer: warm, gentle Rhodes E-Piano (Sine fundamental + soft Triangle overtone)
+   * Sound preview synthesizer: 0,1% Studio Rhodes Mark I Suitcase 73
    */
   public static playTonePreview(ctx: AudioContext, noteName: string): void {
     try {
-      if (!ctx || ctx.state === 'closed' || typeof ctx.createOscillator !== 'function') return;
+      if (!ctx || ctx.state === 'closed') return;
       if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
         ctx.resume().catch(() => {});
       }
@@ -1536,46 +1538,10 @@ export class RelationalHarmonicEngine {
       const freq = noteNameToFreq(noteName);
       if (!freq || freq <= 0) return;
 
-      const now = Math.max(ctx.currentTime, 0.001);
-      const osc1 = ctx.createOscillator(); // Sine fundamental
-      const osc2 = ctx.createOscillator(); // Triangle harmonic
-      const tineGain = ctx.createGain();   // Harmonic attenuator
-      const masterVoiceGain = ctx.createGain();
-
-      // Fundamental warm sine
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, now);
-
-      // Soft octave harmonic triangle for authentic Rhodes tine character
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(freq * 2, now);
-      tineGain.gain.setValueAtTime(0.28, now);
-
-      const attack = 0.015;
-      const duration = 0.65;
-      const peakGain = 0.28;
-
-      masterVoiceGain.gain.setValueAtTime(0.0001, now);
-      masterVoiceGain.gain.linearRampToValueAtTime(peakGain, now + attack);
-      masterVoiceGain.gain.exponentialRampToValueAtTime(peakGain * 0.40, now + attack + 0.16);
-      masterVoiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc1.connect(masterVoiceGain);
-      osc2.connect(tineGain);
-      tineGain.connect(masterVoiceGain);
-      masterVoiceGain.connect(ctx.destination);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + duration + 0.05);
-      osc2.stop(now + duration + 0.05);
-
-      osc1.onended = () => {
-        try {
-          masterVoiceGain.disconnect();
-          tineGain.disconnect();
-        } catch (_) {}
-      };
+      StudioKeyboardEngine.playRhodesNote(ctx, freq, {
+        durationSec: 0.75,
+        velocity: 0.82
+      });
     } catch (e) {
       console.warn('[RelationalHarmonicEngine] Sound preview error:', e);
     }

@@ -37,25 +37,32 @@ export interface WochenFahrplanAudioTrack {
 
 export function parseHomeworkAudioNotes(notes: any[]): WochenFahrplanAudioTrack[] {
   if (!Array.isArray(notes)) return [];
-  return notes
+  const tracks: WochenFahrplanAudioTrack[] = [];
+  const seenUrls = new Set<string>();
+
+  notes
     .map((note) => (typeof note === 'string' ? note : String(note || '')))
     .filter(n => n.includes('AUDIO:'))
-    .map((raw, idx) => {
+    .forEach((raw) => {
       const cleanStr = raw.startsWith('[') ? raw.replace(/[\[\]"]/g, '') : raw;
       const audioContent = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6);
       const parts = audioContent.split('|');
       const url = parts[0]?.replace(/^["']|["']$/g, '').trim();
+      if (!url || seenUrls.has(url)) return;
+      seenUrls.add(url);
+
       const duration = parseInt(parts[1] || '0', 10);
       const date = parts[2]?.trim();
-      const label = parts[3]?.trim() || `Aufnahme #${idx + 1}`;
+      const label = parts[3]?.trim() || `Aufnahme #${tracks.length + 1}`;
       let bpm: number | undefined = undefined;
       const bpmMatch = audioContent.match(/BPM:(\d+)/);
       if (bpmMatch && bpmMatch[1]) {
         bpm = parseInt(bpmMatch[1], 10);
       }
-      return { url, duration, date, label, bpm, isTeacher: true };
-    })
-    .filter(t => Boolean(t.url));
+      tracks.push({ url, duration, date, label, bpm, isTeacher: true });
+    });
+
+  return tracks;
 }
 
 export interface LehrwerkReference {

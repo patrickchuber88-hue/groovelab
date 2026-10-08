@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Disc, X, ChevronDown, Check, CheckCircle2, Play, Pause,
-  Mic, Square, Sparkles
+  Mic, Square, Sparkles, Sliders, Radio, Home, Landmark,
+  Building2, Music2, FileText, AlertTriangle, RotateCcw, Volume2
 } from 'lucide-react';
 import {
   ReverbRoomType,
@@ -73,14 +74,34 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
   const [tempNote, setTempNote] = useState<string>('');
   const [modalPreviewPlaying, setModalPreviewPlaying] = useState<'master' | 'raw' | null>(null);
   const [isReMasteringReverb, setIsReMasteringReverb] = useState<boolean>(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState<boolean>(false);
 
   const modalDualAudioRef = useRef<{ master: HTMLAudioElement | null; raw: HTMLAudioElement | null }>({ master: null, raw: null });
   const remasterDebounceRef = useRef<any>(null);
+  const createdBlobUrlsRef = useRef<Set<string>>(new Set());
 
   const colors = {
     textPrimary: isLight ? '#0f172a' : '#f8fafc',
     textSecondary: isLight ? '#475569' : '#cbd5e1'
   };
+
+  const registerBlobUrl = useCallback((url: string) => {
+    if (url && url.startsWith('blob:')) {
+      createdBlobUrlsRef.current.add(url);
+    }
+    return url;
+  }, []);
+
+  const cleanupBlobUrls = useCallback(() => {
+    createdBlobUrlsRef.current.forEach((url) => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+    });
+    createdBlobUrlsRef.current.clear();
+  }, []);
 
   const stopModalDualPreview = useCallback(() => {
     if (modalDualAudioRef.current.master) {
@@ -97,8 +118,9 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
   useEffect(() => {
     return () => {
       stopModalDualPreview();
+      cleanupBlobUrls();
     };
-  }, [stopModalDualPreview]);
+  }, [stopModalDualPreview, cleanupBlobUrls]);
 
   const toggleModalPreview = useCallback((version: 'master' | 'raw') => {
     if (!pendingDualResult) return;
@@ -109,10 +131,16 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
     }
 
     if (modalDualAudioRef.current.master && modalDualAudioRef.current.raw && modalPreviewPlaying) {
+      const currentTime = modalPreviewPlaying === 'master' 
+        ? modalDualAudioRef.current.master.currentTime 
+        : modalDualAudioRef.current.raw.currentTime;
+
       if (version === 'master') {
+        modalDualAudioRef.current.master.currentTime = currentTime;
         modalDualAudioRef.current.raw.volume = 0.0;
         modalDualAudioRef.current.master.volume = 1.0;
       } else {
+        modalDualAudioRef.current.raw.currentTime = currentTime;
         modalDualAudioRef.current.master.volume = 0.0;
         modalDualAudioRef.current.raw.volume = 1.0;
       }
@@ -165,6 +193,7 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
           enableReverb: wetPercent > 0
         });
 
+        registerBlobUrl(newMasterRes.masteredUrl);
         pendingDualResult.masteredBlob = newMasterRes.masteredBlob;
         pendingDualResult.masteredUrl = newMasterRes.masteredUrl;
 
@@ -186,7 +215,7 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
         setIsReMasteringReverb(false);
       }
     }, 120);
-  }, [pendingDualResult, recordSeconds, activeInstrument.profile, modalPreviewPlaying]);
+  }, [pendingDualResult, recordSeconds, activeInstrument.profile, modalPreviewPlaying, registerBlobUrl]);
 
   const handleUploadRoomTypeChange = useCallback((newRoomType: ReverbRoomType) => {
     setSelectedRoomType(newRoomType);
@@ -253,13 +282,26 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Disc size={22} color="#10b981" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.15)',
+              border: `1.5px solid ${isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.3)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#10b981',
+              flexShrink: 0
+            }}>
+              <Disc size={22} />
+            </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, letterSpacing: '-0.01em' }}>
+              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, letterSpacing: '-0.02em', color: colors.textPrimary }}>
                 {title}
               </h3>
-              <span style={{ fontSize: '0.80rem', color: colors.textSecondary, fontWeight: 600 }}>
+              <span style={{ fontSize: '0.78rem', color: colors.textSecondary, fontWeight: 600 }}>
                 {subtitle}
               </span>
             </div>
@@ -267,10 +309,22 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: '1.2rem', cursor: 'pointer' }}
-            aria-label="Schließen"
+            style={{
+              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: colors.textSecondary,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            aria-label="Modal schließen"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -378,22 +432,49 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                 🎛️ Studio Audio-Processing...
               </span>
               <span style={{ fontSize: '0.78rem', color: colors.textSecondary, marginTop: '4px', display: 'block' }}>
-                Erzeuge Studio Audio-Processing & Pure RAW
+                Erzeuge Studio Master & Originalaufnahme
               </span>
             </div>
           </div>
         ) : pendingDualResult ? (
           /* Decision Cards: Master vs RAW */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Audiophile Micro CSS Animations for Equalizer Soundbars */}
+            <style>{`
+              @keyframes soundwave-bar-pulse {
+                0%, 100% { height: 4px; }
+                50% { height: 13px; }
+              }
+              .gl-soundwave-1 { animation: soundwave-bar-pulse 0.7s ease-in-out infinite; }
+              .gl-soundwave-2 { animation: soundwave-bar-pulse 0.7s ease-in-out infinite 0.18s; }
+              .gl-soundwave-3 { animation: soundwave-bar-pulse 0.7s ease-in-out infinite 0.36s; }
+            `}</style>
+
             <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '0.96rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
-                🎵 Aufnahme fertig! Welche Version möchtest du speichern?
+              <span style={{ fontSize: '1.02rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.01em', display: 'block' }}>
+                Aufnahme fertig: Wähle deinen Klang
+              </span>
+              <span style={{ fontSize: '0.78rem', color: colors.textSecondary, marginTop: '3px', display: 'block' }}>
+                Vergleiche das Studio-Mastering direkt mit der Rohaufnahme.
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div
+              role="radiogroup"
+              aria-label="Klangversion auswählen"
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}
+            >
               {/* Studio Master Card */}
               <div
+                role="radio"
+                aria-checked={selectedVersionChoice === 'master'}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedVersionChoice('master');
+                  }
+                }}
                 onClick={() => setSelectedVersionChoice('master')}
                 style={{
                   border: `2px solid ${selectedVersionChoice === 'master' ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
@@ -403,17 +484,32 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px'
+                  gap: '8px',
+                  outline: 'none',
+                  boxShadow: selectedVersionChoice === 'master' ? '0 4px 16px rgba(16, 185, 129, 0.18)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, padding: '2px 8px', borderRadius: '100px', background: '#10b981', color: 'white' }}>
-                    ✨ STUDIO MASTER
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    padding: '3px 9px',
+                    borderRadius: '100px',
+                    background: '#10b981',
+                    color: 'white',
+                    letterSpacing: '0.04em'
+                  }}>
+                    <Sparkles size={11} />
+                    <span>STUDIO MASTER</span>
                   </span>
-                  {selectedVersionChoice === 'master' && <CheckCircle2 size={16} color="#10b981" />}
+                  {selectedVersionChoice === 'master' && <CheckCircle2 size={17} color="#10b981" />}
                 </div>
-                <div style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary }}>Studio Audio-Processing</div>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 900, color: colors.textPrimary }}>Studio Audio-Processing</div>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.35 }}>
                   Mit Studio Audio-Processing, Raumakustik & Dynamik.
                 </p>
 
@@ -423,11 +519,12 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                     e.stopPropagation();
                     toggleModalPreview('master');
                   }}
+                  aria-label={modalPreviewPlaying === 'master' ? 'Studio Master pausieren' : 'Studio Master vorhören'}
                   style={{
-                    padding: '7px 12px',
+                    padding: '8px 12px',
                     borderRadius: '100px',
                     border: 'none',
-                    background: modalPreviewPlaying === 'master' ? '#ef4444' : '#10b981',
+                    background: modalPreviewPlaying === 'master' ? '#047857' : '#10b981',
                     color: 'white',
                     fontWeight: 800,
                     fontSize: '0.74rem',
@@ -435,17 +532,42 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '5px',
-                    marginTop: '4px'
+                    gap: '6px',
+                    marginTop: '4px',
+                    boxShadow: modalPreviewPlaying === 'master' ? '0 0 12px rgba(16, 185, 129, 0.4)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  {modalPreviewPlaying === 'master' ? <Pause size={13} /> : <Play size={13} />}
-                  <span>{modalPreviewPlaying === 'master' ? '🔁 Loop stoppen' : '▶️ Master vorhören (Loop)'}</span>
+                  {modalPreviewPlaying === 'master' ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '12px' }}>
+                        <span className="gl-soundwave-1" style={{ width: '2.5px', background: '#ffffff', borderRadius: '1px' }} />
+                        <span className="gl-soundwave-2" style={{ width: '2.5px', background: '#ffffff', borderRadius: '1px' }} />
+                        <span className="gl-soundwave-3" style={{ width: '2.5px', background: '#ffffff', borderRadius: '1px' }} />
+                      </div>
+                      <Pause size={12} />
+                      <span>Wiedergabe stoppen</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={12} fill="white" />
+                      <span>Master vorhören</span>
+                    </>
+                  )}
                 </button>
               </div>
 
               {/* RAW Card */}
               <div
+                role="radio"
+                aria-checked={selectedVersionChoice === 'raw'}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedVersionChoice('raw');
+                  }
+                }}
                 onClick={() => setSelectedVersionChoice('raw')}
                 style={{
                   border: `2px solid ${selectedVersionChoice === 'raw' ? '#3b82f6' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
@@ -455,17 +577,32 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px'
+                  gap: '8px',
+                  outline: 'none',
+                  boxShadow: selectedVersionChoice === 'raw' ? '0 4px 16px rgba(59, 130, 246, 0.18)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, padding: '2px 8px', borderRadius: '100px', background: '#3b82f6', color: 'white' }}>
-                    🎙️ PURE RAW
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    padding: '3px 9px',
+                    borderRadius: '100px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    letterSpacing: '0.04em'
+                  }}>
+                    <Radio size={11} />
+                    <span>ORIGINALAUFNAHME</span>
                   </span>
-                  {selectedVersionChoice === 'raw' && <CheckCircle2 size={16} color="#3b82f6" />}
+                  {selectedVersionChoice === 'raw' && <CheckCircle2 size={17} color="#3b82f6" />}
                 </div>
-                <div style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary }}>Originalklang (RAW)</div>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 900, color: colors.textPrimary }}>Originalaufnahme</div>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.35 }}>
                   Unbearbeitete Originalaufnahme mit pegelangepasster Lautheit.
                 </p>
 
@@ -475,11 +612,12 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                     e.stopPropagation();
                     toggleModalPreview('raw');
                   }}
+                  aria-label={modalPreviewPlaying === 'raw' ? 'Originalaufnahme pausieren' : 'Originalaufnahme vorhören'}
                   style={{
-                    padding: '7px 12px',
+                    padding: '8px 12px',
                     borderRadius: '100px',
                     border: 'none',
-                    background: modalPreviewPlaying === 'raw' ? '#ef4444' : '#3b82f6',
+                    background: modalPreviewPlaying === 'raw' ? '#1e40af' : '#3b82f6',
                     color: 'white',
                     fontWeight: 800,
                     fontSize: '0.74rem',
@@ -487,17 +625,33 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '5px',
-                    marginTop: '4px'
+                    gap: '6px',
+                    marginTop: '4px',
+                    boxShadow: modalPreviewPlaying === 'raw' ? '0 0 12px rgba(59, 130, 246, 0.4)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  {modalPreviewPlaying === 'raw' ? <Pause size={13} /> : <Play size={13} />}
-                  <span>{modalPreviewPlaying === 'raw' ? '🔁 Loop stoppen' : '▶️ RAW vorhören (Loop)'}</span>
+                  {modalPreviewPlaying === 'raw' ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '12px' }}>
+                        <span className="gl-soundwave-1" style={{ width: '2.5px', background: '#ffffff', borderRadius: '1px' }} />
+                        <span className="gl-soundwave-2" style={{ width: '2.5px', background: '#ffffff', borderRadius: '1px' }} />
+                        <span className="gl-soundwave-3" style={{ width: '2.5px', background: '#ffffff', borderRadius: '1px' }} />
+                      </div>
+                      <Pause size={12} />
+                      <span>Wiedergabe stoppen</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={12} fill="white" />
+                      <span>Originalaufnahme vorhören</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* 🏛️ Apple-Style Spatial Audio Raumakustik (3 Presets + Fein-Tuning Slider) */}
+            {/* Apple-Style Spatial Audio Raumakustik (3 Presets + Fein-Tuning Slider) */}
             <div style={{
               background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
               borderRadius: '18px',
@@ -507,38 +661,51 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
               flexDirection: 'column',
               gap: '12px'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
-                    🏛️ Raumgröße & Hall
+                  <Sliders size={16} color="#10b981" />
+                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
+                    Raumakustik & Hall
                   </span>
                   {isReMasteringReverb && (
-                    <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 800, animation: 'pulse 1s infinite' }}>
-                      ⏳ Remastering...
+                    <span style={{ fontSize: '0.70rem', color: '#10b981', fontWeight: 800, animation: 'pulse 1s infinite' }}>
+                      Remastering...
                     </span>
                   )}
                 </div>
-                <span style={{
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   fontSize: '0.74rem',
-                  fontWeight: 900,
-                  color: '#10b981',
-                  background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)',
+                  fontWeight: 800,
+                  color: isLight ? '#065f46' : '#6ee7b7',
+                  background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.18)',
                   border: '1px solid rgba(16, 185, 129, 0.3)',
-                  padding: '2px 9px',
+                  padding: '3px 10px',
                   borderRadius: '100px'
                 }}>
-                  {ROOM_ACOUSTIC_PROFILES[selectedRoomType]?.emoji || '🏛️'} {ROOM_ACOUSTIC_PROFILES[selectedRoomType]?.name || 'Mittel'} ({ROOM_ACOUSTIC_PROFILES[selectedRoomType]?.sub || 'Konzertsaal'}) • {reverbWetSlider}% Wet
-                </span>
+                  {selectedRoomType === 'small' && <Home size={12} />}
+                  {selectedRoomType === 'medium' && <Landmark size={12} />}
+                  {selectedRoomType === 'large' && <Building2 size={12} />}
+                  <span>{ROOM_ACOUSTIC_PROFILES[selectedRoomType]?.name || 'Mittel'} ({ROOM_ACOUSTIC_PROFILES[selectedRoomType]?.sub || 'Konzertsaal'}) • {reverbWetSlider}% Wet</span>
+                </div>
               </div>
 
-              {/* 3 Child-Friendly Room Size Preset Buttons */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              {/* 3 Room Size Preset Buttons with Vector Icons */}
+              <div
+                role="radiogroup"
+                aria-label="Raumgröße Presets"
+                style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}
+              >
                 {[ROOM_ACOUSTIC_PROFILES.small, ROOM_ACOUSTIC_PROFILES.medium, ROOM_ACOUSTIC_PROFILES.large].map(room => {
                   const isActive = selectedRoomType === room.id;
                   return (
                     <button
                       key={room.id}
                       type="button"
+                      role="radio"
+                      aria-checked={isActive}
                       onClick={() => handleUploadRoomTypeChange(room.id as any)}
                       style={{
                         padding: '12px 6px',
@@ -555,12 +722,25 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px',
+                        gap: '6px',
                         transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}
                       className="hover-scale"
                     >
-                      <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>{room.emoji}</span>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '10px',
+                        background: isActive ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.25)') : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isActive ? '#10b981' : colors.textSecondary
+                      }}>
+                        {room.id === 'small' && <Home size={17} />}
+                        {room.id === 'medium' && <Landmark size={17} />}
+                        {room.id === 'large' && <Building2 size={17} />}
+                      </div>
                       <span style={{
                         fontSize: '0.80rem',
                         fontWeight: 900,
@@ -572,7 +752,7 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
                       <span style={{
                         fontSize: '0.64rem',
                         fontWeight: 700,
-                        color: isActive ? (isLight ? '#15803d' : '#86efac') : colors.textSecondary
+                        color: isActive ? (isLight ? '#059669' : '#10b981') : colors.textSecondary
                       }}>
                         {room.sub}
                       </span>
@@ -582,58 +762,203 @@ export const AudioRecordingModal: React.FC<AudioRecordingModalProps> = ({
               </div>
 
               {/* Apple Fine-Tuning Slider Bar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: colors.textSecondary, fontWeight: 700 }}>
-                  <span>Feinabstimmung (Raumtiefe & Wet/Dry Mix):</span>
+                  <label htmlFor="reverb-slider-range" style={{ cursor: 'pointer' }}>
+                    Feinabstimmung (Raumtiefe & Wet/Dry Mix):
+                  </label>
                   <span style={{ color: '#10b981', fontWeight: 900 }}>{reverbWetSlider}% Wet</span>
                 </div>
                 <input
+                  id="reverb-slider-range"
                   type="range"
                   min="0"
                   max="50"
                   step="1"
                   value={reverbWetSlider}
+                  aria-label="Raumtiefe und Wet/Dry Mix"
                   onChange={(e) => handleReverbSliderChange(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer' }}
+                  style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer', height: '6px' }}
                 />
               </div>
             </div>
 
-            {/* Song Meta Inputs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Songtitel eingeben..."
-                value={tempSongTitle}
-                onChange={(e) => setTempSongTitle(e.target.value)}
-                style={{ padding: '10px 12px', borderRadius: '12px', border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`, background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.35)', color: colors.textPrimary }}
-              />
-              <input
-                type="text"
-                placeholder="Persönliche Notiz (optional)..."
-                value={tempNote}
-                onChange={(e) => setTempNote(e.target.value)}
-                style={{ padding: '9px 12px', borderRadius: '12px', border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)'}`, background: isLight ? '#ffffff' : 'rgba(0,0,0,0.25)', color: colors.textPrimary }}
-              />
+            {/* Song Meta Inputs - Structured Track Details Card */}
+            <div style={{
+              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '16px',
+              padding: '14px',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.70rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.textSecondary }}>
+                <Music2 size={13} color="#10b981" />
+                <span>Track-Details</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label htmlFor="recording-song-title" style={{ fontSize: '0.68rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Songtitel
+                </label>
+                <input
+                  id="recording-song-title"
+                  type="text"
+                  placeholder={title || 'Songtitel eingeben...'}
+                  value={tempSongTitle}
+                  onChange={(e) => setTempSongTitle(e.target.value)}
+                  aria-label="Songtitel"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+                    background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.3)',
+                    color: colors.textPrimary,
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label htmlFor="recording-song-note" style={{ fontSize: '0.68rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Persönliche Notiz (optional)
+                </label>
+                <input
+                  id="recording-song-note"
+                  type="text"
+                  placeholder="z. B. Im ersten Take gemeistert..."
+                  value={tempNote}
+                  onChange={(e) => setTempNote(e.target.value)}
+                  aria-label="Persönliche Notiz"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.12)'}`,
+                    background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.2)',
+                    color: colors.textPrimary,
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-              <button
-                type="button"
-                onClick={onResetSession}
-                style={{ flex: 1, padding: '12px', borderRadius: '100px', border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.2)'}`, background: 'transparent', color: colors.textSecondary, fontWeight: 800, cursor: 'pointer' }}
-              >
-                Neu aufnehmen
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                style={{ flex: 2, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', fontWeight: 900, cursor: 'pointer' }}
-                className="hover-scale"
-              >
-                Speichern
-              </button>
-            </div>
+            {/* Action Buttons & Safe Discard Safeguard */}
+            {showDiscardConfirm ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '14px',
+                background: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)',
+                border: `1.5px solid ${isLight ? '#fecaca' : 'rgba(239, 68, 68, 0.3)'}`
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={18} color="#ef4444" />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isLight ? '#991b1b' : '#fca5a5' }}>
+                    Aufnahme wirklich verwerfen und neu starten?
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscardConfirm(false)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '100px',
+                      border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                      background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                      color: colors.textPrimary,
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopModalDualPreview();
+                      setShowDiscardConfirm(false);
+                      onResetSession();
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '100px',
+                      border: 'none',
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      fontSize: '0.78rem',
+                      fontWeight: 900,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ja, Aufnahme löschen
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDiscardConfirm(true)}
+                  style={{
+                    flex: 1,
+                    padding: '12px 14px',
+                    borderRadius: '100px',
+                    border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.2)'}`,
+                    background: 'transparent',
+                    color: colors.textSecondary,
+                    fontWeight: 800,
+                    fontSize: '0.86rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  className="hover-scale"
+                >
+                  <RotateCcw size={15} />
+                  <span>Neu aufnehmen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  style={{
+                    flex: 2,
+                    padding: '12px 20px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    fontWeight: 900,
+                    fontSize: '0.92rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.35)'
+                  }}
+                  className="hover-scale"
+                >
+                  <Check size={18} strokeWidth={2.8} />
+                  <span>Aufnahme speichern</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* Mic Capture View */

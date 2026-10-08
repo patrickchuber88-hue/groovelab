@@ -5758,7 +5758,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               setActiveTab('calendar');
               loadInitialData();
             }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
+            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
           >
             Zurück zur Ansicht
           </button>
@@ -7146,7 +7146,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                         top: `${top}px`,
                                         height: `${height}px`,
                                         border: '2px solid #8b5cf6',
-                                        background: 'repeating-linear-gradient(45deg, rgba(52, 168, 83, 0.1), rgba(52, 168, 83, 0.1) 8px, rgba(139, 92, 246, 0.1) 8px, rgba(139, 92, 246, 0.1) 16px)',
+                                        background: 'repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.08) 8px, rgba(139, 92, 246, 0.18) 8px, rgba(139, 92, 246, 0.18) 16px)',
                                         zIndex: 4,
                                         pointerEvents: 'none',
                                         boxSizing: 'border-box'

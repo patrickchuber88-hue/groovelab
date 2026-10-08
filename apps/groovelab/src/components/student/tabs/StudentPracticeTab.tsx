@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { 
-  Activity, Award, Bell, BookOpen, Calendar, CheckCircle, ChevronRight, Clock, 
-  Disc, Edit3, FileText, Flame, GraduationCap, Headphones, Lightbulb, Moon, Music, 
-  Pause, Play, Rocket, Settings, Shield, ShieldCheck, Smartphone, Sparkles, Square, 
-  Star, Target, Trophy, Users, X, Zap 
+  Activity, Award, Bell, BookOpen, Calendar, CheckCircle, ChevronRight, Clock, Disc, Edit3, FileText, Flame, GraduationCap, Headphones, Lightbulb, Moon, Music, Pause, Play, Rocket, Settings, Shield, ShieldCheck, Smartphone, Sparkles, Square, Star, Target, Trophy, Users, X, Zap 
 } from "lucide-react";
 import { CampusUiLevel } from "../../campus/CampusLevelSwitcher";
 import { ZenPlayAlongDock } from "../../campus/ZenPlayAlongDock";
 import { formatTeacherFullName } from "../../../utils/nameHelper";
 import { getSimulatedNow, toLocalYYYYMMDD } from "../studentDateUtils";
+import { AuthoritativeHomeworkWidget } from "../homework/AuthoritativeHomeworkWidget";
+import { PracticeExerciseStageView } from "../practice/PracticeExerciseStageView";
+import { useModalA11y } from "../../../hooks/useModalA11y";
 
 const Confetti = lazy(() => import("react-confetti"));
 
@@ -127,6 +127,14 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   setExpandedMonths,
 }) => {
   const [showFlatReminder, setShowFlatReminder] = useState(false);
+  const [abortedNotice, setAbortedNotice] = useState<string | null>(null);
+  const practiceSettingsModalRef = useModalA11y(showJuniorPracticeSettingsModal, () => setShowJuniorPracticeSettingsModal(false));
+
+  useEffect(() => {
+    const handleAbort = (e: any) => { setAbortedNotice(e?.detail?.message || 'Fokus-Session abgebrochen: Du hast die App oder den Tab verlassen. 🛑'); };
+    window.addEventListener('campus_focus_session_aborted', handleAbort);
+    return () => window.removeEventListener('campus_focus_session_aborted', handleAbort);
+  }, []);
 
   useEffect(() => {
     // Wenn Übung aktiv ist, Countdown abgeschlossen ist und das Handy nicht flach liegt -> nach 5s Hinweis einblenden
@@ -155,6 +163,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
       }} 
       className="animation-slide-up practice-board-wrapper"
     >
+      {abortedNotice && (
+        <div style={{ background: '#fef2f2', border: '1.5px solid #f87171', borderRadius: '16px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.12)' }}>
+          <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#991b1b' }}>{abortedNotice}</span>
+          <button type="button" onClick={() => setAbortedNotice(null)} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '8px', padding: '4px 8px', fontSize: '0.78rem', fontWeight: 850, cursor: 'pointer' }}>OK</button>
+        </div>
+      )}
       {activeTab === 'practice_board' && (
         <>
           <style>{`
@@ -166,7 +180,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
             }
             @media (min-width: 960px) {
               .practice-studio-cockpit-grid {
-                grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+                grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
                 gap: 20px;
                 align-items: stretch;
               }
@@ -641,8 +655,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         justifyContent: 'center',
                         zIndex: 1
                       }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Smartphone size={13} color="#c7d2fe" /> Handy flach hinlegen
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#fef08a' }}>
+                          <Smartphone size={13} color="#fef08a" /> Zauber-Regel: Handy flach hinlegen
                         </span>
                         <span>·</span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -795,9 +809,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             } else if (!d.isFuture) {
                               bg = '#f8fafc';
                               border = '1px solid #e2e8f0';
-                              textColor = '#94a3b8';
+                              textColor = '#64748b';
                               boxShadow = '0 2px 0 #cbd5e1';
-                              iconEl = <Moon size={15} color="#94a3b8" />;
+                              iconEl = <Moon size={15} color="#64748b" />;
                               subText = 'Pause';
                             }
 
@@ -1040,20 +1054,14 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                   {/* 5. Junior Practice Settings Modal (Anker & Zaubertöne) */}
                   {showJuniorPracticeSettingsModal && createPortal(
                     <div
-                      style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 10005,
-                        background: 'rgba(15, 23, 42, 0.6)',
-                        backdropFilter: 'blur(8px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '16px'
-                      }}
+                      style={{ position: 'fixed', inset: 0, zIndex: 10005, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
                       onClick={() => setShowJuniorPracticeSettingsModal(false)}
                     >
                       <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Übe-Einstellungen"
+                        ref={practiceSettingsModalRef}
                         style={{
                           background: '#ffffff',
                           borderRadius: '24px',
@@ -1077,8 +1085,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           </div>
                           <button
                             type="button"
+                            aria-label="Einstellungen schließen"
                             onClick={() => setShowJuniorPracticeSettingsModal(false)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', minWidth: '36px', minHeight: '36px' }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', minWidth: '36px', minHeight: '36px' }}
                           >
                             <X size={20} />
                           </button>
@@ -1497,20 +1506,20 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '8px',
-                                background: 'rgba(34, 197, 94, 0.12)',
-                                border: '1px solid rgba(74, 222, 128, 0.3)',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                border: 'none',
                                 borderRadius: '100px',
                                 padding: '5px 12px',
                                 fontSize: '0.82rem',
                                 fontWeight: 850,
-                                color: '#86efac'
+                                color: '#ffffff'
                               }}>
                                 <span style={{
                                   width: '7px',
                                   height: '7px',
                                   borderRadius: '50%',
-                                  background: '#22c55e',
-                                  boxShadow: '0 0 8px #22c55e',
+                                  background: '#ffffff',
+                                  boxShadow: '0 0 8px rgba(255, 255, 255, 0.8)',
                                   display: 'inline-block'
                                 }} />
                                 <span>Fokus-Zeit</span>
@@ -1733,7 +1742,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   {s.homework_notes && (
                                     <span style={{
                                       fontSize: '0.74rem',
-                                      color: '#94a3b8',
+                                      color: '#64748b',
                                       fontWeight: 650,
                                       whiteSpace: 'nowrap',
                                       textOverflow: 'ellipsis',
@@ -2041,7 +2050,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     animation: 'flatReminderPulse 2s ease-in-out infinite'
                                   }}>
                                     <Smartphone size={13} strokeWidth={2.4} color="#fef3c7" style={{ flexShrink: 0 }} />
-                                    <span>Handy flach hinlegen</span>
+                                    <span>Handy flach hinlegen für Zauber-XP</span>
                                   </div>
                                 ) : (
                                   <div style={{
@@ -2881,7 +2890,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           flexDirection: 'column',
                           gap: '8px',
                           background: 'rgba(30, 41, 59, 0.85)',
-                          border: '1.5px solid rgba(245, 158, 11, 0.3)',
+                          border: '1.5px solid rgba(255, 255, 255, 0.12)',
                           borderRadius: '20px',
                           padding: '10px 14px',
                           boxSizing: 'border-box'
@@ -3036,93 +3045,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             </div>
                           </div>
 
-                          {/* Hausaufgaben-Bereich am Instrument (Alle Bücher mit Seiten, alle Songs, qualifizierte Lehrkraft-Notiz) */}
-                          {(Boolean(missionInfo.books?.length) || Boolean(missionInfo.songs?.length) || Boolean(missionInfo.teacherNote && missionInfo.hasSpecificNote)) && (
-                            <div style={{
-                              borderTop: '1px solid rgba(255, 255, 255, 0.10)',
-                              paddingTop: '8px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
-                              width: '100%'
-                            }}>
-                              {/* Bücher mit allen Seitenzahlen */}
-                              {missionInfo.books?.map((b: any, bIdx: number) => {
-                                const pageNums = b.pageNums || [];
-                                return (
-                                  <div key={`teen-b-${bIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                      <BookOpen size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
-                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                        {b.title}
-                                      </span>
-                                    </div>
-                                    {pageNums.length > 0 && (
-                                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                                        {pageNums.map((pNum: any) => (
-                                          <span key={`teen-p-${pNum}`} style={{
-                                            background: 'rgba(245, 158, 11, 0.20)',
-                                            color: '#fef08a',
-                                            border: '1px solid rgba(245, 158, 11, 0.4)',
-                                            fontSize: '0.80rem',
-                                            fontWeight: 850,
-                                            padding: '2px 8px',
-                                            borderRadius: '6px'
-                                          }}>
-                                            S. {pNum}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {/* Songs */}
-                              {missionInfo.songs?.map((s: any, sIdx: number) => {
-                                const songTitle = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
-                                return (
-                                  <div key={`teen-s-${sIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                      <Music size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
-                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                        {songTitle}
-                                      </span>
-                                    </div>
-                                    {s.homework_notes && s.homework_notes.trim() && (
-                                      <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '150px' }}>
-                                        {s.homework_notes}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {/* Spezifische Lehrkraft-Notiz */}
-                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && (
-                                <div 
-                                  onClick={() => setShowJuniorCheatSheet(prev => !prev)}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none', cursor: 'pointer' }}
-                                  title="Tipp antippen für Notizen-Ansicht"
-                                >
-                                  <Lightbulb size={13} color="#fcd34d" style={{ flexShrink: 0 }} />
-                                  {missionInfo.isCarriedOver && (
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>
-                                      {missionInfo.carriedOverWeek ? `${missionInfo.carriedOverWeek}` : 'Vorwoche'}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                    „{missionInfo.teacherNote}“
-                                  </span>
-                                  {missionInfo.teacherNotes && missionInfo.teacherNotes.length > 1 && (
-                                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', flexShrink: 0, fontWeight: 700 }}>
-                                      (+{missionInfo.teacherNotes.length - 1})
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          {/* 🎵 Authoritatives Notenständer Hausaufgaben HUD (100% synchron mit Briefing Board) */}
+                          <AuthoritativeHomeworkWidget
+                            variant="hud"
+                            studentId={studentId || studentUser?.id}
+                            studentUser={studentUser}
+                            lehrwerke={lehrwerke}
+                            progressItems={progressItems}
+                            activeSongSkills={activeSongSkills}
+                            assignedCampusSongs={assignedCampusSongs}
+                            theme="dark"
+                            onOpenHomework={() => handleOpenHomeworkBookWithView?.('homework_book')}
+                            style={{ marginTop: '4px' }}
+                          />
                         </div>
 
                         {/* ZONE B: Monumentaler Vinyl Orbit-Reaktor (Zentrum) */}
@@ -3223,7 +3158,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   animation: 'flatReminderPulse 2s ease-in-out infinite'
                                 }}>
                                   <Smartphone size={14} strokeWidth={2.4} color="#fef3c7" style={{ flexShrink: 0 }} />
-                                  <span>Handy flach hinlegen</span>
+                                  <span>Handy flach ablegen – bleib im Flow</span>
                                 </div>
                               ) : (
                                 <div style={{
@@ -3531,6 +3466,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           <span>Übe-Session starten</span>
                         </button>
                       </div>
+
+                      {/* Studio Ergonomie Microcopy */}
+                      <p style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.80rem', color: '#94a3b8', fontWeight: 650, margin: '12px 0 0 0', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', zIndex: 1 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#fbbf24' }}><Smartphone size={13} color="#fbbf24" /> Studio-Setup:</span>
+                        <span>Handy flach ablegen · Voller Fokus auf deine Riffs</span>
+                      </p>
                     </div>
 
                     {/* Rechte Spalte: Gestapelte Partner-Karten (Woche + Meilenstein) */}
@@ -3552,7 +3493,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         flexDirection: 'column',
                         justifyContent: 'space-between',
                         gap: '10px',
-                        flex: 1,
+                        flex: '0 0 auto',
                         boxSizing: 'border-box'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
@@ -3878,7 +3819,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               // Active incomplete songs for Meisterwerk (100% gemeisterte Stücke gehören ins Protokoll-Archiv)
               const activeSongsList: any[] = [];
               (activeSongSkills || []).forEach((skill: any) => {
-                const title = skill.songs?.title || skill.title || skill.song_title;
+                const rawTitle = skill.songs?.title || skill.title || skill.song_title;
+                const title = rawTitle ? rawTitle.replace(/\s*\([^)]*\)\s*$/, '').trim() : '';
                 const progress = skill.progress_percent ?? (skill.status === 'MASTERED' ? 100 : 75);
                 if (title && progress < 100 && skill.status !== 'MASTERED') {
                   if (!activeSongsList.some(s => s.title.toLowerCase() === title.toLowerCase())) {
@@ -3974,7 +3916,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         </div>
                         <div style={{
                           background: '#ffffff',
-                          border: '1.5px solid #86efac',
+                          border: '1.5px solid #10b981',
                           borderRadius: '100px',
                           padding: '8px 24px',
                           color: '#0f172a',
@@ -3985,7 +3927,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           alignItems: 'center',
                           gap: '8px'
                         }}>
-                          <GraduationCap size={18} color="#16a34a" />
+                          <GraduationCap size={18} color="#10b981" />
                           <span>Fokus einnehmen, {instrumentLabel} bereit machen...</span>
                         </div>
                       </div>
@@ -4031,17 +3973,18 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '8px',
-                              background: '#e6f4ea',
-                              border: '1px solid #86efac',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
                               borderRadius: '100px',
                               padding: '5px 12px',
                               fontSize: '0.82rem',
                               fontWeight: 850,
-                              color: '#15803d'
+                              color: '#ffffff',
+                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                             }}>
-                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 6px #16a34a' }} />
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', boxShadow: '0 0 6px #ffffff' }} />
                               <span>Studio-Fokus</span>
-                              <GraduationCap size={13} color="#16a34a" />
+                              <GraduationCap size={13} color="#ffffff" />
                             </div>
 
                             {/* Right Buttons */}
@@ -4164,93 +4107,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             </div>
                           </div>
 
-                          {/* Hausaufgaben-Bereich am Instrument (Alle Bücher mit Seiten, alle Songs, qualifizierte Lehrkraft-Notiz) */}
-                          {(Boolean(missionInfo.books?.length) || Boolean(missionInfo.songs?.length) || Boolean(missionInfo.teacherNote && missionInfo.hasSpecificNote)) && (
-                            <div style={{
-                              borderTop: '1px solid #f1f5f9',
-                              paddingTop: '8px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
-                              width: '100%'
-                            }}>
-                              {/* Bücher */}
-                              {missionInfo.books?.map((b: any, bIdx: number) => {
-                                const pageNums = b.pageNums || [];
-                                return (
-                                  <div key={`pro-b-${bIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                      <BookOpen size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                        {b.title}
-                                      </span>
-                                    </div>
-                                    {pageNums.length > 0 && (
-                                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                                        {pageNums.map((pNum: any) => (
-                                          <span key={`pro-p-${pNum}`} style={{
-                                            background: '#e6f4ea',
-                                            color: '#15803d',
-                                            border: '1px solid #86efac',
-                                            fontSize: '0.80rem',
-                                            fontWeight: 850,
-                                            padding: '2px 8px',
-                                            borderRadius: '6px'
-                                          }}>
-                                            S. {pNum}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {/* Songs */}
-                              {missionInfo.songs?.map((s: any, sIdx: number) => {
-                                const songTitle = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
-                                return (
-                                  <div key={`pro-s-${sIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                      <Music size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                        {songTitle}
-                                      </span>
-                                    </div>
-                                    {s.homework_notes && s.homework_notes.trim() && (
-                                      <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '150px' }}>
-                                        {s.homework_notes}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {/* Spezifische Lehrkraft-Notiz */}
-                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && !missionInfo.teacherNote.includes('WORLDTOUR_MASTERY:') && (
-                                <div 
-                                  onClick={() => setShowJuniorCheatSheet(prev => !prev)}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid #f1f5f9' : 'none', cursor: 'pointer' }}
-                                  title="Tipp antippen für Notizen-Ansicht"
-                                >
-                                  <Lightbulb size={13} color="#16a34a" style={{ flexShrink: 0 }} />
-                                  {missionInfo.isCarriedOver && (
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#16a34a', background: 'rgba(22, 163, 74, 0.12)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>
-                                      {missionInfo.carriedOverWeek ? `${missionInfo.carriedOverWeek}` : 'Vorwoche'}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                    „{missionInfo.teacherNote}“
-                                  </span>
-                                  {missionInfo.teacherNotes && missionInfo.teacherNotes.length > 1 && (
-                                    <span style={{ fontSize: '0.68rem', color: '#64748b', flexShrink: 0, fontWeight: 700 }}>
-                                      (+{missionInfo.teacherNotes.length - 1})
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          {/* 🎵 Authoritatives Notenständer Hausaufgaben HUD (100% synchron mit Briefing Board) */}
+                          <AuthoritativeHomeworkWidget
+                            variant="hud"
+                            studentId={studentId || studentUser?.id}
+                            studentUser={studentUser}
+                            lehrwerke={lehrwerke}
+                            progressItems={progressItems}
+                            activeSongSkills={activeSongSkills}
+                            assignedCampusSongs={assignedCampusSongs}
+                            theme="light"
+                            onOpenHomework={() => handleOpenHomeworkBookWithView?.('homework_book')}
+                            style={{ marginTop: '4px' }}
+                          />
                         </div>
 
                         {/* ZONE B: Monumentaler Apple Precision Dial (Zentrum) */}
@@ -4346,29 +4215,30 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   animation: 'flatReminderPulse 2s ease-in-out infinite'
                                 }}>
                                   <Smartphone size={14} strokeWidth={2.4} color="#92400e" style={{ flexShrink: 0 }} />
-                                  <span>Handy flach hinlegen</span>
+                                  <span>Gerät bitte waagerecht ablegen</span>
                                 </div>
                               ) : (
                                 <div style={{
                                   fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
                                   fontWeight: 900,
-                                  color: '#15803d',
-                                  background: isGoalReached ? '#dcfce7' : '#e6f4ea',
-                                  border: '1.5px solid #86efac',
+                                  color: '#ffffff',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  border: 'none',
                                   padding: isMusicStandMode ? '6px 16px' : '4px 14px',
                                   borderRadius: '100px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '6px'
+                                  gap: '6px',
+                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
                                 }}>
                                   {!isGoalReached ? (
                                     <>
-                                      <Target size={13} color="#16a34a" />
+                                      <Target size={13} color="#ffffff" />
                                       <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
                                     </>
                                   ) : (
                                     <>
-                                      <CheckCircle size={13} color="#15803d" />
+                                      <CheckCircle size={13} color="#ffffff" />
                                       <span>Tagesziel erreicht</span>
                                     </>
                                   )}
@@ -4453,16 +4323,16 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         width: isMusicStandMode ? '56px' : 'clamp(38px, 4.8vh, 50px)',
                         height: isMusicStandMode ? '56px' : 'clamp(38px, 4.8vh, 50px)',
                         borderRadius: '14px',
-                        background: '#e6f4ea',
-                        border: '1.5px solid #86efac',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#16a34a',
-                        boxShadow: '0 4px 12px rgba(22, 163, 74, 0.12)',
+                        color: '#ffffff',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
                         flexShrink: 0
                       }}>
-                        <Music size={isMusicStandMode ? 28 : 22} color="#16a34a" />
+                        <Music size={isMusicStandMode ? 28 : 22} color="#ffffff" />
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.45rem' : 'clamp(1.15rem, 1.8vh, 1.35rem)', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
@@ -4494,19 +4364,37 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: '#e6f4ea',
-                        border: '1.5px solid #86efac',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: '#ffffff',
                         padding: isMusicStandMode ? '6px 14px' : 'clamp(4px, 0.7vh, 6px) clamp(10px, 1.2vw, 14px)',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)'
+                        fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
                       }}>
-                        <Star size={15} fill="#16a34a" color="#16a34a" />
+                        <Star size={15} fill="#ffffff" color="#ffffff" />
                         <span>{xpVal} XP</span>
                       </div>
                     </div>
                   </div>
+
+                  {/* 🏛️ 0,1% Practice Exercise Focus Stage & Context Shelf (65:35 Asymmetric Bento) */}
+                  <PracticeExerciseStageView
+                    studentId={studentId || studentUser?.id}
+                    studentUser={studentUser}
+                    studentUiLevel={studentUiLevel}
+                    isMusicStandMode={isMusicStandMode}
+                    lehrwerke={lehrwerke}
+                    progressItems={progressItems}
+                    activeSongSkills={activeSongSkills}
+                    assignedCampusSongs={assignedCampusSongs}
+                    streak={streak}
+                    availableShields={availableShields}
+                    weekDays={weekDays}
+                    onStartFocusSession={handleStartPracticeSession}
+                    onOpenHomeworkBook={handleOpenHomeworkBookWithView}
+                  />
 
                   {/* 2. Studio 2-Column Cockpit Grid (Hero links, Partner-Karten rechts) */}
                   <div className="practice-studio-cockpit-grid">
@@ -4532,9 +4420,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '7px',
-                        background: '#f0fdf4',
-                        border: '1.5px solid #86efac',
-                        color: '#15803d',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: '#ffffff',
                         padding: isMusicStandMode ? '6px 18px' : '5px 16px',
                         borderRadius: '100px',
                         fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
@@ -4542,10 +4430,10 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         letterSpacing: '0.04em',
                         textTransform: 'uppercase',
                         marginBottom: '18px',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
+                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
                         zIndex: 1
                       }}>
-                        <Target size={14} color="#10b981" />
+                        <Target size={14} color="#ffffff" />
                         <span>Tages-Fokus: {targetMins} Min. am Stück</span>
                       </div>
 
@@ -4636,15 +4524,16 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           </span>
                           <span style={{
                             fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
-                            color: '#15803d',
+                            color: '#ffffff',
                             fontWeight: 850,
                             marginTop: '6px',
                             letterSpacing: '0.08em',
                             textTransform: 'uppercase',
-                            background: '#f0fdf4',
-                            border: '1px solid #86efac',
-                            padding: '2px 10px',
-                            borderRadius: '100px'
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            border: 'none',
+                            padding: '3px 12px',
+                            borderRadius: '100px',
+                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
                           }}>
                             Fokuszeit
                           </span>
@@ -4684,30 +4573,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         </button>
                       </div>
 
-                      {/* Microcopy underneath */}
-                      <p style={{
-                        fontSize: isMusicStandMode ? '0.90rem' : '0.78rem',
-                        color: '#64748b',
-                        fontWeight: 650,
-                        margin: '12px 0 0 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        flexWrap: 'wrap',
-                        justifyContent: 'center',
-                        zIndex: 1
-                      }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Headphones size={12} color="#16a34a" /> Fokus setzen
-                        </span>
-                        <span>·</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Target size={12} color="#16a34a" /> Konzentration bündeln
-                        </span>
-                        <span>·</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <GraduationCap size={12} color="#16a34a" /> Präzision formen
-                        </span>
+                      {/* Ergonomische Übe-Vorbereitung (0,1% Goldstandard) */}
+                      <p style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.80rem', color: '#475569', fontWeight: 700, margin: '12px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', zIndex: 1 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#15803d' }}><Smartphone size={13} strokeWidth={2.4} color="#16a34a" /> Gerät flach auflegen</span>
+                        <span style={{ color: '#cbd5e1' }}>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#475569' }}><Music size={13} color="#16a34a" /> Beide Hände ans Instrument</span>
+                        <span style={{ color: '#cbd5e1' }}>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#475569' }}><Target size={13} color="#16a34a" /> Voller Fokus</span>
                       </p>
                     </div>
 
@@ -4730,13 +4602,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         flexDirection: 'column',
                         justifyContent: 'space-between',
                         gap: '10px',
-                        flex: 1,
+                        flex: '0 0 auto',
                         boxSizing: 'border-box'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: isMusicStandMode ? '48px' : '40px', height: isMusicStandMode ? '48px' : '40px', borderRadius: '12px', background: '#e6f4ea', border: '1.5px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
-                              <Activity size={isMusicStandMode ? 24 : 20} color="#16a34a" />
+                            <div style={{ width: isMusicStandMode ? '48px' : '40px', height: isMusicStandMode ? '48px' : '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
+                              <Activity size={isMusicStandMode ? 24 : 20} color="#ffffff" />
                             </div>
                             <div>
                               <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.30rem' : '1.15rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -4786,13 +4658,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                             if (isMastered) {
                               // 1. Status: Streak erledigt
-                              cardBg = '#f0fdf4';
-                              cardBorder = '1.5px solid #86efac';
-                              cardShadow = '0 2px 6px rgba(16, 185, 129, 0.08)';
-                              dayNameColor = '#166534';
-                              iconEl = <CheckCircle size={14} color="#16a34a" />;
+                              cardBg = '#ecfdf5';
+                              cardBorder = '1.5px solid #10b981';
+                              cardShadow = '0 2px 6px rgba(16, 185, 129, 0.12)';
+                              dayNameColor = '#065f46';
+                              iconEl = <CheckCircle size={14} color="#10b981" />;
                               subText = `${d.totalMins > 0 ? d.totalMins : 3}m`;
-                              subTextColor = '#166534';
+                              subTextColor = '#065f46';
                             } else if (isToday) {
                               // Offener Übetag (Heute Standby)
                               cardBg = '#fefce8';
@@ -4873,224 +4745,65 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         </div>
                       </div>
 
-                      {/* Karte B: Meisterwerk & Repertoire-Widget (Offene Song-Projekte & Repertoire) */}
+                      {/* Karte B: Meisterwerk & Repertoire Quick-Access */}
                       <div style={{
                         background: '#ffffff',
-                        borderRadius: '20px',
-                        border: '1px solid #e2e8f0',
-                        padding: isMusicStandMode ? '20px 22px' : '16px 18px',
-                        boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
+                        borderRadius: '24px',
+                        border: '2px solid #e2e8f0',
+                        padding: isMusicStandMode ? '20px 24px' : '16px 20px',
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)',
                         display: 'flex',
-                        flexDirection: 'column',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: '10px',
-                        flex: 1,
+                        gap: '12px',
                         boxSizing: 'border-box'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                              width: isMusicStandMode ? '44px' : '38px',
-                              height: isMusicStandMode ? '44px' : '38px',
-                              borderRadius: '11px',
-                              background: 'rgba(245, 158, 11, 0.08)',
-                              border: '1px solid rgba(245, 158, 11, 0.16)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#d97706',
-                              flexShrink: 0
-                            }}>
-                              <Trophy size={isMusicStandMode ? 22 : 18} />
-                            </div>
-                            <div>
-                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.20rem' : '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Meisterwerk &amp; Repertoire
-                              </h4>
-                              <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                                Aktuelle Song-Projekte &amp; Übestücke
-                              </span>
-                            </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: isMusicStandMode ? '46px' : '42px',
+                            height: isMusicStandMode ? '46px' : '42px',
+                            borderRadius: '13px',
+                            background: 'rgba(245, 158, 11, 0.10)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#d97706',
+                            flexShrink: 0
+                          }}>
+                            <Trophy size={isMusicStandMode ? 24 : 20} />
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                            style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '100px',
-                              padding: '4px 12px',
-                              color: '#475569',
-                              fontSize: '0.76rem',
-                              fontWeight: 750,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <FileText size={13} color="#64748b" />
-                            <span>Protokoll öffnen</span>
-                          </button>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.20rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Meisterwerk &amp; Repertoire
+                            </h4>
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+                              {activeSongsList.length > 0 ? `${activeSongsList.length} Stücke in Arbeit` : 'Alle Song-Projekte gemeistert'}
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Repertoire Stücke Preview (Maximal 2 unvollständige Stücke im Arbeits-Fokus) */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {activeSongsList.length > 0 ? (
-                            <>
-                              {activeSongsList.slice(0, 2).map((song, sIdx) => (
-                                <div
-                                  key={`pro-song-${sIdx}`}
-                                  onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    background: '#ffffff',
-                                    borderRadius: '12px',
-                                    padding: '8px 12px',
-                                    border: song.isCurrentHomework ? '1px solid #fde68a' : '1px solid #e2e8f0',
-                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  <div style={{
-                                    width: '34px',
-                                    height: '34px',
-                                    borderRadius: '9px',
-                                    background: song.isCurrentHomework ? '#fffbeb' : '#f8fafc',
-                                    border: song.isCurrentHomework ? '1px solid #fde68a' : '1px solid #e2e8f0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: song.isCurrentHomework ? '#d97706' : '#64748b',
-                                    flexShrink: 0
-                                  }}>
-                                    <Disc size={17} strokeWidth={2} />
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                        <span style={{ fontWeight: 800, fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {song.title}
-                                        </span>
-                                        {song.isCurrentHomework && (
-                                          <span style={{
-                                            background: '#fef9c3',
-                                            color: '#854d0e',
-                                            border: '1px solid #fef08a',
-                                            fontSize: '0.64rem',
-                                            fontWeight: 800,
-                                            padding: '1px 6px',
-                                            borderRadius: '6px',
-                                            flexShrink: 0
-                                          }}>
-                                            Hausaufgabe
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span style={{ fontSize: '0.72rem', fontWeight: 650, color: '#64748b', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                                        <strong style={{ color: '#0f172a', fontWeight: 800 }}>{song.progress}%</strong> Beherrscht
-                                      </span>
-                                    </div>
-                                    <div style={{ width: '100%', height: '5px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
-                                      <div style={{
-                                        width: `${Math.min(99, Math.max(5, song.progress))}%`,
-                                        height: '100%',
-                                        background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
-                                        borderRadius: '10px',
-                                        transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
-                                      }} />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-
-                              {/* Dezente Fußzeile bei mehr als 2 offenen Stücken */}
-                              {activeSongsList.length > 2 && (
-                                <div style={{ textAlign: 'center', paddingTop: '2px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      color: '#64748b',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      padding: '2px 8px'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    + {activeSongsList.length - 2} weitere {activeSongsList.length - 2 === 1 ? 'Stück' : 'Stücke'} in Arbeit • Alle im Protokoll öffnen →
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div style={{
-                              background: '#ffffff',
-                              borderRadius: '16px',
-                              padding: '12px 14px',
-                              textAlign: 'center',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '6px',
-                              border: '1.5px dashed #fcd34d'
-                            }}>
-                              <div style={{
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '50%',
-                                background: '#fef3c7',
-                                border: '1.5px solid #fcd34d',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#d97706'
-                              }}>
-                                <Trophy size={18} />
-                              </div>
-                              <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#0f172a' }}>
-                                Alle Song-Projekte meisterhaft abgeschlossen
-                              </span>
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.35 }}>
-                                Wähle im Meisterwerk-Protokoll ein neues Stück oder sprich deine Lehrkraft an.
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                                style={{
-                                  marginTop: '2px',
-                                  background: '#e6f4ea',
-                                  border: '1.5px solid #86efac',
-                                  borderRadius: '100px',
-                                  padding: '4px 12px',
-                                  color: '#15803d',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 900,
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
-                                }}
-                                className="hover-scale"
-                              >
-                                Neues Stück im Protokoll wählen →
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        <span style={{ fontSize: '0.66rem', color: '#94a3b8', textAlign: 'center', display: 'block' }}>
-                          Geschütztes didaktisches Übeprotokoll deiner Musikschule
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                          style={{
+                            background: '#f8fafc',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '100px',
+                            padding: '6px 14px',
+                            color: '#334155',
+                            fontSize: '0.80rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          className="hover-scale"
+                          aria-label="Protokoll öffnen"
+                        >
+                          <FileText size={14} color="#64748b" />
+                          <span>Protokoll öffnen →</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -5371,9 +5084,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
             const containerBorder = isTeen ? '1.5px solid rgba(245, 158, 11, 0.25)' : '1.5px solid #e2e8f0';
             const containerShadow = isTeen ? '0 20px 40px rgba(0, 0, 0, 0.3)' : '0 8px 24px rgba(0, 0, 0, 0.04)';
             const headerBorderBottom = isTeen ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #f1f5f9';
-            const iconBadgeBg = isTeen ? 'rgba(245, 158, 11, 0.15)' : '#e6f4ea';
-            const iconBadgeBorder = isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #86efac';
-            const iconColor = isTeen ? '#fbbf24' : '#16a34a';
+            const iconBadgeBg = isTeen ? 'rgba(245, 158, 11, 0.15)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            const iconBadgeBorder = isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : 'none';
+            const iconColor = isTeen ? '#fbbf24' : '#ffffff';
             const titleColor = isTeen ? '#ffffff' : '#0f172a';
             const subtitleColor = isTeen ? '#94a3b8' : '#64748b';
             const countPillBg = isTeen ? 'rgba(15, 23, 42, 0.7)' : '#f8fafc';
@@ -5462,9 +5175,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             <span style={{
                               fontSize: '0.70rem',
                               fontWeight: 800,
-                              color: isTeen ? '#fbbf24' : '#15803d',
-                              background: isTeen ? 'rgba(245, 158, 11, 0.15)' : '#e6f4ea',
-                              border: isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #86efac',
+                              color: isTeen ? '#fbbf24' : '#047857',
+                              background: isTeen ? 'rgba(245, 158, 11, 0.15)' : '#ecfdf5',
+                              border: isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #10b981',
                               padding: '3px 10px',
                               borderRadius: '100px'
                             }}>
@@ -5554,7 +5267,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                             </span>
                                             {totalSecs > 0 && (
                                               <>
-                                                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
+                                                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>•</span>
                                                 <span style={{ fontSize: '0.70rem', fontWeight: 650, color: isTeen ? '#cbd5e1' : '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                                   <Clock size={11} color={isTeen ? '#fbbf24' : '#7c3aed'} style={{ flexShrink: 0 }} />
                                                   {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
@@ -5711,7 +5424,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                             <Clock size={11} color={isTeen ? (entry.hasMasteredSession ? '#34d399' : '#94a3b8') : (entry.hasMasteredSession ? '#16a34a' : '#64748b')} style={{ flexShrink: 0 }} />
                                             {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
                                           </span>
-                                          <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
+                                          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>•</span>
                                           <span style={{ 
                                             fontSize: '0.72rem', 
                                             fontWeight: 850, 

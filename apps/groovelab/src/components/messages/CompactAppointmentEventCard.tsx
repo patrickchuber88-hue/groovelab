@@ -185,8 +185,8 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
                 alignItems: 'center',
                 gap: '3px',
                 background: '#ffffff',
-                border: '1px solid #86efac',
-                color: '#15803d',
+                border: '1.5px solid #10b981',
+                color: '#059669',
                 borderRadius: '100px',
                 padding: '2px 7px',
                 fontSize: '0.68rem',
@@ -199,9 +199,9 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
               }}
               className="hover-scale"
             >
-              <Calendar size={11} color="#15803d" />
+              <Calendar size={11} color="#059669" />
               <span>Kalender</span>
-              <ExternalLink size={9} color="#15803d" />
+              <ExternalLink size={9} color="#059669" />
             </button>
           )}
         </div>
@@ -351,8 +351,13 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
       if (msg.occurrence_id) {
         await supabase
           .from('schedule_occurrences')
-          .update({ status: 'confirmed', student_acknowledged: true })
+          .update({ status: 'rescheduled_confirmed', student_acknowledged: true, updated_at: new Date().toISOString() })
           .eq('id', msg.occurrence_id);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('groovelab_schedule_changed'));
+          window.dispatchEvent(new CustomEvent('campus_schedule_sync'));
+          try { localStorage.setItem('campus_schedule_sync', Date.now().toString()); } catch (_) {}
+        }
       }
       if (selectedRecipient && onSendMessage) {
         const text = newTime ? `Unterrichtstermin bestätigt: ${newTime}` : 'Unterrichtstermin bestätigt.';
@@ -388,67 +393,93 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '8px 0' }}>
       <div style={{
         background: '#ffffff',
-        borderRadius: '14px',
-        padding: '8px 12px',
-        maxWidth: '460px',
+        borderRadius: '16px',
+        padding: '14px 16px',
+        maxWidth: '480px',
         width: '100%',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
-        border: '1px solid #e2e8f0',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        border: isPending ? '1.5px solid #fde68a' : '1px solid #e2e8f0',
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
+        gap: '10px',
         boxSizing: 'border-box'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-            {title}
-          </span>
+        {/* Header mit Titel & Badge */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Calendar size={17} color={isPending ? '#b45309' : '#15803d'} strokeWidth={2.4} />
+            <span style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
+              {title}
+            </span>
+          </div>
           <span style={{
-            fontSize: '0.66rem',
+            fontSize: '0.70rem',
             fontWeight: 800,
-            padding: '2px 8px',
+            padding: '4px 10px',
             borderRadius: '100px',
             background: isPending ? '#fef3c7' : (badgeText === 'Bestätigt' ? '#dcfce7' : '#f1f5f9'),
-            color: isPending ? '#92400e' : (badgeText === 'Bestätigt' ? '#15803d' : '#475569')
+            color: isPending ? '#92400e' : (badgeText === 'Bestätigt' ? '#15803d' : '#475569'),
+            border: isPending ? '1px solid #fde68a' : 'none',
+            flexShrink: 0
           }}>
             {badgeText}
           </span>
         </div>
 
-        {oldTime && newTime && (
-          <div style={{ fontSize: '0.76rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ textDecoration: 'line-through', opacity: 0.75 }}>{oldTime}</span>
-            <ArrowRight size={12} color="#94a3b8" />
-            <span style={{ fontWeight: 800, color: '#15803d' }}>{newTime}</span>
+        {/* 2-Stufen Zeitvergleich Box */}
+        {oldTime && newTime ? (
+          <div style={{
+            background: isPending ? '#fffbeb' : '#f0fdf4',
+            borderRadius: '12px',
+            padding: '10px 12px',
+            border: isPending ? '1px solid #fef08a' : '1px solid #bbf7d0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}>
+            <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontWeight: 600 }}>Regulär:</span>
+              <span style={{ opacity: 0.9 }}>{oldTime}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#15803d' }}>Neu:</span>
+              <span style={{ fontSize: '1.02rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
+                {newTime}
+              </span>
+            </div>
           </div>
-        )}
+        ) : null}
 
+        {/* Aktionsbuttons mit min. 44px Touch Targets (WCAG 2.5.5) */}
         {isPending && !isCurrentUserSender && (
-          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
             <button
               type="button"
               disabled={actionLoading}
               onClick={handleConfirm}
               style={{
                 flex: 1,
-                padding: '5px 10px',
-                borderRadius: '8px',
+                minHeight: '44px',
+                padding: '10px 14px',
+                borderRadius: '12px',
                 background: '#15803d',
                 color: '#ffffff',
                 border: 'none',
-                fontSize: '0.74rem',
+                fontSize: '0.86rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px'
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
+                transition: 'all 0.15s ease'
               }}
             >
-              {actionLoading ? <Loader2 size={12} className="spin" /> : <Check size={12} />}
+              {actionLoading ? <Loader2 size={15} className="spin" /> : <Check size={16} strokeWidth={2.6} />}
               <span>Bestätigen</span>
             </button>
             <button
@@ -457,21 +488,23 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
               onClick={handleReject}
               style={{
                 flex: 1,
-                padding: '5px 10px',
-                borderRadius: '8px',
-                background: '#fee2e2',
-                color: '#991b1b',
-                border: 'none',
-                fontSize: '0.74rem',
+                minHeight: '44px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: '#ffffff',
+                color: '#dc2626',
+                border: '1.5px solid #fca5a5',
+                fontSize: '0.86rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px'
+                gap: '6px',
+                transition: 'all 0.15s ease'
               }}
             >
-              {actionLoading ? <Loader2 size={12} className="spin" /> : <X size={12} />}
+              {actionLoading ? <Loader2 size={15} className="spin" /> : <X size={16} strokeWidth={2.6} />}
               <span>Ablehnen</span>
             </button>
           </div>

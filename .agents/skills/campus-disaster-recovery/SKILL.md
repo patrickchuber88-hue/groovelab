@@ -80,39 +80,47 @@ shred -u /root/backup_age_private.key
 EOF
 ```
 
-### Phase 5: DB-Restore & Art. 17 Tombstone Reconcile (Minuten 25 – 35)
+### Phase 5: Production Database Boot & Data Restoration (Minuten 25 – 35)
 ```bash
 ssh root@${NEW_SERVER_IP} << 'EOF'
 set -euo pipefail
 
-docker run -d \
-  --name campus-db-recovery \
-  --restart unless-stopped \
-  -e POSTGRES_PASSWORD=postgres \
-  -v pgdata:/var/lib/postgresql/data \
-  -p 5432:5432 \
-  postgres:15-alpine
+# 1. Zielverzeichnisse auf High-IOPS NVMe vorbereiten
+mkdir -p /var/lib/supabase_nvme/data /mnt/cloud-volume/storage-data
+chown -R 999:999 /var/lib/supabase_nvme/data
+chmod 700 /var/lib/supabase_nvme/data
 
-until docker exec campus-db-recovery pg_isready -U postgres; do sleep 1; done
+# 2. Produktions-Datenbank-Container initialisieren (deploy/docker-compose.production.yml)
+cd /root/deploy
+docker compose -f docker-compose.production.yml up -d supabase-db
 
-# Dump einspielen (Schema, 501+ Migrationen, RLS, Views)
-cat /root/recovery/recovery_dump.sql | docker exec -i campus-db-recovery psql -U postgres
+# 3. Warten bis Postgres betriebsbereit ist
+until docker exec supabase-db pg_isready -U postgres; do sleep 1; done
 
-# ⚖️ ZWINGEND: Zombie-Datensätze nach Restore tilgen!
+# 4. Dump atomar einspielen (Schema, 127 Migrationen, RLS, Views)
+cat /root/recovery/recovery_dump.sql | docker exec -i supabase-db psql -U postgres
+
+# 5. ⚖️ ZWINGEND: Zombie-Datensätze nach Restore tilgen (DSGVO Art. 17)!
 bash /root/scripts/post_restore_reconcile_tombstones.sh
 
+# 6. Unverschlüsselten Notfall-Dump sicher vernichten
 shred -u /root/recovery/recovery_dump.sql
 EOF
 ```
 
-### Phase 6: Application Stack Boot & Health Verification (Minuten 35 – 40)
+### Phase 6: Application Mesh Boot & Health Verification (Minuten 35 – 40)
 ```bash
 ssh root@${NEW_SERVER_IP} << 'EOF'
 set -euo pipefail
 cd /root/deploy
-docker compose -f docker-compose.prod.yml up -d
+
+# Gesamten Produktions-Stack inklusive BFF, Kong, Storage & Nginx starten
+docker compose -f docker-compose.production.yml up -d
 sleep 5
-curl -fsS http://localhost:3000/api/health > /dev/null || (echo "Health check FAILED" && exit 1)
+
+# Autoritativer Health-Check auf BFF (Port 4000) oder Edge-Ingress (Port 443 / healthz)
+curl -fsS http://localhost:4000/gate/health > /dev/null || curl -fsS http://localhost:8000/status > /dev/null || (echo "Health check FAILED" && exit 1)
+echo "✓ Application Stack & Perimeter Gateway operational."
 EOF
 ```
 

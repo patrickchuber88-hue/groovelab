@@ -1091,36 +1091,23 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
       {/* Floating Right-Edge Toggle Button when Collapsed (Desktop only) */}
       {isTeacherBriefingSidebarCollapsed && !isMobileDevice && (() => {
         const isCampus = activePlatform === 'campus';
-        const btnBg = isCampus ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
-        const btnBorder = isCampus ? '1.5px solid #bbf7d0' : '1.5px solid #fde047';
-        const btnColor = isCampus ? '#15803d' : '#854d0e';
-        const btnShadow = isCampus ? '-4px 0 20px rgba(52, 168, 83, 0.2)' : '-4px 0 20px rgba(234, 179, 8, 0.25)';
-        const badgeColor = hasTeacherAppointmentAlerts ? '#f59e0b' : (isCampus ? '#34a853' : '#eab308');
+        const btnBg = isCampus ? '#34a853' : '#eab308';
+        const btnColor = isCampus ? '#ffffff' : '#713f12';
+        const btnShadow = isCampus ? '-4px 0 20px rgba(52, 168, 83, 0.35), inset 1px 1px 0 rgba(255, 255, 255, 0.25)' : '-4px 0 20px rgba(234, 179, 8, 0.35), inset 1px 1px 0 rgba(255, 255, 255, 0.3)';
+        const badgeBg = hasTeacherAppointmentAlerts ? '#f59e0b' : (isCampus ? '#ffffff' : '#713f12');
+        const badgeTextColor = hasTeacherAppointmentAlerts ? '#ffffff' : (isCampus ? '#15803d' : '#ffffff');
 
         return (
           <button
             onClick={() => handleToggleTeacherBriefingSidebar(false)}
+            aria-expanded={false}
+            aria-label="Termine & Mitteilungen ausklappen"
             style={{
-              position: 'fixed',
-              right: '0px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 99,
-              background: btnBg,
-              border: btnBorder,
-              borderRight: 'none',
-              borderRadius: '16px 0 0 16px',
-              padding: '14px 10px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              boxShadow: btnShadow,
-              color: btnColor,
-              fontWeight: 900,
-              fontSize: '0.7rem',
-              transition: 'all 0.2s ease-in-out'
+              position: 'fixed', right: '0px', top: '50%', transform: 'translateY(-50%)', zIndex: 99,
+              background: btnBg, border: 'none', borderRight: 'none', borderRadius: '16px 0 0 16px',
+              padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: '10px', cursor: 'pointer', boxShadow: btnShadow, color: btnColor,
+              fontWeight: 900, fontSize: '0.7rem', transition: 'all 0.2s ease-in-out'
             }}
             className="hover-scale"
             title="Termine & Mitteilungen ausklappen"
@@ -1129,45 +1116,28 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               <ChevronLeft size={18} color={btnColor} />
               {(hasTeacherAppointmentAlerts || hasTeacherFeedAlerts) && (
                 <span style={{
-                  position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  background: badgeColor,
-                  border: '2px solid #ffffff',
-                  boxShadow: `0 0 8px ${badgeColor}`,
-                  animation: 'pulse 1.5s infinite'
+                  position: 'absolute', top: '-6px', right: '-6px', width: '10px', height: '10px',
+                  borderRadius: '50%', background: '#f59e0b', border: `2px solid ${btnBg}`,
+                  boxShadow: '0 0 8px #f59e0b', animation: 'pulse 1.5s infinite'
                 }} />
               )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
               <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                background: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                width: '28px', height: '28px', borderRadius: '8px',
+                background: isCampus ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.08)',
+                backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.2)'
               }}>
                 <Calendar size={15} color={btnColor} />
               </div>
               
               {teacherSidebarTotalAlertsCount > 0 && (
                 <span style={{
-                  background: badgeColor,
-                  color: isCampus || hasTeacherAppointmentAlerts ? '#ffffff' : '#000000',
-                  fontSize: '0.65rem',
-                  fontWeight: 950,
-                  padding: '2px 6px',
-                  borderRadius: '100px',
-                  minWidth: '16px',
-                  textAlign: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                  background: badgeBg, color: badgeTextColor, fontSize: '0.65rem',
+                  fontWeight: 950, padding: '2px 6px', borderRadius: '100px',
+                  minWidth: '16px', textAlign: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
                 }}>
                   {teacherSidebarTotalAlertsCount}
                 </span>
@@ -1175,13 +1145,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             </div>
 
             <span style={{ 
-              writingMode: 'vertical-rl', 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.08em', 
-              fontSize: '0.68rem',
-              fontWeight: 900,
-              color: btnColor,
-              marginTop: '2px'
+              writingMode: 'vertical-rl', textTransform: 'uppercase', letterSpacing: '0.08em', 
+              fontSize: '0.68rem', fontWeight: 900, color: btnColor, marginTop: '2px',
+              textShadow: isCampus ? '0 1px 2px rgba(0,0,0,0.15)' : 'none'
             }}>
               Termine &amp; Mitteilungen
             </span>
@@ -1902,9 +1868,12 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '4px 2px'
+            padding: '4px 2px',
+            gap: '8px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
               <div style={{
                 width: '28px',
                 height: '28px',
@@ -1917,7 +1886,16 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               }}>
                 <Calendar size={15} color={activePlatform === 'campus' ? '#34a853' : '#ca8a04'} />
               </div>
-              <span style={{ fontWeight: 950, fontSize: '0.84rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              <span style={{ 
+                fontWeight: 950, 
+                fontSize: '0.82rem', 
+                color: '#1e293b', 
+                letterSpacing: '-0.02em', 
+                textTransform: 'uppercase', 
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
                 Termine &amp; Mitteilungen
               </span>
               {teacherSidebarTotalAlertsCount > 0 && (
@@ -1937,27 +1915,25 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
 
             <button
               onClick={() => handleToggleTeacherBriefingSidebar(true)}
+              aria-label="Sidebar einklappen"
+              title="Sidebar einklappen"
               style={{
-                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.08)' : '#f8fafc',
-                border: activePlatform === 'campus' ? '1.5px solid rgba(52, 168, 83, 0.30)' : '1.5px solid #e2e8f0',
-                borderRadius: '10px',
-                padding: '6px 10px',
+                width: '28px',
+                height: '28px',
+                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.10)' : 'rgba(234, 179, 8, 0.12)',
+                border: 'none',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                justifyContent: 'center',
                 cursor: 'pointer',
-                color: activePlatform === 'campus' ? '#34a853' : '#64748b',
-                fontSize: '0.72rem',
-                fontWeight: 800,
+                color: activePlatform === 'campus' ? '#34a853' : '#ca8a04',
                 transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
                 flexShrink: 0
               }}
               className="hover-scale"
-              title="Sidebar einklappen"
             >
-              <span>Einklappen</span>
-              <ChevronRight size={14} color={activePlatform === 'campus' ? '#34a853' : '#64748b'} />
+              <ChevronRight size={16} color={activePlatform === 'campus' ? '#34a853' : '#ca8a04'} />
             </button>
           </div>
           

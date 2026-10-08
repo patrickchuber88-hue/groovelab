@@ -93,7 +93,7 @@ export function calculateGuitarFretAndString(pitch: string): { fret: number; str
   if (!match) return { fret: 0, stringIndex: 0 };
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
-  const targetSemi = octave * 12 + noteVal;
+  const targetSemi = (octave + 1) * 12 + noteVal;
 
   // Find lowest fret on most ergonomic string
   for (let s = 0; s < guitarStrings.length; s++) {
@@ -124,7 +124,7 @@ export function calculateBassFretAndString(pitch: string): { fret: number; strin
   if (!match) return { fret: 0, stringIndex: 0 };
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
-  const targetSemi = octave * 12 + noteVal;
+  const targetSemi = (octave + 1) * 12 + noteVal;
 
   // Look for the most natural position (frets 0 to 14)
   for (let s = 0; s < bassStrings.length; s++) {
@@ -162,7 +162,7 @@ export function calculateUkuleleFretAndString(pitch: string): { fret: number; st
   if (!match) return { fret: 0, stringIndex: 0 };
   const noteVal = NOTE_SEMITONES[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
-  const targetSemi = octave * 12 + noteVal;
+  const targetSemi = (octave + 1) * 12 + noteVal;
 
   for (let s = 0; s < ukeStrings.length; s++) {
     const diff = targetSemi - ukeStrings[s].base;

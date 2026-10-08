@@ -1,7 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   BookOpen, Download, Library, Music, Pencil, Plus, Search,
-  Trash2, X, Play, Settings, Sliders, Zap
+  Trash2, X, Play, Settings, Sliders, Zap, Sparkles
 } from "lucide-react";
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { supabase } from "../../lib/supabase";
@@ -12,17 +12,21 @@ export { getLehrwerkColor, getSongColor };
 import { renderSongVinylCover } from "../student/CampusVinylCoverArt";
 export { renderSongVinylCover };
 
+import { AdminMediathekSchnelltext } from "./mediathek/AdminMediathekSchnelltext";
+import { AdminMediathekScoreSnippets } from "./mediathek/AdminMediathekScoreSnippets";
+
 export interface AdminSongsViewProps {
   activePlatform: string;
   admin: any;
   userId: string;
   songs: any[];
+  students?: any[];
   lehrwerke: any[];
   setLehrwerke: React.Dispatch<React.SetStateAction<any[]>>;
   songSearch: string;
   setSongSearch: (q: string) => void;
-  mediathekTab: 'songs' | 'lehrwerke' | 'schnelltext';
-  setMediathekTab: (tab: 'songs' | 'lehrwerke' | 'schnelltext') => void;
+  mediathekTab: 'songs' | 'lehrwerke' | 'schnelltext' | 'notenschnipsel';
+  setMediathekTab: (tab: 'songs' | 'lehrwerke' | 'schnelltext' | 'notenschnipsel') => void;
   bulkModeSongs: boolean;
   setBulkModeSongs: (val: boolean) => void;
   bulkTextSongs: string;
@@ -59,6 +63,7 @@ export interface AdminSongsViewProps {
   handleUpdateSong: (e: React.FormEvent) => Promise<void>;
   handleMediathekTouchStart: (e: React.TouchEvent) => void;
   handleMediathekTouchEnd: (e: React.TouchEvent) => void;
+  handleToggleSongCampusActive?: (songId: string, currentVal: boolean) => Promise<void>;
 }
 
 export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
@@ -66,6 +71,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
   admin,
   userId,
   songs,
+  students = [],
   lehrwerke,
   setLehrwerke,
   songSearch,
@@ -108,8 +114,24 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
   handleUpdateSong,
   handleMediathekTouchStart,
   handleMediathekTouchEnd,
+  handleToggleSongCampusActive,
 }) => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+
+    // 🛡️ 0,1% Goldstandard Bounded Context: Campus Mediathek isoliert 100% Campus-Repertoire
+    const campusSongs = useMemo(() => {
+      return (songs || []).filter(s => s.is_campus_active === true);
+    }, [songs]);
+
+    const filteredSongs = useMemo(() => {
+      const q = songSearch.trim().toLowerCase();
+      return campusSongs.filter(song => {
+        return !q || 
+          (song.title || '').toLowerCase().includes(q) || 
+          (song.artist || '').toLowerCase().includes(q);
+      }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' }));
+    }, [campusSongs, songSearch]);
+
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -458,6 +480,35 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                 <Zap size={14} style={{ color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b' }} />
                 <span>Schnell-Text</span>
               </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mediathekTab === 'notenschnipsel'}
+                id="tab-mediathek-notenschnipsel"
+                onClick={() => setMediathekTab('notenschnipsel')}
+                style={{
+                  flex: 1,
+                  height: '36px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: mediathekTab === 'notenschnipsel' ? brandColor : 'transparent',
+                  color: mediathekTab === 'notenschnipsel' ? '#ffffff' : '#64748b',
+                  fontWeight: 850,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  boxShadow: mediathekTab === 'notenschnipsel' ? `0 2px 8px ${brandColor}40` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <Sparkles size={14} style={{ color: mediathekTab === 'notenschnipsel' ? '#ffffff' : '#64748b' }} />
+                <span>Notenschnipsel</span>
+              </button>
             </div>
           </div>
 
@@ -471,6 +522,9 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
             </button>
             <button type="button" onClick={() => setMediathekTab('schnelltext')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
               <div className={`mediathek-dot ${mediathekTab === 'schnelltext' ? 'active' : ''}`} style={{ background: mediathekTab === 'schnelltext' ? brandColor : '#cbd5e1' }} />
+            </button>
+            <button type="button" onClick={() => setMediathekTab('notenschnipsel')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+              <div className={`mediathek-dot ${mediathekTab === 'notenschnipsel' ? 'active' : ''}`} style={{ background: mediathekTab === 'notenschnipsel' ? brandColor : '#cbd5e1' }} />
             </button>
           </div>
 
@@ -516,7 +570,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Music size={16} color={brandColor} /> Songs ({songs.length})
+                  <Music size={16} color={brandColor} /> Songs ({filteredSongs.length})
                 </h3>
                 <button 
                   type="button"
@@ -543,6 +597,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                   <Plus size={14} strokeWidth={3} /> Song hinzufügen
                 </button>
               </div>
+
 
               {showAddSong && (
                 <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'white', borderRadius: '16px', border: `1px solid ${brandColor}20`, boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
@@ -978,27 +1033,6 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', margin: '4px 0 8px 0' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
-                      <input 
-                        type="checkbox"
-                        checked={editingSong.is_groovelab_active !== undefined ? !!editingSong.is_groovelab_active : true}
-                        onChange={(e) => setEditingSong({ ...editingSong, is_groovelab_active: e.target.checked })}
-                        style={{ accentColor: '#eab308', width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      <span>In GrooveLab aktiv</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
-                      <input 
-                        type="checkbox"
-                        checked={editingSong.is_campus_active !== undefined ? !!editingSong.is_campus_active : true}
-                        onChange={(e) => setEditingSong({ ...editingSong, is_campus_active: e.target.checked })}
-                        style={{ accentColor: '#34a853', width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      <span>In Campus aktiv</span>
-                    </label>
-                  </div>
-
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="submit" style={{ flex: 2, background: brandColor, color: '#1e293b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
                     <button type="button" onClick={() => setEditingSong(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>
@@ -1007,127 +1041,126 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
               )}
 
               {/* Songs List Grid (3-4 columns responsive) */}
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-                gap: '14px',
-                width: '100%',
-                boxSizing: 'border-box'
-              }}>
-                {songs.filter(song => {
-                  const matchesSearch = songSearch === '' || 
-                    song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
-                    song.artist?.toLowerCase().includes(songSearch.toLowerCase());
-                  
-                  const matchesPlatform = activePlatform === 'campus' 
-                    ? song.is_campus_active 
-                    : song.is_groovelab_active;
-                    
-                  return matchesSearch && matchesPlatform;
-                }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' })).map(song => {
-                  const lwColor = getSongColor(song.title || '');
-                  const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
-                  return (
-                    <div key={song.id} className="glass-panel hover-scale" 
-                      onClick={() => {
-                        const inst = song.instrumentation || {};
-                        const norm: any = { 'E-Gitarre': 0, 'E-Bass': 0, 'E-Drums': 0, 'E-Piano': 0, 'Vocals': 0 };
-                        Object.entries(inst).forEach(([k, v]) => {
-                          const lower = k.toLowerCase();
-                          if (lower === 'guitar' || lower === 'e-gitarre') norm['E-Gitarre'] = v;
-                          else if (lower === 'bass' || lower === 'e-bass') norm['E-Bass'] = v;
-                          else if (lower === 'drums' || lower === 'e-drums') norm['E-Drums'] = v;
-                          else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') norm['E-Piano'] = v;
-                          else if (lower === 'vocals' || lower === 'gesang') norm['Vocals'] = v;
-                          else norm[k] = v;
-                        });
-                        setEditingSong({...song, instrumentation: norm});
-                        setShowAddSong(false);
-                      }}
-                      style={{ 
-                        padding: '14px 16px', 
-                        display: 'flex', 
-                        gap: '12px',
-                        alignItems: 'center', 
-                        background: 'white', 
-                        borderRadius: '18px', 
-                        border: editingSong?.id === song.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
-                        borderLeft: `5px solid ${lwColor.from}`,
-                        boxShadow: editingSong?.id === song.id 
-                          ? `0 10px 25px -5px ${brandColor}20` 
-                          : '0 8px 30px -10px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.01)', 
-                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                        minHeight: '88px',
-                        boxSizing: 'border-box',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {/* Pastel Sleeve + Vinyl peeking out Cover */}
-                      {renderSongVinylCover(lwColor, 'sm')}
+              {filteredSongs.length === 0 ? (
+                <div style={{ padding: '40px 20px', textAlign: 'center', background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
+                  <Music size={32} color="#94a3b8" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+                  <div style={{ fontWeight: 800, color: '#475569', fontSize: '0.9rem' }}>Keine Songs in dieser Ansicht gefunden</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px' }}>
+                    {songSearch ? 'Passen Sie den Suchbegriff an.' : 'Fügen Sie neue Repertoire-Songs für den Campus hinzu.'}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                  gap: '14px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  {filteredSongs.map(song => {
+                    const lwColor = getSongColor(song.title || '');
+                    return (
+                      <div key={song.id} className="glass-panel hover-scale" 
+                        onClick={() => {
+                          const inst = song.instrumentation || {};
+                          const norm: any = { 'E-Gitarre': 0, 'E-Bass': 0, 'E-Drums': 0, 'E-Piano': 0, 'Vocals': 0 };
+                          Object.entries(inst).forEach(([k, v]) => {
+                            const lower = k.toLowerCase();
+                            if (lower === 'guitar' || lower === 'e-gitarre') norm['E-Gitarre'] = v;
+                            else if (lower === 'bass' || lower === 'e-bass') norm['E-Bass'] = v;
+                            else if (lower === 'drums' || lower === 'e-drums') norm['E-Drums'] = v;
+                            else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') norm['E-Piano'] = v;
+                            else if (lower === 'vocals' || lower === 'gesang') norm['Vocals'] = v;
+                            else norm[k] = v;
+                          });
+                          setEditingSong({...song, instrumentation: norm});
+                          setShowAddSong(false);
+                        }}
+                        style={{ 
+                          padding: '14px 16px', 
+                          display: 'flex', 
+                          gap: '12px',
+                          alignItems: 'center', 
+                          background: 'white', 
+                          borderRadius: '18px', 
+                          border: editingSong?.id === song.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
+                          borderLeft: `5px solid ${lwColor.from}`,
+                          boxShadow: editingSong?.id === song.id 
+                            ? `0 10px 25px -5px ${brandColor}20` 
+                            : '0 8px 30px -10px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.01)', 
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          minHeight: '88px',
+                          boxSizing: 'border-box',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {/* Pastel Sleeve + Vinyl peeking out Cover */}
+                        {renderSongVinylCover(lwColor, 'sm')}
 
-                      {/* Title and Artist */}
-                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.02rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {song.artist}</div>
-                      </div>
+                        {/* Title and Artist */}
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.02rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {song.artist}</div>
+                        </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
-                        {song.media_link && (
-                          <a 
-                            href={song.media_link} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="Externer Streaming-Dienst (Spotify / YouTube)"
-                            style={{ 
-                              width: '34px', height: '34px', borderRadius: '10px', 
-                              background: '#f8fafc', color: '#0f172a', 
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              textDecoration: 'none', border: '1px solid #e2e8f0',
-                              transition: 'all 0.2s'
-                            }}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
+                          {song.media_link && (
+                            <a 
+                              href={song.media_link} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              onClick={(e) => e.stopPropagation()}
+                              title="Externer Streaming-Dienst (Spotify / YouTube)"
+                              style={{ 
+                                width: '34px', height: '34px', borderRadius: '10px', 
+                                background: '#f8fafc', color: '#0f172a', 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                textDecoration: 'none', border: '1px solid #e2e8f0',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <Play size={14} style={{ fill: '#0f172a' }} />
+                            </a>
+                          )}
+                          {song.tomplay_url && (
+                            <a 
+                              href={song.tomplay_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Interaktive Noten auf Tomplay für ${song.title} öffnen`}
+                              title="Interaktive Noten auf Tomplay öffnen"
+                              style={{
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#2563eb',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <Music size={14} style={{ strokeWidth: 2.5 }} />
+                            </a>
+                          )}
+                          <button 
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} 
+                            aria-label={`Song ${song.title} von ${song.artist} löschen`}
+                            title="Song löschen"
+                            style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
-                            <Play size={14} style={{ fill: '#0f172a' }} />
-                          </a>
-                        )}
-                        {song.tomplay_url && (
-                          <a 
-                            href={song.tomplay_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Interaktive Noten auf Tomplay für ${song.title} öffnen`}
-                            title="Interaktive Noten auf Tomplay öffnen"
-                            style={{
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              width: '38px',
-                              height: '38px',
-                              borderRadius: '10px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#2563eb',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <Music size={14} style={{ strokeWidth: 2.5 }} />
-                          </a>
-                        )}
-                        <button 
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} 
-                          aria-label={`Song ${song.title} von ${song.artist} löschen`}
-                          title="Song löschen"
-                          style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Column 2: Lehrwerke */}
@@ -1368,108 +1401,32 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                 </div>
               </div>
 
-            {/* Column 3: Schnell-Text */}
-            <div 
-              style={{ display: mediathekTab === 'schnelltext' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
-              className={`mediathek-col-card mediathek-col-schnelltext ${mediathekTab === 'schnelltext' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ background: `${brandColor}15`, color: brandColor, padding: '3px 6px', borderRadius: '6px', fontSize: '0.95rem' }}>⚡</span>
-                    Schnell-Text ({textbausteine.filter((tb: any) => tb.active).length})
-                  </h3>
-                  <button 
-                    type="button"
-                    onClick={() => setShowTextbausteinModal(true)}
-                    style={{ 
-                      background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                      color: '#ffffff', 
-                      border: 'none', 
-                      padding: '6px 12px', 
-                      borderRadius: '10px', 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 900,
-                      boxShadow: `0 4px 10px -3px ${brandColor}40`,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <Settings size={14} /> Verwalten
-                  </button>
-                </div>
+            {/* Column 3: Schnell-Text (Modularer Satellit) */}
+            <AdminMediathekSchnelltext
+              mediathekTab={mediathekTab}
+              textbausteine={textbausteine}
+              brandColor={brandColor}
+              songSearch={songSearch}
+              copiedTbId={copiedTbId}
+              setCopiedTbId={setCopiedTbId}
+              setShowTextbausteinModal={setShowTextbausteinModal}
+              setPreviewingTextbaustein={setPreviewingTextbaustein}
+              selectedLehrwerkForDetail={selectedLehrwerkForDetail}
+              selectedSongForDetail={selectedSongForDetail}
+              selectedStudentForProgress={selectedStudentForProgress}
+              setNewHomeworkNoteText={setNewHomeworkNoteText}
+              setSongLessonNotes={setSongLessonNotes}
+            />
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', width: '100%' }}>
-                  {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
-                    const parts = tb.label.split(' ');
-                    const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
-                    const emoji = hasEmoji ? parts[0] : '🎵';
-                    const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
-                    const isCopied = copiedTbId === tb.id;
-
-                    const handleCardClick = () => {
-                      if (selectedLehrwerkForDetail && selectedStudentForProgress) {
-                        setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
-                        setCopiedTbId(tb.id);
-                        setTimeout(() => setCopiedTbId(null), 850);
-                      } else if (selectedSongForDetail && selectedStudentForProgress) {
-                        setSongLessonNotes(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
-                        setCopiedTbId(tb.id);
-                        setTimeout(() => setCopiedTbId(null), 850);
-                      } else {
-                        setPreviewingTextbaustein(tb);
-                      }
-                    };
-
-                    return (
-                      <div 
-                        key={tb.id} 
-                        onClick={handleCardClick}
-                        style={{ 
-                          border: isCopied ? '1.5px solid #34a853' : '1px solid #e2e8f0', 
-                          borderRadius: '16px', 
-                          padding: '12px 10px', 
-                          background: isCopied ? '#e6f4ea' : 'white',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          textAlign: 'center',
-                          gap: '8px',
-                          opacity: tb.active ? 1 : 0.55,
-                          boxShadow: isCopied ? '0 4px 10px rgba(52, 168, 83, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
-                          minHeight: '115px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          transform: isCopied ? 'scale(0.96)' : 'none'
-                        }}
-                        className="hover-scale-mini"
-                      >
-                        <span style={{ fontSize: '1.5rem', marginTop: '2px', filter: 'grayscale(100%)' }}>
-                          {isCopied ? '✓' : emoji}
-                        </span>
-                        
-                        <span style={{ 
-                          fontSize: '0.75rem', 
-                          fontWeight: 800, 
-                          color: isCopied ? '#34a853' : '#1e293b', 
-                          display: '-webkit-box', 
-                          WebkitLineClamp: 2, 
-                          WebkitBoxOrient: 'vertical', 
-                          overflow: 'hidden', 
-                          lineHeight: '1.2', 
-                          height: '2.4em', 
-                          wordBreak: 'break-word'
-                        }}>
-                          {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* Column 4: Notenschnipsel (Modularer Satellit) */}
+            <AdminMediathekScoreSnippets
+              mediathekTab={mediathekTab}
+              brandColor={brandColor}
+              songSearch={songSearch}
+              userId={userId}
+              schoolId={admin?.school_id || (admin?.schools as any)?.id}
+              students={students}
+            />
           </div>
         </div>
       </div>

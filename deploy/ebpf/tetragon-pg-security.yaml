@@ -25,6 +25,8 @@ spec:
               values:
                 - "/var/lib/postgresql"
                 - "/var/lib/docker/volumes/supabase"
+                - "/var/lib/supabase_nvme/data"       # Reales Host-NVMe Mount (PGDATA)
+                - "/mnt/cloud-volume/storage-data"    # Ceph Cloud Volume
           matchNamespaces:
             - namespace: "default"
               operator: "In"
@@ -35,11 +37,15 @@ spec:
                 - "/usr/lib/postgresql/15/bin/postgres"
                 - "/usr/lib/postgresql/16/bin/postgres"
                 - "/usr/local/bin/postgres"
-                - "/bin/tar" # Für geplante Backup-Archive
+                - "/usr/bin/pgbackrest"              # Whitelist für kontinuierliche WAL-Archivierung
+                - "/usr/bin/pg_dump"                 # Whitelist für Pre-Deploy Safety Dumps
+                - "/usr/bin/rsync"                   # Whitelist für Reconcile-Sync
+                - "/bin/tar"                         # Für geplante Backup-Archive
           matchActions:
-            - action: Sigkill # Sofortige Terminierung unbefugter Prozesse
+            # 🛡️ 0,1% Forensik-Standard: 14 Tage Audit-Modus (Post) zur Prozessbaum-Validierung
+            # Nach stabiler Baseline kann zusätzlich Sigkill aktiviert werden.
             - action: Post
-              rateLimit: "1m"
+              rateLimit: "1s"
 
     # ── REGEL 2: Database Container Rogue Egress Guard ──
     # Überwacht unerwartete ausgehende TCP-Sockets (connect Syscall) aus dem DB-Prozess

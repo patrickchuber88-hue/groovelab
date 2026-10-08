@@ -5,6 +5,7 @@
  */
 
 import { initRuntimeIntegrityGuard } from './runtimeIntegrityGuard';
+import { executeSessionZeroize } from './sessionZeroize';
 
 export function initAntiTamperShield(): void {
   if (typeof window === 'undefined') return;
@@ -65,14 +66,21 @@ export function initAntiTamperShield(): void {
     }, { capture: true });
 
     // 4. Self-defending debugger trap (stops automated decompilers/inspectors)
+    // Uses dynamic Function constructor to prevent esbuild / AST drop: ['debugger'] stripping
     setInterval(() => {
       const startTime = performance.now();
-      // eslint-disable-next-line no-debugger
-      debugger;
+      try {
+        Function('debugger')();
+      } catch (_) {}
       const executionTime = performance.now() - startTime;
       // If execution paused > 100ms, DevTools is actively paused on debugger
       if (executionTime > 100) {
-        if (typeof console.clear === 'function') console.clear();
+        if (typeof console.clear === 'function') {
+          console.clear();
+        }
+        try {
+          executeSessionZeroize({ preserveDeviceKey: true });
+        } catch (_) {}
       }
     }, 4000);
 

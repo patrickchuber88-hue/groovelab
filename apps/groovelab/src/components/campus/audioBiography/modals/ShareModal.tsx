@@ -144,8 +144,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         {/* Live Applaus Info */}
         <div style={{
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-          border: '1.5px solid #86efac',
+          background: '#ecfdf5',
+          border: '1.5px solid #10b981',
           borderRadius: '20px',
           padding: '16px',
           display: 'flex',
@@ -154,11 +154,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.4rem' }}>👏 ❤️ ⭐</span>
-            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#166534' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#065f46' }}>
               Live-Applaus für {student?.first_name || 'dich'}
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: '0.76rem', color: '#15803d', lineHeight: 1.4 }}>
+          <p style={{ margin: 0, fontSize: '0.76rem', color: '#047857', lineHeight: 1.4 }}>
             Deine Familie kann deine Stücke sofort im Browser auf jedem Handy oder Tablet anhören und dir mit 1 Klick Applaus schicken!
           </p>
         </div>

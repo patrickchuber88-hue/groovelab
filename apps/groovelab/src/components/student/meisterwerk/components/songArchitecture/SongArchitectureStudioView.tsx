@@ -837,9 +837,10 @@ export const SongArchitectureStudioView: React.FC<SongArchitectureStudioViewProp
                           gap: '6px',
                           padding: '6px 12px',
                           borderRadius: '10px',
-                          border: activeSec.isHomeworkFocus ? '1px solid #86efac' : '1px solid #cbd5e1',
-                          background: activeSec.isHomeworkFocus ? '#f0fdf4' : '#ffffff',
-                          color: activeSec.isHomeworkFocus ? '#16a34a' : '#475569',
+                          border: activeSec.isHomeworkFocus ? 'none' : '1px solid #cbd5e1',
+                          background: activeSec.isHomeworkFocus ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                          color: activeSec.isHomeworkFocus ? '#ffffff' : '#475569',
+                          boxShadow: activeSec.isHomeworkFocus ? '0 2px 6px rgba(16, 185, 129, 0.28)' : 'none',
                           fontSize: '0.76rem',
                           fontWeight: 850,
                           cursor: 'pointer'
@@ -847,7 +848,7 @@ export const SongArchitectureStudioView: React.FC<SongArchitectureStudioViewProp
                         className="hover-scale"
                         title="Als Hausaufgabe-Fokus markieren"
                       >
-                        <Pin size={13} style={{ color: activeSec.isHomeworkFocus ? '#16a34a' : '#475569' }} />
+                        <Pin size={13} style={{ color: activeSec.isHomeworkFocus ? '#ffffff' : '#475569' }} />
                         <span>{activeSec.isHomeworkFocus ? 'Fokus aktiv' : 'Als Fokus setzen'}</span>
                       </button>
                     )}

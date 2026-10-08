@@ -94,8 +94,8 @@ export const DualVersionDownloadModal: React.FC<DualVersionDownloadModalProps> =
             style={{
               padding: '14px 16px',
               borderRadius: '16px',
-              border: `1.5px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.3)'}`,
-              background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)',
+              border: `1.5px solid ${isLight ? '#10b981' : 'rgba(16, 185, 129, 0.3)'}`,
+              background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.12)',
               color: colors.textPrimary,
               cursor: 'pointer',
               display: 'flex',
@@ -122,7 +122,7 @@ export const DualVersionDownloadModal: React.FC<DualVersionDownloadModalProps> =
             <Download size={16} color="#10b981" />
           </button>
 
-          {/* Option 2: Pure RAW */}
+          {/* Option 2: Originalaufnahme */}
           <button
             type="button"
             onClick={() => onDownload('raw', track)}
@@ -147,7 +147,7 @@ export const DualVersionDownloadModal: React.FC<DualVersionDownloadModalProps> =
               </div>
               <div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#3b82f6' }}>
-                  Pure RAW (.wav)
+                  Originalaufnahme (.wav)
                 </div>
                 <div style={{ fontSize: '0.74rem', color: isLight ? '#475569' : '#cbd5e1' }}>
                   Unbearbeitete Originalaufnahme • Pegel-Match

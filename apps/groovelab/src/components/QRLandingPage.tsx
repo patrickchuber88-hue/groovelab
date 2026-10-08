@@ -20,12 +20,8 @@ import { verifyPinPbkdf2 } from '../utils/argonPinEngine';
 import { getInstrumentAvatarUrl as getStudioInstrumentAvatarUrl } from './StudioAvatar';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 import { playTriumphantXpChime, animateXpCountUp, CAMPUS_XP_EFFECTS_CSS } from '../utils/campusXpEffects';
-import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
-
-
-
-
-
+import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';import { QrLessonAppointmentCard } from './student/schedule/QrLessonAppointmentCard';
+import { StudentRescheduleDecisionModal } from './student/modals/StudentRescheduleDecisionModal';
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
 
@@ -393,6 +389,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [occurrences, setOccurrences] = useState<any[]>([]);
   const [roomBookings, setRoomBookings] = useState<any[]>([]);
   const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
+  const [studentRescheduleModalOcc, setStudentRescheduleModalOcc] = useState<any | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
   const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
@@ -4644,479 +4641,38 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               {group.items.map((occ: any) => {
                 const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall';
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-                const isPendingReview = occ.schedule?.status === 'ready_for_admin_review' && !occ.room_name && !occ.schedule?.room_id;
                 const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date || isCanceled);
                 const hasMessages = activeChatOccIds.has(occ.id) || Boolean(occ.schedule_id && occ.date && activeChatOccIds.has(`virtual-${occ.schedule_id}-${occ.date}`)) || Boolean(occ.occurrence_id && activeChatOccIds.has(occ.occurrence_id));
-                const isUnread = unreadMessageOccurrences.includes(occ.id) || Boolean(occ.schedule_id && occ.date && unreadMessageOccurrences.includes(`virtual-${occ.schedule_id}-${occ.date}`));
 
-                let rowBg = '#ffffff';
-                let rowBorder = '1px solid #e2e8f0';
-                let textColor = '#0f172a';
-                let subColor = '#64748b';
+                const handleCancelClick = () => {
+                  if (!parentUnlocked && !profile?.parent_allow_absences) {
+                    showToastMsg('🛡️ Unterrichtsstunden können nur von Erziehungsberechtigten abgesagt werden. Bitte im Eltern-Tab freischalten.', 'error');
+                    return;
+                  }
+                  setPendingCancelOccId(occ.id);
+                };
 
-                if (isCanceled) {
-                  rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
-                  rowBorder = '1.5px solid #fca5a5';
-                  textColor = '#991b1b';
-                  subColor = '#dc2626';
-                } else if (isRescheduled) {
-                  rowBg = '#fffbeb';
-                  rowBorder = '1px solid #fef3c7';
-                  textColor = '#92400e';
-                  subColor = '#d97706';
-                } else if (isPendingReview) {
-                  rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                  rowBorder = '1px dashed #eab308';
-                  textColor = '#713f12';
-                  subColor = '#ca8a04';
-                } else if (needsAcknowledge) {
-                  rowBg = 'repeating-linear-gradient(-45deg, #fff7ed 0px, #fff7ed 8px, #ffffff 8px, #ffffff 16px)';
-                  rowBorder = '1px dashed #f97316';
-                  textColor = '#ea580c';
-                  subColor = '#f97316';
-                }
-
-                const teacherName = `Lehrkraft: ${formatTeacherFullName(occ.teacher) || 'Lehrer'}`;
-
-                if (needsAcknowledge && isRescheduled && !isCanceled) {
-                  const origDateStr = occ.original_date ? `${formatWeekday(occ.original_date)}, ${formatDateGerman(occ.original_date)} • ${(occ.original_start_time || occ.start_time || '').substring(0, 5)} Uhr` : null;
-                  const newDateStr = `${formatWeekday(occ.date)}, ${formatDateGerman(occ.date)} • ${(occ.start_time || '').substring(0, 5)} Uhr`;
-
-                  return (
-                    <div
-                      key={occ.id}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        padding: '14px 16px',
-                        borderRadius: '18px',
-                        background: 'linear-gradient(135deg, #fffdf0 0%, #fefce8 100%)',
-                        border: '1px solid #fde047',
-                        gap: '12px',
-                        boxShadow: '0 4px 16px rgba(234, 179, 8, 0.08)',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      {/* Header Row: Teacher Info + Status Badge + Chat */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '10px',
-                            background: '#fef08a',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            flexShrink: 0
-                          }}>
-                            🗓️
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
-                              {teacherName}
-                            </span>
-                            <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              ⏳ Verschiebung angefragt
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveChatOcc(occ)}
-                          style={{
-                            border: isUnread ? '1px solid #fca5a5' : hasMessages ? '1px solid #fef08a' : '1px solid #e2e8f0',
-                            background: isUnread ? '#fee2e2' : '#ffffff',
-                            color: isUnread ? '#dc2626' : hasMessages ? '#ca8a04' : '#475569',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            position: 'relative',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
-                            flexShrink: 0
-                          }}
-                          title="Shoutbox öffnen"
-                        >
-                          <MessageSquare size={14} />
-                          {isUnread && (
-                            <span style={{
-                              position: 'absolute',
-                              top: '-2px',
-                              right: '-2px',
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              background: '#ef4444',
-                              border: '1.5px solid #ffffff'
-                            }} />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Visual Time Difference Banner */}
-                      <div style={{
-                        background: '#ffffff',
-                        border: '1px solid #fef08a',
-                        borderRadius: '12px',
-                        padding: '10px 12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px'
-                      }}>
-                        {origDateStr && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#64748b' }}>
-                            <span style={{ fontWeight: 650 }}>Ursprünglich:</span>
-                            <span>{origDateStr}</span>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', color: '#854d0e', fontWeight: 800 }}>
-                          <span style={{ fontSize: '0.7rem', background: '#fef9c3', padding: '2px 6px', borderRadius: '5px', color: '#a16207', fontWeight: 800 }}>Neu:</span>
-                          <span>{newDateStr}</span>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons Row */}
-                      <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleAcknowledgeOccurrence(occ)}
-                          style={{
-                            flex: 1,
-                            background: '#34a853',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '10px 12px',
-                            fontSize: '0.82rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '5px',
-                            boxShadow: '0 3px 10px rgba(52, 168, 83, 0.25)',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <Check size={15} /> Verschiebung annehmen
-                        </button>
-
-                        {pendingCancelOccId === occ.id ? (
-                          <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleRejectReschedule(occ);
-                                setPendingCancelOccId(null);
-                              }}
-                              style={{
-                                flex: 1,
-                                background: '#ef4444',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '12px',
-                                padding: '10px 8px',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Ja, ablehnen
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPendingCancelOccId(null)}
-                              style={{
-                                background: '#f1f5f9',
-                                color: '#475569',
-                                border: 'none',
-                                borderRadius: '12px',
-                                padding: '10px 10px',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Abbrechen
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!parentUnlocked && !profile?.parent_allow_absences) {
-                                alert('🛡️ Terminänderungen können nur von Erziehungsberechtigten abgelehnt werden. Bitte melde dich im Eltern-Tab mit der 6-stelligen Eltern-Master-PIN an.');
-                                return;
-                              }
-                              setPendingCancelOccId(occ.id);
-                            }}
-                            style={{
-                              background: '#fef2f2',
-                              color: '#dc2626',
-                              border: '1px solid #fecaca',
-                              borderRadius: '12px',
-                              padding: '10px 14px',
-                              fontSize: '0.82rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              whiteSpace: 'nowrap',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <X size={15} /> Ablehnen
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
+                const handleExecuteCancel = () => {
+                  handleCancelOccurrence(occ);
+                  setPendingCancelOccId(null);
+                };
 
                 return (
-                  <div
+                  <QrLessonAppointmentCard
                     key={occ.id}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      padding: '8px 12px',
-                      borderRadius: '14px',
-                      background: rowBg,
-                      border: rowBorder,
-                      gap: '4px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', width: '100%' }}>
-                      {/* Left side: Date Badge & Teacher Info */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: isCanceled ? '#fee2e2' : '#f1f5f9',
-                          borderRadius: '10px',
-                          width: '44px',
-                          height: '44px',
-                          border: isCanceled ? '1.5px solid #fca5a5' : '1px solid rgba(0,0,0,0.06)',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontSize: '9.5px', fontWeight: 900, textTransform: 'uppercase', color: isCanceled ? '#ef4444' : subColor, letterSpacing: '0.04em' }}>
-                            {formatWeekday(occ.date)}
-                          </span>
-                          <span style={{ fontSize: '15px', fontWeight: 900, color: isCanceled ? '#b91c1c' : textColor, marginTop: '-1px', lineHeight: 1 }}>
-                            {occ.date.substring(8, 10)}
-                          </span>
-                        </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-                          <span style={{ fontSize: '13.5px', fontWeight: 800, color: textColor, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                            {teacherName}
-                          </span>
-                          <span style={{ fontSize: '0.80rem', color: subColor, fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: 'none', marginTop: '2px' }}>
-                            {formatDateGerman(occ.date)} • {occ.start_time.substring(0, 5)} Uhr ({occ.duration} Min)
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Right side: Action Buttons & Shoutbox */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                        {needsAcknowledge && (
-                          <button
-                            type="button"
-                            onClick={() => handleAcknowledgeOccurrence(occ)}
-                            style={{
-                              background: '#34a853',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '10px',
-                              minHeight: '36px',
-                              padding: '6px 14px',
-                              fontSize: '0.80rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              whiteSpace: 'nowrap',
-                              boxShadow: '0 1px 3px rgba(52, 168, 83, 0.3)'
-                            }}
-                            title={isRescheduled ? 'Verschiebung bestätigen' : 'Änderung als gelesen markieren'}
-                          >
-                            <Check size={14} strokeWidth={2.5} /> {isRescheduled ? 'Bestätigen' : 'Gelesen'}
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveChatOcc(occ)}
-                          style={{
-                            border: isUnread ? '1px solid #fca5a5' : hasMessages ? '1px solid #fef08a' : '1px solid #e2e8f0',
-                            background: isUnread ? '#fee2e2' : hasMessages ? '#fefce8' : '#f8fafc',
-                            color: isUnread ? '#dc2626' : hasMessages ? '#ca8a04' : '#475569',
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            position: 'relative'
-                          }}
-                          title="Shoutbox öffnen"
-                        >
-                          <MessageSquare size={17} />
-                          {isUnread && (
-                            <span style={{
-                              position: 'absolute',
-                              top: '-2px',
-                              right: '-2px',
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              background: '#ef4444',
-                              border: '1.5px solid #ffffff'
-                            }} />
-                          )}
-                        </button>
-
-                        {!isCanceled ? (
-                          pendingCancelOccId === occ.id ? (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isRescheduled) {
-                                    handleRejectReschedule(occ);
-                                  } else {
-                                    handleCancelOccurrence(occ);
-                                  }
-                                  setPendingCancelOccId(null);
-                                }}
-                                style={{
-                                  background: '#ef4444',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  padding: '4px 8px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {isRescheduled ? 'Ja, ablehnen' : 'Ja, absagen'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPendingCancelOccId(null)}
-                                style={{
-                                  background: '#e2e8f0',
-                                  color: '#475569',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  padding: '4px 8px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                Abbrechen
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!parentUnlocked && !profile?.parent_allow_absences) {
-                                  alert('🛡️ Unterrichtsstunden können nur von Erziehungsberechtigten abgesagt werden. Bitte melde dich im Eltern-Tab mit der 6-stelligen Eltern-Master-PIN an.');
-                                  return;
-                                }
-                                setPendingCancelOccId(occ.id);
-                              }}
-                              style={{
-                                background: '#f8fafc',
-                                color: isRescheduled ? '#dc2626' : '#64748b',
-                                border: isRescheduled ? '1px solid #fca5a5' : '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                padding: '5px 9px',
-                                fontSize: '0.72rem',
-                                fontWeight: 750,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              <X size={12} /> {isRescheduled ? 'Ablehnen' : 'Absagen'}
-                            </button>
-                          )
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                              Entfällt
-                            </span>
-                            {occ.status === 'canceled_by_student' && (
-                              <button
-                                type="button"
-                                onClick={() => handleUndoCancel(occ)}
-                                style={{
-                                  background: '#ffffff',
-                                  color: '#dc2626',
-                                  border: '1px solid #fca5a5',
-                                  borderRadius: '8px',
-                                  padding: '4px 8px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                Reaktivieren
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Status badges row (for pending review / reschedule / acknowledge) */}
-                    {(isPendingReview || isRescheduled || needsAcknowledge) && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '1px' }}>
-                        {isPendingReview && (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                            ⏳ In Prüfung
-                          </span>
-                        )}
-                        {isRescheduled && (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                            Verschoben
-                          </span>
-                        )}
-                        {needsAcknowledge && (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                            ⏳ Bestätigung ausstehend
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                    occurrence={occ}
+                    roomName={occ.room_override_name || occ.room_name || occ.schedule?.room?.name || occ.room?.name}
+                    hasMessages={hasMessages}
+                    needsAcknowledge={needsAcknowledge}
+                    onAcknowledge={() => handleAcknowledgeOccurrence(occ)}
+                    onOpenChat={() => setActiveChatOcc(occ)}
+                    onOpenDecision={() => setStudentRescheduleModalOcc(occ)}
+                    onCancelRequest={handleCancelClick}
+                    isCancelPending={pendingCancelOccId === occ.id}
+                    onConfirmCancel={handleExecuteCancel}
+                    onDismissCancel={() => setPendingCancelOccId(null)}
+                    onUndoCancel={() => handleUndoCancel(occ)}
+                  />
                 );
               })}
             </div>
@@ -12386,6 +11942,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               if (activeChatOcc) {
                 setActiveChatOcc((prev: any) => prev ? ({ ...prev, status: newStatus, ...updatedOcc }) : null);
               }
+            }}
+          />,
+          document.body
+        )}
+
+        {/* 🏛️ 0,1% Goldstandard: Student Reschedule Decision Modal */}
+        {studentRescheduleModalOcc && createPortal(
+          <StudentRescheduleDecisionModal
+            isOpen={Boolean(studentRescheduleModalOcc)}
+            onClose={() => setStudentRescheduleModalOcc(null)}
+            occurrence={studentRescheduleModalOcc}
+            teacherName={studentRescheduleModalOcc?.teacher_name || formatTeacherFullName(studentRescheduleModalOcc?.teacher)}
+            instrumentName={studentRescheduleModalOcc?.instrument || studentRescheduleModalOcc?.subject}
+            onConfirm={async (occId) => {
+              const targetOcc = occurrences.find((o: any) => o.id === occId) || studentRescheduleModalOcc;
+              await handleAcknowledgeOccurrence(targetOcc);
+              setStudentRescheduleModalOcc(null);
+            }}
+            onReject={async (occ) => {
+              await handleRejectReschedule(occ);
+              setStudentRescheduleModalOcc(null);
+            }}
+            onOpenChat={() => {
+              setActiveChatOcc(studentRescheduleModalOcc);
+              setStudentRescheduleModalOcc(null);
             }}
           />,
           document.body

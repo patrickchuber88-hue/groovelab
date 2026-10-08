@@ -348,7 +348,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       fontSize: '10px',
-                                      color: 'white',
+                                      color: '#0f172a',
                                       fontWeight: 900,
                                     }}
                                   >

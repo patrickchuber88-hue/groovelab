@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
-import {
-  AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert,
-  Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown,
-  ChevronRight, FileText, Check, ArrowRight, Activity, Building, Building2,
-  HelpCircle, Download, AlertTriangle, MapPin, Search, Layers, Coffee, FileSpreadsheet
-} from 'lucide-react';
+import { AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert, Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown, ChevronRight, FileText, Check, ArrowRight, Activity, Building, Building2, HelpCircle, Download, AlertTriangle, MapPin, Search, Layers, Coffee, FileSpreadsheet } from 'lucide-react';
+import { SecretaryRoomCollisionAlertCard } from './widgets/SecretaryRoomCollisionAlertCard';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 export interface SecretaryRoomsViewProps {
   schoolId: string;
@@ -91,6 +88,7 @@ export function SecretaryRoomsView({
     if (controlledSetRoomsSubView) controlledSetRoomsSubView(v);
     setInternalRoomsSubView(v);
   };
+  const roomSettingsModalRef = useModalA11y(roomsSubView === 'settings', () => { setRoomsSubView('overview'); setEditingRoom(null); });
   const [editingRoom, setEditingRoom] = useState<any | null>(null);
   const [roomFormName, setRoomFormName] = useState('');
   const [roomFormFloor, setRoomFormFloor] = useState('EG');
@@ -678,9 +676,9 @@ export function SecretaryRoomsView({
 
           return (
             <>
+              <SecretaryRoomCollisionAlertCard schoolId={schoolId} />
               {roomsSubView !== 'settings' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', minWidth: 0, marginBottom: '24px' }}>
-                
                 {/* UNIFIED HEADER CARD (FULL WIDTH) */}
                 <div className="google-card" style={{
                   width: '100%',
@@ -2417,6 +2415,7 @@ export function SecretaryRoomsView({
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="room-settings-modal-title"
+                  ref={roomSettingsModalRef}
                   onClick={(e) => {
                     if (e.target === e.currentTarget) { setRoomsSubView('overview'); setEditingRoom(null); }
                   }}

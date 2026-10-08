@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import {
-  AlertCircle, BarChart2, Calendar, ChevronRight, Clock, CreditCard,
-  Download, FileText, HardDrive, Info, Lock, RefreshCw, ScrollText,
-  Search, Sparkles, Cloud, Zap, Rocket, Crown, Database, ShieldCheck,
-  School, Users, Award, CheckCircle2, Eye, Printer
+  AlertCircle, BarChart2, Calendar, ChevronRight, Clock, CreditCard, Download, FileText, HardDrive, Info, Lock, RefreshCw, ScrollText, Search, Sparkles, Cloud, Zap, Rocket, Crown, Database, ShieldCheck, School, Users, Award, CheckCircle2, Eye, Printer
 } from 'lucide-react';
+import { useModalA11y } from '../../hooks/useModalA11y';
 import { UniversalPdfPreviewModal } from '../modals/UniversalPdfPreviewModal';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../domain/pricingEngine';
@@ -347,6 +345,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
   const [selectedDashboardMonth, setSelectedDashboardMonth] = useState<number>(() => new Date().getMonth());
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<number>(() => new Date().getFullYear());
   const [activationSearchQuery, setActivationSearchQuery] = useState<string>('');
+  const successModalRef = useModalA11y(showSuccessModal, () => setShowSuccessModal(false));
 
   // 🏛️ Universal High-Fidelity PDF Preview Modal State (0,1% Goldstandard)
   const [pdfPreviewState, setPdfPreviewState] = useState<{
@@ -527,7 +526,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         : (isCurrent ? '#34a853' : '#f1f5f9'),
                                       color: isPassed || isCurrent 
                                         ? '#ffffff' 
-                                        : '#94a3b8',
+                                        : '#64748b',
                                       border: isPassed || isCurrent 
                                         ? 'none' 
                                         : '1px solid #e2e8f0',
@@ -546,7 +545,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     <span style={{ 
                                       fontSize: '0.78rem', 
                                       fontWeight: isCurrent ? 800 : (isPassed ? 700 : 500), 
-                                      color: isCurrent ? '#0f172a' : (isPassed ? '#15803d' : '#94a3b8'),
+                                      color: isCurrent ? '#0f172a' : (isPassed ? '#15803d' : '#64748b'),
                                       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Outfit", sans-serif',
                                       letterSpacing: '-0.01em',
                                       whiteSpace: 'nowrap'
@@ -653,7 +652,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
                                     <span style={{ fontWeight: 900, color: '#1e293b' }}>{effectiveSchoolRates.priceCampus.toFixed(2).replace('.', ',')} € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
-                                    <span style={{ color: hasCampusSub ? '#34a853' : '#94a3b8', fontWeight: 800 }}>{hasCampusSub ? 'Aktiviert' : 'Bereit'}</span>
+                                    <span style={{ color: hasCampusSub ? '#34a853' : '#64748b', fontWeight: 800 }}>{hasCampusSub ? 'Aktiviert' : 'Bereit'}</span>
                                   </div>
                                 </div>
 
@@ -708,7 +707,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
                                     <span style={{ fontWeight: 900, color: '#1e293b' }}>{effectiveSchoolRates.priceGroovelab.toFixed(2).replace('.', ',')} € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
-                                    <span style={{ color: hasGroovelabSub ? '#a16207' : '#94a3b8', fontWeight: 800 }}>{hasGroovelabSub ? 'Aktiviert' : 'Bereit'}</span>
+                                    <span style={{ color: hasGroovelabSub ? '#a16207' : '#64748b', fontWeight: 800 }}>{hasGroovelabSub ? 'Aktiviert' : 'Bereit'}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1507,15 +1506,15 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               {/* Section 2: Student Activation Payment Method */}
                               {billingPayer === 'school' ? (
                                 <div style={{
-                                  background: '#f0fdf4',
-                                  border: '1.5px solid #86efac',
+                                  background: '#ecfdf5',
+                                  border: '1.5px solid #10b981',
                                   borderRadius: '16px',
                                   padding: '16px 20px',
                                   display: 'flex',
                                   alignItems: 'flex-start',
                                   gap: '12px'
                                 }}>
-                                  <div style={{ background: '#dcfce7', padding: '6px', borderRadius: '8px', color: '#15803d', marginTop: '2px' }}>
+                                  <div style={{ background: '#ffffff', padding: '6px', borderRadius: '8px', color: '#10b981', marginTop: '2px' }}>
                                     <Info size={18} />
                                   </div>
                                   <div style={{ fontSize: '0.8rem', color: '#166534', lineHeight: 1.5 }}>
@@ -1527,8 +1526,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 </div>
                               ) : (
                                 <div style={{
-                                  background: '#f0fdf4',
-                                  border: '1.5px solid #86efac',
+                                  background: '#ecfdf5',
+                                  border: '1.5px solid #10b981',
                                   borderRadius: '16px',
                                   padding: '18px 20px',
                                   display: 'flex',
@@ -1536,7 +1535,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   gap: '10px'
                                 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{ background: '#dcfce7', padding: '6px', borderRadius: '8px', color: '#15803d' }}>
+                                    <div style={{ background: '#ffffff', padding: '6px', borderRadius: '8px', color: '#10b981' }}>
                                       <CreditCard size={18} />
                                     </div>
                                     <div>
@@ -2090,7 +2089,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                           }}>
                             <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ABRECHNUNG &amp; TARIFE</span>
+                                <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ABRECHNUNG &amp; TARIFE</span>
                                 <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Vorschau der Buchung</h4>
                               </div>
                               <span style={{ fontSize: '0.68rem', background: '#e6f4ea', color: '#166534', padding: '4px 10px', borderRadius: '9999px', fontWeight: 700 }}>
@@ -2231,6 +2230,10 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="license-booking-success-title"
+                        ref={successModalRef}
+                        onClick={(e) => {
+                          if (e.target === e.currentTarget) setShowSuccessModal(false);
+                        }}
                         style={{
                         position: 'fixed',
                         top: 0,
@@ -2617,8 +2620,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                             </div>
                                           ) : (
                                             <div style={{
-                                              background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-                                              border: '1.5px dashed #86efac',
+                                              background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)',
+                                              border: '1.5px dashed #10b981',
                                               padding: '14px 18px',
                                               borderRadius: '16px',
                                               display: 'flex',
@@ -3096,7 +3099,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         }}>
                                           <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
-                                              <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ABRECHNUNG &amp; TARIFE</span>
+                                              <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ABRECHNUNG &amp; TARIFE</span>
                                               <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Aktuelle Ratenübersicht</h4>
                                             </div>
                                             {subscriptionBypass && (
@@ -3244,14 +3247,14 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                               {isInitialUnsettled && !cachedSnapshot ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                                                   <div className="animate-pulse" style={{ height: '28px', width: '130px', background: 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)', borderRadius: '8px' }} />
-                                                  <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Wird berechnet...</div>
+                                                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Wird berechnet...</div>
                                                 </div>
                                               ) : (
                                                 <>
                                                   <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em' }}>
                                                     {(Number(displayTotalRate) || 0).toFixed(2).replace('.', ',')} € / Mo.
                                                   </div>
-                                                  <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Kleinunternehmerregelung (0% MwSt)</div>
+                                                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Kleinunternehmerregelung (0% MwSt)</div>
                                                 </>
                                               )}
                                             </div>
@@ -4581,14 +4584,14 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                           }}>
                             {/* Card 0: Amtliches B2B-Vertragszertifikat (SaaS-Mietvertrag & AVV) */}
                             <div style={{
-                              background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                              background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)',
                               borderRadius: '20px',
-                              border: '1.5px solid #86efac',
+                              border: '1.5px solid #10b981',
                               padding: '22px',
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
-                              boxShadow: '0 4px 12px -2px rgba(22, 101, 52, 0.06)'
+                              boxShadow: '0 4px 12px -2px rgba(16, 185, 129, 0.06)'
                             }}>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
@@ -4596,7 +4599,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     width: '38px',
                                     height: '38px',
                                     borderRadius: '10px',
-                                    background: '#15803d',
+                                    background: '#10b981',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',

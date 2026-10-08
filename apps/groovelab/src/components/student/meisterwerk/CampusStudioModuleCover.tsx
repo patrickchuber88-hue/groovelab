@@ -100,8 +100,8 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
     xs: { dim: 28, radius: 7, iconSize: 14, strokeWidth: 2.2 },
     sm: { dim: 40, radius: 10, iconSize: 18, strokeWidth: 2.3 },
     md: { dim: 56, radius: 14, iconSize: 26, strokeWidth: 2.3 },
-    lg: { dim: 72, radius: 18, iconSize: 34, strokeWidth: 2.3 },
-    xl: { dim: 96, radius: 22, iconSize: 44, strokeWidth: 2.5 }
+    lg: { dim: 78, radius: 19, iconSize: 36, strokeWidth: 2.3 },
+    xl: { dim: 96, radius: 23, iconSize: 46, strokeWidth: 2.5 }
   }[size];
 
   // Modul-Spezifische Farbverläufe, Schatten & Icons
@@ -311,6 +311,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
           ? '1.5px solid #cbd5e1'
           : 'none',
         boxSizing: 'border-box',
+        maxWidth: '100%',
         flexShrink: 0,
         filter: 'none',
         transition: 'transform 0.16s ease, box-shadow 0.16s ease',

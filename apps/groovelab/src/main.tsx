@@ -242,9 +242,9 @@ class GlobalErrorBoundary extends React.Component<
                       type="button"
                       onClick={this.handleCopyDiagnostics}
                       style={{
-                        background: this.state.copied ? '#dcfce7' : '#ffffff',
-                        border: `1px solid ${this.state.copied ? '#86efac' : '#cbd5e1'}`,
-                        color: this.state.copied ? '#15803d' : '#0f172a',
+                        background: this.state.copied ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                        border: this.state.copied ? 'none' : '1px solid #cbd5e1',
+                        color: this.state.copied ? '#ffffff' : '#0f172a',
                         padding: '3px 8px',
                         borderRadius: '6px',
                         fontSize: '0.68rem',

@@ -16,7 +16,8 @@ import {
   Lock,
   X
 } from 'lucide-react';
-import { getSimulatedNow } from '../../studentDateUtils';
+import { getSimulatedNow, toLocalYYYYMMDD } from '../../studentDateUtils';
+import { isOccurrenceCancelled, isOccurrenceRescheduled, isOccurrencePendingReschedule } from './studentNextLessonHelper';
 
 export interface StudentBriefingRightSidebarProps {
   isMobileSheet?: boolean;
@@ -37,6 +38,7 @@ export interface StudentBriefingRightSidebarProps {
   handleRejectReschedule: (occ: any) => void;
   handleAcknowledgeCancellation: (occ: any) => void;
   onOpenRescheduleBottomSheet?: (occ: any) => void;
+  onOpenAppointmentDetail?: (occ: any) => void;
   studentFeedTab: string;
   setStudentFeedTab: (tab: string) => void;
   campusFeedAnnouncements: any[];
@@ -75,6 +77,7 @@ export function StudentBriefingRightSidebar({
   handleRejectReschedule,
   handleAcknowledgeCancellation,
   onOpenRescheduleBottomSheet,
+  onOpenAppointmentDetail,
   studentFeedTab,
   setStudentFeedTab,
   campusFeedAnnouncements,
@@ -113,9 +116,12 @@ export function StudentBriefingRightSidebar({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '4px 2px 4px 2px'
+                  padding: '4px 2px 4px 2px',
+                  gap: '8px',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
                     <div style={{
                       width: '28px',
                       height: '28px',
@@ -123,11 +129,21 @@ export function StudentBriefingRightSidebar({
                       background: '#e6f4ea',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      flexShrink: 0
                     }}>
                       <Calendar size={15} color="#34a853" />
                     </div>
-                    <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                    <span style={{ 
+                      fontWeight: 950, 
+                      fontSize: '0.82rem', 
+                      color: '#1e293b', 
+                      letterSpacing: '-0.02em', 
+                      textTransform: 'uppercase',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
                       Termine &amp; Mitteilungen
                     </span>
                     {sidebarTotalAlertsCount > 0 && (
@@ -137,7 +153,8 @@ export function StudentBriefingRightSidebar({
                         fontSize: '0.65rem',
                         fontWeight: 900,
                         padding: '2px 7px',
-                        borderRadius: '100px'
+                        borderRadius: '100px',
+                        flexShrink: 0
                       }}>
                         {sidebarTotalAlertsCount}
                       </span>
@@ -146,25 +163,25 @@ export function StudentBriefingRightSidebar({
 
                   <button
                     onClick={() => handleToggleRightSidebar(true)}
+                    aria-label="Sidebar einklappen"
+                    title="Sidebar einklappen"
                     style={{
-                      background: 'rgba(52, 168, 83, 0.08)',
-                      border: '1.5px solid rgba(52, 168, 83, 0.30)',
-                      borderRadius: '10px',
-                      padding: '6px 10px',
+                      width: '28px',
+                      height: '28px',
+                      background: 'rgba(52, 168, 83, 0.10)',
+                      border: 'none',
+                      borderRadius: '8px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      justifyContent: 'center',
                       cursor: 'pointer',
                       color: '#34a853',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0
                     }}
                     className="hover-scale"
-                    title="Sidebar einklappen"
                   >
-                    <span>Einklappen</span>
-                    <ChevronRight size={14} color="#34a853" />
+                    <ChevronRight size={16} color="#34a853" />
                   </button>
                 </div>
               )}
@@ -183,14 +200,21 @@ export function StudentBriefingRightSidebar({
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {(() => {
-                    const todayStr = new Date().toLocaleDateString('sv-SE');
+                    const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                     const combinedList = [...(scheduleOccurrences || []), ...(schoolYearOccurrences || [])];
-                    const seenKeys = new Set<string>();
-                    const upcomingConfirmed = combinedList.filter(occ => {
+                    const validOccurrences = combinedList.filter(occ => {
                       if (!occ || !occ.date) return false;
                       if (occ.date < todayStr) return false;
-                      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student') return false;
-                      const key = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+                      if (occ.status === 'rescheduled_away') return false;
+                      return true;
+                    });
+                    validOccurrences.sort((a, b) => {
+                      if (a.date !== b.date) return a.date.localeCompare(b.date);
+                      return (a.start_time || '').localeCompare(b.start_time || '');
+                    });
+                    const seenKeys = new Set<string>();
+                    const upcomingConfirmed = validOccurrences.filter(occ => {
+                      const key = occ.id || `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
                       if (seenKeys.has(key)) return false;
                       seenKeys.add(key);
                       return true;
@@ -198,262 +222,185 @@ export function StudentBriefingRightSidebar({
                     if (upcomingConfirmed.length > 0) {
                       return upcomingConfirmed.slice(0, 4).map(occ => {
                         const d = new Date(occ.date);
-                        const isCancelled = occ.status === 'cancelled';
-                        
-                        if (isCancelled) {
-                          return (
-                            <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                              <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                                 <div style={{ background: '#ef4444', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                                 <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
-                              </div>
-                              
-                              <div style={{ 
-                                flex: 1, 
-                                background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                                boxShadow: '0 4px 10px rgba(239, 68, 68, 0.1)',
-                                borderRadius: '14px',
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px'
-                              }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: '#000000', color: '#ffffff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
-                                  </div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: 'rgba(255, 255, 255, 0.95)', fontWeight: 650, marginTop: '3px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>{getOccRoomName(occ)}</span>
-                                  </div>
-                                </div>
+                        const isCancelled = isOccurrenceCancelled(occ);
+                        const isRescheduled = !isCancelled && isOccurrenceRescheduled(occ);
+                        const isPendingProposal = isRescheduled && isOccurrencePendingReschedule(occ);
 
-                                <button
-                                  onClick={() => {
-                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                    const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                    const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Ausfall)`;
-                                    setAppointmentChatData({
-                                      ...occ,
-                                      teacherId: occ.teacher_id,
-                                      teacher_id: occ.teacher_id,
-                                      teacher: occ.teacher || occ.teacher_profile,
-                                      teacher_name: occ.teacher_name || occ.teacherName,
-                                      date: occ.date,
-                                      start_time: occ.start_time?.substring(0, 5),
-                                      label,
-                                      occurrenceId: occ.id,
-                                      status: 'cancelled',
-                                      isCancelled: true
-                                    });
-                                    setShowAppointmentChat(true);
-                                  }}
-                                  title="Shoutbox zum Ausfall-Termin öffnen"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'),
-                                    color: (getOccurrenceUnreadCount(occ) > 0 || checkOccurrenceHasMessages(occ)) ? '#d97706' : '#ffffff',
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    flexShrink: 0
-                                  }}
-                                  onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
-                                >
-                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
-                                    {getOccurrenceUnreadCount(occ) > 0 && (
-                                      <span style={{
-                                        position: 'absolute',
-                                        top: '-4px',
-                                        right: '-4px',
-                                        width: '7px',
-                                        height: '7px',
-                                        borderRadius: '50%',
-                                        background: '#ea4335',
-                                        border: '1.5px solid #ffffff',
-                                        boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
-                                      }} />
-                                    )}
-                                  </div>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
+                        const handleCardClick = () => {
+                          if (isPendingProposal && onOpenRescheduleBottomSheet) {
+                            onOpenRescheduleBottomSheet(occ);
+                          } else if (onOpenAppointmentDetail) {
+                            onOpenAppointmentDetail(occ);
+                          }
+                        };
 
-                        const isRescheduled = occ.status === 'rescheduled_confirmed';
-                        if (isRescheduled) {
-                          return (
-                            <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                              <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                                 <div style={{ background: '#eab308', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                                 <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
-                              </div>
-                              
-                              <div style={{ 
-                                flex: 1, 
-                                background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
-                                boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
-                                borderRadius: '14px',
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px'
-                              }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: '#000000', color: '#ffffff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
-                                  </div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 650, marginTop: '3px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>{getOccRoomName(occ)}</span>
-                                  </div>
-                                </div>
+                        const handleChatClick = (e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                          const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
+                          const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                          const statusSuffix = isCancelled ? ' (Ausfall)' : (isRescheduled ? (isPendingProposal ? ' (Vorschlag)' : ' (Verschoben)') : '');
+                          const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr${statusSuffix}`;
+                          setAppointmentChatData({
+                            ...occ,
+                            teacherId: occ.teacher_id,
+                            teacher_id: occ.teacher_id,
+                            teacher: occ.teacher || occ.teacher_profile,
+                            teacher_name: occ.teacher_name || occ.teacherName,
+                            date: occ.date,
+                            start_time: occ.start_time?.substring(0, 5),
+                            label,
+                            occurrenceId: occ.id,
+                            status: occ.status || (isCancelled ? 'cancelled' : (isRescheduled ? 'rescheduled_confirmed' : 'scheduled')),
+                            isCancelled
+                          });
+                          setShowAppointmentChat(true);
+                        };
 
-                                <button
-                                  onClick={() => {
-                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                    const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                    const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr (Verschoben)`;
-                                    setAppointmentChatData({
-                                      ...occ,
-                                      teacherId: occ.teacher_id,
-                                      teacher_id: occ.teacher_id,
-                                      teacher: occ.teacher || occ.teacher_profile,
-                                      teacher_name: occ.teacher_name || occ.teacherName,
-                                      date: occ.date,
-                                      start_time: occ.start_time?.substring(0, 5),
-                                      label,
-                                      occurrenceId: occ.id,
-                                      status: 'rescheduled_confirmed',
-                                      isCancelled: false
-                                    });
-                                    setShowAppointmentChat(true);
-                                  }}
-                                  title="Shoutbox zum verschobenen Termin öffnen"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'),
-                                    color: checkOccurrenceHasMessages(occ) ? '#ffffff' : '#78350f',
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    flexShrink: 0
-                                  }}
-                                  onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
-                                >
-                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
-                                    {getOccurrenceUnreadCount(occ) > 0 && (
-                                      <span style={{
-                                        position: 'absolute',
-                                        top: '-4px',
-                                        right: '-4px',
-                                        width: '7px',
-                                        height: '7px',
-                                        borderRadius: '50%',
-                                        background: '#ea4335',
-                                        border: '1.5px solid #ffffff',
-                                        boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
-                                      }} />
-                                    )}
-                                  </div>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
+                        const unreadCount = getOccurrenceUnreadCount(occ);
+                        const hasMsg = checkOccurrenceHasMessages(occ);
+
+                        // 🎨 0,1% Goldstandard: 3-Farben-Doktrin (Regulär = Grün, Verschoben = Gelb/Amber, Ausfall = Rot)
+                        const calendarHeaderBg = isCancelled ? '#ef4444' : (isRescheduled ? '#eab308' : '#34a853');
+                        const cardBg = isCancelled 
+                          ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
+                          : isRescheduled 
+                            ? 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)' 
+                            : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.03) 100%)';
+                        const cardBorder = isCancelled
+                          ? 'none'
+                          : isRescheduled
+                            ? 'none'
+                            : '1px solid rgba(52, 168, 83, 0.22)';
+                        const cardShadow = isCancelled
+                          ? '0 4px 10px rgba(239, 68, 68, 0.15)'
+                          : isRescheduled
+                            ? '0 4px 10px rgba(234, 179, 8, 0.12)'
+                            : 'none';
+                        const titleColor = isCancelled ? '#ffffff' : (isRescheduled ? '#78350f' : '#1e293b');
+                        const subtitleColor = isCancelled ? 'rgba(255, 255, 255, 0.95)' : (isRescheduled ? 'rgba(120, 53, 15, 0.95)' : '#475569');
+                        const roomColor = isCancelled ? '#fee2e2' : (isRescheduled ? '#b45309' : '#15803d');
+                        const badgeBg = isCancelled ? '#000000' : (isRescheduled ? (isPendingProposal ? '#b45309' : '#000000') : '#34a853');
+                        const badgeColor = '#ffffff';
+                        const badgeText = isCancelled ? 'Ausfall' : (isRescheduled ? (isPendingProposal ? 'Vorschlag' : 'Verschoben') : 'Regulär');
+
+                        const chatBtnBg = isCancelled 
+                          ? (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'))
+                          : isRescheduled
+                            ? (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'))
+                            : (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef3c7' : '#f8fafc'));
+                        const chatBtnColor = isCancelled
+                          ? ((unreadCount > 0 || hasMsg) ? '#d97706' : '#ffffff')
+                          : isRescheduled
+                            ? (hasMsg ? '#ffffff' : '#78350f')
+                            : ((unreadCount > 0 || hasMsg) ? '#d97706' : '#475569');
 
                         return (
-                          <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                            <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
-                              <div style={{ background: '#34a853', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                              <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
+                          <div 
+                            key={occ.id} 
+                            role="button"
+                            tabIndex={0}
+                            onClick={handleCardClick}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleCardClick();
+                              }
+                            }}
+                            style={{ 
+                              display: 'flex', 
+                              gap: '16px', 
+                              alignItems: 'center', 
+                              borderBottom: '1px solid #f1f5f9', 
+                              paddingBottom: '16px',
+                              cursor: 'pointer',
+                              borderRadius: '16px',
+                              outline: 'none',
+                              transition: 'transform 0.15s ease, opacity 0.15s ease'
+                            }}
+                            className="hover-scale"
+                            title={
+                              isCancelled 
+                                ? 'Ausfall-Termin – Klicke für Details' 
+                                : isRescheduled 
+                                  ? (isPendingProposal ? 'Verschobenen Termin prüfen – Klicke zum Bestätigen/Ablehnen' : 'Verschobener Termin – Klicke für Details')
+                                  : 'Unterrichtstermin – Klicke für Details'
+                            }
+                          >
+                            {/* Kalender-Tag-Widget */}
+                            <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                              <div style={{ background: calendarHeaderBg, color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>
+                                {d.toLocaleDateString('de-DE', { month: 'short' })}
                               </div>
-                              <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#475569', fontWeight: 650 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#15803d', fontWeight: 800 }}>{getOccRoomName(occ)}</span></div>
-                            </div>
-                            <button
-                              onClick={() => {
-                                const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                const dayLabel = DAYS_DE[new Date(occ.date).getDay()];
-                                const formattedDate = new Date(occ.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr`;
-                                setAppointmentChatData({
-                                      ...occ,
-                                      teacherId: occ.teacher_id,
-                                      teacher_id: occ.teacher_id,
-                                      teacher: occ.teacher || occ.teacher_profile,
-                                      teacher_name: occ.teacher_name || occ.teacherName,
-                                      date: occ.date,
-                                  start_time: occ.start_time?.substring(0, 5),
-                                  label,
-                                  occurrenceId: occ.id,
-                                  status: occ.status || 'scheduled',
-                                  isCancelled: false
-                                });
-                                setShowAppointmentChat(true);
-                              }}
-                              title="Shoutbox öffnen"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#f8fafc'),
-                                color: (getOccurrenceUnreadCount(occ) > 0 || checkOccurrenceHasMessages(occ)) ? '#d97706' : '#475569',
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                marginLeft: 'auto',
-                                flexShrink: 0
-                              }}
-                              onMouseOver={e => {
-                                e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : '#f1f5f9';
-                                e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#1e293b';
-                              }}
-                              onMouseOut={e => {
-                                e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#ffffff';
-                                e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#475569';
-                              }}
-                            >
-                              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
-                                {getOccurrenceUnreadCount(occ) > 0 && (
-                                  <span style={{
-                                    position: 'absolute',
-                                    top: '-4px',
-                                    right: '-4px',
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    background: '#ea4335',
-                                    border: '1.5px solid #ffffff',
-                                    boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
-                                  }} />
-                                )}
+                              <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>
+                                {d.toLocaleDateString('de-DE', { day: '2-digit' })}
                               </div>
-                            </button>
+                            </div>
+
+                            {/* Info-Karte */}
+                            <div style={{ 
+                              flex: 1, 
+                              background: cardBg,
+                              border: cardBorder,
+                              boxShadow: cardShadow,
+                              borderRadius: '14px',
+                              padding: '10px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              minWidth: 0
+                            }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: titleColor, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span>{d.toLocaleDateString('de-DE', { weekday: 'long' })}</span>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: badgeBg, color: badgeColor, padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                                    {badgeText}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: subtitleColor, fontWeight: 650, marginTop: '3px' }}>
+                                  {occ.start_time?.substring(0, 5)} Uhr <span style={{ color: roomColor, fontWeight: 800 }}>{getOccRoomName(occ)}</span>
+                                </div>
+                              </div>
+
+                              {/* Shoutbox Button (entkoppelt per stopPropagation) */}
+                              <button
+                                type="button"
+                                onClick={handleChatClick}
+                                title={isCancelled ? 'Shoutbox zum Ausfall-Termin öffnen' : (isRescheduled ? 'Shoutbox zum verschobenen Termin öffnen' : 'Shoutbox öffnen')}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: chatBtnBg,
+                                  color: chatBtnColor,
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  marginLeft: 'auto',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <MessageSquare size={14} fill={hasMsg ? 'currentColor' : 'none'} />
+                                  {unreadCount > 0 && (
+                                    <span style={{
+                                      position: 'absolute',
+                                      top: '-4px',
+                                      right: '-4px',
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: '#ea4335',
+                                      border: 'none',
+                                      boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
+                                    }} />
+                                  )}
+                                </div>
+                              </button>
+                            </div>
                           </div>
                         );
                       });
@@ -466,7 +413,7 @@ export function StudentBriefingRightSidebar({
                         if (effectiveLevel === 'junior') {
                           return (
                             <div style={{
-                              background: 'linear-gradient(135deg, #fffbeb 0%, #f0fdf4 50%, #eff6ff 100%)',
+                              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                               border: '1.5px solid #bbf7d0',
                               borderRadius: '20px',
                               padding: '20px 16px',
@@ -776,7 +723,7 @@ export function StudentBriefingRightSidebar({
                                       background: '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
-                                      minHeight: '40px',
+                                      minHeight: '44px',
                                       padding: '8px 14px', 
                                       borderRadius: '12px', 
                                       fontSize: '0.82rem', 
@@ -804,7 +751,7 @@ export function StudentBriefingRightSidebar({
                                       background: '#34a853', 
                                       color: 'white', 
                                       border: 'none', 
-                                      minHeight: '40px',
+                                      minHeight: '44px',
                                       padding: '8px 14px', 
                                       borderRadius: '12px', 
                                       fontSize: '0.82rem', 

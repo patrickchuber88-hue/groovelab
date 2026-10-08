@@ -68,8 +68,9 @@ export interface ProgressItem {
 }
 
 export const formatPageNumbers = (pages: number[]): string => {
-  if (pages.length === 0) return '';
-  const sorted = [...pages].sort((a, b) => a - b);
+  if (!pages || pages.length === 0) return '';
+  const sorted = Array.from(new Set(pages.filter(p => typeof p === 'number' && !isNaN(p)))).sort((a, b) => a - b);
+  if (sorted.length === 0) return '';
   const ranges: string[] = [];
   let start = sorted[0];
   let end = start;
@@ -81,7 +82,7 @@ export const formatPageNumbers = (pages: number[]): string => {
       if (start === end) {
         ranges.push(`${start}`);
       } else {
-        ranges.push(`${start}–${end}`);
+        ranges.push(`${start}-${end}`);
       }
       start = sorted[i];
       end = start;
@@ -90,12 +91,78 @@ export const formatPageNumbers = (pages: number[]): string => {
   if (start === end) {
     ranges.push(`${start}`);
   } else {
-    ranges.push(`${start}–${end}`);
+    ranges.push(`${start}-${end}`);
   }
   
-  if (ranges.length === 1) return `S. ${ranges[0]}`;
-  const last = ranges.pop();
-  return `S. ${ranges.join(', ')} & ${last}`;
+  return `S. ${ranges.join(', ')}`;
+};
+
+/**
+ * 0.1% Goldstandard Formatter: Formatiert Hausaufgaben-Übungen verlustfrei und konsekutiv.
+ * Z.B. ['1', '2', '3', '4'] -> 'Üb. 1–4'
+ * ['1', '2', '5'] -> 'Üb. 1–2, 5'
+ * Alphanumerische Übungen ('1', '2a', '3') werden sauber integriert.
+ * Verhindert Informationsverlust durch Abschneiden ('...').
+ */
+export const formatConsecutiveExerciseRanges = (
+  exercises?: (string | number)[] | null,
+  prefix = 'Üb. '
+): string => {
+  if (!exercises || !Array.isArray(exercises) || exercises.length === 0) return '';
+
+  const cleaned = exercises
+    .map(e => String(e).replace(/^(?:Nr\.|Üb\.|Übung)\s*/i, '').trim())
+    .filter(e => e.length > 0);
+
+  if (cleaned.length === 0) return '';
+
+  const numericValues: number[] = [];
+  const nonNumericValues: string[] = [];
+
+  cleaned.forEach(item => {
+    const num = Number(item);
+    if (!isNaN(num) && Number.isInteger(num) && num > 0) {
+      numericValues.push(num);
+    } else {
+      nonNumericValues.push(item);
+    }
+  });
+
+  const parts: string[] = [];
+
+  if (numericValues.length > 0) {
+    const sorted = Array.from(new Set(numericValues)).sort((a, b) => a - b);
+    let start = sorted[0];
+    let end = start;
+
+    for (let i = 1; i < sorted.length; i++) {
+      const current = sorted[i];
+      if (current === end + 1) {
+        end = current;
+      } else {
+        if (start === end) {
+          parts.push(`${start}`);
+        } else {
+          parts.push(`${start}–${end}`);
+        }
+        start = current;
+        end = current;
+      }
+    }
+    if (start === end) {
+      parts.push(`${start}`);
+    } else {
+      parts.push(`${start}–${end}`);
+    }
+  }
+
+  if (nonNumericValues.length > 0) {
+    const uniqueNonNumeric = Array.from(new Set(nonNumericValues));
+    parts.push(...uniqueNonNumeric);
+  }
+
+  if (parts.length === 0) return '';
+  return `${prefix}${parts.join(', ')}`;
 };
 
 export const getCleanPageNotes = (notes: any): string => {

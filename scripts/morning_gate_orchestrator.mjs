@@ -37,7 +37,10 @@ const guards = [
   { id: 'ISO27001_COMPLIANCE', name: 'ISO/IEC 27001 & ISO 27701 Compliance Guard', cmd: 'node', args: ['scripts/iso27001_compliance_guard.mjs'] },
   { id: 'MONOLITH_CAP_GUARD', name: 'Monolith Ceiling & Zero-Inline-Feature Guard', cmd: 'node', args: ['scripts/monolith_growth_guard.mjs'] },
   { id: 'NEUTRAL_AUSFALL', name: 'Neutral Ausfall Guard (DSGVO Art. 9 / No Sick Tokens)', cmd: 'node', args: ['scripts/verify_neutral_ausfall_invariants.mjs'] },
-  { id: 'PARENT_PORTAL_GOVERNANCE', name: 'Parental Governance & Child Protection Guard (OWASP/BGB/DSGVO)', cmd: 'node', args: ['scripts/parent_portal_governance_guard.mjs'] }
+  { id: 'PARENT_PORTAL_GOVERNANCE', name: 'Parental Governance & Child Protection Guard (OWASP/BGB/DSGVO)', cmd: 'node', args: ['scripts/parent_portal_governance_guard.mjs'] },
+  { id: 'TEST_FACADE_GUARD', name: 'AST Mock-Facade & Test Authenticity Guard', cmd: 'node', args: ['scripts/test_facade_guard.mjs'] },
+  { id: 'SW_INTEGRITY', name: 'PWA Service Worker & Cache Integrity Guard (Build-Buster/Edge)', cmd: 'node', args: ['scripts/verify_sw_integrity.mjs'] },
+  { id: 'EXOCORTEX_INTEGRITY', name: 'Exocortex & Product Bible Integrity Guard (0,1% Goldstandard)', cmd: 'node', args: ['scripts/product_bible_guard.mjs', '--check'] }
 ];
 
 function runGuardAsync(guard) {

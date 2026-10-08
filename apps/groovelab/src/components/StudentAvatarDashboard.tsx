@@ -33,6 +33,7 @@ const StudentSettingsTab = lazy(() => import('./student/tabs/StudentSettingsTab'
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal || (m as any).default })));
 import { StudentScreenTimeGate, useStudentScreenTimeLock } from './student/gates/StudentScreenTimeGate';
+import { AuthoritativeHomeworkProvider } from './student/context/AuthoritativeHomeworkContext';
 
 
 export interface StudentAvatarDashboardProps {
@@ -69,16 +70,34 @@ export function StudentAvatarDashboard({
     getTargetMinutes: (streak: number) => getEngineTargetMinutes(profile.studentUser?.evolution_level || 1, streak)
   });
 
-  // 3. Streaks & Flame Engine Domain Hook
+  // 3. Mediathek, Songs & Lehrwerke Domain Hook
+  const songsData = useStudentSongsData({
+    studentId,
+    studentUser: profile.studentUser
+  });
+  const {
+    assignedCampusSongs,
+    lehrwerke,
+    progressItems,
+    localProgress,
+    activeSongSkills,
+    setActiveSongSkills,
+    isSongMastered,
+    progressLoading
+  } = songsData;
+
+  // 4. Streaks & Flame Engine Domain Hook
   const streaks = useStudentStreaks({
     studentId,
     studentUser: profile.studentUser,
     fokusLogs: practice.fokusLogs,
     sessionActive: practice.sessionActive,
-    secondsElapsed: practice.secondsElapsed
+    secondsElapsed: practice.secondsElapsed,
+    songSkills: activeSongSkills,
+    progressItems
   });
 
-  // 4. Parent Controls Domain Hook
+  // 5. Parent Controls Domain Hook
   const parent = useStudentParentControls({
     studentId,
     studentUser: profile.studentUser,
@@ -95,7 +114,7 @@ export function StudentAvatarDashboard({
     parentControls: parent
   });
 
-  // 5. Schedule & Cancellations Domain Hook
+  // 6. Schedule & Cancellations Domain Hook
   const schedule = useStudentSchedule({
     studentId,
     studentUser: profile.studentUser,
@@ -103,27 +122,11 @@ export function StudentAvatarDashboard({
     inMemoryParentPinRef: parent.inMemoryParentPinRef
   });
 
-  // 6. Feed & TTS Domain Hook
+  // 7. Feed & TTS Domain Hook
   const feed = useStudentFeed({
     studentId,
     studentUser: profile.studentUser
   });
-
-  // 7. Mediathek, Songs & Lehrwerke Domain Hook
-  const songsData = useStudentSongsData({
-    studentId,
-    studentUser: profile.studentUser
-  });
-  const {
-    assignedCampusSongs,
-    lehrwerke,
-    progressItems,
-    localProgress,
-    activeSongSkills,
-    setActiveSongSkills,
-    isSongMastered,
-    progressLoading
-  } = songsData;
   const [selectedSongForDetail, setSelectedSongForDetail] = useState<any | null>(null);
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [selectedTopic, setSelectedTopic] = useState('');
@@ -138,6 +141,20 @@ export function StudentAvatarDashboard({
     };
     window.addEventListener('campus_reset_homework_board', handleReset);
     return () => window.removeEventListener('campus_reset_homework_board', handleReset);
+  }, []);
+
+  // 🏛️ Tier-1 SWR Preload: Pre-warm CampusEventsBoard chunk in browser cache during idle
+  useEffect(() => {
+    const preloadEvents = () => {
+      import('./CampusEventsBoard');
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const handle = (window as any).requestIdleCallback(preloadEvents);
+      return () => (window as any).cancelIdleCallback(handle);
+    } else {
+      const timer = setTimeout(preloadEvents, 1800);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   // 🚀 Junior Space Mission & Sticker Engine Hook (Isomorphic Extraction)
@@ -267,7 +284,8 @@ export function StudentAvatarDashboard({
     setShowPushSoftPrompt,
     handleOpenHomeworkBookWithView,
     totalPracticeMinutes,
-    unifiedStickersMap
+    unifiedStickersMap,
+    songStats: songsData.songStats
   }), [
     studentId,
     profile,
@@ -288,7 +306,8 @@ export function StudentAvatarDashboard({
     selectedTopic,
     handleOpenHomeworkBookWithView,
     totalPracticeMinutes,
-    unifiedStickersMap
+    unifiedStickersMap,
+    songsData.songStats
   ]);
 
   const settingsTabProps = useMemo(() => buildStudentSettingsProps({
@@ -333,7 +352,15 @@ export function StudentAvatarDashboard({
           onOpenParentGate={() => parent.setShowParentGateModal(true)}
         />
       ) : (
-        <>
+        <AuthoritativeHomeworkProvider
+          studentId={studentId}
+          studentUser={profile.studentUser}
+          localProgress={localProgress}
+          lehrwerke={lehrwerke}
+          progressItems={progressItems}
+          activeSongSkills={activeSongSkills}
+          assignedCampusSongs={assignedCampusSongs}
+        >
           {/* 1. Übe-Board / Practice Tab */}
       {profile.visitedTabs.has('practice_board') && (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
@@ -352,7 +379,10 @@ export function StudentAvatarDashboard({
             handleFinishJuniorMission={handleFinishJuniorMission}
             handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
             handleCloseJuniorCelebration={handleCloseJuniorCelebration}
-            handleStartPracticeSession={async () => { practice.setSessionActive(true); }}
+            handleStartPracticeSession={async () => {
+              await practice.requestOrientationPermission?.();
+              practice.setSessionActive(true);
+            }}
             finishPracticeSession={practice.finishPracticeSession}
             logParentGuidedPractice={async () => {}}
             handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
@@ -572,7 +602,7 @@ export function StudentAvatarDashboard({
           <StudentSettingsTab {...settingsTabProps} />
         </Suspense>
       )}
-        </>
+        </AuthoritativeHomeworkProvider>
       )}
 
       {/* 10. Modals & Overlays Hub */}
@@ -592,6 +622,10 @@ export function StudentAvatarDashboard({
         pendingSiblingUnlock={parent.pendingSiblingUnlock}
         setPendingSiblingUnlock={parent.setPendingSiblingUnlock}
         executeSwitchFamilyStudent={parent.executeSwitchFamilyStudent}
+        isAddSiblingModalOpen={parent.isAddSiblingModalOpen}
+        setIsAddSiblingModalOpen={parent.setIsAddSiblingModalOpen}
+        familyProfiles={parent.familyProfiles}
+        setFamilyProfiles={parent.setFamilyProfiles}
         showJuniorPreFlightModal={showJuniorPreFlightModal}
         setShowJuniorPreFlightModal={setShowJuniorPreFlightModal}
         juniorMissionDetails={getJuniorMissionDetails()}
