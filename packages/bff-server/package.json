@@ -15,7 +15,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
     "http-proxy-middleware": "^2.0.6",
-    "jose": "^6.2.10"
+    "jose": "^6.2.10",
+    "proxy-addr": "^2.0.8"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.7",
