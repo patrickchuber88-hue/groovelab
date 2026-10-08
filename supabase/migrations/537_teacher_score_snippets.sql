@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS public.teacher_score_snippets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
-  teacher_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES public.users_raw(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   instrument TEXT NOT NULL DEFAULT 'piano',
   tempo_bpm INTEGER NOT NULL DEFAULT 80 CHECK (tempo_bpm BETWEEN 40 AND 240),

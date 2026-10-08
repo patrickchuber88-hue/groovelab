@@ -15,6 +15,8 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const APP_PKG = path.join(ROOT_DIR, 'apps', 'groovelab', 'package.json');
 const ROOT_LOCK = path.join(ROOT_DIR, 'package-lock.json');
 const OUTPUT_FILE = path.join(ROOT_DIR, 'apps', 'groovelab', 'dist', 'sbom.json');
+const OUTPUT_FILE_CDX = path.join(ROOT_DIR, 'apps', 'groovelab', 'dist', 'sbom.cdx.json');
+const OUTPUT_FILE_SHA = path.join(ROOT_DIR, 'apps', 'groovelab', 'dist', 'sbom.sha256');
 
 console.log('📦 Generiere dynamisches Software Bill of Materials (SBOM) nach NIST SP 800-161 & CycloneDX v1.5...');
 
@@ -101,6 +103,13 @@ const sbom = {
   components
 };
 
+const sbomJson = JSON.stringify(sbom, null, 2);
+const sha256Digest = crypto.createHash('sha256').update(sbomJson, 'utf-8').digest('hex');
+
 fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
-fs.writeFileSync(OUTPUT_FILE, JSON.stringify(sbom, null, 2), 'utf-8');
-console.log(`✅ Dynamisches CycloneDX SBOM erfolgreich erstellt (${components.length} Komponenten) unter: ${OUTPUT_FILE}`);
+fs.writeFileSync(OUTPUT_FILE, sbomJson, 'utf-8');
+fs.writeFileSync(OUTPUT_FILE_CDX, sbomJson, 'utf-8');
+fs.writeFileSync(OUTPUT_FILE_SHA, `SHA256 (sbom.cdx.json) = ${sha256Digest}\n`, 'utf-8');
+
+console.log(`✅ Dynamisches CycloneDX SBOM erfolgreich erstellt (${components.length} Komponenten) unter: ${OUTPUT_FILE_CDX}`);
+console.log(`🔒 Kryptografisches SHA-256 Siegel: ${sha256Digest}`);

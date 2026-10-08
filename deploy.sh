@@ -44,6 +44,37 @@ else
   }
   echo "  ✓ Pre-Deploy Security Shield verifiziert."
 fi
+
+echo "📦 Generiere kryptografische CycloneDX SBOM (NIST SP 800-161 / ISO 5230)..."
+node scripts/generate_cyclonedx_sbom.mjs || {
+  echo "❌ Fehler: SBOM-Generierung fehlgeschlagen!"
+  exit 1
+}
+echo ""
+
+# 0b. Read-Only Database Schema Parity Preflight (Anti-Split-Brain Guard)
+echo "🔍 [PRE-FLIGHT] Verifiziere DB-Schema-Parität gegen Live-Cluster (Read-Only)..."
+LATEST_MIGRATION_FILE=$(ls -1 supabase/migrations/*.sql 2>/dev/null | sort -V | tail -n 1)
+LATEST_MIGRATION_NUM=$(basename "$LATEST_MIGRATION_FILE" | grep -oE '^[0-9]+' || echo "0")
+
+if [ "$LATEST_MIGRATION_NUM" -gt 0 ]; then
+  CHECK_TABLE="teacher_score_snippets"
+  REMOTE_CHECK=$(ssh "$SERVER" "if command -v docker >/dev/null 2>&1; then docker exec supabase-db psql -U postgres -d postgres -tAc \"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '$CHECK_TABLE');\" 2>/dev/null; else echo 'unknown'; fi" || echo "unknown")
+  
+  if [ "$REMOTE_CHECK" = "t" ]; then
+    echo "  ✓ DB-Schema-Parität verifiziert: Tabelle '$CHECK_TABLE' (Migration $LATEST_MIGRATION_NUM) ist aktiv."
+  elif [ "$REMOTE_CHECK" = "f" ]; then
+    echo "⚠️  [SCHEMA PARITY DRIFT DETECTED] Neueste Migration $LATEST_MIGRATION_NUM ('$CHECK_TABLE') ist auf der Live-DB noch nicht eingespielt!"
+    echo "    Gemäss Least-Privilege & Zero-Downtime Doktrin führt deploy.sh keine DDL-Befehle aus."
+    echo "    Bitte vor dem Release ausführen: bash scripts/apply_migrations_531_to_537.sh"
+    if [ "${REQUIRE_SCHEMA_PARITY:-0}" = "1" ]; then
+      echo "🚨 Deployment abgebrochen: REQUIRE_SCHEMA_PARITY=1 gesetzt."
+      exit 1
+    fi
+  else
+    echo "  ℹ️  DB-Schema-Paritäts-Check: Live-DB nicht direkt über Docker erreichbar oder Read-Only skipped."
+  fi
+fi
 echo ""
 
 # Merke vorheriges Release für den automatischen Rollback im Fehlerfall

@@ -78,7 +78,7 @@ BEGIN
             RETURN v_decrypted;
         EXCEPTION WHEN OTHERS THEN
             v_decrypted := NULL;
-        END IF;
+        END;
     END IF;
 
     -- Attempt 2: Master Salt Fallback
@@ -88,7 +88,7 @@ BEGIN
             RETURN v_decrypted;
         EXCEPTION WHEN OTHERS THEN
             v_decrypted := NULL;
-        END IF;
+        END;
     END IF;
 
     -- Attempt 3: General System Key Fallback
@@ -98,7 +98,7 @@ BEGIN
             RETURN v_decrypted;
         EXCEPTION WHEN OTHERS THEN
             v_decrypted := NULL;
-        END IF;
+        END;
     END IF;
 
     RETURN '[Verschlüsselte Nachricht]';

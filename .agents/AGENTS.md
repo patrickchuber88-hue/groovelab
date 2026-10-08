@@ -1,6 +1,7 @@
 # Project Rules
 
 ## 🛡️ Enterprise+ Security Governance (OWASP ASVS Level 3 / Fail-Closed)
+- **Absolute 0% US-Cloud-Doktrin (Souveräne Datenhaltung & Zero US-Cloud Exposure)**: Es dürfen NIEMALS US-Cloud-Dienste (wie AWS, Google Cloud / GCP, Microsoft Azure, Cloudflare, Vercel oder Supabase US-Cloud) für Datenverarbeitung, Hosting, Backups oder CI/CD-Pipelines eingebunden oder genutzt werden. 100 % der Daten, Rechenkapazität, Backups und Deployments verbleiben ausnahmslos in ISO/IEC 27001 zertifizierten deutschen Rechenzentren (Hetzner Falkenstein / Nürnberg) oder Schweizer Standorten. Zero US CLOUD Act, Zero FISA 702 Exposition.
 - **Zero-Trust Frontend**: Browser-JavaScript, `localStorage`, `sessionStorage`, React-State und URL-Parameter besitzen NIEMALS Autorisierungs- oder Sicherheitswirkung. Keine sicherheitsrelevanten Entscheidungen im Frontend.
 - **Autoritative Auth-RPCs**: Logins (Ausweis, QR, PIN, Passkey, Master-Admin) laufen AUSNAHMSLOS über:
   - `authenticate_by_credential(p_credential, p_school_id)`
