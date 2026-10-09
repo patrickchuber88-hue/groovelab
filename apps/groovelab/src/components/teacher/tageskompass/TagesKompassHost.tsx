@@ -11,7 +11,7 @@ import {
 import { TagesKompassPreflight } from './TagesKompassPreflight';
 import { TagesKompassLive } from './TagesKompassLive';
 import { TagesKompassWrapUp } from './TagesKompassWrapUp';
-import { CalendarOff, Palmtree, UserX } from 'lucide-react';
+import { TagesKompassOffDayState } from './TagesKompassOffDayState';
 
 export interface TagesKompassHostProps {
   currentState: TagesKompassState;
@@ -115,34 +115,14 @@ export const TagesKompassHost: React.FC<TagesKompassHostProps> = ({
     return list;
   }, [timeline, prep]);
 
-  // Fallback-Zustände (Wochenende, Feiertag, Abwesenheit)
-  if (currentState === 'WOCHENENDE') {
+  // Fallback-Zustände (Wochenende, Feiertag, Abwesenheit) - 0,1% Goldstandard
+  if (currentState === 'WOCHENENDE' || currentState === 'UNTERRICHTSFREI' || currentState === 'ABWESENHEIT') {
     return (
-      <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-        <Palmtree size={32} color="#64748b" style={{ margin: '0 auto 10px auto' }} />
-        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>Schönes Wochenende!</h3>
-        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Heute findet kein regulärer Unterricht statt.</p>
-      </div>
-    );
-  }
-
-  if (currentState === 'UNTERRICHTSFREI') {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-        <CalendarOff size={32} color="#64748b" style={{ margin: '0 auto 10px auto' }} />
-        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>Unterrichtsfreier Tag</h3>
-        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Heute ist unterrichtsfrei (Schulferien oder Feiertag).</p>
-      </div>
-    );
-  }
-
-  if (currentState === 'ABWESENHEIT') {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center', background: '#fef2f2', borderRadius: '20px', border: '1.5px solid #fca5a5' }}>
-        <UserX size={32} color="#dc2626" style={{ margin: '0 auto 10px auto' }} />
-        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#991b1b' }}>Ausfall aktiv gemeldet</h3>
-        <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#b91c1c' }}>Deine Termine sind für diesen Zeitraum als Ausfall hinterlegt.</p>
-      </div>
+      <TagesKompassOffDayState
+        currentState={currentState}
+        teacher={teacher}
+        nextDaySummary={nextDaySummary}
+      />
     );
   }
 

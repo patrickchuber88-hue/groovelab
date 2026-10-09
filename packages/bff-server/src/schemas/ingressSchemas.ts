@@ -124,3 +124,46 @@ export const sentinelIncidentSchema = z
   .strict({ message: 'Unerwartete Parameter im Incident-Payload abgewiesen.' });
 
 export type SentinelIncidentInput = z.infer<typeof sentinelIncidentSchema>;
+
+// ── 5. Direct-to-Storage Presign Stream Ingress (Egress) ──
+export const presignStreamSchema = z
+  .object({
+    filePath: z
+      .string({ required_error: 'filePath ist erforderlich.' })
+      .min(3, 'filePath muss mindestens 3 Zeichen lang sein.')
+      .max(512, 'filePath darf maximal 512 Zeichen lang sein.')
+      .refine(val => !val.includes('..') && !val.includes('//') && !val.includes('\\'), {
+        message: 'Path Traversal oder ungültige Pfadsequenzen im filePath erkannt.'
+      }),
+    bucket: z.enum(ALLOWED_STORAGE_BUCKETS).default('campus-assets'),
+    expiresInSeconds: z
+      .number()
+      .int()
+      .min(60, 'Mindestgültigkeit beträgt 60 Sekunden.')
+      .max(3600, 'Maximale Gültigkeit beträgt 3.600 Sekunden (UrhG § 73).')
+      .default(1800),
+  })
+  .strict({ message: 'Unerwartete Parameter im Presign-Stream Payload abgewiesen.' });
+
+export type PresignStreamInput = z.infer<typeof presignStreamSchema>;
+
+// ── 6. Storage Delete Assets Ingress (GDPR Art. 17 / Purge) ──
+export const deleteAssetsSchema = z
+  .object({
+    bucket: z.enum(ALLOWED_STORAGE_BUCKETS).default('campus-assets'),
+    filePaths: z
+      .array(
+        z
+          .string()
+          .min(3, 'Jeder filePath muss mindestens 3 Zeichen lang sein.')
+          .max(512, 'Jeder filePath darf maximal 512 Zeichen lang sein.')
+          .refine(val => !val.includes('..') && !val.includes('\\'), {
+            message: 'Path Traversal in einem der filePaths erkannt.'
+          })
+      )
+      .min(1, 'Mindestens ein Dateipfad muss zum Löschen übergeben werden.')
+      .max(100, 'Maximal 100 Dateien können pro Batch-Löschung verarbeitet werden.'),
+  })
+  .strict({ message: 'Unerwartete Parameter im Delete-Assets Payload abgewiesen.' });
+
+export type DeleteAssetsInput = z.infer<typeof deleteAssetsSchema>;

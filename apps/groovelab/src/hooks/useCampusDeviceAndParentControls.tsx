@@ -6,6 +6,7 @@ import { useInactivityTimeout, HARD_LOCK_TIMEOUT_MS } from './useInactivityTimeo
 import { executeSessionZeroize } from '../utils/sessionZeroize';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { safeReplaceState } from '../utils/historyUtils';
+import { subscribeParentGovernanceRealtime } from '../services/realtime/parentGovernanceRealtimeSync';
 
 export interface UseCampusDeviceAndParentControlsParams {
   searchParams: URLSearchParams;
@@ -360,74 +361,60 @@ export function useCampusDeviceAndParentControls({
     }
   }, [user?.campus_ui_level, user?.id]);
 
-  // Reagiert sofort und ohne Reload auf UI-Level-Änderungen aus dem Elternbereich anderer Clients
+  // 🛡️ [Hebel 13: SEC-108 / CAM-148] Autoritativer Parent Governance SSOT-Handshake & Realtime-Reconciliation
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase.channel(`realtime_ui_level_${user.id}`);
-    channel
-      .on('broadcast', { event: 'ui-level-changed' }, (payload: any) => {
-        const newLevel = payload?.payload?.uiLevel;
-        if (newLevel && (newLevel === 'junior' || newLevel === 'teen' || newLevel === 'pro')) {
-          console.log('[Realtime-Root] UI-Level update broadcast received:', newLevel);
-          setCampusStudentUiLevel(newLevel);
-          setUser((prev: any) => prev ? { ...prev, campus_ui_level: newLevel } : prev);
+    const unsubscribe = subscribeParentGovernanceRealtime({
+      userId: user.id,
+      schoolId: user.school_id,
+      supabaseClient: supabase,
+      onVerifiedUpdate: (verified) => {
+        if (verified.campus_ui_level && (verified.campus_ui_level === 'junior' || verified.campus_ui_level === 'teen' || verified.campus_ui_level === 'pro')) {
+          setCampusStudentUiLevel(verified.campus_ui_level);
           try {
-            localStorage.setItem(`campus_student_ui_level_${user.id}`, newLevel);
-            localStorage.setItem('campus_student_ui_level', newLevel);
+            localStorage.setItem(`campus_student_ui_level_${user.id}`, verified.campus_ui_level);
+            localStorage.setItem('campus_student_ui_level', verified.campus_ui_level);
           } catch {}
-          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
-        }
-      })
-      .on('broadcast', { event: 'parent-controls-changed' }, (payload: any) => {
-        const data = payload?.payload;
-        if (!data) return;
-        console.log('[Realtime-Root] Full parent-controls-changed broadcast received:', data);
-        if (data.uiLevel && (data.uiLevel === 'junior' || data.uiLevel === 'teen' || data.uiLevel === 'pro')) {
-          setCampusStudentUiLevel(data.uiLevel);
-          try {
-            localStorage.setItem(`campus_student_ui_level_${user.id}`, data.uiLevel);
-            localStorage.setItem('campus_student_ui_level', data.uiLevel);
-          } catch {}
-          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: data.uiLevel }));
+          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: verified.campus_ui_level }));
         }
         setUser((prev: any) => {
           if (!prev) return prev;
           return {
             ...prev,
-            campus_ui_level: data.uiLevel ?? prev.campus_ui_level,
-            parent_allow_absences: data.allowAbsences ?? prev.parent_allow_absences,
-            parent_allow_reschedule_confirm: data.allowRescheduleConfirm ?? prev.parent_allow_reschedule_confirm,
-            parent_allow_chat: data.allowChat ?? prev.parent_allow_chat,
-            parent_allow_timer: data.allowTimer ?? prev.parent_allow_timer,
-            parent_allow_leaderboard: data.allowLeaderboard ?? prev.parent_allow_leaderboard,
-            parent_allow_proposals: data.allowProposals ?? prev.parent_allow_proposals,
-            parent_allow_audio: data.allowAudio ?? prev.parent_allow_audio,
-            parent_permissions: data.parentPermissions ?? prev.parent_permissions,
+            campus_ui_level: verified.campus_ui_level ?? prev.campus_ui_level,
+            parent_allow_absences: verified.parent_allow_absences ?? prev.parent_allow_absences,
+            parent_allow_reschedule_confirm: verified.parent_allow_reschedule_confirm ?? prev.parent_allow_reschedule_confirm,
+            parent_allow_chat: verified.parent_allow_chat ?? prev.parent_allow_chat,
+            parent_allow_timer: verified.parent_allow_timer ?? prev.parent_allow_timer,
+            parent_allow_leaderboard: verified.parent_allow_leaderboard ?? prev.parent_allow_leaderboard,
+            parent_allow_proposals: verified.parent_allow_proposals ?? prev.parent_allow_proposals,
+            parent_allow_audio: verified.parent_allow_audio ?? prev.parent_allow_audio,
+            parent_permissions: verified.parent_permissions ?? prev.parent_permissions,
           };
         });
-        if (data.allowChat !== undefined) {
-          try { localStorage.setItem(`groovelab_parent_allow_chat_${user.id}`, String(data.allowChat)); } catch {}
-          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'messages', allowed: data.allowChat } }));
+        if (verified.parent_allow_chat !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_chat_${user.id}`, String(verified.parent_allow_chat)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'messages', allowed: verified.parent_allow_chat } }));
         }
-        if (data.allowTimer !== undefined) {
-          try { localStorage.setItem(`groovelab_parent_allow_timer_${user.id}`, String(data.allowTimer)); } catch {}
-          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'practice_board', allowed: data.allowTimer } }));
+        if (verified.parent_allow_timer !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_timer_${user.id}`, String(verified.parent_allow_timer)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'practice_board', allowed: verified.parent_allow_timer } }));
         }
-        if (data.allowLeaderboard !== undefined) {
-          try { localStorage.setItem(`groovelab_parent_allow_leaderboard_${user.id}`, String(data.allowLeaderboard)); } catch {}
-          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'campus_cup', allowed: data.allowLeaderboard } }));
+        if (verified.parent_allow_leaderboard !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_leaderboard_${user.id}`, String(verified.parent_allow_leaderboard)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'campus_cup', allowed: verified.parent_allow_leaderboard } }));
         }
-        if (data.allowAudio !== undefined) {
-          try { localStorage.setItem(`groovelab_parent_allow_audio_${user.id}`, String(data.allowAudio)); } catch {}
-          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'recordings', allowed: data.allowAudio } }));
+        if (verified.parent_allow_audio !== undefined) {
+          try { localStorage.setItem(`groovelab_parent_allow_audio_${user.id}`, String(verified.parent_allow_audio)); } catch {}
+          window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'recordings', allowed: verified.parent_allow_audio } }));
         }
-      })
-      .subscribe();
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
-  }, [user?.id, setUser]);
+  }, [user?.id, user?.school_id, setUser]);
 
   // 🔒 Dynamic Inactivity Idle Screen Lock (Enterprise Goldstandard / Reload-Resistant):
   const [isScreenLockedByInactivity, setIsScreenLockedByInactivityRaw] = useState<boolean>(() => {

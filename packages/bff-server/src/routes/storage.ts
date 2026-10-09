@@ -4,7 +4,7 @@ import { decryptSession } from '../lib/session/crypto';
 import { validateMagicBytes, scrubMediaMetadata } from '../lib/mediaValidator';
 import { validateBody } from '../middleware/validateIngress';
 import { idempotencyBarrier } from '../middleware/idempotencyMiddleware';
-import { presignUploadSchema } from '../schemas/ingressSchemas';
+import { presignUploadSchema, presignStreamSchema, deleteAssetsSchema } from '../schemas/ingressSchemas';
 
 const router = Router();
 
@@ -55,6 +55,133 @@ interface PresignUploadRequest {
   bucket?: string;
 }
 
+export interface AuthUserData {
+  accessToken: string;
+  user: any;
+  role: string;
+  schoolId: string | null;
+}
+
+/**
+ * Authoritatively resolves and verifies user session via JWE cookie or Bearer header.
+ */
+export async function resolveAuthUser(req: Request): Promise<AuthUserData | null> {
+  let accessToken: string | null = null;
+  const sessionCookie = req.cookies?.['__Host-session'];
+  if (sessionCookie) {
+    const session = await decryptSession(sessionCookie);
+    if (session?.accessToken) {
+      accessToken = session.accessToken;
+    }
+  }
+
+  if (!accessToken && req.headers.authorization) {
+    const parts = req.headers.authorization.split(' ');
+    if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
+      accessToken = parts[1];
+    }
+  }
+
+  if (!accessToken) return null;
+
+  try {
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    });
+
+    const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
+    if (userError || !userData?.user) {
+      return null;
+    }
+
+    const user = userData.user;
+    const role = user.user_metadata?.role || user.app_metadata?.role || 'student';
+    const schoolId = user.user_metadata?.school_id || user.app_metadata?.school_id || null;
+
+    return { accessToken, user, role, schoolId };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates path traversal and BOLA/IDOR permissions against authenticated user identity.
+ */
+export function validatePathAccess(
+  filePath: string,
+  authData: AuthUserData
+): { allowed: boolean; reason?: string } {
+  // 1. Strict Path Traversal Prevention
+  if (filePath.includes('..') || filePath.includes('\\') || filePath.includes('//')) {
+    return { allowed: false, reason: 'PATH_TRAVERSAL_DETECTED' };
+  }
+
+  // Master Admin can access all paths
+  if (authData.role === 'master_admin') {
+    return { allowed: true };
+  }
+
+  // Canonical Hierarchies:
+  // schools/<schoolId>/students/<studentId>/<context>/<filename>
+  // schools/<schoolId>/<context>/<filename>
+  // <context>/<filename>
+  const segments = filePath.split('/').filter(Boolean);
+
+  if (segments[0] === 'schools') {
+    const targetSchoolId = segments[1];
+    // School staff/admin/teacher/student must match targetSchoolId if schoolId is known
+    if (authData.schoolId && targetSchoolId && authData.schoolId !== targetSchoolId) {
+      return { allowed: false, reason: 'MULTI_TENANT_VIOLATION' };
+    }
+
+    if (segments[2] === 'students') {
+      const targetStudentId = segments[3];
+      // If student caller, they can ONLY access their own student folder
+      if (authData.role === 'student' && authData.user.id !== targetStudentId) {
+        return { allowed: false, reason: 'STUDENT_BOLA_VIOLATION' };
+      }
+    }
+  }
+
+  return { allowed: true };
+}
+
+// ── In-Memory LRU Cache for Signed Streaming Leases ──
+interface CachedStreamLease {
+  signedUrl: string;
+  expiresAt: number;
+}
+const streamLeaseCache = new Map<string, CachedStreamLease>();
+const MAX_STREAM_CACHE_ENTRIES = 5000;
+
+export function getCachedStreamUrl(cacheKey: string): string | null {
+  const cached = streamLeaseCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt - Date.now() > 300 * 1000) {
+    return cached.signedUrl;
+  }
+  streamLeaseCache.delete(cacheKey);
+  return null;
+}
+
+export function setCachedStreamUrl(cacheKey: string, signedUrl: string, ttlSeconds: number): void {
+  if (streamLeaseCache.size >= MAX_STREAM_CACHE_ENTRIES) {
+    const oldestKey = streamLeaseCache.keys().next().value;
+    if (oldestKey) streamLeaseCache.delete(oldestKey);
+  }
+  streamLeaseCache.set(cacheKey, {
+    signedUrl,
+    expiresAt: Date.now() + ttlSeconds * 1000
+  });
+}
+
+export function invalidateStreamLease(cacheKey: string): void {
+  streamLeaseCache.delete(cacheKey);
+}
+
 /**
  * Sanitizes path segments to prevent directory traversal or malicious characters.
  */
@@ -73,46 +200,15 @@ function sanitizePathSegment(input: string | null | undefined, defaultValue: str
 router.post('/presign-upload', validateBody(presignUploadSchema), idempotencyBarrier(), async (req: Request, res: Response) => {
   try {
     // 1. Authenticate user via JWE session cookie or Authorization header
-    let accessToken: string | null = null;
-    const sessionCookie = req.cookies['__Host-session'];
-    if (sessionCookie) {
-      const session = await decryptSession(sessionCookie);
-      if (session?.accessToken) {
-        accessToken = session.accessToken;
-      }
-    }
-
-    if (!accessToken && req.headers.authorization) {
-      const parts = req.headers.authorization.split(' ');
-      if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
-        accessToken = parts[1];
-      }
-    }
-
-    // 🛡️ FAIL-CLOSED AUTHENTICATION GUARD (Zero unauthenticated uploads)
-    if (!accessToken) {
+    const authData = await resolveAuthUser(req);
+    if (!authData) {
       return res.status(401).json({
         error: 'UNAUTHORIZED',
         message: 'Authentifizierung erforderlich. Kein gültiger Sitzungs-Token vorhanden.'
       });
     }
-
-    // 🛡️ Authoritatively verify user token with Supabase
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false },
-      global: {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }
-    });
-
-    const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
-    if (userError || !userData?.user) {
-      return res.status(401).json({
-        error: 'UNAUTHORIZED',
-        message: 'Ungültiger oder abgelaufener Authentifizierungs-Token.'
-      });
-    }
-    const authUser = userData.user;
+    const authUser = authData.user;
+    const accessToken = authData.accessToken;
 
     const {
       context = 'audio',
@@ -259,10 +355,91 @@ router.post('/verify-upload-buffer', express.raw({ type: '*/*', limit: '25mb' })
 });
 
 /**
+ * POST /api/storage/presign-stream
+ * 
+ * Generates an ephemeral, cryptographically authenticated Pre-signed Streaming URL (UrhG § 73).
+ * Protected by: Ingress Schema Validation -> JWE Session Auth -> BOLA Multi-Tenant Gatekeeper -> In-Memory LRU Cache.
+ */
+router.post('/presign-stream', validateBody(presignStreamSchema), async (req: Request, res: Response) => {
+  try {
+    const authData = await resolveAuthUser(req);
+    if (!authData) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Authentifizierung erforderlich. Keine gültige Sitzung vorhanden.'
+      });
+    }
+
+    const { filePath, bucket = 'campus-assets', expiresInSeconds = 1800 } = req.body;
+
+    const accessCheck = validatePathAccess(filePath, authData);
+    if (!accessCheck.allowed) {
+      console.warn(`🚨 [BFF Storage BOLA Guard] Blocked stream access to ${filePath} by user ${authData.user.id}: ${accessCheck.reason}`);
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Zugriff auf diese Mediendatei verweigert (BOLA / Mandantenschutz).'
+      });
+    }
+
+    // Sub-millisecond In-Memory LRU Cache lookup
+    const cacheKey = `${bucket}:${filePath}`;
+    const cachedUrl = getCachedStreamUrl(cacheKey);
+    if (cachedUrl) {
+      return res.status(200).json({
+        success: true,
+        bucket,
+        filePath,
+        signedUrl: cachedUrl,
+        expiresInSeconds,
+        cached: true
+      });
+    }
+
+    // Ephemeral scoped storage client
+    const storageClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${authData.accessToken}` }
+      }
+    });
+
+    const { data: signedData, error: signError } = await storageClient.storage
+      .from(bucket)
+      .createSignedUrl(filePath, expiresInSeconds);
+
+    if (signError || !signedData?.signedUrl) {
+      return res.status(404).json({
+        error: 'FILE_NOT_FOUND',
+        message: 'Audiodatei nicht gefunden oder Signierung fehlgeschlagen.',
+        details: signError?.message
+      });
+    }
+
+    setCachedStreamUrl(cacheKey, signedData.signedUrl, expiresInSeconds);
+
+    return res.status(200).json({
+      success: true,
+      bucket,
+      filePath,
+      signedUrl: signedData.signedUrl,
+      expiresInSeconds,
+      cached: false
+    });
+  } catch (err: any) {
+    console.error('[BFF Storage Presign Stream] Unexpected error:', err);
+    return res.status(500).json({
+      error: 'INTERNAL_SERVER_ERROR',
+      message: 'Unerwarteter Fehler bei der Medien-Signierung.'
+    });
+  }
+});
+
+/**
  * GET /api/storage/stream/:bucket/*
  * 
  * Streams protected private audio media with HTTP 206 Partial Content (Range Support)
  * for seamless scrubbing/buffering in iOS Safari WebAudio.
+ * Zero-Memory Architecture: HTTP 307 Temporary Redirect directly to signed storage endpoint.
  */
 router.get('/stream/:bucket/*', async (req: Request, res: Response) => {
   try {
@@ -273,8 +450,31 @@ router.get('/stream/:bucket/*', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Zugriff auf diesen Speicherpfad verweigert.' });
     }
 
+    // 🛡️ Fail-Closed Authentication & Session Verification (CWE-306 Remediation)
+    const authData = await resolveAuthUser(req);
+    if (!authData) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Authentifizierung für Medien-Streaming erforderlich.'
+      });
+    }
+
+    // 🛡️ Path Traversal & BOLA Validation
+    const accessCheck = validatePathAccess(filePath, authData);
+    if (!accessCheck.allowed) {
+      if (accessCheck.reason === 'PATH_TRAVERSAL_DETECTED') {
+        return res.status(400).json({ error: 'BAD_REQUEST', message: 'Ungültiger Pfad.' });
+      }
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Zugriff auf diese Mediendatei verweigert (BOLA).' });
+    }
+
     // Ephemeral download client
-    const storageClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+    const storageClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${authData.accessToken}` }
+      }
+    });
     const { data: signedData, error: signError } = await storageClient.storage
       .from(bucket)
       .createSignedUrl(filePath, 3600); // 3.600s TTL (60 Minuten) für Unterrichtseinheiten & Bandproben (UrhG § 73)
@@ -292,6 +492,88 @@ router.get('/stream/:bucket/*', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[BFF Storage Stream] Error streaming media:', err);
     return res.status(500).json({ error: 'STREAMING_ERROR', message: 'Fehler beim Medienstreaming.' });
+  }
+});
+
+/**
+ * POST /api/storage/delete-assets
+ * 
+ * Authoritative GDPR Art. 17 Asset Purge Engine & Batch Deletion Gateway.
+ * Protected by: Ingress Schema Validation -> Session Auth -> BOLA Path Verification -> Audit Log.
+ */
+router.post('/delete-assets', validateBody(deleteAssetsSchema), async (req: Request, res: Response) => {
+  try {
+    const authData = await resolveAuthUser(req);
+    if (!authData) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Authentifizierung erforderlich. Keine gültige Sitzung vorhanden.'
+      });
+    }
+
+    const { bucket = 'campus-assets', filePaths }: { bucket: string; filePaths: string[] } = req.body;
+
+    const authorizedPaths: string[] = [];
+    const rejectedPaths: string[] = [];
+
+    for (const p of filePaths) {
+      const check = validatePathAccess(p, authData);
+      if (check.allowed) {
+        authorizedPaths.push(p);
+      } else {
+        rejectedPaths.push(p);
+      }
+    }
+
+    if (authorizedPaths.length === 0) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Keine Berechtigung zum Löschen der angegebenen Dateien (BOLA Schutz).',
+        rejectedPaths
+      });
+    }
+
+    const storageClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${authData.accessToken}` }
+      }
+    });
+
+    const { error: removeError } = await storageClient.storage
+      .from(bucket)
+      .remove(authorizedPaths);
+
+    if (removeError) {
+      console.error('[BFF Storage Delete] Upstream storage deletion failed:', removeError);
+      return res.status(502).json({
+        error: 'STORAGE_DELETION_FAILED',
+        message: 'Löschen der Dateien im Storage-System fehlgeschlagen.',
+        details: removeError.message
+      });
+    }
+
+    // Invalidate LRU stream cache for deleted paths
+    for (const p of authorizedPaths) {
+      invalidateStreamLease(`${bucket}:${p}`);
+    }
+
+    console.log(`[BFF Storage Delete] User ${authData.user.id} (${authData.role}) purged ${authorizedPaths.length} assets from ${bucket}.`);
+
+    return res.status(200).json({
+      success: true,
+      bucket,
+      deletedCount: authorizedPaths.length,
+      deletedPaths: authorizedPaths,
+      rejectedCount: rejectedPaths.length,
+      rejectedPaths
+    });
+  } catch (err: any) {
+    console.error('[BFF Storage Delete] Unexpected error:', err);
+    return res.status(500).json({
+      error: 'INTERNAL_SERVER_ERROR',
+      message: 'Unerwarteter Fehler beim Löschen der Mediendateien.'
+    });
   }
 });
 

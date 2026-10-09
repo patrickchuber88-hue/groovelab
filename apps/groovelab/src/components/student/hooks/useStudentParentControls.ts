@@ -778,13 +778,20 @@ export function useStudentParentControls({
             console.warn('[ParentControls] Cache sync notice:', cErr);
           }
 
-          // 🛡️ REVISIONSSICHERE CROSS-ORIGIN ECHTZEIT-SYNCHRONISATION (Dual-Event Architektur)
+          // 🛡️ REVISIONSSICHERE CROSS-ORIGIN ECHTZEIT-SYNCHRONISATION (Dual-Event & Dual-Channel Architektur)
           try {
-            const topicName = `realtime_ui_level_${targetStudentId}`;
-            const existingCh = supabase.getChannels().find((c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName);
+            const schoolId = studentUser?.school_id;
+            const primaryTopic = schoolId ? `realtime_parent_gov_${schoolId}_${targetStudentId}` : null;
+            const legacyTopic = `realtime_ui_level_${targetStudentId}`;
+            const targetTopics = Array.from(new Set([primaryTopic, legacyTopic].filter(Boolean))) as string[];
+
+            const nonce = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : Math.random().toString(36).substring(2);
 
             const fullPermissionsPayload = {
               studentId: targetStudentId,
+              schoolId: schoolId || null,
               uiLevel: nextUiLevel,
               allowAbsences: payload.parent_allow_absences,
               allowRescheduleConfirm: payload.parent_allow_reschedule_confirm,
@@ -794,7 +801,8 @@ export function useStudentParentControls({
               allowProposals: payload.parent_allow_proposals,
               allowAudio: payload.parent_allow_audio,
               parentPermissions: payload.parent_permissions,
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
+              nonce
             };
 
             const sendBroadcasts = (ch: any) => {
@@ -809,22 +817,27 @@ export function useStudentParentControls({
                 ch.send({
                   type: 'broadcast',
                   event: 'ui-level-changed',
-                  payload: { uiLevel: updates.uiLevel }
+                  payload: { uiLevel: updates.uiLevel, studentId: targetStudentId, updatedAt: fullPermissionsPayload.updatedAt, nonce }
                 });
               }
             };
 
-            if (existingCh && (existingCh.state === 'joined' || existingCh.state === 'joining')) {
-              sendBroadcasts(existingCh);
-            } else {
-              const tempCh = supabase.channel(topicName);
-              tempCh.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                  sendBroadcasts(tempCh);
-                  setTimeout(() => supabase.removeChannel(tempCh), 1500);
-                }
-              });
-            }
+            targetTopics.forEach((topicName) => {
+              const existingCh = supabase.getChannels().find((c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName);
+              if (existingCh && (existingCh.state === 'joined' || existingCh.state === 'joining')) {
+                sendBroadcasts(existingCh);
+              } else {
+                const tempCh = supabase.channel(topicName);
+                tempCh.subscribe((status) => {
+                  if (status === 'SUBSCRIBED') {
+                    sendBroadcasts(tempCh);
+                    setTimeout(() => {
+                      try { supabase.removeChannel(tempCh); } catch {}
+                    }, 1500);
+                  }
+                });
+              }
+            });
 
             if (updates.uiLevel !== undefined) {
               const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };

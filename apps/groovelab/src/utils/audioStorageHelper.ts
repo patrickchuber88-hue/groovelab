@@ -317,8 +317,36 @@ export async function getSecureAudioUrl(
     }
   }
 
+  // 1. Primary Tier-1 Sovereign Egress: Request authenticated pre-signed streaming URL from Express BFF
   try {
-    // 1. Generate short-lived HMAC Pre-Signed URL for private audio streaming
+    const bffOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const res = await fetch(`${bffOrigin}/api/storage/presign-stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        filePath: relativePath,
+        bucket: actualBucket,
+        expiresInSeconds
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.signedUrl) {
+        signedUrlCache.set(cacheKey, {
+          url: data.signedUrl,
+          expiresAt: now + expiresInSeconds * 1000
+        });
+        return data.signedUrl;
+      }
+    }
+  } catch (bffErr) {
+    // Offline or network error: cascade gracefully to direct fallback
+  }
+
+  try {
+    // 2. Fallback: Direct client-side signed URL (for active developer sessions)
     const { data: signedData, error: signErr } = await supabase.storage
       .from(actualBucket)
       .createSignedUrl(relativePath, expiresInSeconds);
@@ -331,7 +359,7 @@ export async function getSecureAudioUrl(
       return signedData.signedUrl;
     }
 
-    // 2. Fallback to public URL ONLY if the bucket is genuinely public.
+    // 3. Fallback to public URL ONLY if the bucket is genuinely public.
     // For private ASVS L3 buckets ('campus-assets', 'groovelab-assets'), a public URL returns 400/403.
     // Fail-Closed Doktrin: Return empty string so caller triggers offline fallback or honest error.
     if (actualBucket === 'campus-assets' || actualBucket === 'groovelab-assets') {
@@ -623,6 +651,97 @@ export async function uploadAudioWithIntegrityVerification(
       sizeBytes,
       publicUrl: '',
       error: err
+    };
+  }
+}
+
+export interface DeleteAudioAssetsResult {
+  success: boolean;
+  deletedCount: number;
+  deletedPaths: string[];
+  rejectedCount: number;
+  rejectedPaths: string[];
+  error?: any;
+}
+
+/**
+ * Authoritatively deletes audio and media assets via the Express BFF (/api/storage/delete-assets).
+ * Enforces JWE session authentication, BOLA tenant verification, and GDPR Art. 17 compliance.
+ */
+export async function deleteAudioAssets(
+  filePaths: string[],
+  bucket: string = 'campus-assets'
+): Promise<DeleteAudioAssetsResult> {
+  if (!filePaths || filePaths.length === 0) {
+    return {
+      success: true,
+      deletedCount: 0,
+      deletedPaths: [],
+      rejectedCount: 0,
+      rejectedPaths: []
+    };
+  }
+
+  // 1. Invalidate local signed URL cache
+  for (const p of filePaths) {
+    signedUrlCache.delete(`${bucket}:${p}`);
+  }
+
+  // 2. Authoritative deletion via Express BFF
+  try {
+    const bffOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const res = await fetch(`${bffOrigin}/api/storage/delete-assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ bucket, filePaths })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        success: true,
+        deletedCount: data.deletedCount || filePaths.length,
+        deletedPaths: data.deletedPaths || filePaths,
+        rejectedCount: data.rejectedCount || 0,
+        rejectedPaths: data.rejectedPaths || []
+      };
+    }
+
+    const errData = await res.json().catch(() => ({}));
+    console.warn('[AudioStorageHelper] BFF delete-assets returned non-200:', res.status, errData);
+  } catch (err) {
+    console.warn('[AudioStorageHelper] Network error in deleteAudioAssets:', err);
+  }
+
+  // 3. Fallback: Direct Supabase client removal
+  try {
+    const { error } = await supabase.storage.from(bucket).remove(filePaths);
+    if (!error) {
+      return {
+        success: true,
+        deletedCount: filePaths.length,
+        deletedPaths: filePaths,
+        rejectedCount: 0,
+        rejectedPaths: []
+      };
+    }
+    return {
+      success: false,
+      deletedCount: 0,
+      deletedPaths: [],
+      rejectedCount: filePaths.length,
+      rejectedPaths: filePaths,
+      error
+    };
+  } catch (fallbackErr) {
+    return {
+      success: false,
+      deletedCount: 0,
+      deletedPaths: [],
+      rejectedCount: filePaths.length,
+      rejectedPaths: filePaths,
+      error: fallbackErr
     };
   }
 }

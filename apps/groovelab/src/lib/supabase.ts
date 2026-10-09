@@ -382,6 +382,25 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
   if (!userIds || userIds.length === 0) return;
   console.log('[GDPR/COPPA Cleanup] Starting physical storage cleanup for user IDs:', userIds);
 
+  const purgeViaBffOrFallback = async (bucket: string, filePaths: string[]) => {
+    if (filePaths.length === 0) return;
+    try {
+      const bffOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await fetch(`${bffOrigin}/api/storage/delete-assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ bucket, filePaths })
+      });
+      if (res.ok) {
+        console.log(`[GDPR/COPPA Cleanup] Successfully purged ${filePaths.length} assets from ${bucket} via BFF.`);
+        return;
+      }
+    } catch {}
+    const { error: delErr } = await supabase.storage.from(bucket).remove(filePaths);
+    if (delErr) console.error(`[GDPR/COPPA Cleanup] Fallback delete error on ${bucket}:`, delErr);
+  };
+
   try {
     // 1. Fetch user photo_urls to delete custom avatars
     const { data: users, error: userErr } = await supabase
@@ -406,13 +425,11 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
 
       if (groovelabFiles.length > 0) {
         console.log('[GDPR/COPPA Cleanup] Deleting custom avatars from groovelab-assets:', groovelabFiles);
-        const { error: delErr } = await supabase.storage.from('groovelab-assets').remove(groovelabFiles);
-        if (delErr) console.error('[GDPR/COPPA Cleanup] Error deleting groovelab custom avatars:', delErr);
+        await purgeViaBffOrFallback('groovelab-assets', groovelabFiles);
       }
       if (campusFiles.length > 0) {
         console.log('[GDPR/COPPA Cleanup] Deleting custom avatars from campus-assets:', campusFiles);
-        const { error: delErr } = await supabase.storage.from('campus-assets').remove(campusFiles);
-        if (delErr) console.error('[GDPR/COPPA Cleanup] Error deleting campus custom avatars:', delErr);
+        await purgeViaBffOrFallback('campus-assets', campusFiles);
       }
     }
 
@@ -450,8 +467,7 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
 
       if (audioFilesToDelete.length > 0) {
         console.log('[GDPR/COPPA Cleanup] Physically deleting audio recordings from campus-assets:', audioFilesToDelete);
-        const { error: delErr } = await supabase.storage.from('campus-assets').remove(audioFilesToDelete);
-        if (delErr) console.error('[GDPR/COPPA Cleanup] Error deleting audio recordings:', delErr);
+        await purgeViaBffOrFallback('campus-assets', audioFilesToDelete);
       }
     }
   } catch (err) {
