@@ -2739,46 +2739,51 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
     setRespectWarning(null);
 
-    // Group message dispatch
-    if (selectedRecipient.is_group) {
-      await onSendMessage(
-        user.id, 
-        content.trim(), 
-        selectedRecipient.id, 
-        activeChannelId || undefined
-      );
+    try {
+      if (selectedRecipient.is_group) {
+        await onSendMessage(user.id, content.trim(), selectedRecipient.id, activeChannelId || undefined);
+      } else if (activeSubTab !== 'all' && activeSubTab !== 'general' && activeSubTab !== 'system') {
+        const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
+        if (targetOccTab) {
+          const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
+          const { data } = await supabase.from('campus_direct_messages').insert({
+            sender_id: user.id,
+            recipient_id: selectedRecipient.id,
+            content: content.trim(),
+            occurrence_id: targetOccTab.id,
+            read_by: [user.id],
+            school_id: effectiveSchoolId
+          }).select().single();
+          if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+            primeDecryptedCache(effectiveSchoolId, data.content, content.trim());
+          }
+        } else {
+          await onSendMessage(selectedRecipient.id, content.trim());
+        }
+      } else {
+        await onSendMessage(selectedRecipient.id, content.trim());
+      }
       playChatMessageSentSound();
       triggerChatHapticFeedback();
       setTimeout(() => scrollToBottom(true), 50);
-      return;
-    }
-    
-    if (activeSubTab !== 'all' && activeSubTab !== 'general' && activeSubTab !== 'system') {
-      const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
-      if (targetOccTab) {
-        const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
-        const { data } = await supabase.from('campus_direct_messages').insert({
-          sender_id: user.id,
-          recipient_id: selectedRecipient.id,
-          content: content.trim(),
-          occurrence_id: targetOccTab.id,
-          read_by: [user.id],
-          school_id: effectiveSchoolId
-        }).select().single();
-        if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
-          primeDecryptedCache(effectiveSchoolId, data.content, content.trim());
-        }
-        playChatMessageSentSound();
-        triggerChatHapticFeedback();
-        setTimeout(() => scrollToBottom(true), 50);
-        return;
+    } catch (err: any) {
+      const errStr = String(err?.message || err || '');
+      if (errStr.includes('PARENTAL_CHAT_LOCK') || errStr.includes('JUNIOR_DEFAULT_CHAT')) {
+        setRespectWarning({
+          isValid: false,
+          category: 'harassment',
+          reason: 'Der Chat ist für dieses Profil durch die elterlichen Einstellungen pausiert 🛡️'
+        });
+      } else if (errStr.includes('RECIPIENT_PARENTAL_CHAT') || errStr.includes('RECIPIENT_JUNIOR_CHAT')) {
+        setRespectWarning({
+          isValid: false,
+          category: 'harassment',
+          reason: 'Der Empfänger kann aufgrund elterlicher Schutz-Einstellungen keine Direktnachrichten empfangen 🛡️'
+        });
+      } else {
+        console.warn('[CampusDirectMessages] Send error:', err);
       }
     }
-
-    await onSendMessage(selectedRecipient.id, content.trim());
-    playChatMessageSentSound();
-    triggerChatHapticFeedback();
-    setTimeout(() => scrollToBottom(true), 50);
   };
 
   const handleSend = async (e: React.FormEvent) => {

@@ -167,3 +167,27 @@ export const deleteAssetsSchema = z
   .strict({ message: 'Unerwartete Parameter im Delete-Assets Payload abgewiesen.' });
 
 export type DeleteAssetsInput = z.infer<typeof deleteAssetsSchema>;
+
+// ── 7. Direct Message Ingress (OWASP ASVS L3 / BGB § 104 / Anti-DoS) ──
+export const directMessageIngressSchema = z
+  .object({
+    senderId: z.string().uuid('senderId muss eine gültige UUID sein.'),
+    recipientId: z.string().uuid('recipientId muss eine gültige UUID sein.').optional().nullable(),
+    groupId: z.string().uuid('groupId muss eine gültige UUID sein.').optional().nullable(),
+    occurrenceId: z.string().max(128, 'occurrenceId darf maximal 128 Zeichen umfassen.').optional().nullable(),
+    schoolId: z.string().uuid('schoolId muss eine gültige UUID sein.').optional().nullable(),
+    content: z
+      .string()
+      .min(1, 'Nachrichtentext darf nicht leer sein.')
+      .max(4000, 'Nachrichtentext darf maximal 4.000 Zeichen umfassen (Anti-DoS).')
+      .refine(val => val.trim().length > 0, {
+        message: 'Nachrichtentext darf nicht ausschließlich aus Whitespace bestehen.'
+      })
+      .refine(val => !val.includes('\0'), {
+        message: 'Null-Bytes im Nachrichtentext sind unzulässig.'
+      }),
+    messageType: z.string().max(64).optional().nullable(),
+  })
+  .strict({ message: 'Unerwartete Parameter im Chat-Message Payload abgewiesen.' });
+
+export type DirectMessageIngressInput = z.infer<typeof directMessageIngressSchema>;
