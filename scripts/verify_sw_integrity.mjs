@@ -58,6 +58,15 @@ if (!fs.existsSync(SW_PATH)) {
     'CACHE_NAME format matches groovelab-static-* convention',
     hasCacheName ? null : 'CACHE_NAME is not declared or does not follow naming convention'
   );
+
+  const hasApiBypass = swContent.includes("url.pathname.startsWith('/api/')") &&
+                       (swContent.includes("url.pathname.startsWith('/gate/')") || swContent.includes("url.pathname === '/gate'"));
+  recordCheck(
+    'Service Worker Anti-API-Cache Barrier (OWASP ASVS L3 / Art. 5 DSGVO)',
+    hasApiBypass,
+    'sw.js explicitly bypasses /api/ and /gate/ from Cache API (prevents multi-tenant cache pollution on shared tablets)',
+    hasApiBypass ? null : 'sw.js lacks strict /api/ or /gate/ bypass filter'
+  );
 }
 
 // 2. Vite Build-Plugin Integration

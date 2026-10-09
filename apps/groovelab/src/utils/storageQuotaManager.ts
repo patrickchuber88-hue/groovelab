@@ -244,8 +244,82 @@ export function getEphemeralAudioFallback(id: string): any | null {
 }
 
 /**
- * Entfernt einen Take aus dem RAM-Notfall-Puffer, sobald er synchronisiert wurde
+ * Gibt alle aktuell im RAM gepufferten Audio-Takes zurück
+ */
+export function getAllEphemeralAudioFallbacks(): any[] {
+  return Array.from(ephemeralAudioMap.values());
+}
+
+/**
+ * Gibt die Anzahl der aktuell im RAM gepufferten Audio-Takes zurück
+ */
+export function getEphemeralAudioCount(): number {
+  return ephemeralAudioMap.size;
+}
+
+/**
+ * Leert alle temporären Audio-Takes aus dem RAM (z.B. nach erfolgreichem Gesamt-Flush)
+ */
+export function clearAllEphemeralAudio(): void {
+  ephemeralAudioMap.clear();
+  emitQuotaClearedEvent();
+}
+
+/**
+ * Feuert Entwarnungsevent ins Fenster, sobald der RAM-Puffer vollständig entleert wurde
+ */
+export function emitQuotaClearedEvent(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('campus-storage-quota-cleared', {
+        detail: {
+          timestamp: Date.now(),
+          message: 'Gerätespeicher-Puffer erfolgreich synchronisiert. Alle Aufnahmen gesichert.'
+        }
+      })
+    );
+  }
+}
+
+/**
+ * Entfernt einen Take aus dem RAM-Notfall-Puffer, sobald er synchronisiert wurde.
+ * Sendet Entwarnungsevent, wenn alle Notfall-Aufnahmen evakuiert sind.
  */
 export function removeEphemeralAudioFallback(id: string): void {
   ephemeralAudioMap.delete(id);
+  if (ephemeralAudioMap.size === 0) {
+    emitQuotaClearedEvent();
+  }
+}
+
+// ── 4. Fail-Safe Ephemeral Mutation Fallback (Hausaufgaben & Notizen) ──
+const ephemeralMutationsMap = new Map<string, any>();
+
+/**
+ * Speichert eine Datenbank-Mutation im RAM-Fallback bei IndexedDB-Überlauf
+ */
+export function storeEphemeralMutationFallback(id: string, action: any): void {
+  ephemeralMutationsMap.set(id, action);
+  console.warn(`[StorageQuotaManager] Mutation ${id} buffered in RAM due to storage limits.`);
+}
+
+/**
+ * Gibt alle im RAM gepufferten Mutationen zurück
+ */
+export function getAllEphemeralMutationFallbacks(): any[] {
+  return Array.from(ephemeralMutationsMap.values());
+}
+
+/**
+ * Gibt die Anzahl der im RAM gepufferten Mutationen zurück
+ */
+export function getEphemeralMutationCount(): number {
+  return ephemeralMutationsMap.size;
+}
+
+/**
+ * Entfernt eine Mutation aus dem RAM-Puffer
+ */
+export function removeEphemeralMutationFallback(id: string): void {
+  ephemeralMutationsMap.delete(id);
 }

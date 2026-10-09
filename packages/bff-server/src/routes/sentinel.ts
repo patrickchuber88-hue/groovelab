@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { DeadLetterSentinel } from '../services/deadLetterSentinel';
 import { validateBody } from '../middleware/validateIngress';
+import { idempotencyBarrier } from '../middleware/idempotencyMiddleware';
 import { sentinelIncidentSchema } from '../schemas/ingressSchemas';
 
 const router = Router();
@@ -38,8 +39,9 @@ function authenticateSentinelInternal(req: Request, res: Response, next: () => v
 /**
  * POST /api/v1/sentinel/incident
  * Ingests a critical incident from shell scripts, cron jobs or external workers
+ * Protected by: Authentication -> Zod Ingress Validation -> Idempotency Barrier
  */
-router.post('/incident', authenticateSentinelInternal, validateBody(sentinelIncidentSchema), async (req: Request, res: Response) => {
+router.post('/incident', authenticateSentinelInternal, validateBody(sentinelIncidentSchema), idempotencyBarrier(), async (req: Request, res: Response) => {
   try {
     const { incidentType, sourceComponent, severity, details, traceId, schoolId } = req.body;
 

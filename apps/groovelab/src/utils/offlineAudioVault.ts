@@ -9,7 +9,13 @@ import {
   pruneStorageIfNecessary,
   storeEphemeralAudioFallback,
   getEphemeralAudioFallback,
-  removeEphemeralAudioFallback
+  getAllEphemeralAudioFallbacks,
+  getEphemeralAudioCount,
+  removeEphemeralAudioFallback,
+  storeEphemeralMutationFallback,
+  getAllEphemeralMutationFallbacks,
+  getEphemeralMutationCount,
+  removeEphemeralMutationFallback
 } from './storageQuotaManager';
 
 export interface OfflineAudioRecord {
@@ -169,39 +175,62 @@ export async function getOfflineAudioRecord(id: string): Promise<OfflineAudioRec
 }
 
 /**
- * Retrieve all pending offline audio records
+ * Retrieve all pending offline audio records (merges IndexedDB and ephemeral RAM records)
+ * 🚨 IN-FLIGHT PRIORITY: Flüchtige RAM-Takes werden an die Spitze sortiert!
  */
 export async function getAllPendingAudioRecords(): Promise<OfflineAudioRecord[]> {
+  const ramRecords: OfflineAudioRecord[] = getAllEphemeralAudioFallbacks();
+  let dbRecords: OfflineAudioRecord[] = [];
+
   try {
     const db = await openAudioDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const request = store.getAll();
 
-    return new Promise((resolve, reject) => {
+    dbRecords = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     });
   } catch (err) {
-    console.error('[OfflineAudioVault] Failed to retrieve all pending records:', err);
-    return [];
+    console.error('[OfflineAudioVault] Failed to retrieve all pending records from IndexedDB:', err);
   }
+
+  // Dedupliziere nach ID (RAM-Takes haben Vorrang bei Identitätsgleichheit)
+  const seenIds = new Set<string>();
+  const merged: OfflineAudioRecord[] = [];
+
+  for (const rec of ramRecords) {
+    if (rec && rec.id && !seenIds.has(rec.id)) {
+      seenIds.add(rec.id);
+      merged.push(rec);
+    }
+  }
+
+  for (const rec of dbRecords) {
+    if (rec && rec.id && !seenIds.has(rec.id)) {
+      seenIds.add(rec.id);
+      merged.push(rec);
+    }
+  }
+
+  return merged;
 }
 
 /**
- * Get count of pending offline audio records
+ * Get count of pending offline audio records (IndexedDB + RAM fallback)
  */
 export async function getPendingAudioCount(): Promise<number> {
   try {
     const records = await getAllPendingAudioRecords();
     return records.length;
   } catch {
-    return 0;
+    return getEphemeralAudioCount();
   }
 }
 
 /**
- * Remove an audio record from IndexedDB once uploaded
+ * Remove an audio record from IndexedDB and RAM once uploaded
  */
 export async function removeOfflineAudioRecord(id: string): Promise<void> {
   removeEphemeralAudioFallback(id);
@@ -221,48 +250,73 @@ export async function removeOfflineAudioRecord(id: string): Promise<void> {
 }
 
 /**
- * Save a pending database mutation in IndexedDB
+ * Save a pending database mutation in IndexedDB with Fail-Safe RAM Fallback
  */
 export async function saveOfflineMutation(action: any): Promise<void> {
+  const actionId = action.id || `mut_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const normalizedAction = { ...action, id: actionId };
+
   try {
     const db = await openAudioDB();
     const tx = db.transaction(MUTATIONS_STORE_NAME, 'readwrite');
     const store = tx.objectStore(MUTATIONS_STORE_NAME);
-    store.put(action);
+    store.put(normalizedAction);
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
   } catch (err) {
-    console.error('[OfflineAudioVault] Error saving offline mutation in IndexedDB:', err);
-    throw err;
+    console.warn('[OfflineAudioVault] IndexedDB quota/write error for mutation, diverting to RAM fallback:', err);
+    storeEphemeralMutationFallback(actionId, normalizedAction);
   }
 }
 
 /**
- * Retrieve all pending database mutations from IndexedDB
+ * Retrieve all pending database mutations (merges IndexedDB and RAM fallback)
  */
 export async function getAllOfflineMutations(): Promise<any[]> {
+  const ramMutations = getAllEphemeralMutationFallbacks();
+  let dbMutations: any[] = [];
+
   try {
     const db = await openAudioDB();
     const tx = db.transaction(MUTATIONS_STORE_NAME, 'readonly');
     const store = tx.objectStore(MUTATIONS_STORE_NAME);
     const request = store.getAll();
 
-    return new Promise((resolve, reject) => {
+    dbMutations = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     });
   } catch (err) {
     console.error('[OfflineAudioVault] Failed to retrieve offline mutations from IndexedDB:', err);
-    return [];
   }
+
+  const seenIds = new Set<string>();
+  const merged: any[] = [];
+
+  for (const mut of ramMutations) {
+    if (mut && mut.id && !seenIds.has(mut.id)) {
+      seenIds.add(mut.id);
+      merged.push(mut);
+    }
+  }
+
+  for (const mut of dbMutations) {
+    if (mut && mut.id && !seenIds.has(mut.id)) {
+      seenIds.add(mut.id);
+      merged.push(mut);
+    }
+  }
+
+  return merged;
 }
 
 /**
- * Remove a mutation from IndexedDB once synced
+ * Remove a mutation from IndexedDB and RAM once synced
  */
 export async function removeOfflineMutation(id: string): Promise<void> {
+  removeEphemeralMutationFallback(id);
   try {
     const db = await openAudioDB();
     const tx = db.transaction(MUTATIONS_STORE_NAME, 'readwrite');
@@ -278,14 +332,14 @@ export async function removeOfflineMutation(id: string): Promise<void> {
 }
 
 /**
- * Get count of pending offline mutations
+ * Get count of pending offline mutations (IndexedDB + RAM)
  */
 export async function getOfflineMutationCount(): Promise<number> {
   try {
     const mutations = await getAllOfflineMutations();
     return mutations.length;
   } catch {
-    return 0;
+    return getEphemeralMutationCount();
   }
 }
 

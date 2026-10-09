@@ -7,7 +7,7 @@ import authRoutes from './routes/auth';
 import storageRoutes from './routes/storage';
 import gateRoutes from './routes/gate';
 import sentinelRoutes from './routes/sentinel';
-import { supabaseProxy, silentRefreshMiddleware } from './routes/proxy';
+import { supabaseProxy, silentRefreshMiddleware, circuitBreakerMiddleware } from './routes/proxy';
 import { DeadLetterSentinel } from './services/deadLetterSentinel';
 
 dotenv.config();
@@ -230,8 +230,8 @@ app.use(
 // 1. Auth Routes with Strict Rate Limiting & 1MB Body Limit
 app.use('/api/auth', authRateLimiter, tenantRateLimiter, express.json({ limit: '1mb' }), authRoutes);
 
-// 2. Supabase PostgREST Proxy with API Rate Limiting & Silent Refresh
-app.use('/api/db', apiRateLimiter, tenantRateLimiter, silentRefreshMiddleware, supabaseProxy);
+// 2. Supabase PostgREST Proxy with API Rate Limiting, Circuit Breaker & Silent Refresh
+app.use('/api/db', apiRateLimiter, tenantRateLimiter, circuitBreakerMiddleware, silentRefreshMiddleware, supabaseProxy);
 
 // 3. Zero-Memory Direct-to-Storage Presign Routes (Audio & Asset Ingestion)
 app.use('/api/storage', storageRateLimiter, tenantRateLimiter, express.json({ limit: '1mb' }), storageRoutes);

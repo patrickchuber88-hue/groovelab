@@ -11,6 +11,7 @@ import {
   removeOfflineMutation,
   OfflineAudioRecord 
 } from '../utils/offlineAudioVault';
+import { getEphemeralAudioCount } from '../utils/storageQuotaManager';
 
 export type OfflineOperationType = 'upsert' | 'delete' | 'insert';
 
@@ -238,12 +239,13 @@ export const flushOfflineAudioQueue = async (forceUpload: boolean = false): Prom
     if (records.length === 0) return { success: 0, failed: 0 };
 
     const netProfile = getEffectiveNetworkProfile();
-    if (!forceUpload && !netProfile.shouldAutoUploadMedia) {
+    const hasEmergencyRamTakes = getEphemeralAudioCount() > 0;
+    if (!forceUpload && !netProfile.shouldAutoUploadMedia && !hasEmergencyRamTakes) {
       console.log(`[OfflineSync] Mobile/constrained network active (${netProfile.tier}). Postponing ${records.length} heavy audio uploads until WiFi or manual override.`);
       return { success: 0, failed: 0, postponed: records.length };
     }
 
-    console.log(`[OfflineSync] Flushing ${records.length} pending lossless audio records from IndexedDB...`);
+    console.log(`[OfflineSync] Flushing ${records.length} pending lossless audio records (RAM priority: ${hasEmergencyRamTakes})...`);
 
     for (const record of records) {
       try {

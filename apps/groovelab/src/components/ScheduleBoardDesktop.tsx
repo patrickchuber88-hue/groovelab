@@ -5192,40 +5192,36 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleDeleteDraft = async (draftId: string) => {
-    const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
-    if (currentList.length <= 1) {
+    const currentActiveId = activeDraftIdRef.current || activeDraftId;
+    const baseList = (draftsRef.current.length > 0 ? draftsRef.current : drafts).map(d => d.id === currentActiveId ? { ...d, boards } : d);
+    if (baseList.length <= 1) {
       await showAlert('Der letzte verbleibende Entwurf kann nicht gelöscht werden.');
       return;
     }
-    if (!await showConfirm('Möchtest du diesen Entwurf wirklich löschen?')) {
-      return;
-    }
-    const filtered = currentList.filter(d => d.id !== draftId);
-    const updatedDrafts = filtered.map((d, index) => ({
-      ...d,
-      name: `Entwurf ${index + 1}`
-    }));
-    
+    const targetDraft = baseList.find(d => d.id === draftId);
+    const draftLabel = targetDraft?.name ? `„${targetDraft.name}“` : 'diesen Entwurf';
+    if (!await showConfirm(`Möchtest du ${draftLabel} wirklich löschen?`)) return;
+    const updatedDrafts = baseList.filter(d => d.id !== draftId);
     draftsRef.current = updatedDrafts;
     setDrafts(updatedDrafts);
 
-    let nextActiveId = activeDraftIdRef.current || activeDraftId;
-    let nextBoards = boards;
+    let nextActiveId = currentActiveId, nextBoards = boards;
+    const sourceStudents = masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students;
 
-    if (nextActiveId === draftId) {
+    if (currentActiveId === draftId) {
       const fallback = updatedDrafts[0];
       nextActiveId = fallback.id;
       setActiveDraftId(fallback.id);
       activeDraftIdRef.current = fallback.id;
-      nextBoards = fallback.boards || [];
-      setBoards(nextBoards);
-      syncStudentsWithBoards(nextBoards);
+      nextBoards = (fallback.boards && fallback.boards.length > 0) ? fallback.boards : boards.map(b => ({ ...b, id: `board-${crypto.randomUUID()}`, students: b.students.filter(s => s.isBreak) }));
+      const consolidated = consolidateDatabaseGroups(nextBoards, sourceStudents);
+      setBoards(consolidated.boards);
+      setStudents(consolidated.pool);
     }
 
+    const currentConsolidated = currentActiveId === draftId ? consolidateDatabaseGroups(nextBoards, sourceStudents).pool : students;
     const nextSubmittedDraftId = submittedDraftId === draftId ? '' : submittedDraftId;
-    if (submittedDraftId === draftId) {
-      setSubmittedDraftId('');
-    }
+    if (submittedDraftId === draftId) setSubmittedDraftId('');
 
     // Persist deletion immediately
     const draftStateToSave = {
@@ -5233,22 +5229,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       submittedDraftId: nextSubmittedDraftId,
       submittedAt: nextSubmittedDraftId ? lastSubmittedTime : '',
       drafts: updatedDrafts,
-      allTeacherStudentIds: Array.from(new Set((masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students).map(s => s.id))),
-      unassignedStudentIds: students.filter(s => !s.isBreak && !s.assignedDay).map(s => s.id)
+      allTeacherStudentIds: Array.from(new Set(sourceStudents.map(s => s.id))),
+      unassignedStudentIds: currentConsolidated.filter(s => !s.isBreak && !s.assignedDay).map(s => s.id)
     };
     const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-    const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
     safeLocalStorageSet(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
-    
-    supabase
-      .from('users')
-      .update({
-        planned_boards: draftStateToSave,
-        campus_räume: draftStateToSave,
-        groovelab_räume: draftStateToSave
-      })
-      .eq('id', selectedTeacherId)
-      .then();
+    supabase.from('users').update({ planned_boards: draftStateToSave, campus_räume: draftStateToSave, groovelab_räume: draftStateToSave }).eq('id', selectedTeacherId).then();
+    setToast({ message: `${draftLabel} gelöscht`, type: 'success' });
   };
 
   const handleHardResetSystem = async () => {
@@ -6792,6 +6779,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   }}
                   onOpenAvailability={handleEditTeacherAvailability}
                   onDuplicateCurrentDraft={() => handleConfirmNewDraft('duplicate_with_students')}
+                  onOpenStudentPool={() => setIsPoolManuallyCollapsed(false)}
                 />
               );
             })()}

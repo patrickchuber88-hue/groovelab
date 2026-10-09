@@ -27,8 +27,7 @@ const COOKIE_OPTIONS_LAX = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-// Replay detection tracker for Refresh Tokens (RFC 6819)
-const usedRefreshTokens = new Map<string, number>();
+// 🛡️ Note: Refresh Token Rotation (RFC 6819) is centrally coordinated via TokenRefreshCoordinator in proxy.ts
 
 router.post('/login', validateBody(loginSchema), async (req, res) => {
   const { email, password, isQrOrDeepLink } = req.body;

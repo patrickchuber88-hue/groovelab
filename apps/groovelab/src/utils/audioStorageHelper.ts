@@ -460,11 +460,16 @@ export async function requestPresignedUploadTicket(options: {
 }): Promise<PresignedUploadTicket | null> {
   try {
     const bffOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (options.uniqueId) {
+      headers['Idempotency-Key'] = options.uniqueId;
+    }
+
     const res = await fetch(`${bffOrigin}/api/storage/presign-upload`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify(options),
     });

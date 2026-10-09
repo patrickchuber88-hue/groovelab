@@ -146,27 +146,30 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
         background: 'rgba(255, 255, 255, 0.85)',
         backdropFilter: 'blur(20px) saturate(190%)',
         WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-        borderRadius: '16px',
-        padding: '8px 14px',
+        borderRadius: '14px',
+        padding: '5px 12px',
         border: '1px solid rgba(0, 0, 0, 0.08)',
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.03)',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: '12px',
-        flexWrap: 'wrap'
+        flexWrap: 'nowrap',
+        position: 'relative',
+        zIndex: 40,
+        height: '42px',
+        boxSizing: 'border-box'
       }}
     >
       {/* ── LEFT: DRAFT STUDIO (TABS + PROMINENT ADD BUTTON) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
         <span style={{ 
-          fontSize: '0.70rem', 
+          fontSize: '0.68rem', 
           fontWeight: 800, 
           color: '#64748b', 
           textTransform: 'uppercase', 
           letterSpacing: '0.04em', 
-          fontFamily: 'Urbanist, sans-serif', 
-          flexShrink: 0 
+          fontFamily: 'Urbanist, sans-serif'
         }}>
           Entwürfe:
         </span>
@@ -304,29 +307,57 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
                   </span>
                 </button>
 
-                {/* Edit / Rename Icon on Active Tab */}
+                {/* Actions on Active Tab: Rename & Delete */}
                 {isActive && (
-                  <button
-                    type="button"
-                    onClick={() => handleStartRename(d)}
-                    title="Entwurf umbenennen"
-                    aria-label="Entwurf umbenennen"
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                      padding: '4px 6px 4px 2px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'color 0.15s ease'
-                    }}
-                    onMouseOver={e => e.currentTarget.style.color = '#0f172a'}
-                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
-                  >
-                    <Edit2 size={11} />
-                  </button>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', paddingRight: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleStartRename(d)}
+                      title="Entwurf umbenennen"
+                      aria-label="Entwurf umbenennen"
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '4px 3px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'color 0.15s ease'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.color = '#0f172a'}
+                      onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                    >
+                      <Edit2 size={11} />
+                    </button>
+                    {drafts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteDraft(d.id);
+                        }}
+                        title={`Entwurf „${d.name}“ löschen`}
+                        aria-label={`Entwurf „${d.name}“ löschen`}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#94a3b8',
+                          cursor: 'pointer',
+                          padding: '4px 3px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'color 0.15s ease'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                        onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -334,7 +365,7 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
         </div>
 
         {/* 🌟 HERO ACTION BUTTON: [+ Neuer Entwurf ▾] */}
-        <div ref={newDraftBtnRef} style={{ position: 'relative' }}>
+        <div ref={newDraftBtnRef} style={{ position: 'relative', flexShrink: 0 }}>
           <button
             type="button"
             onClick={() => setShowNewDraftDropdown(prev => !prev)}
@@ -343,31 +374,30 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
             style={{
               background: showNewDraftDropdown 
                 ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
-                : 'linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.08) 100%)',
+                : 'rgba(34, 197, 94, 0.10)',
               color: showNewDraftDropdown ? '#ffffff' : '#15803d',
-              border: '1.5px solid rgba(34, 197, 94, 0.35)',
-              borderRadius: '9px',
-              padding: '5px 11px',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              borderRadius: '8px',
+              padding: '4px 9px',
               fontSize: '0.74rem',
               fontWeight: 800,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
               boxShadow: 'none',
-              transition: 'all 0.16s ease',
-              flexShrink: 0
+              transition: 'all 0.16s ease'
             }}
             onMouseOver={e => {
               if (!showNewDraftDropdown) {
-                e.currentTarget.style.background = 'rgba(34, 197, 94, 0.18)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.background = 'rgba(34, 197, 94, 0.16)';
               }
             }}
             onMouseOut={e => {
               if (!showNewDraftDropdown) {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.08) 100%)';
-                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.background = 'rgba(34, 197, 94, 0.10)';
               }
             }}
           >
@@ -391,7 +421,7 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
                 border: '1px solid rgba(0, 0, 0, 0.1)',
                 borderRadius: '14px',
                 padding: '6px',
-                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.14)',
+                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.16)',
                 minWidth: '260px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -511,25 +541,25 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
         </div>
       </div>
 
-      {/* ── CENTER: CANVAS TOOLS (MAGNET-RASTER, DATENSCHUTZ, ZEITEN, MEHR) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        {/* Magnet-Raster Selector */}
+      {/* ── CENTER: APPLE CANVAS PREFERENCES (RASTER & DATENSCHUTZ) ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+        {/* Magnet-Raster Selector mit semantischem Info-Tooltip */}
         <div 
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: '6px', 
-            background: 'rgba(255,255,255,0.9)', 
-            border: '1px solid rgba(0,0,0,0.08)', 
-            borderRadius: '9px', 
+            gap: '5px', 
+            background: 'rgba(0, 0, 0, 0.04)', 
+            border: '1px solid rgba(0, 0, 0, 0.05)', 
+            borderRadius: '8px', 
             padding: '3px 8px', 
-            minHeight: '32px', 
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)' 
+            height: '28px',
+            boxSizing: 'border-box'
           }} 
-          title="Magnetisches Zeilen-Raster für Unterrichtstermine"
+          title="Magnetisches Raster für Unterrichtstermine • Grün = Wunschzeit erfüllt • Weiß = Ausweichzeit"
         >
-          <Grid3X3 size={13} style={{ color: brandColor }} />
-          <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <Grid3X3 size={12} style={{ color: brandColor }} />
+          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Raster:
           </span>
           <select
@@ -537,7 +567,7 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
             onChange={(e) => onChangeGridSnap(Number(e.target.value))}
             style={{ 
               border: 'none', 
-              fontSize: '0.76rem', 
+              fontSize: '0.74rem', 
               fontWeight: 800, 
               color: '#0f172a', 
               background: 'transparent', 
@@ -552,343 +582,357 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
           </select>
         </div>
 
-        {/* Wunsch / Ausweich Legende */}
-        <div 
-          style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: '6px', 
-            background: 'rgba(255,255,255,0.9)', 
-            border: '1px solid rgba(0,0,0,0.08)', 
-            borderRadius: '9px', 
-            padding: '3px 8px', 
-            minHeight: '32px' 
-          }} 
-          title="Farb-Semantik im Designer: Grün = Schüler-Wunschzeit erfüllt • Weiß = Ausweichzeit"
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', fontWeight: 700, color: '#15803d' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-            ★ Wunsch
-          </span>
-          <span style={{ color: '#cbd5e1' }}>•</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', border: '1.5px solid #cbd5e1', display: 'inline-block' }} />
-            ○ Ausweich
-          </span>
-        </div>
-
-        {/* Apple HIG Button Group */}
-        <div className="apple-btn-group" style={{ height: '32px' }}>
-          {/* Namen schützen / anzeigen */}
-          <button
-            type="button"
-            onClick={onToggleRealNames}
-            className={`apple-btn ${showRealNames ? 'active' : ''}`}
-            style={{ color: showRealNames ? brandColor : undefined, fontSize: '0.74rem', padding: '0 8px' }}
-            title={showRealNames ? "Schüler-Nachnamen sind gekürzt (Datenschutz aktiv)" : "Vollständige Schülernamen anzeigen"}
-          >
-            {showRealNames ? <EyeOff size={12} /> : <Eye size={12} />}
-            <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
-          </button>
-
-          <div style={{ width: '1px', height: '14px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
-
-          {/* Zeiten ändern */}
-          {!isSecretaryWorkspace && selectedTeacherId === userId ? (
-            <button
-              type="button"
-              onClick={onEditAvailability}
-              className="apple-btn"
-              style={{ fontSize: '0.74rem', padding: '0 8px' }}
-              title="Unterrichtszeiten & Wunschtage der Lehrkraft anpassen"
-            >
-              <Clock size={12} />
-              <span>Zeiten ändern</span>
-            </button>
-          ) : (
-            onAddDayBoard && (
-              <button
-                type="button"
-                onClick={onAddDayBoard}
-                className="apple-btn"
-                style={{ fontSize: '0.74rem', padding: '0 8px' }}
-                title="Weiteren Unterrichtstag hinzufügen"
-              >
-                <Plus size={12} />
-                <span>Tag anlegen</span>
-              </button>
-            )
-          )}
-
-          <div style={{ width: '1px', height: '14px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
-
-          {/* Mehr Dropdown */}
-          <div ref={moreBtnRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => setShowMoreMenu(prev => !prev)}
-              className={`apple-btn ${showMoreMenu ? 'active' : ''}`}
-              style={{ fontSize: '0.74rem', padding: '0 8px' }}
-              title="Weitere Optionen & Datensicherung"
-            >
-              <MoreVertical size={12} />
-              <span>Mehr</span>
-            </button>
-
-            {showMoreMenu && (
-              <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 6px)',
-                right: 0,
-                background: 'rgba(255, 255, 255, 0.98)',
-                backdropFilter: 'blur(20px) saturate(190%)',
-                border: '1px solid rgba(0,0,0,0.1)',
-                borderRadius: '12px',
-                padding: '5px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-                zIndex: 1100,
-                minWidth: '220px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    onCopyOnboardingLink();
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    border: 'none',
-                    background: 'transparent',
-                    borderRadius: '8px',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    color: '#1d1d1f',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <Send size={13} />
-                  <span>Onboarding-Link kopieren</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    onRestoreFromPdf();
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    border: 'none',
-                    background: 'transparent',
-                    borderRadius: '8px',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    color: '#1d1d1f',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <Upload size={13} />
-                  <span>PDF-Backup wiederherstellen</span>
-                </button>
-
-                {drafts.length > 1 && (
-                  <>
-                    <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', margin: '3px 0' }} />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMoreMenu(false);
-                        onDeleteDraft(activeDraftId);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '8px 10px',
-                        border: 'none',
-                        background: 'transparent',
-                        borderRadius: '8px',
-                        fontSize: '0.76rem',
-                        fontWeight: 600,
-                        color: '#b91c1c',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <Trash2 size={13} />
-                      <span>Aktuellen Entwurf löschen</span>
-                    </button>
-                  </>
-                )}
-
-                <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', margin: '3px 0' }} />
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    onHardResetSystem();
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    border: 'none',
-                    background: 'rgba(239, 68, 68, 0.08)',
-                    borderRadius: '8px',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    color: '#ef4444',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                >
-                  <AlertTriangle size={13} />
-                  <span>System-Reset</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── RIGHT: PRIMARY AUTO-ASSIGN & UNDO TOOLBAR ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
-        {/* 🌟 HERO FLAGGSCHIFF: Automatisch zuteilen */}
+        {/* Apple Segment Button: Namen schützen / anzeigen */}
         <button
           type="button"
-          onClick={onAutoAssign}
-          disabled={unassignedCount === 0}
-          title={unassignedCount === 0 ? "Alle Schüler sind bereits eingeteilt" : "Universitäre 4-Phasen-Auto-Zuteilung starten"}
+          onClick={onToggleRealNames}
           style={{
-            background: unassignedCount === 0
-              ? 'rgba(0, 0, 0, 0.04)'
-              : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-            color: unassignedCount === 0 ? '#94a3b8' : '#ffffff',
-            border: unassignedCount === 0 ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(22, 163, 74, 0.4)',
-            fontWeight: 800,
-            padding: '6px 14px',
-            borderRadius: '9px',
-            fontSize: '0.76rem',
-            cursor: unassignedCount === 0 ? 'not-allowed' : 'pointer',
+            background: showRealNames ? 'rgba(52, 168, 83, 0.12)' : 'rgba(0, 0, 0, 0.04)',
+            border: showRealNames ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.05)',
+            borderRadius: '8px',
+            padding: '3px 9px',
+            height: '28px',
+            color: showRealNames ? '#15803d' : '#475569',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
-            boxShadow: unassignedCount === 0
-              ? 'none'
-              : '0 3px 12px rgba(22, 163, 74, 0.3), 0 1px 2px rgba(0, 0, 0, 0.08)',
-            transition: 'all 0.16s ease',
-            pointerEvents: unassignedCount === 0 ? 'none' : 'auto'
+            gap: '5px',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
+            transition: 'all 0.15s ease'
           }}
-          onMouseOver={e => {
-            if (unassignedCount > 0) {
-              e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)';
-            }
-          }}
-          onMouseOut={e => {
-            if (unassignedCount > 0) {
-              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            }
-          }}
+          title={showRealNames ? "Schüler-Nachnamen sind gekürzt (Datenschutz aktiv)" : "Vollständige Schülernamen anzeigen"}
         >
-          <Sparkles size={13} strokeWidth={2.4} />
-          <span>Automatisch zuteilen</span>
+          {showRealNames ? <EyeOff size={12} /> : <Eye size={12} />}
+          <span>{showRealNames ? "Namen geschützt" : "Namen anzeigen"}</span>
+        </button>
+      </div>
+
+      {/* ── RIGHT: PRIMARY ACTIONS & UNIFIED APPLE MORE MENU ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+        {/* Undo Button (Subtil, nur aktiv wenn Historie existiert) */}
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={undoCount === 0}
+          style={{
+            background: undoCount > 0 ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+            border: undoCount > 0 ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid transparent',
+            borderRadius: '8px',
+            height: '28px',
+            padding: '0 8px',
+            color: undoCount > 0 ? '#0f172a' : '#cbd5e1',
+            cursor: undoCount > 0 ? 'pointer' : 'not-allowed',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            boxSizing: 'border-box',
+            transition: 'all 0.15s ease'
+          }}
+          title={undoCount > 0 ? `Letzte Aktion rückgängig machen (⌘Z) – ${undoCount} im Speicher` : "Keine Aktionen zum Rückgängig machen"}
+        >
+          <RotateCcw size={12} strokeWidth={2.4} />
+          <span>{undoCount > 0 ? `(${undoCount})` : ''}</span>
         </button>
 
-        {/* Apple HIG Button Group (Rückgängig | Zurücksetzen | Löschen) */}
-        <div className="apple-btn-group" style={{ height: '32px' }}>
-          {/* Rückgängig */}
+        {/* 🌟 HERO FLAGGSCHIFF: Automatisch zuteilen (Apple Green Pill) */}
+        {unassignedCount > 0 && (
           <button
             type="button"
-            onClick={onUndo}
-            disabled={undoCount === 0}
-            className="apple-btn"
+            onClick={onAutoAssign}
             style={{
-              opacity: undoCount > 0 ? 1 : 0.45,
-              cursor: undoCount > 0 ? 'pointer' : 'not-allowed',
-              color: undoCount > 0 ? '#0f172a' : '#94a3b8',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              padding: '0 8px',
+              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 800,
+              padding: '4px 12px',
+              borderRadius: '8px',
+              fontSize: '0.74rem',
+              height: '28px',
+              cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '5px',
+              boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
+              boxSizing: 'border-box',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap'
             }}
-            title={undoCount > 0 ? `Letzte Verschiebung rückgängig machen (⌘Z) – ${undoCount} im Speicher` : "Keine Änderungen zum Rückgängig machen"}
+            onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseOut={e => e.currentTarget.style.transform = 'none'}
+            title="Universitäre 4-Phasen-Auto-Zuteilung starten"
           >
-            <RotateCcw size={11} strokeWidth={2.4} />
-            <span>Rückgängig{undoCount > 0 ? ` (${undoCount})` : ''}</span>
+            <Sparkles size={12} strokeWidth={2.4} style={{ color: 'currentColor' }} />
+            <span>Automatisch zuteilen ({unassignedCount})</span>
           </button>
+        )}
 
-          <div style={{ width: '1px', height: '14px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
-
-          {/* Zuteilung zurücksetzen */}
+        {/* ── UNIFIED APPLE MORE MENU [ ⋯ Optionen ] ── */}
+        <div ref={moreBtnRef} style={{ position: 'relative', flexShrink: 0 }}>
           <button
             type="button"
-            onClick={onResetAllAssignments}
-            disabled={assignedCount === 0}
-            className="apple-btn"
+            onClick={() => setShowMoreMenu(prev => !prev)}
+            aria-expanded={showMoreMenu}
+            aria-haspopup="menu"
             style={{
-              opacity: assignedCount > 0 ? 1 : 0.45,
-              cursor: assignedCount > 0 ? 'pointer' : 'not-allowed',
-              color: assignedCount > 0 ? '#0f172a' : '#94a3b8',
+              background: showMoreMenu ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              borderRadius: '8px',
+              height: '28px',
+              padding: '0 8px',
+              color: '#334155',
+              cursor: 'pointer',
               fontSize: '0.72rem',
               fontWeight: 700,
-              padding: '0 8px',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              boxSizing: 'border-box',
+              transition: 'all 0.15s ease'
             }}
-            title={assignedCount > 0 ? "Alle Schüler vom Board in die Seitenleiste zurücksetzen" : "Keine eingeteilten Schüler zum Zurücksetzen"}
+            title="Weitere Aktionen, Einstellungen & Werkzeuge"
           >
-            <RotateCcw size={11} strokeWidth={2.4} />
-            <span>Zurücksetzen</span>
+            <MoreVertical size={13} />
+            <span>Optionen</span>
           </button>
 
-          <div style={{ width: '1px', height: '14px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
+          {showMoreMenu && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              right: 0,
+              background: 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(25px) saturate(190%)',
+              WebkitBackdropFilter: 'blur(25px) saturate(190%)',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '14px',
+              padding: '6px',
+              boxShadow: '0 16px 40px rgba(0, 0, 0, 0.16)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              zIndex: 1100,
+              minWidth: '240px'
+            }}>
+              {/* Bereich 1: Zeiten & Tage */}
+              <div style={{ padding: '4px 10px 2px 10px', fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Unterrichtstage
+              </div>
+              {!isSecretaryWorkspace && selectedTeacherId === userId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onEditAvailability();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '7px 10px',
+                    border: 'none',
+                    background: 'transparent',
+                    borderRadius: '8px',
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Clock size={13} />
+                  <span>Unterrichtszeiten & Tage anpassen</span>
+                </button>
+              ) : (
+                onAddDayBoard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      onAddDayBoard();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '7px 10px',
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '8px',
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <Plus size={13} />
+                    <span>Weiteren Unterrichtstag anlegen</span>
+                  </button>
+                )
+              )}
 
-          {/* Alle Tage löschen */}
-          <button
-            type="button"
-            onClick={onDeleteAllBoards}
-            disabled={totalBoardsCount === 0}
-            className="apple-btn"
-            style={{
-              opacity: totalBoardsCount > 0 ? 1 : 0.45,
-              cursor: totalBoardsCount > 0 ? 'pointer' : 'not-allowed',
-              color: totalBoardsCount > 0 ? '#ef4444' : '#94a3b8',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              padding: '0 8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-            title={totalBoardsCount > 0 ? "Alle Unterrichtstage leeren & von vorne beginnen" : "Keine Tage vorhanden"}
-          >
-            <Trash2 size={11} strokeWidth={2.4} />
-            <span>Löschen</span>
-          </button>
+              <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '3px 0' }} />
+
+              {/* Bereich 2: Aufräumen & Zurücksetzen (Destruktiv geschützt) */}
+              <div style={{ padding: '4px 10px 2px 10px', fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Zuteilung & Board
+              </div>
+              <button
+                type="button"
+                disabled={assignedCount === 0}
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onResetAllAssignments();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  border: 'none',
+                  background: 'transparent',
+                  borderRadius: '8px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: assignedCount > 0 ? '#0f172a' : '#cbd5e1',
+                  cursor: assignedCount > 0 ? 'pointer' : 'not-allowed',
+                  textAlign: 'left'
+                }}
+                onMouseOver={e => { if (assignedCount > 0) e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'; }}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <RotateCcw size={13} />
+                <span>Schüler vom Board zurücksetzen ({assignedCount})</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={totalBoardsCount === 0}
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onDeleteAllBoards();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  border: 'none',
+                  background: 'transparent',
+                  borderRadius: '8px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: totalBoardsCount > 0 ? '#dc2626' : '#cbd5e1',
+                  cursor: totalBoardsCount > 0 ? 'pointer' : 'not-allowed',
+                  textAlign: 'left'
+                }}
+                onMouseOver={e => { if (totalBoardsCount > 0) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; }}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <Trash2 size={13} />
+                <span>Alle Unterrichtstage leeren</span>
+              </button>
+
+              <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '3px 0' }} />
+
+              {/* Bereich 3: Teilen & Sicherung */}
+              <div style={{ padding: '4px 10px 2px 10px', fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Teilen & Backup
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onCopyOnboardingLink();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  border: 'none',
+                  background: 'transparent',
+                  borderRadius: '8px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <Send size={13} />
+                <span>Schüler-Onboarding-Link kopieren</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onRestoreFromPdf();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  border: 'none',
+                  background: 'transparent',
+                  borderRadius: '8px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <Upload size={13} />
+                <span>PDF-Backup wiederherstellen</span>
+              </button>
+
+              <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '3px 0' }} />
+
+              {/* Bereich 4: Notfall-Reset */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onHardResetSystem();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  border: 'none',
+                  background: 'rgba(239, 68, 68, 0.06)',
+                  borderRadius: '8px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.06)'}
+              >
+                <AlertTriangle size={13} />
+                <span>System-Reset</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

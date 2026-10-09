@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1791560981140';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1791560981140';
+const CACHE_NAME = 'groovelab-static-v1791562688292';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1791562688292';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -222,8 +222,13 @@ self.addEventListener('fetch', function(event) {
     return; // Pass through cleanly to browser native network stack without caching
   }
 
-  // Skip API/Supabase internal traffic, auth endpoints, and cloud storage media (Quota & Memory Shield)
+  // 🛡️ 0,1% Enterprise Goldstandard: Strict API, Auth, Gate & Database Bypass Barrier (OWASP ASVS L3 / Art. 5 DSGVO)
+  // Never intercept, cache, or clone dynamic database queries, credentials, or backend API responses in Service Worker Cache API!
+  // Prevents multi-tenant cache leakage and stale student data on shared school tablets.
   if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/gate/') ||
+    url.pathname === '/gate' ||
     url.pathname.includes('/rest/v1/') ||
     url.pathname.includes('/functions/v1/') ||
     url.pathname.includes('/auth/v1/') ||

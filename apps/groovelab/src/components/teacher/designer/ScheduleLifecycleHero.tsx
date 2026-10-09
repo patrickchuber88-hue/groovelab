@@ -36,6 +36,7 @@ export interface ScheduleLifecycleHeroProps {
   onOpenReportModal: () => void;
   onOpenAvailability: () => void;
   onDuplicateCurrentDraft: () => void;
+  onOpenStudentPool?: () => void;
 }
 
 export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
@@ -59,7 +60,8 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
   onSubmitSchedule,
   onOpenReportModal,
   onOpenAvailability,
-  onDuplicateCurrentDraft
+  onDuplicateCurrentDraft,
+  onOpenStudentPool
 }) => {
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -97,6 +99,11 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       onClick: () => void;
       variant: 'primary' | 'success' | 'amber' | 'neutral';
     };
+    secondaryButton?: {
+      label: string;
+      icon?: React.ReactNode;
+      onClick: () => void;
+    };
     secondaryAction?: {
       label: string;
       onClick: () => void;
@@ -117,7 +124,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       pillTag: 'Rücksprache erforderlich',
       primaryButton: {
         label: submitting ? 'Wird übermittelt...' : 'Änderungen erneut zur Freigabe einreichen',
-        icon: <Send size={14} />,
+        icon: <Send size={14} style={{ color: 'currentColor' }} />,
         onClick: onSubmitSchedule,
         variant: 'amber'
       },
@@ -137,7 +144,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       pillTag: 'Live & Aktiv',
       primaryButton: {
         label: 'Als neuen Entwurf duplizieren (Szenario)',
-        icon: <Copy size={14} />,
+        icon: <Copy size={14} style={{ color: 'currentColor' }} />,
         onClick: onDuplicateCurrentDraft,
         variant: 'neutral'
       },
@@ -171,12 +178,12 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       pillTag: 'Unverbindlicher Entwurf',
       primaryButton: unassignedCount > 0 ? {
         label: 'Automatisch zuteilen',
-        icon: <Sparkles size={14} />,
+        icon: <Sparkles size={14} style={{ color: 'currentColor' }} />,
         onClick: onAutoAssign,
         variant: 'primary'
       } : {
         label: submitting ? 'Wird übermittelt...' : `„${activeDraftName}“ zur Freigabe einreichen`,
-        icon: <Send size={14} />,
+        icon: <Send size={14} style={{ color: 'currentColor' }} />,
         onClick: onSubmitSchedule,
         variant: 'success'
       },
@@ -185,23 +192,50 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
         onClick: onOpenReportModal
       }
     };
-  } else if (unassignedCount > 0) {
+  } else if (totalStudents === 0) {
+    // 🏛️ 0,1% Goldstandard: Beseitigung des Cold-Start-Paradoxons bei 0 Schülern
     heroTheme = {
-      bgGradient: 'linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.9) 100%)',
+      bgGradient: 'linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%)',
       border: '1px solid rgba(0, 0, 0, 0.08)',
       iconBg: 'rgba(52, 168, 83, 0.12)',
       iconColor: brandColor,
-      title: `${unassignedCount} von ${totalStudents} Schülern warten auf Einteilung`,
-      description: 'Lass den universitären 15-Phasen-Algorithmus alle Schülerwünsche und lückenlose Blöcke in Sekunden berechnen.',
-      pillTag: 'Schritt 1: Zuteilung',
+      title: 'Willkommen beim Stundenplan-Designer',
+      description: 'Deine Musikschule hat dir für dieses Semester noch keine Schüler zugewiesen. Lege jetzt schon deine Wunsch-Unterrichtstage und Zeitfenster fest.',
+      pillTag: 'Schritt 1: Zeiten festlegen',
       primaryButton: {
-        label: '✨ Stundenplan automatisch berechnen',
-        icon: <Sparkles size={14} />,
+        label: 'Unterrichtszeiten & Tage festlegen',
+        icon: <Clock size={14} style={{ color: 'currentColor' }} />,
+        onClick: onOpenAvailability,
+        variant: 'primary'
+      }
+    };
+  } else if (unassignedCount > 0) {
+    const isFreshStart = totalAssigned === 0;
+    heroTheme = {
+      bgGradient: 'linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%)',
+      border: '1px solid rgba(0, 0, 0, 0.08)',
+      iconBg: 'rgba(52, 168, 83, 0.12)',
+      iconColor: brandColor,
+      title: isFreshStart 
+        ? `${unassignedCount} Schüler warten auf Einteilung • Bereit für deinen Plan`
+        : `${unassignedCount} von ${totalStudents} Schülern noch einzuteilen`,
+      description: isFreshStart
+        ? 'Wähle deinen Weg: Lass den 15-Stufen-Solver alle Wünsche sekundenschnell berechnen oder ziehe deine Schüler von Hand per Drag & Drop ein.'
+        : 'Lass den universitären 15-Phasen-Algorithmus alle Schülerwünsche und lückenlose Blöcke in Sekunden berechnen.',
+      pillTag: isFreshStart ? 'Schritt 2: Zuteilung' : `${unassignedCount} offen`,
+      primaryButton: {
+        label: 'Stundenplan automatisch berechnen',
+        icon: <Sparkles size={14} style={{ color: 'currentColor' }} />,
         onClick: onAutoAssign,
         variant: 'primary'
       },
+      secondaryButton: (isFreshStart && onOpenStudentPool) ? {
+        label: 'Manuell per Drag & Drop einteilen',
+        icon: <Sliders size={14} style={{ color: 'currentColor' }} />,
+        onClick: onOpenStudentPool
+      } : undefined,
       secondaryAction: {
-        label: 'Unterrichtszeiten & Tage anpassen',
+        label: 'Unterrichtszeiten anpassen',
         onClick: onOpenAvailability
       }
     };
@@ -216,7 +250,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       pillTag: 'Schritt 2: Feinschliff',
       primaryButton: {
         label: submitting ? 'Wird übermittelt...' : 'Stundenplan zur Freigabe einreichen',
-        icon: <Send size={14} />,
+        icon: <Send size={14} style={{ color: 'currentColor' }} />,
         onClick: onSubmitSchedule,
         variant: 'success'
       },
@@ -231,12 +265,12 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       border: '1.5px solid rgba(34, 197, 94, 0.35)',
       iconBg: 'rgba(34, 197, 94, 0.15)',
       iconColor: '#16a34a',
-      title: `Hervorragend! Lückenloser Stundenplan bereit zur Freigabe`,
+      title: 'Hervorragend! Lückenloser Stundenplan bereit zur Freigabe',
       description: `Alle ${totalStudents} Schüler eingeteilt, 0 Min Lücken. Reiche deinen Entwurf jetzt verbindlich an die Musikschule ein.`,
       pillTag: 'Schritt 3: Bereit',
       primaryButton: {
         label: submitting ? 'Wird übermittelt...' : 'Stundenplan zur Freigabe einreichen',
-        icon: <Send size={14} />,
+        icon: <Send size={14} style={{ color: 'currentColor' }} />,
         onClick: onSubmitSchedule,
         variant: 'success'
       },
@@ -263,6 +297,8 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
           justifyContent: 'space-between',
           gap: '12px',
           boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+          position: 'relative',
+          zIndex: 10,
           transition: 'all 0.2s ease'
         }}
       >
@@ -322,7 +358,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
               justifyContent: 'center'
             }}
           >
-            <ChevronDown size={14} />
+            <ChevronDown size={14} style={{ color: 'currentColor' }} />
           </button>
         </div>
       </div>
@@ -347,6 +383,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
         gap: '16px',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
         position: 'relative',
+        zIndex: 10,
         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         flexWrap: 'wrap'
       }}
@@ -365,7 +402,17 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
           flexShrink: 0,
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
         }}>
-          {isCurrentDraftLive ? <ShieldCheck size={20} /> : <Sparkles size={20} />}
+          {isCurrentDraftLive ? (
+            <ShieldCheck size={20} style={{ color: 'currentColor' }} />
+          ) : totalStudents === 0 ? (
+            <Clock size={20} style={{ color: 'currentColor' }} />
+          ) : isCurrentDraftNeedsRevision ? (
+            <AlertCircle size={20} style={{ color: 'currentColor' }} />
+          ) : isCurrentDraftPending ? (
+            <Clock size={20} style={{ color: 'currentColor' }} />
+          ) : (
+            <Sparkles size={20} style={{ color: 'currentColor' }} />
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
@@ -396,7 +443,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
       </div>
 
       {/* Right: Primary CTAs & Collapse Toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: 'auto', flexWrap: 'wrap' }}>
         {heroTheme.secondaryAction && (
           <button
             type="button"
@@ -416,6 +463,41 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
             onMouseOut={e => e.currentTarget.style.background = 'transparent'}
           >
             {heroTheme.secondaryAction.label}
+          </button>
+        )}
+
+        {heroTheme.secondaryButton && (
+          <button
+            type="button"
+            onClick={heroTheme.secondaryButton.onClick}
+            style={{
+              background: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid rgba(0, 0, 0, 0.12)',
+              color: '#0f172a',
+              fontWeight: 700,
+              padding: '8px 14px',
+              borderRadius: '10px',
+              fontSize: '0.80rem',
+              letterSpacing: '-0.01em',
+              minHeight: '34px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              transition: 'all 0.16s ease'
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.transform = 'none';
+            }}
+          >
+            {heroTheme.secondaryButton.icon}
+            <span>{heroTheme.secondaryButton.label}</span>
           </button>
         )}
 
@@ -485,7 +567,7 @@ export const ScheduleLifecycleHero: React.FC<ScheduleLifecycleHeroProps> = ({
           onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
           onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
         >
-          <ChevronUp size={14} />
+          <ChevronUp size={14} style={{ color: 'currentColor' }} />
         </button>
       </div>
     </div>
