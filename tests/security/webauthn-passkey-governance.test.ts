@@ -27,22 +27,22 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
         'Must create private_auth.webauthn_credentials'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /credential_id\s+TEXT\s+UNIQUE\s+NOT\s+NULL/i,
         'credential_id must be UNIQUE NOT NULL'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /sign_count\s+BIGINT\s+DEFAULT\s+0\s+NOT\s+NULL/i,
         'sign_count must exist for cloned authenticator defense'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /is_active\s+BOOLEAN\s+DEFAULT\s+TRUE\s+NOT\s+NULL/i,
         'is_active flag must exist'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /last_used_at\s+TIMESTAMPTZ/i,
         'last_used_at timestamp must exist'
       );
@@ -50,17 +50,17 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('ensures backward-compatibility columns on public.user_credentials', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /ALTER\s+TABLE\s+public\.user_credentials\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+is_active/i,
         'Must add is_active to public.user_credentials'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /ALTER\s+TABLE\s+public\.user_credentials\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+sign_count/i,
         'Must add sign_count to public.user_credentials'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /ALTER\s+TABLE\s+public\.user_credentials\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+last_used_at/i,
         'Must add last_used_at to public.user_credentials'
       );
@@ -68,17 +68,17 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('backfills legacy credentials from public.user_credentials to private_auth.webauthn_credentials', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /INSERT\s+INTO\s+private_auth\.webauthn_credentials/i,
         'Must backfill into private_auth'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /FROM\s+public\.user_credentials\s+uc/i,
         'Must select from legacy public.user_credentials'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /ON\s+CONFLICT\s+\(credential_id\)\s+DO\s+UPDATE/i,
         'Must be idempotent with ON CONFLICT'
       );
@@ -89,12 +89,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
   describe('2. Cryptographic Nonce Generation (generate_webauthn_challenge)', () => {
     it('generates 32-byte cryptographic random challenge with 5-minute TTL', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /encode\(extensions\.gen_random_bytes\(32\),\s*'hex'\)/i,
         'Must generate 32-byte (256-bit) cryptographically strong random hex nonce'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /NOW\(\)\s*\+\s*INTERVAL\s*'5\s+minutes'/i,
         'Must enforce 5-minute maximum challenge TTL'
       );
@@ -102,7 +102,7 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('purges expired nonces before issuing new challenge', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /DELETE\s+FROM\s+private_auth\.webauthn_challenges\s+WHERE\s+expires_at\s*<\s*NOW\(\)/i,
         'Must automatically sweep expired nonces'
       );
@@ -113,17 +113,17 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
   describe('3. Registration RPC Governance (register_webauthn_credential)', () => {
     it('verifies caller ownership or master admin authorization', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /public\.is_master_admin\(\)/i,
         'Must allow master admin override'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /v_caller_id\s*=\s*p_user_id/i,
         'Must strictly check caller ownership against target user_id'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /UNAUTHORIZED_PASSKEY_REGISTRATION/,
         'Must fail closed with UNAUTHORIZED_PASSKEY_REGISTRATION'
       );
@@ -131,12 +131,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('atomically verifies and consumes registration challenge', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /FROM\s+private_auth\.webauthn_challenges[\s\S]*?FOR\s+UPDATE/i,
         'Must lock challenge row FOR UPDATE'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /DELETE\s+FROM\s+private_auth\.webauthn_challenges\s+WHERE\s+id\s*=\s*v_chal_record\.id/i,
         'Must immediately delete challenge to prevent reuse'
       );
@@ -144,12 +144,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('synchronously persists in both private_auth and public.user_credentials', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /INSERT\s+INTO\s+private_auth\.webauthn_credentials/i,
         'Must insert into private_auth'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /INSERT\s+INTO\s+public\.user_credentials/i,
         'Must dual-persist into public.user_credentials'
       );
@@ -157,7 +157,7 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('creates an immutable audit log entry upon registration', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /INSERT\s+INTO\s+public\.audit_logs[\s\S]*?'REGISTER_PASSKEY'/i,
         'Must log REGISTER_PASSKEY in audit_logs'
       );
@@ -168,12 +168,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
   describe('4. Authentication RPC Governance (authenticate_webauthn_credential)', () => {
     it('atomically locks and consumes challenge via FOR UPDATE', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /FROM\s+private_auth\.webauthn_challenges[\s\S]*?WHERE\s+challenge\s*=\s*v_clean_chal[\s\S]*?FOR\s+UPDATE/i,
         'Must lock auth challenge row FOR UPDATE'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /DELETE\s+FROM\s+private_auth\.webauthn_challenges\s+WHERE\s+id\s*=\s*v_challenge_record\.id/i,
         'Must delete challenge on consumption for replay protection'
       );
@@ -181,12 +181,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('looks up credential with active check and fallback', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /FROM\s+private_auth\.webauthn_credentials[\s\S]*?WHERE\s+credential_id\s*=\s*v_clean_cred\s+AND\s+is_active\s*=\s*TRUE/i,
         'Must query private_auth.webauthn_credentials with is_active = TRUE'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /FROM\s+public\.user_credentials[\s\S]*?WHERE\s+credential_id\s*=\s*v_clean_cred/i,
         'Must have resilient fallback to public.user_credentials'
       );
@@ -194,12 +194,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('enforces lockout defense (pin_locked_until)', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /v_user\.pin_locked_until\s*>\s*NOW\(\)/i,
         'Must check pin_locked_until'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /Sicherheitssperre:\s*Zu\s*viele\s*Fehlversuche/i,
         'Must return lockout error message'
       );
@@ -207,17 +207,17 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('enforces cloned authenticator defense by incrementing sign_count and counter', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /sign_count\s*=\s*sign_count\s*\+\s*1/i,
         'Must increment sign_count'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /counter\s*=\s*counter\s*\+\s*1/i,
         'Must increment counter'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /last_used_at\s*=\s*NOW\(\)/i,
         'Must update last_used_at'
       );
@@ -225,7 +225,7 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('enforces multi-tenant isolation and active user verification', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /\(p_school_id\s+IS\s+NULL\s+OR\s+school_id\s*=\s*p_school_id\s+OR\s+is_master_admin\s*=\s*TRUE\)/i,
         'Must enforce school_id matching or master admin override'
       );
@@ -233,12 +233,12 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('issues verified 30-day session lease and redacts student last_name (DSGVO Art. 8 & 9)', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /INSERT\s+INTO\s+public\.session_leases/i,
         'Must issue session_leases record'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /'last_name',\s*CASE\s+WHEN\s+v_user\.role\s*=\s*'student'\s+THEN\s+NULL\s+ELSE\s+v_user\.last_name\s+END/i,
         'Must strictly redact student last_name per KUG § 22 and DSGVO'
       );
@@ -246,7 +246,7 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('logs AUTH_PASSKEY in audit_logs', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /'webauthn_credentials',\s*'AUTH_PASSKEY'/i,
         'Must log AUTH_PASSKEY in public.audit_logs'
       );
@@ -257,27 +257,27 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
   describe('5. Passkey Revocation & Multi-Device Session Purge (revoke_user_passkeys)', () => {
     it('deactivates credentials and invalidates active session leases', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.revoke_user_passkeys/i,
         'Must declare revoke_user_passkeys function'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /UPDATE\s+private_auth\.webauthn_credentials\s+SET\s+is_active\s*=\s*FALSE/i,
         'Must deactivate passkeys in private_auth'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /UPDATE\s+public\.session_leases\s+SET\s+is_revoked\s*=\s*TRUE/i,
         'Must revoke all session leases for target user'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /token_version\s*=\s*COALESCE\(token_version,\s*1\)\s*\+\s*1/i,
         'Must increment token_version for instant JWT invalidation'
       );
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /sessions_revoked_at\s*=\s*timezone\('utc'::text,\s*now\(\)\)/i,
         'Must stamp sessions_revoked_at'
       );
@@ -285,7 +285,7 @@ describe('🛡️ Hebel 15: WebAuthn FIDO2 Passkey Hardware Citadel & Credential
 
     it('enforces strict role-based authorization on revocation', () => {
       assert.match(
-        migration552Sql,
+        migration553Sql,
         /UNAUTHORIZED_REVOCATION/i,
         'Must fail-closed with UNAUTHORIZED_REVOCATION'
       );
