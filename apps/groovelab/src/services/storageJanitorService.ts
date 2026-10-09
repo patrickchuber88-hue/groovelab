@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { VOLATILE_STORAGE_PREFIXES } from '../utils/storageQuotaGuard';
 
 export interface JanitorReport {
   scannedFiles: number;
@@ -215,8 +216,8 @@ export const runClientStorageJanitor = async (): Promise<{ bytesFreedEstimated: 
       const key = localStorage.key(i);
       if (!key) continue;
 
-      // Identify temporary cached items (recordings, blobs, old audit items)
-      if (key.startsWith('temp_audio_') || key.startsWith('cg_draft_') || key.startsWith('cached_blob_')) {
+      // Identify temporary cached items via canonical SSOT prefixes
+      if (VOLATILE_STORAGE_PREFIXES.some(p => key.startsWith(p))) {
         const val = localStorage.getItem(key);
         if (val) {
           bytesFreed += val.length * 2; // rough UTF-16 byte estimate

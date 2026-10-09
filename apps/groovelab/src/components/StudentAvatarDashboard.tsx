@@ -382,7 +382,8 @@ export function StudentAvatarDashboard({
             handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
             handleCloseJuniorCelebration={handleCloseJuniorCelebration}
             handleStartPracticeSession={async () => {
-              await practice.requestOrientationPermission?.();
+              const ok = await practice.requestOrientationPermission?.();
+              if (ok === false) return;
               practice.setSessionActive(true);
             }}
             finishPracticeSession={(explicitXp) => practice.finishPracticeSession(explicitXp, streaks.avatar?.streak_flame)}

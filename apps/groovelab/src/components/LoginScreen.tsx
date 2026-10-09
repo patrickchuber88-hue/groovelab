@@ -3505,8 +3505,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               };
             }
             if (devData.teacher) {
-              const isPeter = (devData.teacher.name || '').includes('Peter') || devData.teacher.first_name === 'Peter';
-              resolvedTeacher = { ...devData.teacher, name: isPeter ? `Patrick Huber (Seed • ${resolvedSchoolName})` : devData.teacher.name, first_name: isPeter ? 'Patrick' : devData.teacher.first_name, last_name: isPeter ? 'Huber' : devData.teacher.last_name, school_id: targetSchoolId, is_campus_active: true, is_groovelab_active: true };
+              resolvedTeacher = {
+                ...devData.teacher,
+                school_id: targetSchoolId,
+                is_campus_active: true,
+                is_groovelab_active: true
+              };
             }
             if (devData.student) {
               resolvedStudent = {
@@ -3524,11 +3528,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           console.warn('[Bypass dev RPC notice]:', rpcErr);
         }
 
-        // 2. Canonical Fail-Safe Fallback defaults (Verifizierte Seed-Identitäten nach Migration 245 & 443)
+        // 2. Canonical Fail-Safe Fallback defaults (Verifizierte Seed-Identitäten nach Migration 550)
         if (!resolvedAdmin) {
           resolvedAdmin = {
-            id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
-            name: `Manuel Wagner (Seed • ${resolvedSchoolName})`,
+            id: '11079eae-664a-49a4-8692-771d83a3193c',
+            name: `Peter Pan (Seed • ${resolvedSchoolName})`,
             role: 'admin',
             school_id: targetSchoolId,
             is_campus_active: true,
@@ -3538,8 +3542,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (!resolvedTeacher) {
           resolvedTeacher = {
-            id: '11079eae-664a-49a4-8692-771d83a3193c',
-            name: `Patrick Huber (Seed • ${resolvedSchoolName})`,
+            id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
+            name: `Mateo Jansen (Seed • ${resolvedSchoolName})`,
             role: 'teacher',
             school_id: targetSchoolId,
             is_campus_active: true,
@@ -7049,7 +7053,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             style={{
               background: '#0f172a',
               color: '#ffffff',
-              border: '1.5px solid #38bdf8',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
               borderRadius: '12px',
               padding: '11px 16px',
               minHeight: '44px',
@@ -7068,20 +7072,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {bypassBusyRole === 'master' ? '👑 LEITSTAND WIRD GELADEN...' : '👑 [DEV ONLY] MASTER-ADMIN LEITSTAND'}
           </button>
 
-          {/* 2. Verwaltung / Schulleitung Bypass */}
+          {/* 2. Verwaltung / Schulleitung Bypass (Peter Pan) */}
           <button
             type="button"
             disabled={!!bypassBusyRole}
-            aria-label="Entwickler-Direktzugang: Schulleitung / Verwaltung anmelden"
-            title="Dev Only: 1-Klick Verwaltung Login"
+            aria-label="Entwickler-Direktzugang: Schulleitung Peter Pan anmelden"
+            title="Dev Only: 1-Klick Schulleitung Login"
             onClick={async () => {
               if (bypassBusyRole) return;
               try {
                 setBypassBusyRole('admin');
                 const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
                 const baseUser = bypassUserCounts.adminUser || {
-                  id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
-                  name: 'Manuel Wagner',
+                  id: '11079eae-664a-49a4-8692-771d83a3193c',
+                  name: 'Peter Pan',
                   role: 'admin',
                   school_id: fallbackSchoolId
                 };
@@ -7113,6 +7117,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 } catch (authErr) {
                   console.warn('[Bypass] Auth credential notice:', authErr);
                 }
+
+                // Autoritatives Schulleitungs-Scoping: Dual-Role Nutzer für Admin-Workspace härten
+                if (resolvedDbUser.role !== 'admin' && resolvedDbUser.role !== 'secretary') {
+                  try { await supabase.rpc('switch_user_active_role', { p_target_role: 'admin' }); } catch {}
+                  resolvedDbUser = { ...resolvedDbUser, role: 'admin' };
+                }
+
                 const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, effectiveSchoolId).catch(() => null);
                 if (leaseRes && (leaseRes as any).lease_id) {
                   sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
@@ -7151,7 +7162,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             style={{
               background: '#450a0a',
               color: '#fecaca',
-              border: '1.5px solid #ea4335',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '12px',
               padding: '11px 16px',
               minHeight: '44px',
@@ -7167,7 +7178,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           >
             {bypassBusyRole === 'admin' 
               ? '🏛️ ANMELDUNG LÄUFT...' 
-              : `🏛️ BYPASS: ${bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} (${bypassUserCounts.adminUser?.name || 'Manuel Wagner'} • ${bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})`}
+              : `🏛️ BYPASS: ${bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} (${bypassUserCounts.adminUser?.name || 'Peter Pan'} • ${bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})`}
           </button>
 
           {/* 3. Lehrer Bypass */}
@@ -7182,8 +7193,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 setBypassBusyRole('teacher');
                 const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
                 const baseUser = bypassUserCounts.teacherUser || {
-                  id: '11079eae-664a-49a4-8692-771d83a3193c',
-                  name: 'Patrick Huber',
+                  id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
+                  name: 'Mateo Jansen',
                   role: 'teacher',
                   school_id: fallbackSchoolId
                 };
@@ -7210,7 +7221,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
                     if (authResult.user) {
                       resolvedDbUser = { ...authResult.user, school_id: effectiveSchoolId };
-                      if (resolvedDbUser.first_name === 'Peter' && (resolvedDbUser.last_name === 'Pan' || resolvedDbUser.last_name === 'P.')) { resolvedDbUser.first_name = 'Patrick'; resolvedDbUser.last_name = 'Huber'; }
                     }
                   }
                 } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
@@ -7245,7 +7255,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             style={{
               background: '#064e3b',
               color: '#a7f3d0',
-              border: '1.5px solid #059669',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '12px',
               padding: '11px 16px',
               minHeight: '44px',
@@ -7261,7 +7271,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           >
             {bypassBusyRole === 'teacher'
               ? '🎓 ANMELDUNG LÄUFT...'
-              : `🎓 BYPASS: LEHRKRAFT (${bypassUserCounts.teacherUser?.name || 'Patrick Huber'} • ${bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})`}
+              : `🎓 BYPASS: LEHRKRAFT (${bypassUserCounts.teacherUser?.name || 'Mateo Jansen'} • ${bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})`}
           </button>
 
           {/* 4. Schüler Bypass */}
@@ -7343,7 +7353,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             style={{
               background: '#422006',
               color: '#fef08a',
-              border: '1.5px solid #eab308',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '12px',
               padding: '11px 16px',
               minHeight: '44px',

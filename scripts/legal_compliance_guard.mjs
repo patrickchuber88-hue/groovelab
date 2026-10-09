@@ -315,7 +315,9 @@ let hasWakeLockVisibility = false;
 
 if (fs.existsSync(nginxConfPath)) {
   const conf = fs.readFileSync(nginxConfPath, 'utf8');
-  hasNginxSensorBlock = conf.includes('accelerometer=()') && conf.includes('gyroscope=()') && conf.includes('magnetometer=()');
+  hasNginxSensorBlock = (conf.includes('accelerometer=(self)') || conf.includes('accelerometer=()')) &&
+                        (conf.includes('gyroscope=(self)') || conf.includes('gyroscope=()')) &&
+                        conf.includes('magnetometer=()');
 }
 
 if (fs.existsSync(webAuthnServicePath)) {
@@ -332,7 +334,7 @@ recordCheck(
   'LEG-06b: TDDDG § 25 Endgeräteschutz (Hardware-Sandbox, FIDO2 Enclave & WakeLock Visibility)',
   hasNginxSensorBlock && hasWebAuthnEnclave && hasWakeLockVisibility,
   hasNginxSensorBlock && hasWebAuthnEnclave && hasWakeLockVisibility
-    ? 'Permissions-Policy sperrt Gyroskop/Sensoren fail-closed; WebAuthn erzwingt Hardware-Platform-Enclave; WakeLock reagiert auf visibilitychange.'
+    ? 'Permissions-Policy beschränkt Gyroskop/Sensoren auf self-origin fail-closed; WebAuthn erzwingt Hardware-Platform-Enclave; WakeLock reagiert auf visibilitychange.'
     : 'TDDDG § 25 Lücke: Sensor-Sperre in Nginx, WebAuthn Enclave oder WakeLock-Visibility unvollständig.'
 );
 

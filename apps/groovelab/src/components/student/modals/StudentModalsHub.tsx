@@ -7,7 +7,7 @@ import { StudentJuniorPreFlightModal } from './StudentJuniorPreFlightModal';
 import { StudentJuniorStickerModal, JuniorStickerCategory } from './StudentJuniorStickerModal';
 import { StudentJuniorStickerDetailModal } from './StudentJuniorStickerDetailModal';
 import { StudentJuniorStickerAwardModal } from './StudentJuniorStickerAwardModal';
-import { StudentSessionCelebrationModal } from './StudentSessionCelebrationModal';
+import { StudentSessionCelebrationModal, StudentSessionCelebrationModalProps } from './StudentSessionCelebrationModal';
 import { StudentMatchCelebrationModal } from './StudentMatchCelebrationModal';
 import { CampusAppointmentShoutboxModal } from '../../CampusAppointmentShoutboxModal';
 import { StudentRescheduleBottomSheetModal } from './StudentRescheduleBottomSheetModal';
@@ -88,7 +88,8 @@ export interface StudentModalsHubProps {
   // Session Celebration
   showCelebration: boolean;
   setShowCelebration: (show: boolean) => void;
-  celebrationDetails: any;
+  celebrationDetails: StudentSessionCelebrationModalProps['celebrationDetails'];
+  validationMode?: StudentSessionCelebrationModalProps['validationMode'];
   celebrationRingProgress: number;
 
   // Match Celebration
@@ -234,6 +235,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
   showCelebration,
   setShowCelebration,
   celebrationDetails,
+  validationMode,
   celebrationRingProgress,
   matchCelebrationData,
   setMatchCelebrationData,
@@ -422,6 +424,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
       <StudentSessionCelebrationModal
         isOpen={showCelebration}
         celebrationDetails={celebrationDetails}
+        validationMode={validationMode || celebrationDetails?.validationMode}
         studentUiLevel={studentUiLevel}
         personalAverageMinutes={15}
         celebrationCanvasRef={internalCanvasRef}

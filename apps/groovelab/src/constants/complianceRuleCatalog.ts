@@ -605,7 +605,7 @@ export const COMPLIANCE_RULES_180: ComplianceRuleDefinition[] = [
     severity: 'CRITICAL',
     category: 'SECURITY_HEADER',
     invariantTarget: 'scripts/verify_perimeter_headers.mjs',
-    enforcementMechanism: 'Permissions-Policy: geolocation=(), gyroscope=(), magnetometer=()'
+    enforcementMechanism: 'Permissions-Policy: camera=(self), microphone=(self), geolocation=(), accelerometer=(self), gyroscope=(self), magnetometer=()'
   },
 
   // BEREICH C: STATUSRECHT & HERRENBERG (051 – 065)

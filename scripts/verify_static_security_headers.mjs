@@ -24,6 +24,16 @@ const FILES_TO_VALIDATE = [
     path: path.join(ROOT_DIR, 'deploy', 'nginx', 'security-headers.conf'),
     type: 'nginx-conf',
     name: 'deploy/nginx/security-headers.conf'
+  },
+  {
+    path: path.join(ROOT_DIR, 'apps', 'groovelab', 'nginx.security.conf'),
+    type: 'nginx-conf',
+    name: 'apps/groovelab/nginx.security.conf'
+  },
+  {
+    path: path.join(ROOT_DIR, 'scripts', 'nginx_enterprise_waf.conf'),
+    type: 'nginx-conf',
+    name: 'scripts/nginx_enterprise_waf.conf'
   }
 ];
 
@@ -129,8 +139,8 @@ const REQUIRED_INVARIANTS = [
       if (!/camera=\(/i.test(val)) return 'camera-Restriktion fehlt';
       if (!/microphone=\(/i.test(val)) return 'microphone-Restriktion fehlt';
       if (!/geolocation=\(\)/i.test(val)) return 'geolocation=() fehlt';
-      if (!/gyroscope=\(\)/i.test(val)) return 'gyroscope=() fehlt (TDDDG § 25)';
-      if (!/accelerometer=\(\)/i.test(val)) return 'accelerometer=() fehlt (TDDDG § 25)';
+      if (!/gyroscope=(?:\(self\)|\(\))/i.test(val)) return 'gyroscope Restriktion fehlt (Erlaubt: (self) oder ())';
+      if (!/accelerometer=(?:\(self\)|\(\))/i.test(val)) return 'accelerometer Restriktion fehlt (Erlaubt: (self) oder ())';
       if (!/magnetometer=\(\)/i.test(val)) return 'magnetometer=() fehlt (TDDDG § 25)';
       return null;
     }

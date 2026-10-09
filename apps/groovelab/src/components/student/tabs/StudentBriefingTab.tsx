@@ -117,6 +117,7 @@ export interface StudentBriefingTabProps {
   setJuniorMissionPhase: (phase: any) => void;
   setJuniorPreviewCurrentTime: React.Dispatch<React.SetStateAction<number>>;
   setJuniorRecordTitle: React.Dispatch<React.SetStateAction<string>>;
+  requestOrientationPermission?: () => Promise<boolean>;
   setSessionActive: React.Dispatch<React.SetStateAction<boolean>>;
   setShowAppointmentChat: React.Dispatch<React.SetStateAction<boolean>>;
   setShowJuniorHomeworkModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -252,6 +253,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     setJuniorMissionPhase,
     setJuniorPreviewCurrentTime,
     setJuniorRecordTitle,
+    requestOrientationPermission,
     setSessionActive,
     setShowAppointmentChat,
     setShowJuniorHomeworkModal: setShowJuniorHomeworkModalProp,
@@ -3726,7 +3728,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           {!sessionActive ? (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={async () => {
+                                if (requestOrientationPermission && (await requestOrientationPermission()) === false) return;
                                 setSessionActive(true);
                               }}
                               style={{

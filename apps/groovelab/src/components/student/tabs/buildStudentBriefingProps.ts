@@ -157,6 +157,7 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     setJuniorMissionPhase: practice.setJuniorMissionPhase || (() => {}),
     setJuniorPreviewCurrentTime: practice.setJuniorPreviewCurrentTime || (() => {}),
     setJuniorRecordTitle: practice.setJuniorRecordTitle || (() => {}),
+    requestOrientationPermission: practice.requestOrientationPermission,
     setSessionActive: practice.setSessionActive,
     setShowAppointmentChat: schedule.setShowAppointmentChat,
     setShowJuniorHomeworkModal: () => {},

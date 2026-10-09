@@ -152,8 +152,11 @@ export function useStudentJuniorMission({
   }, [localProgress, lehrwerke, progressItems, activeSongSkills, assignedCampusSongs, studentId, studentUser]);
 
   // 🚀 3-2-1 Zündungs-Countdown am Instrument mit klangvollen Zaubertönen
-  const startJuniorMissionImmediately = useCallback(() => {
-    practice?.requestOrientationPermission?.();
+  const startJuniorMissionImmediately = useCallback(async () => {
+    if (practice?.requestOrientationPermission) {
+      const ok = await practice.requestOrientationPermission();
+      if (ok === false) return;
+    }
     clearCountdownTimers();
     setIsJuniorMissionPaused(false);
     isJuniorMissionPausedRef.current = false;

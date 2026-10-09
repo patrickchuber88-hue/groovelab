@@ -7,15 +7,97 @@ import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } fr
 import { toLocalYYYYMMDD, getSimulatedNow, getDaysBetweenLocal, getISOWeek } from '../studentDateUtils';
 import { MIN_PRACTICE_SECONDS } from '../utils/studentAvatarDashboardUtils';
 
+export type PracticeSessionValidationMode = 'sensor_verified' | 'desktop_focus_guard' | 'sensors_unsupported';
+
+export interface PracticeSessionFokusLog {
+  id?: string;
+  user_id?: string;
+  song_id?: string | null;
+  duration_seconds?: number;
+  duration_minutes?: number;
+  is_extra?: boolean;
+  flame_level?: string;
+  xp_earned?: number;
+  mood?: string | null;
+  metadata?: Record<string, unknown>;
+  validation_mode?: PracticeSessionValidationMode;
+  created_at?: string;
+  date?: string;
+  [key: string]: unknown;
+}
+
+export interface PracticeSessionCelebrationDetails {
+  exactSeconds?: number;
+  sessionMinutes?: number;
+  durationMinutes?: number;
+  dailyGoal?: number;
+  sessionCompletedTarget?: boolean;
+  streakFlame?: number;
+  streak?: number;
+  newStreak?: number;
+  xpGained?: number;
+  usedJokerThisSession?: boolean;
+  validationMode?: PracticeSessionValidationMode;
+  [key: string]: unknown;
+}
+
+export interface JuniorLocalRecording {
+  id: string;
+  title: string;
+  url: string;
+  duration: number;
+  date: string;
+  blobKey?: string;
+  recordedAt?: string;
+}
+
+export interface JuniorTeacherRecording {
+  id: string;
+  title: string;
+  url: string;
+  duration?: number;
+  date: string;
+  topic?: string;
+  week?: string;
+  blobKey?: string;
+}
+
+interface WakeLockSentinelLike {
+  released: boolean;
+  type: string;
+  release: () => Promise<void>;
+  addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
+  removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
+}
+
 interface UseStudentPracticeSessionProps {
   studentId: string;
-  studentUser: any;
-  avatar: any;
+  studentUser?: {
+    id?: string;
+    streak_flame?: number;
+    evolution_level?: number;
+    [key: string]: unknown;
+  } | null;
+  avatar?: {
+    id?: string;
+    streak_flame?: number;
+    xp?: number;
+    [key: string]: unknown;
+  } | null;
   studentUiLevel: string;
   isTeacherSession: boolean;
   onRefreshData?: () => Promise<void>;
   getTargetMinutes: (streak: number) => number;
-  progressItems?: any[];
+  progressItems?: Array<{
+    id?: string;
+    topic_name?: string;
+    homework_notes?: string;
+    audio_url?: string;
+    duration?: number;
+    created_at?: string;
+    updated_at?: string;
+    [key: string]: unknown;
+  }>;
 }
 
 export function useStudentPracticeSession({
@@ -43,8 +125,14 @@ export function useStudentPracticeSession({
     isSessionPausedRef.current = isSessionPaused;
   }, [isSessionPaused]);
 
-  // Gyro Detox, sensor & flat orientation states
-  const [isPhoneFlat, setIsPhoneFlat] = useState(true);
+  // Device & Sensor detection (inkl. iPadOS Safari/PWA MacIntel Touch-Erkennung)
+  const isMobile = typeof navigator !== 'undefined' && (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+
+  // Gyro Detox, sensor & flat orientation states (Fail-Closed: kein optimistischer Default auf Mobile)
+  const [isPhoneFlat, setIsPhoneFlat] = useState(!isMobile);
   const isPhoneFlatRef = useRef(isPhoneFlat);
   useEffect(() => {
     isPhoneFlatRef.current = isPhoneFlat;
@@ -53,23 +141,22 @@ export function useStudentPracticeSession({
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
   const [sessionAbortedNotice, setSessionAbortedNotice] = useState<string | null>(null);
 
-  // Device & Sensor detection
-  const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const hasReceivedSensorEventRef = useRef(false);
   const isDeviceMovingRef = useRef(false);
-  const motionTimeoutRef = useRef<any>(null);
+  const motionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notFlatGraceRef = useRef(0);
 
   // Focus logs state
-  const [fokusLogs, setFokusLogs] = useState<any[]>([]);
+  const [fokusLogs, setFokusLogs] = useState<PracticeSessionFokusLog[]>([]);
   const currentLogIdRef = useRef<string | null>(null);
 
   // Celebration modal states
   const [showCelebration, setShowCelebration] = useState(false);
-  const [celebrationDetails, setCelebrationDetails] = useState<any>(null);
+  const [celebrationDetails, setCelebrationDetails] = useState<PracticeSessionCelebrationDetails | null>(null);
   const [celebrationRingProgress, setCelebrationRingProgress] = useState(0);
 
   // WakeLock ref for active practice sessions
-  const wakeLockRef = useRef<any>(null);
+  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null);
 
   // 🛡️ Fail-Safe Screen-WakeLock Helper Functions (TDDDG § 25 Akkuschonung & Tab-Switch-Immunität)
   const requestScreenWakeLock = useCallback(async () => {
@@ -77,8 +164,11 @@ export function useStudentPracticeSession({
     if (!('wakeLock' in navigator) || document.hidden) return;
     try {
       if (!wakeLockRef.current) {
-        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-        wakeLockRef.current.addEventListener('release', () => {
+        const nav = navigator as unknown as { wakeLock?: { request: (type: string) => Promise<WakeLockSentinelLike> } };
+        if (nav.wakeLock?.request) {
+          wakeLockRef.current = await nav.wakeLock.request('screen');
+        }
+        wakeLockRef.current?.addEventListener('release', () => {
           wakeLockRef.current = null;
         });
       }
@@ -96,43 +186,114 @@ export function useStudentPracticeSession({
     }
   }, []);
 
-  // 🛡️ iOS Safari Sensor Permission Handler (muss im User-Gesture aufgerufen werden)
-  const requestOrientationPermission = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined') return true;
-    if (typeof (DeviceOrientationEvent as any)?.requestPermission === 'function') {
+  // 🛡️ Fail-Closed Anti-Cheat Session Abort Helper
+  const abortActiveSession = useCallback((reason: string, message: string) => {
+    setSessionActive(false);
+    setSecondsElapsed(0);
+    setIsSessionPaused(false);
+    isSessionPausedRef.current = false;
+    setSessionAbortedNotice(message);
+    try {
+      window.dispatchEvent(new CustomEvent('campus_focus_session_aborted', {
+        detail: { reason, message }
+      }));
+    } catch {}
+    if (reason === 'permission_denied' || reason === 'sensor_events_missing') {
       try {
-        const state = await (DeviceOrientationEvent as any).requestPermission();
-        return state === 'granted';
-      } catch (err) {
-        console.warn('[OrientationPermission] iOS permission prompt error:', err);
-        return false;
-      }
+        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+          window.alert(message);
+        }
+      } catch {}
     }
-    return true;
   }, []);
 
-  // 📱 Sensor-Listener Engine: Gyroscope & Accelerometer
+  // 🛡️ WebKit Dual-Permission Handshake (DeviceOrientationEvent & DeviceMotionEvent synchron im Klick-Event anfordern)
+  const requestOrientationPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return true;
+
+    try {
+      const DeviceOrientationWithPermission = typeof DeviceOrientationEvent !== 'undefined'
+        ? (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> })
+        : undefined;
+      const DeviceMotionWithPermission = typeof DeviceMotionEvent !== 'undefined'
+        ? (DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> })
+        : undefined;
+
+      const orientationPromise = typeof DeviceOrientationWithPermission?.requestPermission === 'function'
+        ? DeviceOrientationWithPermission.requestPermission().catch((err: unknown) => {
+            console.warn('[OrientationPermission] DeviceOrientationEvent requestPermission error:', err);
+            return 'denied';
+          })
+        : Promise.resolve('granted');
+
+      const motionPromise = typeof DeviceMotionWithPermission?.requestPermission === 'function'
+        ? DeviceMotionWithPermission.requestPermission().catch((err: unknown) => {
+            console.warn('[OrientationPermission] DeviceMotionEvent requestPermission error:', err);
+            return 'denied';
+          })
+        : Promise.resolve('granted');
+
+      const [orientationRes, motionRes] = await Promise.all([orientationPromise, motionPromise]);
+      const granted = orientationRes === 'granted' && motionRes === 'granted';
+
+      if (!granted && isMobile) {
+        const notice = 'Sensor-Berechtigung verweigert: Der Fokus-Timer benötigt Zugriff auf die Bewegungssensoren, um die Ausrichtung zu prüfen. Bitte erlaube den Zugriff in den iOS/Browser-Einstellungen! 🛑';
+        abortActiveSession('permission_denied', notice);
+      }
+
+      return granted;
+    } catch (err) {
+      console.warn('[OrientationPermission] Dual permission handshake error:', err);
+      if (isMobile) {
+        const notice = 'Sensor-Berechtigungsfehler: Zugriff auf die Lagesensoren fehlgeschlagen. 🛑';
+        abortActiveSession('permission_denied', notice);
+      }
+      return false;
+    }
+  }, [isMobile, abortActiveSession]);
+
+  // 📱 Sensor-Listener Engine: Gyroscope & Accelerometer mit 400ms Fail-Closed Liveness-Probe
   useEffect(() => {
     if (!sessionActive || typeof window === 'undefined') {
-      setIsPhoneFlat(true);
+      setIsPhoneFlat(!isMobile);
       setFlatType('none');
       notFlatGraceRef.current = 0;
+      hasReceivedSensorEventRef.current = false;
       return;
     }
 
     if (!isMobile || !('DeviceOrientationEvent' in window)) {
-      // Desktop / Laptop ohne Lagesensoren: Standardmäßig aktiv
+      // Desktop / Laptop ohne Lagesensoren: Standardmäßig aktiv (Immunität durch Desktop Focus-Loss Guard)
       setIsPhoneFlat(true);
       setFlatType('face-up');
       return;
     }
 
+    // Mobilgerät: Zunächst false (Fail-Closed), bis Lagesensor echte Flachlage meldet
+    setIsPhoneFlat(false);
+    setFlatType('none');
+    hasReceivedSensorEventRef.current = false;
+
+    // 400ms Sensor-Probe: Überprüft, ob das Mobilgerät nach Aktivierung echte Events liefert
+    const probeTimeout = setTimeout(() => {
+      if (sessionActive && !hasReceivedSensorEventRef.current) {
+        console.warn('[Anti-Cheat] Sensor probe failed after 400ms: No sensor events received.');
+        abortActiveSession(
+          'sensor_events_missing',
+          'Keine Sensor-Signale empfangen: Auf Mobilgeräten erfordert der Fokus-Timer aktive Lagesensoren. Bitte stelle sicher, dass Sensoren im Browser erlaubt sind. 🛑'
+        );
+      }
+    }, 400);
+
     const handleOrientation = (e: DeviceOrientationEvent) => {
       const beta = e.beta;
       const gamma = e.gamma;
+      if (beta !== null || gamma !== null) {
+        hasReceivedSensorEventRef.current = true;
+      }
       if (beta === null || gamma === null) {
-        setIsPhoneFlat(true);
-        setFlatType('face-up');
+        setIsPhoneFlat(false);
+        setFlatType('none');
         return;
       }
 
@@ -152,6 +313,9 @@ export function useStudentPracticeSession({
 
     const handleMotion = (e: DeviceMotionEvent) => {
       const acc = e.acceleration || e.accelerationIncludingGravity;
+      if (acc) {
+        hasReceivedSensorEventRef.current = true;
+      }
       if (!acc) return;
       const x = acc.x || 0;
       const y = acc.y || 0;
@@ -174,15 +338,16 @@ export function useStudentPracticeSession({
     window.addEventListener('devicemotion', handleMotion);
 
     return () => {
+      clearTimeout(probeTimeout);
       window.removeEventListener('deviceorientation', handleOrientation);
       window.removeEventListener('devicemotion', handleMotion);
       if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
     };
-  }, [sessionActive, isMobile]);
+  }, [sessionActive, isMobile, abortActiveSession]);
 
   // Active Timer Loop (Pausiert nach 5s Nicht-Flachlage; stoppt zuverlässig bei Pause)
   useEffect(() => {
-    let timer: any = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
     if (sessionActive && !isSessionPaused) {
       timer = setInterval(() => {
         // Anti-Cheat: Wenn Handy auf Mobile nicht flach auf dem Tisch liegt
@@ -209,7 +374,7 @@ export function useStudentPracticeSession({
     };
   }, [sessionActive, isSessionPaused, isMobile, requestScreenWakeLock, releaseScreenWakeLock]);
 
-  // 🛡️ 0,1% Goldstandard Anti-Cheat: Sofort-Abbruch bei Tab-Wechsel / App-Verlassen
+  // 🛡️ 0,1% Goldstandard Anti-Cheat: Sofort-Abbruch bei Tab-Wechsel / App-Verlassen / Desktop Focus-Loss
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
@@ -218,27 +383,39 @@ export function useStudentPracticeSession({
         releaseScreenWakeLock();
         if (sessionActive) {
           console.warn('[Anti-Cheat] Focus session immediately aborted due to tab switch/backgrounding.');
-          setSessionActive(false);
-          setSecondsElapsed(0);
-          setIsSessionPaused(false);
-          const notice = 'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt der Fokus-Timer geöffnet! 🛑';
-          setSessionAbortedNotice(notice);
-          try {
-            window.dispatchEvent(new CustomEvent('campus_focus_session_aborted', {
-              detail: { reason: 'tab_switch', message: notice }
-            }));
-          } catch {}
+          abortActiveSession(
+            'tab_switch',
+            'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt der Fokus-Timer geöffnet! 🛑'
+          );
         }
       } else if (sessionActive && !isSessionPausedRef.current) {
         requestScreenWakeLock();
       }
     };
 
+    // Desktop Focus-Loss Guard: Auf Desktops wird Fenster-Fokusverlust überwacht
+    const handleWindowBlur = () => {
+      if (!isMobile && sessionActive) {
+        setTimeout(() => {
+          if (sessionActive && (!document.hasFocus() || document.hidden)) {
+            console.warn('[Anti-Cheat] Desktop focus session aborted due to window blur.');
+            abortActiveSession(
+              'focus_loss',
+              'Fokus-Session abgebrochen: Du hast das Browser-Fenster verlassen. Beim Üben am Computer bleibt der Tab im Fokus! 🛑'
+            );
+          }
+        }, 150);
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [sessionActive, releaseScreenWakeLock]);
+  }, [sessionActive, isMobile, releaseScreenWakeLock, requestScreenWakeLock, abortActiveSession]);
 
   // Fetch Fokus Logs
   const fetchFokusLogs = useCallback(async () => {
@@ -246,12 +423,19 @@ export function useStudentPracticeSession({
     try {
       const { data, error } = await supabase
         .from('fokus_logs')
-        .select('id, user_id, duration_seconds, duration_minutes, is_extra, flame_level, xp_earned, created_at')
+        .select('id, user_id, duration_seconds, duration_minutes, is_extra, flame_level, xp_earned, metadata, created_at')
         .eq('user_id', studentId)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        setFokusLogs(data);
+        const mappedLogs: PracticeSessionFokusLog[] = (data as Array<Record<string, unknown>>).map(row => {
+          const meta = (row.metadata && typeof row.metadata === 'object' ? row.metadata : {}) as Record<string, unknown>;
+          return {
+            ...row,
+            validation_mode: (meta.validation_mode as PracticeSessionValidationMode) || undefined
+          };
+        });
+        setFokusLogs(mappedLogs);
       }
     } catch (err) {
       console.error('Error fetching fokus logs:', err);
@@ -279,7 +463,8 @@ export function useStudentPracticeSession({
 
     try {
       const simNow = getSimulatedNow();
-      let logData: any = null;
+      let logData: PracticeSessionFokusLog | null = null;
+      const validationMode: PracticeSessionValidationMode = isMobile ? 'sensor_verified' : 'desktop_focus_guard';
 
       // 1. Primär: Autoritativer Server-RPC complete_focus_session (Migration 531)
       try {
@@ -288,11 +473,13 @@ export function useStudentPracticeSession({
           p_duration_seconds: elapsed,
           p_metadata: {
             device: isMobile ? 'mobile' : 'desktop',
+            validation_mode: validationMode,
+            sensor_probed: isMobile,
             completed_at: simNow.toISOString()
           }
         });
         if (!rpcErr && rpcRes?.success && rpcRes?.log) {
-          logData = rpcRes.log;
+          logData = { ...(rpcRes.log as PracticeSessionFokusLog), validation_mode: validationMode };
         }
       } catch (_) {}
 
@@ -306,18 +493,24 @@ export function useStudentPracticeSession({
             duration_minutes: durationMinutes,
             is_extra: false,
             flame_level: durationMinutes >= 30 ? 'Große Flamme' : durationMinutes >= 15 ? 'Mittlere Flamme' : 'Kleine Flamme',
-            xp_earned: xpGained
+            xp_earned: xpGained,
+            metadata: {
+              device: isMobile ? 'mobile' : 'desktop',
+              validation_mode: validationMode,
+              sensor_probed: isMobile,
+              completed_at: simNow.toISOString()
+            }
           })
           .select()
           .single();
 
         if (!logErr && insData) {
-          logData = insData;
+          logData = { ...(insData as PracticeSessionFokusLog), validation_mode: validationMode };
         }
       }
 
       if (logData) {
-        setFokusLogs(prev => [logData, ...prev]);
+        setFokusLogs(prev => [logData!, ...prev]);
         if (typeof window !== 'undefined' && xpGained > 0) {
           window.dispatchEvent(new CustomEvent('campus-xp-awarded', {
             detail: { studentId, amount: xpGained }
@@ -339,7 +532,8 @@ export function useStudentPracticeSession({
         streakFlame: newStreak,
         streak: newStreak,
         newStreak,
-        xpGained
+        xpGained,
+        validationMode
       });
       setShowCelebration(true);
       setSecondsElapsed(0);
@@ -362,7 +556,7 @@ export function useStudentPracticeSession({
   const [juniorRecordedUrl, setJuniorRecordedUrl] = useState<string | null>(null);
   const [juniorRecordTitle, setJuniorRecordTitle] = useState('');
   const [juniorIsSaving, setJuniorIsSaving] = useState(false);
-  const [juniorLocalRecordings, setJuniorLocalRecordings] = useState<any[]>(() => {
+  const [juniorLocalRecordings, setJuniorLocalRecordings] = useState<JuniorLocalRecording[]>(() => {
     try {
       const raw = localStorage.getItem(`campus_junior_recordings_${studentId}`);
       return raw ? JSON.parse(raw) : [];
@@ -373,7 +567,7 @@ export function useStudentPracticeSession({
 
   const juniorAudioStreamRef = useRef<MediaStream | null>(null);
   const juniorMediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const juniorRecordTimerRef = useRef<any>(null);
+  const juniorRecordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startJuniorRecordingFlow = async () => {
     try {
@@ -445,7 +639,7 @@ export function useStudentPracticeSession({
       await storeBlob(localBlobKey, juniorRecordedBlob);
 
       const songTitle = juniorRecordTitle.trim() || `Aufnahme • ${new Date().toLocaleDateString('de-DE')}`;
-      const newRecEntry = {
+      const newRecEntry: JuniorLocalRecording = {
         id: recUniqueId,
         title: songTitle,
         url: localBlobKey,
@@ -455,8 +649,8 @@ export function useStudentPracticeSession({
       };
 
       const localKey = `campus_junior_recordings_${studentId}`;
-      const existingLocal = JSON.parse(localStorage.getItem(localKey) || '[]');
-      const updatedLocal = [newRecEntry, ...existingLocal.filter((x: any) => x.id !== recUniqueId)];
+      const existingLocal: JuniorLocalRecording[] = JSON.parse(localStorage.getItem(localKey) || '[]');
+      const updatedLocal: JuniorLocalRecording[] = [newRecEntry, ...existingLocal.filter((x: JuniorLocalRecording) => x.id !== recUniqueId)];
       localStorage.setItem(localKey, JSON.stringify(updatedLocal));
       setJuniorLocalRecordings(updatedLocal);
 
@@ -469,7 +663,7 @@ export function useStudentPracticeSession({
     }
   };
 
-  const downloadJuniorRecording = (recording: any) => {
+  const downloadJuniorRecording = (recording: JuniorLocalRecording) => {
     if (!recording?.url) return;
     const a = document.createElement('a');
     a.href = recording.url;
@@ -481,8 +675,8 @@ export function useStudentPracticeSession({
 
   // Junior Student Recordings List
   const juniorStudentRecordings = useMemo(() => {
-    const recsMap = new Map<string, any>();
-    (juniorLocalRecordings || []).forEach((item: any) => {
+    const recsMap = new Map<string, JuniorLocalRecording>();
+    (juniorLocalRecordings || []).forEach((item: JuniorLocalRecording) => {
       if (item && (item.id || item.url)) {
         const uniqueKey = item.id || item.url;
         recsMap.set(uniqueKey, {
@@ -500,7 +694,7 @@ export function useStudentPracticeSession({
 
   // Junior Teacher Recordings (All historical recordings created by the teacher across all weeks/progressItems)
   const juniorTeacherRecordings = useMemo(() => {
-    const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; topic?: string; week?: string; blobKey?: string }>();
+    const recsMap = new Map<string, JuniorTeacherRecording>();
 
     const processAudioString = (str: string, fallbackTopic: string, fallbackDate: string, defaultIdx: number) => {
       if (!str || typeof str !== 'string' || !str.includes('AUDIO:')) return;
@@ -528,7 +722,7 @@ export function useStudentPracticeSession({
       }
     };
 
-    (progressItems || []).forEach((item: any, itemIdx: number) => {
+    (progressItems || []).forEach((item, itemIdx: number) => {
       if (!item) return;
       const itemDate = item.created_at || item.updated_at || new Date().toISOString();
       const itemTopic = item.topic_name || 'Unterrichts-Übung';
@@ -537,7 +731,9 @@ export function useStudentPracticeSession({
         try {
           const parsed = JSON.parse(item.homework_notes);
           if (Array.isArray(parsed)) {
-            parsed.forEach((n: any, idx: number) => processAudioString(n, itemTopic, itemDate, idx));
+            parsed.forEach((n: unknown, idx: number) => {
+              if (typeof n === 'string') processAudioString(n, itemTopic, itemDate, idx);
+            });
           } else if (typeof parsed === 'string') {
             processAudioString(parsed, itemTopic, itemDate, itemIdx);
           }
@@ -567,7 +763,9 @@ export function useStudentPracticeSession({
         try {
           const parsed = JSON.parse(localGenNotes);
           if (Array.isArray(parsed)) {
-            parsed.forEach((n: any, idx: number) => processAudioString(n, 'Hausaufgabe', new Date().toISOString(), idx));
+            parsed.forEach((n: unknown, idx: number) => {
+              if (typeof n === 'string') processAudioString(n, 'Hausaufgabe', new Date().toISOString(), idx);
+            });
           } else if (typeof parsed === 'string') {
             processAudioString(parsed, 'Hausaufgabe', new Date().toISOString(), 0);
           }
@@ -583,8 +781,8 @@ export function useStudentPracticeSession({
   const monthlyFocusMinutes = useMemo(() => {
     const currentYearMonth = new Date().toISOString().slice(0, 7);
     return (fokusLogs || [])
-      .filter((l: any) => (l.date || l.created_at || '').startsWith(currentYearMonth))
-      .reduce((sum: number, l: any) => sum + (l.duration_minutes || Math.floor((l.duration_seconds || 0) / 60)), 0);
+      .filter((l: PracticeSessionFokusLog) => (l.date || l.created_at || '').startsWith(currentYearMonth))
+      .reduce((sum: number, l: PracticeSessionFokusLog) => sum + (l.duration_minutes || Math.floor((l.duration_seconds || 0) / 60)), 0);
   }, [fokusLogs]);
 
   return {

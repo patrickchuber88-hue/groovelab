@@ -6,7 +6,9 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import storageRoutes from './routes/storage';
 import gateRoutes from './routes/gate';
+import sentinelRoutes from './routes/sentinel';
 import { supabaseProxy, silentRefreshMiddleware } from './routes/proxy';
+import { DeadLetterSentinel } from './services/deadLetterSentinel';
 
 dotenv.config();
 
@@ -37,20 +39,17 @@ const dispatchSecurityAlert = async (type: string, req: express.Request, details
 
   console.warn(`🚨 [SECURITY INCIDENT] ${type}:`, JSON.stringify(alertPayload));
 
-  // Optional: Send to external Webhook (Discord / Slack / Telegram) if configured
-  const webhookUrl = process.env.ADMIN_ALERT_WEBHOOK_URL;
-  if (webhookUrl) {
-    try {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: `🚨 **[Campus-Groovelab Security Alert]**\n**Type:** \`${type}\`\n**IP:** \`${ip}\`\n**Path:** \`${req.originalUrl}\``
-        })
-      });
-    } catch (e) {
-      console.error('[Alert Webhook] Failed to dispatch webhook:', e);
-    }
+  // Delegate to DeadLetterSentinel for sovereign ntfy push, debouncing & webhook dispatching
+  try {
+    await DeadLetterSentinel.getInstance().handleIncident({
+      incidentType: type,
+      sourceComponent: 'bff-server',
+      severity: 'CRITICAL',
+      details: alertPayload,
+      summary: `Security violation on ${req.method} ${req.originalUrl} from IP ${ip}`
+    });
+  } catch (err) {
+    console.error('[SENTINEL] dispatchSecurityAlert integration error:', err);
   }
 };
 
@@ -237,7 +236,13 @@ app.use('/api/db', apiRateLimiter, tenantRateLimiter, silentRefreshMiddleware, s
 // 3. Zero-Memory Direct-to-Storage Presign Routes (Audio & Asset Ingestion)
 app.use('/api/storage', storageRateLimiter, tenantRateLimiter, express.json({ limit: '1mb' }), storageRoutes);
 
+// 4. Enterprise Dead-Letter Sentinel & Sovereign Alert Ingestion Routes
+app.use(['/api/sentinel', '/api/v1/sentinel'], express.json({ limit: '64kb' }), sentinelRoutes);
+
 app.listen(PORT, () => {
   console.log(`🛡️ BFF Server running on http://localhost:${PORT}`);
   console.log(`🔒 Banking Goldstandard Active: Rate-Limiting, JWE A256GCM, Anti-CSRF & Alert-Telemetry Enabled.`);
+  
+  // Start Realtime Dead-Letter Listener
+  DeadLetterSentinel.getInstance().startListener();
 });

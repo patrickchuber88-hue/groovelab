@@ -2,6 +2,8 @@ import express, { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { decryptSession } from '../lib/session/crypto';
 import { validateMagicBytes, scrubMediaMetadata } from '../lib/mediaValidator';
+import { validateBody } from '../middleware/validateIngress';
+import { presignUploadSchema } from '../schemas/ingressSchemas';
 
 const router = Router();
 
@@ -66,7 +68,7 @@ function sanitizePathSegment(input: string | null | undefined, defaultValue: str
  * Generates an ephemeral, cryptographically signed Direct-to-Storage upload URL.
  * Bypasses the BFF Node.js process heap memory completely (Zero-Memory Audio Pipeline).
  */
-router.post('/presign-upload', async (req: Request, res: Response) => {
+router.post('/presign-upload', validateBody(presignUploadSchema), async (req: Request, res: Response) => {
   try {
     // 1. Authenticate user via JWE session cookie or Authorization header
     let accessToken: string | null = null;

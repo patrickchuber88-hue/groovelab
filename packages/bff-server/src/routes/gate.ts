@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
+import { validateBody } from '../middleware/validateIngress';
+import { gateLoginSchema } from '../schemas/ingressSchemas';
 
 const router = Router();
 
@@ -113,7 +115,7 @@ router.get('/verify', (req: Request, res: Response) => {
 });
 
 // ── 2. Password Submission (JSON fetch or Native Form POST) ──
-router.post('/login', gateRateLimiter, async (req: Request, res: Response) => {
+router.post('/login', gateRateLimiter, validateBody(gateLoginSchema), async (req: Request, res: Response) => {
   const isForm = req.headers['content-type']?.includes('application/x-www-form-urlencoded');
   const password = typeof req.body?.password === 'string' ? req.body.password.trim() : '';
 

@@ -4,6 +4,14 @@
  * even in un-networked music school cellars, bunkers, and practice rooms.
  */
 
+import {
+  checkStorageAvailability,
+  pruneStorageIfNecessary,
+  storeEphemeralAudioFallback,
+  getEphemeralAudioFallback,
+  removeEphemeralAudioFallback
+} from './storageQuotaManager';
+
 export interface OfflineAudioRecord {
   id: string;
   blob: Blob;
@@ -61,6 +69,7 @@ function openAudioDB(): Promise<IDBDatabase> {
 
 /**
  * Save an uncompressed/studio-quality audio Blob into IndexedDB
+ * 🛡️ Hardened with Pre-Flight Quota-Radar, Smart Eviction & Fail-Safe RAM Buffering (Art. 32 DSGVO)
  */
 export async function saveOfflineAudioRecord(record: Omit<OfflineAudioRecord, 'id' | 'createdAt'> & { id?: string }): Promise<OfflineAudioRecord> {
   const finalRecord: OfflineAudioRecord = {
@@ -70,6 +79,20 @@ export async function saveOfflineAudioRecord(record: Omit<OfflineAudioRecord, 'i
     syncAttempts: 0
   };
 
+  const incomingBytes = finalRecord.blob ? finalRecord.blob.size : 0;
+
+  // 1. Proaktiver Pre-Flight Quota Check
+  try {
+    const quotaInfo = await checkStorageAvailability(incomingBytes);
+    if (quotaInfo.isCritical) {
+      console.warn('[OfflineAudioVault] Storage critical before write. Initiating automatic LRU pruning...');
+      await pruneStorageIfNecessary(50 * 1024 * 1024);
+    }
+  } catch (quotaErr) {
+    console.warn('[OfflineAudioVault] Pre-flight quota check notice:', quotaErr);
+  }
+
+  // 2. Primärer Schreibversuch
   try {
     const db = await openAudioDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -80,18 +103,55 @@ export async function saveOfflineAudioRecord(record: Omit<OfflineAudioRecord, 'i
       tx.onerror = () => reject(tx.error);
     });
     console.log('[OfflineAudioVault] Audio record saved locally in lossless format:', finalRecord.id);
-  } catch (err) {
-    console.error('[OfflineAudioVault] Error saving audio record:', err);
-    throw err;
-  }
+    return finalRecord;
+  } catch (primaryErr: any) {
+    const isQuotaErr =
+      primaryErr?.name === 'QuotaExceededError' ||
+      String(primaryErr?.message || '').toLowerCase().includes('quota');
 
-  return finalRecord;
+    if (isQuotaErr) {
+      console.warn('[OfflineAudioVault] QuotaExceededError encountered! Triggering Emergency Pruning and Retry...');
+      try {
+        // Notfall-Eviction Stufe 2
+        await pruneStorageIfNecessary(100 * 1024 * 1024);
+
+        // Sekundärer Schreibversuch nach Eviction
+        const retryDb = await openAudioDB();
+        const retryTx = retryDb.transaction(STORE_NAME, 'readwrite');
+        const retryStore = retryTx.objectStore(STORE_NAME);
+        retryStore.put(finalRecord);
+        await new Promise<void>((resolve, reject) => {
+          retryTx.oncomplete = () => resolve();
+          retryTx.onerror = () => reject(retryTx.error);
+        });
+        console.log('[OfflineAudioVault] Audio record recovered and saved after emergency pruning:', finalRecord.id);
+        return finalRecord;
+      } catch (retryErr) {
+        console.error('[OfflineAudioVault] Storage permanently full on device. Activating Ephemeral RAM Vault:', retryErr);
+        // 🛡️ FAIL-SAFE RETTUNGSSCHIRM: Halte den Take im RAM, feuere Warnung, aber crashe niemals!
+        storeEphemeralAudioFallback(finalRecord.id, finalRecord);
+        return finalRecord;
+      }
+    }
+
+    console.error('[OfflineAudioVault] Error saving audio record:', primaryErr);
+    // Bei sonstigen Fehlern ebenfalls im RAM abfedern, um Datenverlust zu verhindern
+    storeEphemeralAudioFallback(finalRecord.id, finalRecord);
+    return finalRecord;
+  }
 }
 
 /**
  * Retrieve a specific offline audio record by ID
+ * Checks Ephemeral RAM Vault first, falls back to IndexedDB
  */
 export async function getOfflineAudioRecord(id: string): Promise<OfflineAudioRecord | null> {
+  // 1. Erst im Notfall-RAM prüfen
+  const ephemeral = getEphemeralAudioFallback(id);
+  if (ephemeral) {
+    return ephemeral;
+  }
+
   try {
     const db = await openAudioDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
@@ -144,6 +204,7 @@ export async function getPendingAudioCount(): Promise<number> {
  * Remove an audio record from IndexedDB once uploaded
  */
 export async function removeOfflineAudioRecord(id: string): Promise<void> {
+  removeEphemeralAudioFallback(id);
   try {
     const db = await openAudioDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');

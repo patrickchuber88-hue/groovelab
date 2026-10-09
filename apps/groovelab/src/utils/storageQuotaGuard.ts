@@ -130,3 +130,94 @@ export async function checkAndEnforceStorageQuota(): Promise<StorageQuotaCheckRe
       : `Warnung: Gerätespeicher knapp (${metrics.percentUsed}% belegt), keine flüchtigen Caches zur automatischen Bereinigung gefunden.`
   };
 }
+
+/**
+ * Canonical SSOT list of volatile / transient localStorage key prefixes that can be safely
+ * evicted when storage quotas are constrained or during automated janitor runs.
+ */
+export const VOLATILE_STORAGE_PREFIXES = [
+  'campus_peaks_',
+  'temp_audio_',
+  'cached_blob_',
+  'cg_draft_',
+  'groovelab_deleted_messages_',
+  'cgl_channel_reads_',
+  'groovelab_founding_ignored_',
+  'groovelab_cached_events_',
+  'campus_feed_cache_',
+  'groovelab_quarantined_offline_sync',
+  'groovelab_pending_schedule_changes',
+  'groovelab_copied_week_data',
+  'groovelab_calendar_active_occurrences_'
+] as const;
+
+/**
+ * Safely writes to window.localStorage with automatic quota eviction and zero-crash guarantee.
+ * If QuotaExceededError is encountered:
+ * 1. Prunes volatile / transient caches (old teacher boards, temporary audio blobs, peaks, cached events).
+ * 2. Retries writing the key.
+ * 3. If still failing, logs a warning and fails gracefully without throwing an uncaught exception.
+ */
+export function safeLocalStorageSet(key: string, value: string): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) return false;
+
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err: unknown) {
+    const errObj = (err && typeof err === 'object' ? err : {}) as { name?: string; code?: number; message?: string };
+    const isQuotaError = 
+      errObj.name === 'QuotaExceededError' || 
+      errObj.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      errObj.code === 22 || 
+      errObj.code === 1014 ||
+      String(errObj.message || '').toLowerCase().includes('quota');
+
+    if (!isQuotaError) {
+      console.warn(`[safeLocalStorageSet] Storage write error for key "${key}":`, err);
+      return false;
+    }
+
+    console.warn(`[safeLocalStorageSet] LocalStorage quota exceeded when writing "${key}". Initiating emergency purge...`);
+
+    // Emergency Eviction of transient & redundant items
+    try {
+      // Step 1: Remove all volatile and transient keys
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && VOLATILE_STORAGE_PREFIXES.some(prefix => k.startsWith(prefix))) {
+          localStorage.removeItem(k);
+        }
+      }
+
+      // Step 2: If key is teacher draft/board, remove other teachers' legacy board states
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('groovelab_teacher_boards_') && !k.endsWith(key.split('_').pop() || '')) {
+          localStorage.removeItem(k);
+        }
+      }
+
+      // Step 3: Retry write
+      localStorage.setItem(key, value);
+      console.info(`[safeLocalStorageSet] Successfully wrote "${key}" after emergency purge.`);
+      return true;
+    } catch (retryErr) {
+      console.error(`[safeLocalStorageSet] Quota still exceeded after purge for key "${key}". Write skipped safely.`, retryErr);
+      return false;
+    }
+  }
+}
+
+/**
+ * Safely removes a key from window.localStorage without throwing.
+ */
+export function safeLocalStorageRemove(key: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    console.warn(`[safeLocalStorageRemove] Error removing key "${key}":`, err);
+  }
+}
+

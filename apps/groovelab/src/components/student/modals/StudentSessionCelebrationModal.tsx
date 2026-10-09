@@ -13,17 +13,20 @@ export interface StudentSessionCelebrationModalProps {
     xpGained?: number;
     usedJokerThisSession?: boolean;
     streak?: number;
+    validationMode?: 'sensor_verified' | 'desktop_focus_guard' | 'sensors_unsupported';
   } | null;
+  validationMode?: 'sensor_verified' | 'desktop_focus_guard' | 'sensors_unsupported';
   studentUiLevel: 'junior' | 'teen' | 'pro';
   personalAverageMinutes: number;
   celebrationRingProgress: number;
-  celebrationCanvasRef: React.RefObject<any>;
+  celebrationCanvasRef: React.RefObject<HTMLCanvasElement>;
   onClose: () => void;
 }
 
 export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationModalProps> = ({
   isOpen,
   celebrationDetails,
+  validationMode,
   studentUiLevel,
   personalAverageMinutes,
   celebrationRingProgress,
@@ -31,6 +34,8 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
   onClose,
 }) => {
   if (!isOpen || !celebrationDetails || typeof document === "undefined") return null;
+
+  const effectiveValidationMode = validationMode || celebrationDetails.validationMode;
 
   const exactSecs = celebrationDetails.exactSeconds ?? ((celebrationDetails.sessionMinutes ?? 0) * 60);
   const targetMins = celebrationDetails.dailyGoal || 3;
@@ -376,6 +381,32 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
                 Dein <strong>{celebrationDetails.streak}-Tage-Streak</strong> wurde gerettet und glimmt geschützt weiter!
               </div>
             </div>
+          </div>
+        )}
+
+        {effectiveValidationMode && (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            color: '#64748b',
+            background: '#f8fafc',
+            padding: '5px 12px',
+            borderRadius: '100px',
+            border: '1px solid #e2e8f0',
+            marginTop: '-6px',
+            marginBottom: '-6px'
+          }}>
+            <Shield size={13} color="#10b981" />
+            <span>
+              {effectiveValidationMode === 'sensor_verified'
+                ? 'Sensor-geprüfte Fokus-Session'
+                : effectiveValidationMode === 'desktop_focus_guard'
+                ? 'Desktop-Fokus aktiv'
+                : 'Fokus-Session erfasst'}
+            </span>
           </div>
         )}
 

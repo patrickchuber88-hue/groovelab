@@ -55,6 +55,7 @@ import {
 } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
+import { safeLocalStorageSet, safeLocalStorageRemove } from '../utils/storageQuotaGuard';
 const StudentScheduleSlotsModal = React.lazy(() => import('./StudentScheduleSlotsModal').then(m => ({ default: m.StudentScheduleSlotsModal })));
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
@@ -929,17 +930,14 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       if (lastSavedStateRef.current === payloadStr) {
         return;
       }
-      lastSavedStateRef.current = payloadStr;
-
       // Update local drafts state to keep it fully synchronized!
       setDrafts(updatedDrafts);
-
-      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadStr);
+      safeLocalStorageSet(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadStr);
       // Legacy compatibility item
       if (boards.length > 0) {
-        localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
+        safeLocalStorageSet(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
       } else {
-        localStorage.removeItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`);
+        safeLocalStorageRemove(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`);
       }
 
       // Debounce Supabase write (1000ms delay)
@@ -2386,9 +2384,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       if (error) throw error;
       
       try {
-        localStorage.setItem('groovelab_teacher_availability', JSON.stringify(availabilityJson));
+        safeLocalStorageSet('groovelab_teacher_availability', JSON.stringify(availabilityJson));
         if (selectedTeacherId) {
-          localStorage.setItem(`groovelab_teacher_availability_${selectedTeacherId}`, JSON.stringify(availabilityJson));
+          safeLocalStorageSet(`groovelab_teacher_availability_${selectedTeacherId}`, JSON.stringify(availabilityJson));
         }
       } catch (e) {}
       
@@ -2969,7 +2967,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       lastSavedStateRef.current = JSON.stringify(draftStateToSave);
 
       // 1. Immediate local storage persistence
-      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+      safeLocalStorageSet(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
 
       // 2. View persistence (users)
       try {
@@ -4463,7 +4461,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
             students: b.students
           }));
           const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-          localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
+          safeLocalStorageSet(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
           await showAlert('Stundenplan erfolgreich aus dem Backup wiederhergestellt!');
         } else {
           await showAlert('Ungültiges Backup-Format.');
@@ -4579,7 +4577,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     };
     const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
     const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
-    localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+    safeLocalStorageSet(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
     
     supabase
       .from('users')
@@ -4644,7 +4642,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     };
     const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
     const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
-    localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+    safeLocalStorageSet(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
     
     supabase
       .from('users')
@@ -4848,7 +4846,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       const payloadToSaveStr = JSON.stringify(draftStateToSave);
       lastSavedStateRef.current = payloadToSaveStr;
-      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadToSaveStr);
+      safeLocalStorageSet(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadToSaveStr);
 
       await supabase
         .from('users')
@@ -5521,7 +5519,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       setGridSnapMinutes(val);
-                      localStorage.setItem('groovelab_grid_snap_minutes', String(val));
+                      safeLocalStorageSet('groovelab_grid_snap_minutes', String(val));
                     }}
                     style={{ border: 'none', fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', background: 'transparent', outline: 'none', cursor: 'pointer', padding: 0 }}
                   >
@@ -6223,7 +6221,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 type="button"
                 onClick={() => {
                   setShowTipBanner(false);
-                  try { localStorage.setItem('groovelab_hide_designer_tip', 'true'); } catch (_) {}
+                  try { safeLocalStorageSet('groovelab_hide_designer_tip', 'true'); } catch (_) {}
                 }}
                 style={{
                   border: 'none',

@@ -56,7 +56,31 @@ if [ -f "${LOCAL_TOMBSTONE_FILE}" ]; then
         "${LOCAL_TOMBSTONE_FILE}" "${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:${STORAGE_BOX_DEST_DIR}/gdpr_tombstones.jsonl" 2>/dev/null; then
         echo "  ✅ Erfolgreich mit Storage Box synchronisiert."
     else
-        echo "  ℹ️  Storage Box Direktverbindung nicht möglich (Offline / Dry-Run). Lokales Backup auf Cloud-Volumen verbleibt intakt."
+        echo "  ⚠️ Storage Box Direktverbindung nicht möglich (Offline / SFTP Timeout)."
+        
+        # 🚨 Enterprise Sentinel Integration: Report Dead-Letter Incident in Production
+        BFF_SENTINEL_URL="${BFF_SENTINEL_URL:-http://localhost:4000/api/v1/sentinel/incident}"
+        SENTINEL_SHARED_SECRET="${SENTINEL_SHARED_SECRET:-}"
+        
+        if [ "${NODE_ENV:-}" = "production" ] || [ "${STRICT_SENTINEL_ALERT:-false}" = "true" ]; then
+            echo "  🚨 Sende Dead-Letter Alarm an Sentinel Daemon..."
+            curl -s -m 5 -X POST "${BFF_SENTINEL_URL}" \
+                -H "Content-Type: application/json" \
+                -H "X-Sentinel-Key: ${SENTINEL_SHARED_SECRET}" \
+                -d "{
+                    \"incidentType\": \"STORAGE_BOX_SYNC_FAILED\",
+                    \"sourceComponent\": \"sync_tombstones_to_storage_box.sh\",
+                    \"severity\": \"CRITICAL\",
+                    \"details\": {
+                        \"target_host\": \"${STORAGE_BOX_HOST}\",
+                        \"target_port\": \"${STORAGE_BOX_PORT}\",
+                        \"local_file\": \"${LOCAL_TOMBSTONE_FILE}\",
+                        \"error\": \"rsync connection failure or SFTP timeout\"
+                    }
+                }" >/dev/null 2>&1 || true
+        fi
+        
+        echo "  ℹ️  Lokales Backup auf Cloud-Volumen verbleibt intakt."
     fi
 fi
 

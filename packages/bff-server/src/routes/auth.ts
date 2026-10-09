@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { encryptSession } from '../lib/session/crypto';
+import { validateBody } from '../middleware/validateIngress';
+import { loginSchema } from '../schemas/ingressSchemas';
 
 const router = Router();
 
@@ -28,7 +30,7 @@ const COOKIE_OPTIONS_LAX = {
 // Replay detection tracker for Refresh Tokens (RFC 6819)
 const usedRefreshTokens = new Map<string, number>();
 
-router.post('/login', async (req, res) => {
+router.post('/login', validateBody(loginSchema), async (req, res) => {
   const { email, password, isQrOrDeepLink } = req.body;
   
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
