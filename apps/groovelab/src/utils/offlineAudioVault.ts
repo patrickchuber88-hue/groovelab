@@ -17,6 +17,11 @@ import {
   getEphemeralMutationCount,
   removeEphemeralMutationFallback
 } from './storageQuotaManager';
+import {
+  encryptOfflineBlob,
+  decryptOfflineBlob,
+  EncryptedOfflineBlobResult
+} from '../lib/security/encryptedOfflineVault';
 
 export interface OfflineAudioRecord {
   id: string;
@@ -32,6 +37,8 @@ export interface OfflineAudioRecord {
   createdAt: number;
   syncAttempts?: number;
   lastError?: string;
+  isEncrypted?: boolean;
+  encryptedBlobPayload?: EncryptedOfflineBlobResult;
 }
 
 const DB_NAME = 'CampusGroovelabOfflineAudioVault';
@@ -98,17 +105,34 @@ export async function saveOfflineAudioRecord(record: Omit<OfflineAudioRecord, 'i
     console.warn('[OfflineAudioVault] Pre-flight quota check notice:', quotaErr);
   }
 
+  // 1.5 🛡️ Enterprise AES-256-GCM Verschlüsselung vor Persistierung in IndexedDB
+  let recordToPersist: OfflineAudioRecord = finalRecord;
+  try {
+    if (finalRecord.blob && typeof window !== 'undefined' && window.crypto?.subtle) {
+      const encrypted = await encryptOfflineBlob(finalRecord.blob);
+      recordToPersist = {
+        ...finalRecord,
+        isEncrypted: true,
+        encryptedBlobPayload: encrypted,
+        // Plaintext-Blob im Speicher leeren, um Klartext auf Flash-Speicher zu eliminieren
+        blob: new Blob([], { type: finalRecord.mimeType })
+      };
+    }
+  } catch (encErr) {
+    console.warn('[OfflineAudioVault] Encryption notice, falling back to raw blob:', encErr);
+  }
+
   // 2. Primärer Schreibversuch
   try {
     const db = await openAudioDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.put(finalRecord);
+    store.put(recordToPersist);
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-    console.log('[OfflineAudioVault] Audio record saved locally in lossless format:', finalRecord.id);
+    console.log('[OfflineAudioVault] Audio record saved locally in encrypted lossless format:', finalRecord.id);
     return finalRecord;
   } catch (primaryErr: any) {
     const isQuotaErr =
@@ -125,7 +149,7 @@ export async function saveOfflineAudioRecord(record: Omit<OfflineAudioRecord, 'i
         const retryDb = await openAudioDB();
         const retryTx = retryDb.transaction(STORE_NAME, 'readwrite');
         const retryStore = retryTx.objectStore(STORE_NAME);
-        retryStore.put(finalRecord);
+        retryStore.put(recordToPersist);
         await new Promise<void>((resolve, reject) => {
           retryTx.oncomplete = () => resolve();
           retryTx.onerror = () => reject(retryTx.error);
@@ -148,6 +172,26 @@ export async function saveOfflineAudioRecord(record: Omit<OfflineAudioRecord, 'i
 }
 
 /**
+ * Entschlüsselt einen Datensatz transparent, falls er verschlüsselt gespeichert wurde.
+ */
+async function hydrateDecryptedRecord(record: any): Promise<OfflineAudioRecord> {
+  if (!record) return record;
+  if (record.isEncrypted && record.encryptedBlobPayload) {
+    try {
+      const decryptedBlob = await decryptOfflineBlob(record.encryptedBlobPayload);
+      return {
+        ...record,
+        blob: decryptedBlob
+      };
+    } catch (decErr) {
+      console.warn('[OfflineAudioVault] Decryption fallback (key unavailable or corrupt payload):', decErr);
+      return record;
+    }
+  }
+  return record;
+}
+
+/**
  * Retrieve a specific offline audio record by ID
  * Checks Ephemeral RAM Vault first, falls back to IndexedDB
  */
@@ -164,10 +208,11 @@ export async function getOfflineAudioRecord(id: string): Promise<OfflineAudioRec
     const store = tx.objectStore(STORE_NAME);
     const request = store.get(id);
 
-    return new Promise((resolve, reject) => {
+    const rawResult = await new Promise<any>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
+    return hydrateDecryptedRecord(rawResult);
   } catch (err) {
     console.error('[OfflineAudioVault] Failed to retrieve audio record:', err);
     return null;
@@ -188,10 +233,11 @@ export async function getAllPendingAudioRecords(): Promise<OfflineAudioRecord[]>
     const store = tx.objectStore(STORE_NAME);
     const request = store.getAll();
 
-    dbRecords = await new Promise((resolve, reject) => {
+    const rawDbRecords = await new Promise<any[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     });
+    dbRecords = await Promise.all(rawDbRecords.map(r => hydrateDecryptedRecord(r)));
   } catch (err) {
     console.error('[OfflineAudioVault] Failed to retrieve all pending records from IndexedDB:', err);
   }

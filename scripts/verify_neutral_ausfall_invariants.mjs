@@ -26,7 +26,8 @@ const IGNORED_PATHS = [
   '.git',
   'scripts/verify_neutral_ausfall_invariants.mjs',
   'forensic_ux_process_audit.md',
-  'implementation_plan.md'
+  'implementation_plan.md',
+  'apps/groovelab/src/utils/medicalTermGuard.ts'
 ];
 
 let violationsCount = 0;

@@ -400,7 +400,8 @@ for (const filePath of migrationFiles) {
         // Exempt authoritative login/challenge functions
         const isLoginOrChallengeExempt = [
           'authenticate_by_credential',
-          'authenticate_webauthn_credential'
+          'authenticate_webauthn_credential',
+          'generate_webauthn_challenge'
         ].includes(funcName);
 
         if (isLoginOrChallengeExempt) continue;

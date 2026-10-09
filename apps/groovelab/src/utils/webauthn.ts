@@ -635,3 +635,32 @@ export const registerMasterPasskeyAuthoritative = async (
   }
 };
 
+/**
+ * Authoritative Passkey Revocation across all user devices
+ * Enforces atomic session purge and database deactivation via revoke_user_passkeys RPC
+ */
+export const revokeUserPasskeysAuthoritative = async (
+  supabase: any,
+  targetUserId: string
+): Promise<{ success: boolean; revokedCount?: number; error?: string }> => {
+  try {
+    const { data, error } = await supabase.rpc('revoke_user_passkeys', {
+      p_target_user_id: targetUserId
+    });
+
+    if (error || !data?.success) {
+      return {
+        success: false,
+        error: data?.error || error?.message || 'Widerruf der Passkeys fehlgeschlagen.'
+      };
+    }
+
+    return {
+      success: true,
+      revokedCount: data.revoked_count ?? 0
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Passkey-Widerruf fehlgeschlagen.' };
+  }
+};
+

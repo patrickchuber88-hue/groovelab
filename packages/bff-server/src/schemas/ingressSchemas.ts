@@ -191,3 +191,67 @@ export const directMessageIngressSchema = z
   .strict({ message: 'Unerwartete Parameter im Chat-Message Payload abgewiesen.' });
 
 export type DirectMessageIngressInput = z.infer<typeof directMessageIngressSchema>;
+
+// ── 8. WebAuthn / FIDO2 Passkey Ingress (OWASP ASVS L3 / NIST SP 800-63B AAL3) ──
+export const webauthnChallengeSchema = z
+  .object({
+    userId: z.string().uuid('userId muss eine gültige UUID sein.').optional().nullable(),
+    type: z.enum(['auth', 'register', 'step_up']).default('auth'),
+  })
+  .strict({ message: 'Unerwartete Parameter im WebAuthn-Challenge Payload abgewiesen.' });
+
+export type WebauthnChallengeInput = z.infer<typeof webauthnChallengeSchema>;
+
+export const webauthnRegistrationSchema = z
+  .object({
+    userId: z.string().uuid('userId muss eine gültige UUID sein.'),
+    credentialId: z
+      .string()
+      .min(16, 'credentialId muss mindestens 16 Zeichen umfassen.')
+      .max(1024, 'credentialId darf maximal 1.024 Zeichen umfassen.')
+      .trim(),
+    publicKey: z
+      .string()
+      .min(16, 'publicKey muss mindestens 16 Zeichen umfassen.')
+      .max(8192, 'publicKey darf maximal 8.192 Zeichen umfassen.')
+      .trim(),
+    deviceName: z
+      .string()
+      .max(128, 'deviceName darf maximal 128 Zeichen umfassen.')
+      .optional()
+      .nullable(),
+    challenge: z
+      .string()
+      .min(32, 'challenge muss mindestens 32 Zeichen lang sein.')
+      .max(256, 'challenge darf maximal 256 Zeichen lang sein.')
+      .trim(),
+  })
+  .strict({ message: 'Unerwartete Parameter im WebAuthn-Registration Payload abgewiesen.' });
+
+export type WebauthnRegistrationInput = z.infer<typeof webauthnRegistrationSchema>;
+
+export const webauthnAuthenticationSchema = z
+  .object({
+    credentialId: z
+      .string()
+      .min(16, 'credentialId muss mindestens 16 Zeichen umfassen.')
+      .max(1024, 'credentialId darf maximal 1.024 Zeichen umfassen.')
+      .trim(),
+    challenge: z
+      .string()
+      .min(32, 'challenge muss mindestens 32 Zeichen lang sein.')
+      .max(256, 'challenge darf maximal 256 Zeichen lang sein.')
+      .trim(),
+    schoolId: z.string().uuid('schoolId muss eine gültige UUID sein.').optional().nullable(),
+  })
+  .strict({ message: 'Unerwartete Parameter im WebAuthn-Authentication Payload abgewiesen.' });
+
+export type WebauthnAuthenticationInput = z.infer<typeof webauthnAuthenticationSchema>;
+
+export const webauthnRevocationSchema = z
+  .object({
+    targetUserId: z.string().uuid('targetUserId muss eine gültige UUID sein.'),
+  })
+  .strict({ message: 'Unerwartete Parameter im WebAuthn-Revocation Payload abgewiesen.' });
+
+export type WebauthnRevocationInput = z.infer<typeof webauthnRevocationSchema>;

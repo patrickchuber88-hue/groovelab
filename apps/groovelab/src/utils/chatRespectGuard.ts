@@ -11,10 +11,12 @@
  * - Art. 25 DSGVO: 100 % Client-seitig, null Daten-Tracking, kein Drittanbieter-Leakage
  */
 
+import { detectHealthDataTerms } from './medicalTermGuard';
+
 export interface ChatRespectValidationResult {
   isValid: boolean;
   matchedTerm?: string;
-  category?: 'extremism' | 'insult' | 'harassment' | 'threat';
+  category?: 'extremism' | 'insult' | 'harassment' | 'threat' | 'health_data';
   reason?: string;
   isCrisis?: boolean;
 }
@@ -165,6 +167,18 @@ export function validateChatMessageContent(content: string | null | undefined): 
         };
       }
     }
+  }
+
+  // 2. 🛡️ DSGVO Art. 9 / BDSG § 26 Schutz vor unbewusster Speicherung von Gesundheits- & Diagnosedaten
+  const healthCheck = detectHealthDataTerms(rawTrimmed);
+  if (healthCheck.hasHealthData) {
+    return {
+      isValid: false,
+      matchedTerm: healthCheck.matchedTerm,
+      category: 'health_data',
+      reason: `Datenschutz-Schutzschild (Art. 9 DSGVO): Die Nachricht enthält medizinische Signalwörter ('${healthCheck.matchedTerm}'). Bitte erfassen Sie Absagen neutral und vermeiden Sie Diagnosedaten im Chat.`,
+      isCrisis: false
+    };
   }
 
   return { isValid: true };

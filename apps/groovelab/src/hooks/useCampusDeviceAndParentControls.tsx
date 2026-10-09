@@ -467,7 +467,16 @@ export function useCampusDeviceAndParentControls({
   }, []);
 
   const effectiveInactivityTimeoutMs = useMemo(() => {
+    const isSharedKiosk = Boolean(kioskRoomIdParam || stationIdFromStorage || kioskDetails);
     const activeRole = (user?.role || '').toLowerCase();
+
+    // 🛡️ Enterprise Goldstandard (OWASP ASVS L3): Geteilte Schul-iPads erhalten 3-Minuten-Timeout
+    if (isSharedKiosk) {
+      return 3 * 60 * 1000; // 3 Minuten für Shared Tablets / Kiosk
+    }
+    if (activeRole === 'student') {
+      return 10 * 60 * 1000; // 10 Minuten für Schüler-Sessions auf Privatgeräten
+    }
     if (activeRole === 'admin' || activeRole === 'secretary') {
       return 45 * 60 * 1000; // 45 Minuten für Verwaltung
     }
@@ -475,7 +484,7 @@ export function useCampusDeviceAndParentControls({
       return 60 * 60 * 1000; // 60 Minuten für Lehrkräfte
     }
     return 45 * 60 * 1000; // Fallback 45 Minuten
-  }, [user?.role]);
+  }, [user?.role, kioskRoomIdParam, stationIdFromStorage, kioskDetails]);
 
   useInactivityTimeout({
     timeoutMs: effectiveInactivityTimeoutMs,
@@ -483,6 +492,23 @@ export function useCampusDeviceAndParentControls({
     isScreenLocked: isScreenLockedByInactivity,
     onTimeout: () => {
       console.warn(`[Inactivity] Idle timeout reached (${effectiveInactivityTimeoutMs / 60000}m). Activating Privacy Screen Lock...`);
+      const isSharedKiosk = Boolean(kioskRoomIdParam || stationIdFromStorage || kioskDetails);
+      const activeRole = (user?.role || '').toLowerCase();
+
+      // 🛡️ Kiosk Auto-Scrub: Verhindert Sitzungsübernahme bei Raumwechsel
+      if (isSharedKiosk && activeRole === 'student') {
+        console.warn('[Inactivity] Kiosk Shared Device student timeout reached. Executing automatic session zeroize & cache scrubbing...');
+        try {
+          import('../utils/sharedDeviceScrubber').then(({ scrubSharedDeviceCache }) => {
+            scrubSharedDeviceCache().catch(() => {});
+          });
+        } catch (_) {}
+        executeSessionZeroize({ preserveDeviceKey: true, broadcast: true });
+        setUser(null);
+        setLoggedInUserId('');
+        return;
+      }
+
       try {
         const storedUserStr = sessionStorage.getItem('groovelab_cached_user');
         if (storedUserStr) {
