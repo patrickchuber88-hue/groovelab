@@ -108,14 +108,34 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
           if (isMounted) {
             setSponsors([
               {
-                id: 'dev_primary_sponsor',
-                companyName: 'sameday & Patrick Huber',
-                industrySubline: 'Offizielle Bildungsförderung & Stiftung',
+                id: 'musaek-sponsor-1',
+                companyName: 'sameday',
+                industrySubline: 'Logistik & Fulfillment',
                 city: 'Bad Säckingen',
-                isActive: true,
-                isMainSponsor: true,
                 tier: 'haupt',
-                createdAt: new Date().toISOString()
+                isMainSponsor: true,
+                isActive: true,
+                createdAt: '2026-01-01T00:00:00.000Z'
+              },
+              {
+                id: 'musaek-sponsor-2',
+                companyName: 'Patrick Huber',
+                industrySubline: 'Bildungsstiftung',
+                city: 'Rheinfelden',
+                tier: 'partner',
+                isMainSponsor: false,
+                isActive: true,
+                createdAt: '2026-01-01T00:00:00.000Z'
+              },
+              {
+                id: 'musaek-sponsor-3',
+                companyName: 'Jasna',
+                industrySubline: 'Tollste Frau der Welt',
+                city: 'Bad Säckingen',
+                tier: 'foerderer',
+                isMainSponsor: false,
+                isActive: true,
+                createdAt: '2026-01-01T00:00:00.000Z'
               }
             ]);
           }

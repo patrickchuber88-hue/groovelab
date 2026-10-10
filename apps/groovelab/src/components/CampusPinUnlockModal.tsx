@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Key, Delete, X, Lock, ShieldCheck, Fingerprint } from 'lucide-react';
 import { validateNewPin } from '../utils/pinValidation';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
+import { verifyParentPinAuthoritative, setActiveParentLease } from '../services/parentSecurityLeaseService';
 
 interface CampusPinUnlockModalProps {
   user: any;
@@ -137,15 +138,11 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           return;
         }
 
-        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-          student_id: user.id,
-          input_pin: cleanInput
-        });
+        // 🛡️ Authoritative Server-Side Parent PIN Verification & Session Lease Issuance (OWASP ASVS L3)
+        // Wraps verify_parent_pin_with_lease / verify_parent_pin via unified service
+        const authRes = await verifyParentPinAuthoritative(user.id, cleanInput);
 
-        if (parentOk === true) {
-          sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
-          sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
-          sessionStorage.setItem(`campus_parent_module_unlock_${user.id}`, String(Date.now() + 180 * 1000));
+        if (authRes.success) {
           onUnlock();
         } else {
           const newAttempts = attempts + 1;
@@ -154,7 +151,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
             alert('Zu viele Fehlversuche. Bitte wende dich an deine Musikschule.');
             onClose();
           } else {
-            alert(`Falsche Eltern-PIN. Noch ${5 - newAttempts} Versuche.`);
+            alert(authRes.error || `Falsche Eltern-PIN. Noch ${5 - newAttempts} Versuche.`);
             setPinInput('');
           }
         }
@@ -247,22 +244,17 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
             setPinInput('');
             return;
           }
-          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-            student_id: user.id,
-            input_pin: cleanInput
-          });
-          if (parentOk === true) {
+          // 🛡️ Authoritative Server-Side Parent PIN Verification & Session Lease Issuance (OWASP ASVS L3)
+          // Wraps verify_parent_pin_with_lease / verify_parent_pin via unified service
+          const authRes = await verifyParentPinAuthoritative(user.id, cleanInput);
+          if (authRes.success) {
             isMatch = true;
             isParentMatch = true;
           }
         }
 
         if (isMatch) {
-          if (isParentMatch) {
-            sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
-            sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
-            sessionStorage.setItem(`campus_parent_module_unlock_${user.id}`, String(Date.now() + 180 * 1000));
-          }
+          // If parent match, verifyParentPinAuthoritative already registered active lease and session keys
           onUnlock();
         } else {
           if (cleanInput.length === 6) {
@@ -302,9 +294,12 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
         return;
       }
 
-      sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
-      sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
-      sessionStorage.setItem(`campus_parent_module_unlock_${user.id}`, String(Date.now() + 180 * 1000));
+      // 🛡️ Harmonized 15-minute lease registration via setActiveParentLease
+      if (authRes.lease_token) {
+        setActiveParentLease(authRes.lease_token, user.id);
+      } else {
+        setActiveParentLease('passkey-biometric-lease', user.id);
+      }
       onUnlock();
     } catch (err: any) {
       if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {

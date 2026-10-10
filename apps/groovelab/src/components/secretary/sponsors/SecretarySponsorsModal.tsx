@@ -14,8 +14,10 @@ import {
 } from 'lucide-react';
 import { generateSponsorPitchPDF } from '../../../utils/sponsorPitchPdfGenerator';
 import { UniversalPdfPreviewModal } from '../../modals/UniversalPdfPreviewModal';
+import { SecretarySponsorDeleteConfirmModal } from './SecretarySponsorDeleteConfirmModal';
 import { supabase as defaultSupabase } from '../../../lib/supabase';
 import { CampusSponsorIngressBanner } from '../../ui/CampusSponsorIngressBanner';
+import { isDevEnvironment } from '../../../utils/tenantUrlHelper';
 
 export type SponsorTier = 'foerderer' | 'partner' | 'haupt';
 
@@ -60,6 +62,39 @@ export interface SecretarySponsorsModalProps {
 
 const STORAGE_KEY_PREFIX = 'campus_sponsor_settings_';
 
+const CANONICAL_MUSAECK_SPONSORS: SchoolSponsorItem[] = [
+  {
+    id: 'musaek-sponsor-1',
+    companyName: 'sameday',
+    industrySubline: 'Logistik & Fulfillment',
+    city: 'Bad Säckingen',
+    tier: 'haupt',
+    isMainSponsor: true,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'musaek-sponsor-2',
+    companyName: 'Patrick Huber',
+    industrySubline: 'Bildungsstiftung',
+    city: 'Rheinfelden',
+    tier: 'partner',
+    isMainSponsor: false,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'musaek-sponsor-3',
+    companyName: 'Jasna',
+    industrySubline: 'Tollste Frau der Welt',
+    city: 'Bad Säckingen',
+    tier: 'foerderer',
+    isMainSponsor: false,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  }
+];
+
 export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
   isOpen,
   onClose,
@@ -76,7 +111,28 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
   // --- STATE ---
   const [settings, setSettings] = useState<SchoolSponsorSettings>(() => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}${schoolId}`);
+      // Stufe 1: Direkter Key über schoolId
+      let saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}${schoolId}`);
+
+      // Stufe 2: Resiliente Suche über alle campus_sponsor_settings_* Keys
+      if (!saved) {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_KEY_PREFIX)) {
+            const val = localStorage.getItem(k);
+            if (val) {
+              try {
+                const parsedVal = JSON.parse(val);
+                if (parsedVal && Array.isArray(parsedVal.sponsors) && parsedVal.sponsors.length > 0) {
+                  saved = val;
+                  break;
+                }
+              } catch {}
+            }
+          }
+        }
+      }
+
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.sponsors)) {
@@ -85,8 +141,29 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
           if (hadLegacyDemo) {
             localStorage.setItem(`${STORAGE_KEY_PREFIX}${schoolId}`, JSON.stringify(parsed));
           }
+          if (parsed.sponsors.length > 0) {
+            return parsed;
+          }
         }
-        return parsed;
+      }
+
+      // Stufe 3: Flagship & Dev-Fallback für Musäk Bad Säckingen
+      const isMusaek = (
+        schoolId === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' ||
+        (Boolean(schoolName) && (schoolName.toLowerCase().includes('musäk') || schoolName.toLowerCase().includes('bad säckingen'))) ||
+        isDevEnvironment()
+      );
+
+      if (isMusaek) {
+        const fallbackSettings: SchoolSponsorSettings = {
+          mode: 'school_funded',
+          sponsors: CANONICAL_MUSAECK_SPONSORS,
+          allowCoSponsorsWithMain: true
+        };
+        try {
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}${schoolId}`, JSON.stringify(fallbackSettings));
+        } catch {}
+        return fallbackSettings;
       }
     } catch {}
     return {
@@ -98,6 +175,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
 
   const [editingSponsor, setEditingSponsor] = useState<SchoolSponsorItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [deletingSponsor, setDeletingSponsor] = useState<SchoolSponsorItem | null>(null);
   const [pdfPreviewState, setPdfPreviewState] = useState<{
     isOpen: boolean;
     title: string;
@@ -133,6 +211,12 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
       setShowSavedBadge(true);
       setTimeout(() => setShowSavedBadge(false), 2500);
 
+      // Reaktiver Broadcast für Ingress-Banner, Login-Pille & Elternportal
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_sponsor_refresh'));
+        window.dispatchEvent(new CustomEvent('groovelab_auth_state_changed'));
+      }
+
       // Async persistence to Supabase if available
       const db = supabase || defaultSupabase;
       if (db && schoolId) {
@@ -164,14 +248,59 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
           if (loaded && Array.isArray(loaded.sponsors)) {
             loaded.sponsors = loaded.sponsors.filter((s: SchoolSponsorItem) => s.id !== 'demo-1' && s.companyName !== 'Sanitär Meier');
           }
-          setSettings(loaded);
-          localStorage.setItem(`${STORAGE_KEY_PREFIX}${schoolId}`, JSON.stringify(loaded));
+          if (loaded.sponsors && loaded.sponsors.length > 0) {
+            setSettings(loaded);
+            localStorage.setItem(`${STORAGE_KEY_PREFIX}${schoolId}`, JSON.stringify(loaded));
+            return;
+          }
+        }
+
+        // Falls Supabase leer ist und es sich um Musäk Bad Säckingen / Dev handelt
+        const isMusaek = (
+          schoolId === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' ||
+          (Boolean(schoolName) && (schoolName.toLowerCase().includes('musäk') || schoolName.toLowerCase().includes('bad säckingen'))) ||
+          isDevEnvironment()
+        );
+        if (isMusaek) {
+          setSettings(prev => {
+            if (!prev.sponsors || prev.sponsors.length === 0) {
+              const fallbackSettings: SchoolSponsorSettings = {
+                mode: 'school_funded',
+                sponsors: CANONICAL_MUSAECK_SPONSORS,
+                allowCoSponsorsWithMain: true
+              };
+              try {
+                localStorage.setItem(`${STORAGE_KEY_PREFIX}${schoolId}`, JSON.stringify(fallbackSettings));
+              } catch {}
+              return fallbackSettings;
+            }
+            return prev;
+          });
         }
       } catch (err) {
         // Fallback to local storage is already hydrated
       }
     })();
-  }, [isOpen, schoolId, supabase]);
+  }, [isOpen, schoolId, schoolName, supabase]);
+
+  // Barrierefreie Tastatur-Steuerung (BFSG 2025 / WCAG 2.2 AA)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (deletingSponsor) {
+          e.stopPropagation();
+          setDeletingSponsor(null);
+        } else if (isFormOpen) {
+          e.stopPropagation();
+          setIsFormOpen(false);
+        } else if (isOpen) {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [deletingSponsor, isFormOpen, isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -765,7 +894,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteSponsor(sponsor.id)}
+                        onClick={() => setDeletingSponsor(sponsor)}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -778,7 +907,8 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
-                        title="Löschen"
+                        title={`Bildungspartner ${sponsor.companyName} entfernen`}
+                        aria-label={`Bildungspartner ${sponsor.companyName} entfernen`}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -1153,6 +1283,17 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
 
       </div>
     </div>
+
+    {/* 🏛️ 2-STUFIGE SICHERHEITS-BESTÄTIGUNG BEIM LÖSCHEN EINES BILDUNGSPARTNERS (0,1% Goldstandard Satellite) */}
+    <SecretarySponsorDeleteConfirmModal
+      isOpen={Boolean(deletingSponsor)}
+      sponsor={deletingSponsor}
+      onClose={() => setDeletingSponsor(null)}
+      onConfirm={(sponsorId) => {
+        setDeletingSponsor(null);
+        handleDeleteSponsor(sponsorId);
+      }}
+    />
 
     {/* 🏛️ Universal High-Fidelity PDF Preview Modal (0,1% Goldstandard) */}
     <UniversalPdfPreviewModal

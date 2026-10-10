@@ -416,7 +416,7 @@ export const authenticateParentBiometricPasskey = async (
   supabase: any,
   targetUserId: string,
   schoolId?: string | null
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<{ success: boolean; lease_token?: string; error?: string }> => {
   if (!isWebAuthnSupported()) {
     return { success: false, error: 'WebAuthn / Biometrie wird von diesem Gerät nicht unterstützt.' };
   }
@@ -466,7 +466,10 @@ export const authenticateParentBiometricPasskey = async (
       };
     }
 
-    return { success: true };
+    return { 
+      success: true, 
+      lease_token: authResult?.lease_token 
+    };
   } catch (err: any) {
     if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
       return { success: false, error: 'Biometrische Prüfung abgebrochen.' };

@@ -3,6 +3,12 @@ import { supabase } from '../../../lib/supabase';
 import { useParentSessionLock } from '../../../hooks/useParentSessionLock';
 import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics } from '../../../utils/webauthn';
 import { getOrCreateDeviceKey } from '../../../utils/sessionLeaseManager';
+import {
+  verifyParentPinAuthoritative,
+  enrichParentControlsPayload,
+  setActiveParentLease,
+  purgeParentSessionLease
+} from '../../../services/parentSecurityLeaseService';
 
 export interface StudentFamilyProfileDto {
   id: string;
@@ -223,6 +229,9 @@ export function useStudentParentControls({
         throw new Error(authResult?.error || authErr?.message || 'Passkey nicht erkannt.');
       }
 
+      if (authResult?.lease_token) {
+        setActiveParentLease(authResult.lease_token, targetId);
+      }
       setIsParentUnlocked(true);
       setShowParentGateModal(false);
       extendParentSession();
@@ -289,33 +298,11 @@ export function useStudentParentControls({
 
     setIsVerifyingParentGate(true);
     try {
-      let isOk = false;
-      try {
-        const currentDevKey = getOrCreateDeviceKey();
-        const { data: leaseData, error: leaseErr } = await supabase.rpc('verify_parent_pin_with_lease', {
-          p_student_id: targetId,
-          p_input_pin: cleanInput,
-          p_device_key: currentDevKey
-        });
-        if (!leaseErr && leaseData?.success === true) {
-          isOk = true;
-          const token = String(leaseData.lease_token || leaseData.lease_id || '');
-          if (token) {
-            sessionStorage.setItem('gl_parent_session_lease', token);
-            sessionStorage.setItem('gl_active_session_lease_id', token);
-          }
-        }
-      } catch (e) {}
-
-      if (!isOk) {
-        try {
-          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-            student_id: targetId,
-            input_pin: cleanInput
-          });
-          if (parentOk === true) isOk = true;
-        } catch (e) {}
-      }
+      // 🛡️ Authoritative Server-Side Lease Verification: verify_parent_pin_with_lease (via parentSecurityLeaseService)
+      // rpc('verify_parent_pin_with_lease') & rpc('verify_parent_pin')
+      const currentDevKey = getOrCreateDeviceKey();
+      const res = await verifyParentPinAuthoritative(targetId, cleanInput, currentDevKey);
+      const isOk = res.success;
 
       if (isOk) {
         inMemoryParentPinRef.current = cleanInput;
@@ -359,12 +346,12 @@ export function useStudentParentControls({
         bedtime_start: start || bedtimeStart,
         bedtime_end: end || bedtimeEnd
       };
+      const settingsPayload = enrichParentControlsPayload(studentId, {
+        parent_permissions: nextPermissions
+      }, inMemoryParentPinRef.current);
       await supabase.rpc('save_parent_controls', {
         p_student_id: studentId,
-        p_settings: {
-          parent_pin: inMemoryParentPinRef.current || undefined,
-          parent_permissions: nextPermissions
-        }
+        p_settings: settingsPayload
       });
       if (studentUser) {
         studentUser.parent_permissions = nextPermissions;
@@ -387,12 +374,12 @@ export function useStudentParentControls({
         daytime_lock_end: end || daytimeLockEnd,
         daytime_lock_days: days || daytimeLockDays
       };
+      const settingsPayload = enrichParentControlsPayload(studentId, {
+        parent_permissions: nextPermissions
+      }, inMemoryParentPinRef.current);
       await supabase.rpc('save_parent_controls', {
         p_student_id: studentId,
-        p_settings: {
-          parent_pin: inMemoryParentPinRef.current || undefined,
-          parent_permissions: nextPermissions
-        }
+        p_settings: settingsPayload
       });
       if (studentUser) {
         studentUser.parent_permissions = nextPermissions;
@@ -719,15 +706,7 @@ export function useStudentParentControls({
 
     try {
       if (targetStudentId) {
-        const activeLeaseToken = typeof window !== 'undefined'
-          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
-          : null;
-
-        const settingsPayload = {
-          ...payload,
-          ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {}),
-          ...(inMemoryParentPinRef.current ? { parent_pin: inMemoryParentPinRef.current } : {})
-        };
+        const settingsPayload = enrichParentControlsPayload(targetStudentId, payload, inMemoryParentPinRef.current);
 
         const { data: rpcData, error: rpcErr } = await supabase.rpc('save_parent_controls', {
           p_student_id: targetStudentId,

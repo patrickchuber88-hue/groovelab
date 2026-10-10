@@ -265,7 +265,7 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
             allowCoSponsorsWithMain: true,
             sponsors: [
               {
-                id: 'dev-demo-1',
+                id: 'musaek-sponsor-1',
                 companyName: 'sameday',
                 industrySubline: 'Logistik & Fulfillment',
                 city: 'Bad Säckingen',
@@ -275,11 +275,21 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
                 createdAt: new Date().toISOString()
               },
               {
-                id: 'dev-demo-2',
+                id: 'musaek-sponsor-2',
                 companyName: 'Patrick Huber',
                 industrySubline: 'Bildungsstiftung',
                 city: 'Rheinfelden',
                 tier: 'partner',
+                isMainSponsor: false,
+                isActive: true,
+                createdAt: new Date().toISOString()
+              },
+              {
+                id: 'musaek-sponsor-3',
+                companyName: 'Jasna',
+                industrySubline: 'Tollste Frau der Welt',
+                city: 'Bad Säckingen',
+                tier: 'foerderer',
                 isMainSponsor: false,
                 isActive: true,
                 createdAt: new Date().toISOString()

@@ -29,6 +29,7 @@
     "test:edge-proxy": "tsx tests/security/edge-proxy-resilience.test.ts",
     "test:refresh-concurrency": "tsx tests/security/token-refresh-concurrency.test.ts",
     "test:storage-egress": "tsx tests/security/storage-egress-governance.test.ts",
+    "test:parental-lease": "tsx tests/security/parental-lease-governance.test.ts",
     "test:realtime-governance": "tsx tests/security/realtime-parent-governance.test.ts",
     "test:chat-governance": "tsx tests/security/chat-governance-child-protection.test.ts",
     "test:webauthn": "tsx tests/security/webauthn-passkey-governance.test.ts",

@@ -405,11 +405,12 @@ for (const filePath of migrationFiles) {
 
         if (!isGrantedToAuthOrAnon) continue;
 
-        // Exempt authoritative login/challenge functions
+        // Exempt authoritative login/challenge functions and public landing/theme metadata functions
         const isLoginOrChallengeExempt = [
           'authenticate_by_credential',
           'authenticate_webauthn_credential',
-          'generate_webauthn_challenge'
+          'generate_webauthn_challenge',
+          'get_public_school_theme'
         ].includes(funcName);
 
         if (isLoginOrChallengeExempt) continue;
