@@ -208,6 +208,14 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'CRITICAL',
     description: 'Rechtssicherheit (§ 14 UStG & SEPA Clearing): Bundesbank-Test-IBANs (DE02...) und Phantasie-Steuernummern (04123/45678) sind im Produktivcode streng verboten. Nutze stattdessen OPERATOR_BANKING_CONFIG oder echte Mandantenbankdaten.',
     allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-22',
+    name:        'Unencrypted Offline Audio Storage Invariant',
+    regex:       /store\.put\(\s*finalRecord\s*\)/g,
+    severity:    'HIGH',
+    description: 'DSGVO Art. 32 Compliance: Audio records must be encrypted with encryptOfflineBlob before persistence to IndexedDB (use recordToPersist).',
+    allowedFiles: ['src/tests/']
   }
 ];
 

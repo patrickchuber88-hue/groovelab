@@ -4,6 +4,16 @@
   "created_at": "2026-10-06T20:24:44.495Z",
   "snapshots": [
     {
+      "id": "SNAP-f311f02e",
+      "filename": "matrix_2026-10-10T06-35-36-542Z_f311f02e.md",
+      "created_at": "2026-10-10T06:35:36.542Z",
+      "sha256": "f311f02ece460bd15dbaf471119c0120a2395f65bf2bb21298ebe6d29b876cba",
+      "byte_size": 722390,
+      "line_count": 454,
+      "feature_count": 364,
+      "reason": "manual-cli"
+    },
+    {
       "id": "SNAP-d0fd89ec",
       "filename": "matrix_2026-10-09T17-15-34-525Z_d0fd89ec.md",
       "created_at": "2026-10-09T17:15:34.525Z",
@@ -141,16 +151,6 @@
       "byte_size": 563962,
       "line_count": 389,
       "feature_count": 300,
-      "reason": "auto"
-    },
-    {
-      "id": "SNAP-a690b199",
-      "filename": "matrix_2026-10-07T14-35-51-990Z_a690b199.md",
-      "created_at": "2026-10-07T14:35:51.990Z",
-      "sha256": "a690b19944242e94d6da0fb96cb931f7e9d137384b0385149cac00d0eae6b736",
-      "byte_size": 558507,
-      "line_count": 387,
-      "feature_count": 298,
       "reason": "auto"
     }
   ]

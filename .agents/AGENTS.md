@@ -32,8 +32,14 @@
 - **`Monats-Check` / `Monthly Audit`**: Führt den monatlichen Routine-Check der Wächter („Wächter der Wächter“, `npm run operator:monthly` bzw. `scripts/export_monthly_governance_dossier.ts`) aus: Normativer Horizont-Scan, Drift- & Whitelist-Audit, synthetisches Mutation-Testing aller 15 Wächter und Generierung des gerichtsfesten Monatsdossiers (`reports/forensics/monthly/`) mit SHA-256 Siegel zur Betreiber-Enthaftung (§ 43 GmbHG / Art. 5 Abs. 2 DSGVO).
 - **`Jahres-Check` / `Annual Audit`**: Führt die jährliche Governance- & Resilienz-Engine (`npm run operator:annual` bzw. `scripts/export_annual_governance_dossier.ts`) über alle 10 Säulen aus: Schuljahres-Zyklus & DIN 66398 Purge (Migration 454), 12-Monats-GFS-Cold-Storage & Hetzner Storage Box Sync, GoBD 10-Jahres-Archivierung (§ 147 AO), Multi-Tenant RLS, WORM-Audit-Trail, Audio-Edge Streaming, Legacy Ingestion & 360° Legal Forensics mit SHA-256 Siegel (`reports/forensics/annual/`).
 - **`Full Audit` / `verify enterprise`**: Führt die maximale Enterprise-Prüfung (`npm run verify:enterprise`) aus (Gate + Pyramide + Forensik-All + Bundle/Heap-Budget).
-- **`post-deploy` / `verify:perimeter`**: Führt die Multi-Asset & Precache Smoke Engine (`npm run operator:post-deploy`) aus (100% HTTP 200 auf alle in `index.html` referenzierten Bundles, `/sw.js` Cache-Busting-Header, Mozilla Observatory A+).
-- **`commit` / `commit and deploy`**: Führt `npm run gate`, `npm run verify:invariants`, `npm run build:groovelab` aus und setzt nach erfolgreicher Integrität den Git-Commit um.
+- **`commit`**: Führt `npm run gate`, `npm run verify:invariants`, `npm run build:groovelab` aus und setzt nach erfolgreicher Integrität den Git-Commit & Push um.
+- **`commit und deploy` / `commit and deploy`**: Führt die vollständige 0,1% Enterprise Closed-Loop Deployment Pipeline aus:
+  1. Pre-Flight Gate (`npm run gate`, `npm run verify:invariants`, `npm run typecheck`)
+  2. Autoritativer DB-Migrations-Runner (`npm run deploy:db` via `scripts/apply_pending_migrations.sh` auf Hetzner + PostgREST Schema-Reload)
+  3. Produktions-Build (`npm run build:groovelab` inkl. SRI-Hashes, Precompression & SW-Cache-Buster)
+  4. Git Commit & Git Push
+  5. Hetzner Server Deploy (`bash deploy.sh` mit atomarem Symlink-Switch, Container-Sync & BFF-Reload)
+  6. Kryptografische Live-Paritäts-Verifikation (SHA-256 Abgleich des Live-Assets mit dem lokalen Build + Mozilla Observatory A+ Perimeter Smoke Test). Der Agent darf eine Erfolgsmeldung im Chat erst nach bestätigter 100% Live-Parität ausgeben.
 - **On-Demand Antigravity Skills (`.agents/skills/`)**:
   - `/campus-disaster-recovery`: 7-Phasen Hetzner Notfall-Runbook (RTO $\le$ 45 Min, RPO $\le$ 60 Min, Age X25519, WORM Tombstones).
   - `/campus-legacy-ingestion`: Migration 502 Ingestion Engine (WinMusik/MBS/Excel, Zero-Payroll RAM-Filter, Ausweisdruck).

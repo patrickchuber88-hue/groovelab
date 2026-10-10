@@ -1,74 +1,93 @@
-# 🏛️ 0,1% Enterprise Goldstandard Redesign: Tages-Kompass Off-Day States (`UNTERRICHTSFREI`, `WOCHENENDE`, `ABWESENHEIT`)
+# 🏛️ 0,1% Enterprise Goldstandard Deployment & Live-Cluster Reconciliation
 
-## 📋 1. Ausgangslage & Problemanalyse
+## 📋 1. Forensische Befund-Matrix (Status Quo)
 
-### Aktueller Zustand (Kritik: „Windows 2000 Tool“)
-In [`TagesKompassHost.tsx` (L118–147)](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/teacher/tageskompass/TagesKompassHost.tsx#L118-L147) sind die drei unterrichtsfreien Zustände (`WOCHENENDE`, `UNTERRICHTSFREI`, `ABWESENHEIT`) als minimale, statische 7-Zeilen-Platzhalter umgesetzt:
-```tsx
-<div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-  <CalendarOff size={32} color="#64748b" style={{ margin: '0 auto 10px auto' }} />
-  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>Unterrichtsfreier Tag</h3>
-  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Heute ist unterrichtsfrei (Schulferien oder Feiertag).</p>
-</div>
+| Prüf-Vektor | Lokaler Stand (Workspace / Git) | Live-Cluster (178.105.10.2) | Forensischer Status |
+| :--- | :--- | :--- | :--- |
+| **Git HEAD** | `68625079` (Passkey Citadel, Sibling Linking, Health Guard) | `release_20261009_012940` (7 Commits im Rückstand!) | 🚨 **DRIFT: 7 Commits fehlen** |
+| **DB-Migrationen** | Migration **553** (`webauthn_passkey_citadel.sql`) | Migration **539** (`is_demo_tenant`) | 🚨 **DRIFT: 14 Migrationen fehlen** |
+| **DB-Tabellen** | `private_auth.webauthn_credentials`, `school_sepa_mandates`, `system_alerts` | Fehlen komplett auf `supabase-db` | 🚨 **CRITICAL: RPCs & Queries crashen** |
+| **BFF-Gateway** | Zod Ingress, Idempotency Ledger, Token Refresh Mutex | Docker-Container vor 7 Tagen eingefroren | ⚠️ **STALE: Backend-Logik veraltet** |
+| **Web-Ingress** | Nginx Document Root erwartet `/var/www/groovelab/current` | Docker cp in ephemeren Container ohne Host-Mount | ⚠️ **FRAGILE: Ephemerer Layer** |
+| **Agenten-Regel** | `commit und deploy` führt nur Git-Commit aus | `deploy.sh` wurde nie aufgerufen | 🚨 **PROCESS: Fehlende Pipeline-Kopplung** |
+
+---
+
+## 🎯 2. Der 0,1% Enterprise Goldstandard (Soll-Zustand)
+
+Ein weltklasse Deployment nach **OWASP ASVS Level 3**, **ISO/IEC 27001 (A.8.29)** und **BSI IT-Grundschutz (OPS.1.1.6)** erfordert einen geschlossenen Regelkreis (**Closed-Loop Deployment Engine**):
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│           0,1% ENTERPRISE CLOSED-LOOP DEPLOYMENT ENGINE                │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │
+  Phase 1: Pre-Flight Gate         ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  npm run gate && npm run verify:invariants && npm run typecheck     │
+  └────────────────────────────────┬────────────────────────────────────┘
+                                   │
+  Phase 2: DB Schema Reconciliation▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  Automatischer Migrations-Runner (scripts/apply_pending_migrations.sh)│
+  │  - Identifiziert ausstehende Migrationen (540 bis 553)             │
+  │  - Transaktionale, atomare Ausführung auf supabase-db               │
+  │  - PostgREST Schema-Reload: NOTIFY pgrst, 'reload schema'          │
+  │  - Schema-Paritäts-Beweis: 0 ausstehende Migrationen               │
+  └────────────────────────────────┬────────────────────────────────────┘
+                                   │
+  Phase 3: Production Build & Seal ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  npm run build:groovelab (Vite + SRI + Precompression + sw.js bump) │
+  │  Erzeugt versionsgebundenen Release-Hash in dist/version.json       │
+  └────────────────────────────────┬────────────────────────────────────┘
+                                   │
+  Phase 4: Atomarer Live-Sync      ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  rsync apps/groovelab/dist/ -> 178.105.10.2:/var/www/groovelab/... │
+  │  Atomarer Symlink-Switch current -> new_release                     │
+  │  Container-Sync & Web-Ingress Reload                                │
+  │  BFF-Container Restart bei Backend-Änderungen                       │
+  └────────────────────────────────┬────────────────────────────────────┘
+                                   │
+  Phase 5: Kryptografischer Beweis ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  - Curl https://campus-groovelab.de/version.json                    │
+  │  - KRYPTOGRAFISCHER HASH-ABGLEICH: Live-Version == Build-Version    │
+  │  - Perimeter Headers Check (Mozilla Observatory A+)                 │
+  │  - Git Tag v<timestamp> & Git Push                                  │
+  └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Weshalb das veraltet wirkt:
-1. **Kasten-im-Kasten-Effekt:** Das übergeordnete Widget [`TeacherHausaufgabenWidget.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/teacher/TeacherHausaufgabenWidget.tsx#L780-L790) ist bereits eine abgerundete Glassmorphism-Card. Darin wird eine zweite starre Box mit Rahmen gerendert (klassischer Win32-`GroupBox`-Effekt).
-2. **Bürokratisch-negatives Icon:** Das `CalendarOff`-Icon (durchgestrichener Kalender) suggeriert einen Systemfehler oder ein Verbot statt einer wohlverdienten Pause.
-3. **Ungenutzte Realdaten:** Das Widget empfängt bereits das berechnete Prop `nextDaySummary` (nächster Unterrichtstag, Terminanzahl, Uhrzeit, Raum). In `TagesKompassWrapUp.tsx` wird dies genutzt, in `UNTERRICHTSFREI` und `WOCHENENDE` jedoch komplett ignoriert.
+---
+
+## 🏗️ 3. Detaillierter Umsetzungsplan (Schritt für Schritt)
+
+### Schritt 1: Automatischer Migrations-Runner (`scripts/apply_pending_migrations.sh`)
+* Erstellung eines deterministischen, idempotenten Shell-Skripts:
+  * Liest alle nummerierten Migrationen (`supabase/migrations/[0-9]*.sql`) ein.
+  * Prüft auf dem Live-PostgreSQL (`supabase-db`), welche Migrationen bereits angewendet wurden.
+  * Führt die noch offenen Migrationen (540 bis 553) in korrekter Reihenfolge transaktionssicher aus.
+  * Sendet `NOTIFY pgrst, 'reload schema';`.
+  * Verifiziert die Existenz der neuen Tabellen (`private_auth.webauthn_credentials`, `school_sepa_mandates`, Spalte `sibling_group_id` etc.).
+
+### Schritt 2: Härtung von `deploy.sh`
+* **Entfernung veralteter Heuristiken:** Der starre Check auf `teacher_score_snippets` (Migration 537) wird durch den dynamischen Schema-Paritäts-Check ersetzt.
+* **Release-Hash Verifikation:** Nach dem Upload ruft `deploy.sh` `https://campus-groovelab.de/version.json` ab und vergleicht den Zeitstempel/Hash mit der lokalen `dist/version.json`. Bei Abweichung schlägt das Skript fail-closed mit Rollback fehl.
+* **BFF-Awareness:** Bei Änderungen in `packages/bff-server` wird der Container `groovelab-bff` neu gebaut bzw. neugestartet.
+
+### Schritt 3: Schärfung von `.agents/AGENTS.md` (Verbindliche Codewort-Doktrin)
+* Definition des Codeworts **`commit und deploy`**:
+  * Der Agent führt **nicht nur** `git commit` aus, sondern zwingend die gesamte Kette bis einschließlich `bash deploy.sh` und kryptografischer Live-Verifikation.
+  * Erst wenn `https://campus-groovelab.de/version.json` den identischen Hash liefert und der Perimeter-Check bestanden ist, darf der Agent Vollzug melden.
+
+### Schritt 4: Sofortige Live-Reconciliation (Ausführung)
+1. **Migrationen 540 bis 553** atomar auf `178.105.10.2` anwenden.
+2. **Neuen Produktions-Build** erstellen (inkl. der 7 unübertragenen Commits).
+3. **Live-Deployment** nach `178.105.10.2` ausführen.
+4. **Verifikation:** Live-Perimeter-Check und Hash-Validierung live auf `https://campus-groovelab.de`.
 
 ---
 
-## 🎯 2. Der 0,1% Goldstandard (Zielzustand)
-
-Statt einer sterilen grauen Box erhält der Screen die exakte Design-DNA von `TagesKompassPreflight` und `TagesKompassWrapUp`:
-
-1. **Nahtlose Container-Integration (Zero Box-in-Box):**  
-   Kein zweiter Kasten mit innerer Umrandung. Die Fläche atmet durch großzügigen Whitespace und harmonische Typografie.
-2. **Konsistenter Tages-Kompass Header:**  
-   * Links: Kompass-Icon im dezenten Container + Titel **Tages-Kompass** + Subline (*„Dein Überblick für heute“* / *„Wochenend-Pause“*).
-   * Rechts: Dezent gestyltes Status-Pill-Badge (*„Unterrichtsfrei“* / *„Wochenende“* / *„Ausfall aktiv“*).
-3. **Vorschau auf den nächsten Unterrichtstag (`nextDaySummary`):**  
-   Zeigt der Lehrkraft die reale Information für ihre Wochenplanung:
-   > 🗓️ **Nächster Unterricht: Montag, 14. Oktober**  
-   > *5 Einheiten ab 13:45 Uhr (Raum 4)*
-4. **Keine erfundenen Elemente:**  
-   Keine Phantom-Buttons, keine erfundenen Bibliotheken oder Schein-Aktionen. 100% real und an den echten Datenstrom gekoppelt.
-
----
-
-## 🏗️ 3. Architektur & Bounded Contexts
-
-Um die **Monolith-Ceiling-Regel** ([`AGENTS.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/.agents/AGENTS.md)) einzuhalten, wird [`TagesKompassHost.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/teacher/tageskompass/TagesKompassHost.tsx) nicht mit Inline-UI vergrößert.
-
-### Komponenten-Aufteilung:
-1. **Neuer Feature-Satellit:**  
-   `apps/groovelab/src/components/teacher/tageskompass/TagesKompassOffDayState.tsx`  
-   * Autarker, schlanker Monolith (~120 Zeilen).
-   * Kapselt die 3 Zustände: `UNTERRICHTSFREI`, `WOCHENENDE`, `ABWESENHEIT`.
-   * Unterstützt optionales `nextDaySummary`.
-2. **Orchestrator-Anpassung:**  
-   [`TagesKompassHost.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/teacher/tageskompass/TagesKompassHost.tsx) ersetzt die Zeilen 118–147 durch:
-   ```tsx
-   if (currentState === 'WOCHENENDE' || currentState === 'UNTERRICHTSFREI' || currentState === 'ABWESENHEIT') {
-     return (
-       <TagesKompassOffDayState
-         currentState={currentState}
-         teacher={teacher}
-         nextDaySummary={nextDaySummary}
-       />
-     );
-   }
-   ```
-3. **Export-Registrierung:**  
-   `apps/groovelab/src/components/teacher/tageskompass/index.ts` exportiert `TagesKompassOffDayState`.
-4. **Dokumentation:**  
-   Aktualisierung von `CAM-86` in [`docs/SYSTEM_FEATURE_MATRIX.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/docs/SYSTEM_FEATURE_MATRIX.md).
-
----
-
-## 🔒 4. Governance & Qualitätskriterien
-- **BFSG 2025 / WCAG 2.2 AA:** Kontrast $\ge 4.5:1$ auf allen Textelementen.
-- **Monolith Ceiling:** `TagesKompassHost.tsx` schrumpft sogar leicht (Netto-Reduktion um ~15 Zeilen). `TagesKompassOffDayState.tsx` bleibt weit unter 1.500 Zeilen (~120 Zeilen).
-- **TypeScript Strictness:** 100 % typisiert mit den bestehenden Typen aus `types.ts`.
-- **Zero-Bypass:** Keine Terminal-Ausführung vor Freigabe.
+## 🛑 Stopp-Punkt & Genehmigungsvorbehalt
+Gemäß der Monolith-Governance und Implementierungsplan-Richtlinie startet die Ausführung **erst nach deiner ausdrücklichen Freigabe** im Chat.

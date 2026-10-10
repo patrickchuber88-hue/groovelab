@@ -154,6 +154,26 @@ if (!fs.existsSync(parentConsentPath)) {
 }
 
 // -----------------------------------------------------------------------------
+// 8. AXIOM: SHARED-DEVICE KIOSK AUTO-SCRUB & 3-MINUTE IDLE LOCK (OWASP ASVS L3)
+// -----------------------------------------------------------------------------
+const deviceHookPath = path.join(SRC_DIR, 'hooks', 'useCampusDeviceAndParentControls.tsx');
+if (!fs.existsSync(deviceHookPath)) {
+  check('PAR-09: Device Controls Hook Exists', false, 'useCampusDeviceAndParentControls.tsx not found.');
+} else {
+  const deviceCode = fs.readFileSync(deviceHookPath, 'utf8');
+  const hasKioskTimeout = deviceCode.includes('isSharedKiosk') &&
+                          deviceCode.includes('3 * 60 * 1000');
+  const hasAutoScrub = deviceCode.includes('scrubSharedDeviceCache') &&
+                       deviceCode.includes('executeSessionZeroize');
+
+  check(
+    'PAR-09: OWASP ASVS L3 Shared-Device Kiosk 3-Minute Idle Lock & Auto-Scrubbing',
+    hasKioskTimeout && hasAutoScrub,
+    'useCampusDeviceAndParentControls fehlt das 3-Minuten-Timeout für Shared Kiosks oder das automatische Session-Zeroize & Cache-Scrubbing!'
+  );
+}
+
+// -----------------------------------------------------------------------------
 // SUMMARY
 // -----------------------------------------------------------------------------
 process.stdout.write('\n' + '─'.repeat(74) + '\n');

@@ -26,9 +26,9 @@ BEGIN
         RAISE EXCEPTION 'CHAT_CONTENT_NULL: Nachrichtentext darf nicht null sein.' USING ERRCODE = '23502';
     END IF;
 
-    -- Null-Byte Injection Defense
-    IF position(E'\x00' in NEW.content) > 0 THEN
-        RAISE EXCEPTION 'CHAT_CONTENT_NULL_BYTE: Ungültige Steuerzeichen im Nachrichtentext.' USING ERRCODE = '22021';
+    -- Non-printable control characters injection defense (PostgreSQL automatically rejects 0x00 at the protocol layer)
+    IF NEW.content ~ '[\x01-\x08\x0B\x0C\x0E-\x1F]' THEN
+        RAISE EXCEPTION 'CHAT_CONTENT_CONTROL_CHAR: Ungültige Steuerzeichen im Nachrichtentext.' USING ERRCODE = '22021';
     END IF;
 
     v_content_len := char_length(TRIM(NEW.content));

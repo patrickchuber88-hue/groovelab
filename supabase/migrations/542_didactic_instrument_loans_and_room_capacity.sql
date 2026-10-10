@@ -63,8 +63,8 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.instrument_loans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
-    student_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-    teacher_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    student_id UUID REFERENCES public.users_raw(id) ON DELETE SET NULL,
+    teacher_id UUID REFERENCES public.users_raw(id) ON DELETE SET NULL,
     instrument_name TEXT NOT NULL,
     inventory_number TEXT,
     serial_number TEXT,

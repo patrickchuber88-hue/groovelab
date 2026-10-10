@@ -52,28 +52,15 @@ node scripts/generate_cyclonedx_sbom.mjs || {
 }
 echo ""
 
-# 0b. Read-Only Database Schema Parity Preflight (Anti-Split-Brain Guard)
-echo "🔍 [PRE-FLIGHT] Verifiziere DB-Schema-Parität gegen Live-Cluster (Read-Only)..."
-LATEST_MIGRATION_FILE=$(ls -1 supabase/migrations/*.sql 2>/dev/null | sort -V | tail -n 1)
-LATEST_MIGRATION_NUM=$(basename "$LATEST_MIGRATION_FILE" | grep -oE '^[0-9]+' || echo "0")
-
-if [ "$LATEST_MIGRATION_NUM" -gt 0 ]; then
-  CHECK_TABLE="teacher_score_snippets"
-  REMOTE_CHECK=$(ssh "$SERVER" "if command -v docker >/dev/null 2>&1; then docker exec supabase-db psql -U postgres -d postgres -tAc \"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '$CHECK_TABLE');\" 2>/dev/null; else echo 'unknown'; fi" || echo "unknown")
-  
-  if [ "$REMOTE_CHECK" = "t" ]; then
-    echo "  ✓ DB-Schema-Parität verifiziert: Tabelle '$CHECK_TABLE' (Migration $LATEST_MIGRATION_NUM) ist aktiv."
-  elif [ "$REMOTE_CHECK" = "f" ]; then
-    echo "⚠️  [SCHEMA PARITY DRIFT DETECTED] Neueste Migration $LATEST_MIGRATION_NUM ('$CHECK_TABLE') ist auf der Live-DB noch nicht eingespielt!"
-    echo "    Gemäss Least-Privilege & Zero-Downtime Doktrin führt deploy.sh keine DDL-Befehle aus."
-    echo "    Bitte vor dem Release ausführen: bash scripts/apply_migrations_531_to_537.sh"
-    if [ "${REQUIRE_SCHEMA_PARITY:-0}" = "1" ]; then
-      echo "🚨 Deployment abgebrochen: REQUIRE_SCHEMA_PARITY=1 gesetzt."
-      exit 1
-    fi
-  else
-    echo "  ℹ️  DB-Schema-Paritäts-Check: Live-DB nicht direkt über Docker erreichbar oder Read-Only skipped."
-  fi
+# 0b. Authoritative Database Schema Migration & Parity Guard (0,1% Goldstandard)
+echo "🔍 [PRE-FLIGHT] Verifiziere & synchronisiere DB-Schema-Parität gegen Live-Cluster..."
+if [ "${SKIP_MIGRATIONS:-0}" = "1" ]; then
+  echo "⏩ Überspringe DB-Migrationen (SKIP_MIGRATIONS=1 gesetzt)..."
+else
+  bash scripts/apply_pending_migrations.sh || {
+    echo "🚨 KRITISCHER DEPLOY-ABBRUCH: DB-Schema-Migrationen fehlgeschlagen!"
+    exit 1
+  }
 fi
 echo ""
 
@@ -117,6 +104,7 @@ ssh "$SERVER" "ln -sfn '$TARGET_RELEASE' '$CURRENT_LINK'"
 
 # 5. Atomare Nginx-Aktualisierung (Zero-Downtime, 100% Reboot-resistent)
 echo "🚀 Validiere und aktualisiere Live-Webserver & Security Headers..."
+WEB_CONTAINER=$(ssh "$SERVER" "docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify\|groovelab-bff' | head -n 1" || true)
 ssh "$SERVER" "mkdir -p /tmp/nginx_sync"
 scp deploy/nginx/security-headers.conf deploy/nginx/campus-groovelab.de.conf deploy/nginx/supabase.campus-groovelab.de.conf apps/groovelab/public/nginx.default.conf "$SERVER:/tmp/nginx_sync/" || true
 ssh "$SERVER" "if command -v nginx >/dev/null 2>&1; then \
@@ -127,16 +115,13 @@ ssh "$SERVER" "if command -v nginx >/dev/null 2>&1; then \
   sudo ln -sf /etc/nginx/sites-available/campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
   sudo ln -sf /etc/nginx/sites-available/supabase.campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
   sudo nginx -t && sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress & Security Headers erfolgreich reloaded.'; \
-else \
-  WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify\|groovelab-bff' | head -n 1); \
-  if [ -n \"\$WEB_CONTAINER\" ]; then \
-    docker cp $TARGET_RELEASE/. \$WEB_CONTAINER:/usr/share/nginx/html/ 2>/dev/null || true; \
-    docker exec \$WEB_CONTAINER mkdir -p /etc/nginx/snippets 2>/dev/null || true; \
-    docker cp /tmp/nginx_sync/security-headers.conf \$WEB_CONTAINER:/etc/nginx/snippets/security-headers.conf 2>/dev/null || true; \
-    docker cp /tmp/nginx_sync/nginx.default.conf \$WEB_CONTAINER:/etc/nginx/conf.d/default.conf 2>/dev/null || true; \
-    docker exec \$WEB_CONTAINER nginx -t 2>/dev/null && docker exec \$WEB_CONTAINER nginx -s reload 2>/dev/null || true; \
-    echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) & Security Headers synchronisiert & reloaded.\"; \
-  fi; \
+elif [ -n \"$WEB_CONTAINER\" ]; then \
+  docker cp $TARGET_RELEASE/. $WEB_CONTAINER:/usr/share/nginx/html/ 2>/dev/null || true; \
+  docker exec $WEB_CONTAINER mkdir -p /etc/nginx/snippets 2>/dev/null || true; \
+  docker cp /tmp/nginx_sync/security-headers.conf $WEB_CONTAINER:/etc/nginx/snippets/security-headers.conf 2>/dev/null || true; \
+  docker cp /tmp/nginx_sync/nginx.default.conf $WEB_CONTAINER:/etc/nginx/conf.d/default.conf 2>/dev/null || true; \
+  docker exec $WEB_CONTAINER nginx -t 2>/dev/null && docker exec $WEB_CONTAINER nginx -s reload 2>/dev/null || true; \
+  echo \"  ✓ Live-Web-Container ($WEB_CONTAINER) & Security Headers synchronisiert & reloaded.\"; \
 fi" || rollback
 
 # 6. Retention: Bereinige alte Releases (hält die letzten 5 Releases vor)
@@ -146,9 +131,22 @@ ssh "$SERVER" "cd '$RELEASES_DIR' 2>/dev/null && ls -dt release_* 2>/dev/null | 
 # 7. Synchronisiere Enterprise Server-Skripte nach ~/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
 ssh "$SERVER" "mkdir -p ~/scripts"
-scp scripts/backup.sh scripts/post_restore_reconcile_tombstones.sh scripts/verify_backup_restore.sh scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh "$SERVER:~/scripts/" || true
+scp scripts/backup.sh scripts/post_restore_reconcile_tombstones.sh scripts/verify_backup_restore.sh scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh scripts/apply_pending_migrations.sh "$SERVER:~/scripts/" || true
 ssh "$SERVER" "chmod +x ~/scripts/*.sh 2>/dev/null || true; sudo mkdir -p /root/scripts 2>/dev/null && sudo cp ~/scripts/*.sh /root/scripts/ 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."
+
+# 7b. Groovelab BFF API Gateway Health Check & Reload
+BFF_CONTAINER=$(ssh "$SERVER" "docker ps --format '{{.Names}}' | grep '^groovelab-bff' | head -n 1" || true)
+if [ -n "$BFF_CONTAINER" ]; then
+  echo "🔄 Synchronisiere Groovelab BFF Gateway ($BFF_CONTAINER)..."
+  ssh "$SERVER" "docker restart '$BFF_CONTAINER' >/dev/null 2>&1 || true"
+  echo "  ⏳ Warte auf Socket-Bind des BFF Gateways..."
+  ssh "$SERVER" "for i in \$(seq 1 15); do \
+    STATUS=\$(docker exec \$WEB_CONTAINER curl -s -o /dev/null -w '%{http_code}' http://groovelab-bff:4000/gate/verify 2>/dev/null || echo '000'); \
+    if [ \"\$STATUS\" = '401' ] || [ \"\$STATUS\" = '200' ]; then echo '  ✓ BFF Gateway aktiv (Port 4000 gebunden).'; break; fi; \
+    sleep 1; \
+  done"
+fi
 
 # 8. Post-Deployment Smoke Test & Live Perimeter Guard (Zero-Trust)
 echo ""
@@ -169,7 +167,21 @@ node scripts/verify_perimeter_headers.mjs https://campus-groovelab.de || {
 }
 echo "  ✓ Live-Perimeter-Check erfolgreich: 100% Mozilla Observatory A+ Konformität aktiv."
 
+# 8b. Forensischer Live-Artifact Hash Check (Zero-Sampling Invariante)
+echo "🔒 [LIVE-HASH PARITÄT] Verifiziere SHA-256 Hash der Live-Assets gegen lokalen Build..."
+LOCAL_HASH=$(shasum -a 256 "$LOCAL_DIST/index.html" | cut -d ' ' -f 1)
+REMOTE_HASH=$(ssh "$SERVER" "if [ -n '$WEB_CONTAINER' ]; then docker exec '$WEB_CONTAINER' sha256sum /usr/share/nginx/html/index.html 2>/dev/null | cut -d ' ' -f 1; else sha256sum '$CURRENT_LINK/index.html' 2>/dev/null | cut -d ' ' -f 1; fi" || echo "remote_failed")
+
+if [ -z "$REMOTE_HASH" ] || [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+  echo "🚨 KRYPTOGRAFISCHE DISKREPANZ: Der SHA-256 Hash des Live-Servers weicht vom lokalen Build ab!"
+  echo "   Lokal:  $LOCAL_HASH"
+  echo "   Remote: $REMOTE_HASH"
+  rollback
+fi
+echo "  ✓ Live-Asset-Parität bestätigt (SHA-256: ${LOCAL_HASH:0:16}...)."
+
 echo ""
 echo "🎉 DEPLOYMENT ERFOLGREICH ABGESCHLOSSEN!"
 echo "   Aktives Release: $RELEASE_ID"
 echo "   Live-URL:        https://campus-groovelab.de"
+echo "   SHA-256 Siegel:  $LOCAL_HASH"

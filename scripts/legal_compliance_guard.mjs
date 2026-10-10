@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // =============================================================================
 // ⚖️  Campus-Groovelab Automated Legal & Compliance Guard [Compliance-as-Code]
-// Standard:  18 Säulen / 33 Checks: DIN EN 301 549 V3.2.1 / ISO/IEC 27001 Annex A.8 /
+// Standard:  18 Säulen / 34 Checks: DIN EN 301 549 V3.2.1 / ISO/IEC 27001 Annex A.8 /
 //            ISO/IEC 27701:2019/2025 (PIMS) / BFSG 2025 / WCAG 2.2 AA / DSGVO Art. 5, 8, 9, 15, 17, 25, 28, 32 /
 //            TDDDG § 25 / BGB §§ 312j, 312k / UrhG § 73 / UrhDaG § 1 Abs. 2 / KUG § 22 /
 //            § 8a SGB VIII / DSA Art. 16 / NIS-2 & § 202a StGB / Clean Wording /
@@ -29,7 +29,7 @@ let totalChecks = 0;
 
 const HR = '═'.repeat(74);
 process.stdout.write(`\n${HR}\n`);
-process.stdout.write('  ⚖️   Campus-Groovelab Legal & Regulatory Compliance Guard (18 Säulen / 33 Checks)\n');
+process.stdout.write('  ⚖️   Campus-Groovelab Legal & Regulatory Compliance Guard (18 Säulen / 34 Checks)\n');
 process.stdout.write('       Auditing DIN EN 301 549, ISO/IEC 27001, ISO/IEC 27701 (PIMS), BFSG 2025, DSGVO,\n');
 process.stdout.write('       BGB, UrhG, NIS-2, Herrenberg, EU AI Act, Schweizer revDSG & 360° Invariants SSOT\n');
 process.stdout.write(`${HR}\n\n`);
@@ -544,6 +544,25 @@ recordCheck(
   studentNeutral && teacherNeutral && foundHealthTokens.length === 0 
     ? 'Absagen erfolgen für Schüler ("canceled_by_student") und Lehrkräfte ("teacher_ausfall") vollkommen neutral ohne Gesundheitsdaten.'
     : `Verstoß gegen Art. 9 DSGVO / § 26 BDSG: Gesundheitsmerkmale (${foundHealthTokens.join(', ')}) oder fehlender neutraler Status.`
+);
+
+// LEG-14b: DSGVO Art. 9 Abs. 1 & BDSG § 26 Chat Health & Diagnosis Data Guard
+const chatRespectGuardFile = path.join(SRC_DIR, 'utils', 'chatRespectGuard.ts');
+const medicalTermGuardFile = path.join(SRC_DIR, 'utils', 'medicalTermGuard.ts');
+let chatHealthShieldActive = false;
+
+if (fs.existsSync(chatRespectGuardFile) && fs.existsSync(medicalTermGuardFile)) {
+  const respectSrc = fs.readFileSync(chatRespectGuardFile, 'utf8');
+  chatHealthShieldActive = respectSrc.includes('detectHealthDataTerms') &&
+                           respectSrc.includes("category: 'health_data'");
+}
+
+recordCheck(
+  'LEG-14b: DSGVO Art. 9 Abs. 1 Chat Health & Diagnosis Shield (Zero Freitext-Diagnosedaten)',
+  chatHealthShieldActive,
+  chatHealthShieldActive
+    ? 'chatRespectGuard integriert detectHealthDataTerms und fängt medizinische Signalwörter vor Speicherung ab.'
+    : 'Verstoß gegen Art. 9 DSGVO: chatRespectGuard fehlt die Integration des detectHealthDataTerms Schutzschilds.'
 );
 
 // =============================================================================

@@ -98,8 +98,30 @@ export async function resolveAuthUser(req: Request): Promise<AuthUserData | null
     }
 
     const user = userData.user;
-    const role = user.user_metadata?.role || user.app_metadata?.role || 'student';
-    const schoolId = user.user_metadata?.school_id || user.app_metadata?.school_id || null;
+    let role = user.user_metadata?.role || user.app_metadata?.role || 'student';
+    let schoolId = user.user_metadata?.school_id || user.app_metadata?.school_id || null;
+
+    // 🛡️ Authoritative DB Resolution Fallback:
+    // If schoolId is missing from JWT metadata, fetch authoritatively from public.users_raw
+    if (!schoolId) {
+      try {
+        const serviceClient = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey, {
+          auth: { persistSession: false }
+        });
+        const { data: dbUser } = await serviceClient
+          .from('users_raw')
+          .select('school_id, role, is_master_admin')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (dbUser) {
+          schoolId = dbUser.school_id || schoolId;
+          role = dbUser.is_master_admin ? 'master_admin' : (dbUser.role || role);
+        }
+      } catch (dbErr) {
+        console.warn('[BFF Storage Auth] Authoritative users_raw resolution fallback notice:', dbErr);
+      }
+    }
 
     return { accessToken, user, role, schoolId };
   } catch {
@@ -107,12 +129,16 @@ export async function resolveAuthUser(req: Request): Promise<AuthUserData | null
   }
 }
 
+export type StorageAction = 'read' | 'write' | 'delete';
+
 /**
  * Validates path traversal and BOLA/IDOR permissions against authenticated user identity.
+ * Standards: OWASP ASVS Level 3 V4/V8, DIN EN ISO/IEC 27001 (A.8.20/A.8.24), DSGVO Art. 8 & 17
  */
 export function validatePathAccess(
   filePath: string,
-  authData: AuthUserData
+  authData: AuthUserData,
+  action: StorageAction = 'read'
 ): { allowed: boolean; reason?: string } {
   // 1. Strict Path Traversal Prevention
   if (filePath.includes('..') || filePath.includes('\\') || filePath.includes('//')) {
@@ -126,24 +152,62 @@ export function validatePathAccess(
 
   // Canonical Hierarchies:
   // schools/<schoolId>/students/<studentId>/<context>/<filename>
+  // schools/<schoolId>/teachers/<teacherId>/<context>/<filename>
   // schools/<schoolId>/<context>/<filename>
-  // <context>/<filename>
   const segments = filePath.split('/').filter(Boolean);
 
-  if (segments[0] === 'schools') {
-    const targetSchoolId = segments[1];
-    // School staff/admin/teacher/student must match targetSchoolId if schoolId is known
-    if (authData.schoolId && targetSchoolId && authData.schoolId !== targetSchoolId) {
-      return { allowed: false, reason: 'MULTI_TENANT_VIOLATION' };
+  // 🛡️ Fail-Closed Default-Deny: Path MUST start with 'schools' and have valid hierarchy
+  if (segments[0] !== 'schools' || segments.length < 3) {
+    return { allowed: false, reason: 'UNSCOPED_STORAGE_PATH_DENIED' };
+  }
+
+  const targetSchoolId = segments[1];
+  // Strict Multi-Tenant Isolation: School staff/admin/teacher/student must match targetSchoolId
+  if (!authData.schoolId || authData.schoolId !== targetSchoolId) {
+    return { allowed: false, reason: 'MULTI_TENANT_VIOLATION' };
+  }
+
+  // ── Student Sub-Path Governance ──
+  if (segments[2] === 'students') {
+    if (segments.length < 5) {
+      return { allowed: false, reason: 'MALFORMED_STUDENT_PATH' };
+    }
+    const targetStudentId = segments[3];
+
+    // If student caller, they can ONLY access their own student folder
+    if (authData.role === 'student' && authData.user.id !== targetStudentId) {
+      return { allowed: false, reason: 'STUDENT_BOLA_VIOLATION' };
     }
 
-    if (segments[2] === 'students') {
-      const targetStudentId = segments[3];
-      // If student caller, they can ONLY access their own student folder
-      if (authData.role === 'student' && authData.user.id !== targetStudentId) {
-        return { allowed: false, reason: 'STUDENT_BOLA_VIOLATION' };
-      }
+    // Teachers, Admins, and the student themselves have legitimate access
+    return { allowed: true };
+  }
+
+  // ── Teacher Sub-Path Governance ──
+  if (segments[2] === 'teachers') {
+    if (segments.length < 5) {
+      return { allowed: false, reason: 'MALFORMED_TEACHER_PATH' };
     }
+    const targetTeacherId = segments[3];
+
+    // Students are strictly blocked from teacher-private folders
+    if (authData.role === 'student') {
+      return { allowed: false, reason: 'STUDENT_ACCESS_TO_TEACHER_DENIED' };
+    }
+
+    // Teachers can only access their own teacher folder
+    if (authData.role === 'teacher' && authData.user.id !== targetTeacherId) {
+      return { allowed: false, reason: 'TEACHER_BOLA_VIOLATION' };
+    }
+
+    // Admins and owning teacher have access
+    return { allowed: true };
+  }
+
+  // ── School-Wide Media & Context Sub-Path Governance (e.g. schools/<schoolId>/audio/...) ──
+  // Students are NEVER allowed to delete school-wide shared media
+  if (action === 'delete' && authData.role === 'student') {
+    return { allowed: false, reason: 'STUDENT_DELETE_SCHOOL_ASSET_DENIED' };
   }
 
   return { allowed: true };
@@ -153,6 +217,8 @@ export function validatePathAccess(
 interface CachedStreamLease {
   signedUrl: string;
   expiresAt: number;
+  userId?: string;
+  schoolId?: string;
 }
 const streamLeaseCache = new Map<string, CachedStreamLease>();
 const MAX_STREAM_CACHE_ENTRIES = 5000;
@@ -167,19 +233,35 @@ export function getCachedStreamUrl(cacheKey: string): string | null {
   return null;
 }
 
-export function setCachedStreamUrl(cacheKey: string, signedUrl: string, ttlSeconds: number): void {
+export function setCachedStreamUrl(
+  cacheKey: string,
+  signedUrl: string,
+  ttlSeconds: number,
+  userId?: string,
+  schoolId?: string
+): void {
   if (streamLeaseCache.size >= MAX_STREAM_CACHE_ENTRIES) {
     const oldestKey = streamLeaseCache.keys().next().value;
     if (oldestKey) streamLeaseCache.delete(oldestKey);
   }
   streamLeaseCache.set(cacheKey, {
     signedUrl,
-    expiresAt: Date.now() + ttlSeconds * 1000
+    expiresAt: Date.now() + ttlSeconds * 1000,
+    userId,
+    schoolId
   });
 }
 
 export function invalidateStreamLease(cacheKey: string): void {
   streamLeaseCache.delete(cacheKey);
+}
+
+export function invalidateUserStreamLeases(userId: string): void {
+  for (const [key, lease] of streamLeaseCache.entries()) {
+    if (lease.userId === userId) {
+      streamLeaseCache.delete(key);
+    }
+  }
 }
 
 /**
@@ -415,7 +497,7 @@ router.post('/presign-stream', validateBody(presignStreamSchema), async (req: Re
       });
     }
 
-    setCachedStreamUrl(cacheKey, signedData.signedUrl, expiresInSeconds);
+    setCachedStreamUrl(cacheKey, signedData.signedUrl, expiresInSeconds, authData.user.id, authData.schoolId || undefined);
 
     return res.status(200).json({
       success: true,
@@ -517,12 +599,16 @@ router.post('/delete-assets', validateBody(deleteAssetsSchema), async (req: Requ
     const rejectedPaths: string[] = [];
 
     for (const p of filePaths) {
-      const check = validatePathAccess(p, authData);
+      const check = validatePathAccess(p, authData, 'delete');
       if (check.allowed) {
         authorizedPaths.push(p);
       } else {
         rejectedPaths.push(p);
       }
+    }
+
+    if (rejectedPaths.length > 0) {
+      console.warn(`🚨 [BFF Storage BOLA Warning] User ${authData.user.id} (${authData.role}) attempted unauthorized deletion of ${rejectedPaths.length} assets:`, rejectedPaths);
     }
 
     if (authorizedPaths.length === 0) {

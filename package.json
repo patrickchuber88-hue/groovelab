@@ -75,6 +75,8 @@
     "operator:weekly": "npx tsx scripts/export_weekly_resilience_dossier.ts",
     "operator:monthly": "npx tsx scripts/export_monthly_governance_dossier.ts",
     "operator:annual": "npx tsx scripts/export_annual_governance_dossier.ts",
+    "deploy": "bash deploy.sh",
+    "deploy:db": "bash scripts/apply_pending_migrations.sh",
     "operator:post-deploy": "npm run verify:perimeter",
     "verify:enterprise": "npm run gate && npm run test:pyramid && npm run test:forensics:all && npm run check:budget",
     "verify:headers:static": "node scripts/verify_static_security_headers.mjs",

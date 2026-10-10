@@ -22,6 +22,7 @@ import {
   getCachedStreamUrl,
   setCachedStreamUrl,
   invalidateStreamLease,
+  invalidateUserStreamLeases,
   AuthUserData
 } from '../../packages/bff-server/src/routes/storage';
 
@@ -195,6 +196,43 @@ async function runStorageEgressGovernanceSuite() {
   const traversalCheck = validatePathAccess('schools/school-alpha/../../secrets.env', teacherAlpha);
   assert('validatePathAccess fängt Path Traversal sicher ab', !traversalCheck.allowed && traversalCheck.reason === 'PATH_TRAVERSAL_DETECTED');
 
+  // Unscoped / flat storage path rejection (Fail-Closed Default-Deny)
+  const unscopedPath1 = validatePathAccess('recordings/take1.webm', studentA);
+  assert('Unscopte Pfade ohne schools/ Prefix werden abgewiesen', !unscopedPath1.allowed && unscopedPath1.reason === 'UNSCOPED_STORAGE_PATH_DENIED');
+
+  const unscopedPath2 = validatePathAccess('schools/school-alpha', studentA);
+  assert('Unvollständige Pfade < 3 Segmente werden abgewiesen', !unscopedPath2.allowed && unscopedPath2.reason === 'UNSCOPED_STORAGE_PATH_DENIED');
+
+  // Student blocked from teacher-private folders
+  const studentToTeacher = validatePathAccess('schools/school-alpha/teachers/usr-teacher-alpha/audio/exercise.mp3', studentA);
+  assert('Schüler wird bei Lehrer-Ordnern strikt blockiert', !studentToTeacher.allowed && studentToTeacher.reason === 'STUDENT_ACCESS_TO_TEACHER_DENIED');
+
+  // Teacher accessing peer teacher folder (Teacher BOLA Isolation)
+  const teacherAlpha2: AuthUserData = {
+    accessToken: 'mock_token_teacher_beta',
+    user: { id: 'usr-teacher-beta' },
+    role: 'teacher',
+    schoolId: 'school-alpha'
+  };
+  const teacherBola = validatePathAccess('schools/school-alpha/teachers/usr-teacher-beta/audio/private.mp3', teacherAlpha);
+  assert('Lehrkraft wird bei fremdem Lehrer-Ordner blockiert (Teacher BOLA)', !teacherBola.allowed && teacherBola.reason === 'TEACHER_BOLA_VIOLATION');
+
+  const teacherOwnFolder = validatePathAccess('schools/school-alpha/teachers/usr-teacher-alpha/audio/private.mp3', teacherAlpha);
+  assert('Lehrkraft darf auf eigenen Lehrer-Ordner zugreifen', teacherOwnFolder.allowed);
+
+  // Action-Aware Delete Governance (Students cannot delete shared school assets)
+  const studentDeleteSchoolAsset = validatePathAccess('schools/school-alpha/audio/school_song.mp3', studentA, 'delete');
+  assert('Schüler darf allgemeine Schul-Assets nicht löschen', !studentDeleteSchoolAsset.allowed && studentDeleteSchoolAsset.reason === 'STUDENT_DELETE_SCHOOL_ASSET_DENIED');
+
+  const studentReadSchoolAsset = validatePathAccess('schools/school-alpha/audio/school_song.mp3', studentA, 'read');
+  assert('Schüler darf allgemeine Schul-Assets anhören (Read)', studentReadSchoolAsset.allowed);
+
+  const studentDeleteOwnAsset = validatePathAccess('schools/school-alpha/students/usr-student-a/audio/take1.webm', studentA, 'delete');
+  assert('Schüler darf eigene Aufnahmen löschen', studentDeleteOwnAsset.allowed);
+
+  const teacherDeleteSchoolAsset = validatePathAccess('schools/school-alpha/audio/school_song.mp3', teacherAlpha, 'delete');
+  assert('Lehrkraft darf Schul-Assets löschen', teacherDeleteSchoolAsset.allowed);
+
   // ----------------------------------------------------------------------------
   // 3. IN-MEMORY LRU CACHE DYNAMICS & LEASE EXPIRATION
   // ----------------------------------------------------------------------------
@@ -213,6 +251,18 @@ async function runStorageEgressGovernanceSuite() {
   // Invalidate on delete
   invalidateStreamLease(cacheKey);
   assert('Cache-Eintrag wird nach Löschung sofort invalidiert', getCachedStreamUrl(cacheKey) === null);
+
+  // User-scoped cache invalidation (GDPR Art. 17 / Logout)
+  const u1Key = 'campus-assets:schools/s-1/students/u1/rec.webm';
+  const u2Key = 'campus-assets:schools/s-1/students/u2/rec.webm';
+  setCachedStreamUrl(u1Key, 'https://storage/u1.webm', 1800, 'u1', 's-1');
+  setCachedStreamUrl(u2Key, 'https://storage/u2.webm', 1800, 'u2', 's-1');
+  assert('User 1 Cache initial vorhanden', getCachedStreamUrl(u1Key) === 'https://storage/u1.webm');
+  assert('User 2 Cache initial vorhanden', getCachedStreamUrl(u2Key) === 'https://storage/u2.webm');
+
+  invalidateUserStreamLeases('u1');
+  assert('User 1 Cache nach User-Invalidierung gelöscht', getCachedStreamUrl(u1Key) === null);
+  assert('User 2 Cache bleibt unberührt aktiv', getCachedStreamUrl(u2Key) === 'https://storage/u2.webm');
 
   // ----------------------------------------------------------------------------
   // 4. BFF STORAGE ROUTE AST & ZERO-HEAP INVARIANT AUDIT
@@ -245,7 +295,18 @@ async function runStorageEgressGovernanceSuite() {
   assert(
     'BOLA Gatekeeper: validatePathAccess wird auf Egress- und Purge-Routen angewendet',
     storageContent.includes('validatePathAccess(filePath, authData)') &&
-    storageContent.includes('validatePathAccess(p, authData)')
+    storageContent.includes("validatePathAccess(p, authData, 'delete')")
+  );
+
+  assert(
+    'Authoritative DB Resolution Fallback: resolveAuthUser fragt users_raw bei fehlendem school_id ab',
+    storageContent.includes("from('users_raw')") &&
+    storageContent.includes("select('school_id, role, is_master_admin')")
+  );
+
+  assert(
+    'GDPR Purge & User Invalidation: invalidateUserStreamLeases ist implementiert',
+    storageContent.includes('export function invalidateUserStreamLeases(')
   );
 
   assert(
