@@ -762,18 +762,11 @@ export function useSecretarySettings({
           console.warn('Rollback backup failed, proceeding anyway:', rollBackErr);
         }
 
-        // Delete all current stations explicitly first, then delete rooms
-        await supabase.from('stations').delete().in('room_id', (await supabase.from('rooms').select('id').eq('school_id', schoolId)).data?.map((r: any) => r.id) || []);
-        await supabase.from('band_members').delete().in('band_id', (await supabase.from('bands').select('id').eq('school_id', schoolId)).data?.map((b: any) => b.id) || []);
-        await supabase.from('bands').delete().eq('school_id', schoolId);
-        await supabase.from('schedules').delete().eq('school_id', schoolId);
-        const restoreStudentIds = (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || [];
-        await supabase.from('student_first_names').delete().in('student_id', restoreStudentIds);
-        await supabase.from('student_last_names').delete().in('student_id', restoreStudentIds);
-        await supabase.from('activation_days').delete().in('student_id', restoreStudentIds);
-        await supabase.from('students').delete().eq('school_id', schoolId);
-        await supabase.from('rooms').delete().eq('school_id', schoolId);
-        await supabase.from('users').delete().eq('school_id', schoolId).neq('id', userId);
+        // Encapsulated server-side cascade purge (OWASP ASVS L3 / Fail-Closed)
+        const { error: purgeError } = await supabase.rpc('purge_school_test_data', {
+          p_school_id: schoolId
+        });
+        if (purgeError) throw purgeError;
 
         if (backupData.school) {
           const { id, created_at, ...schoolSettings } = backupData.school;

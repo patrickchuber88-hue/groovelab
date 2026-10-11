@@ -32,7 +32,7 @@ process.stdout.write('       Scanning for architectural regressions & invariant 
 process.stdout.write(`${HR}\n\n`);
 
 // =============================================================================
-// PATTERN REGISTRY — 14 OWASP ASVS L3 & Architecture Invariants
+// PATTERN REGISTRY — 25 OWASP ASVS L3 & Architecture Invariants
 // =============================================================================
 const FORBIDDEN_FRONTEND_PATTERNS = [
   {
@@ -216,6 +216,66 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'HIGH',
     description: 'DSGVO Art. 32 Compliance: Audio records must be encrypted with encryptOfflineBlob before persistence to IndexedDB (use recordToPersist).',
     allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-23',
+    name:        'Client-Side Birthdate or Partial PIN Comparison Guard (FE-19)',
+    regex:       /(?:(?:studentBirthDay|birthDay|dayOfBirth|day_of_birth)\b\s*(?:===?|!==?)|(?:===?|!==?)\s*(?:[a-zA-Z0-9_]+\.)*(?:studentBirthDay|birthDay|dayOfBirth|day_of_birth)\b|parseInt\([^)]*pin[^)]*\)\s*(?:===?|!==?)|(?:===?|!==?)\s*parseInt\([^)]*pin[^)]*\))/gi,
+    severity:    'CRITICAL',
+    description: 'PIN or birthdate verification must NEVER happen in client-side JavaScript. Use the authoritative verify_personal_pin RPC.',
+    allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-24',
+    name:        'Realtime Multi-Tenant CDC Filter Invariant (FE-20)',
+    regex:       /\.on\(\s*['"]postgres_changes['"]\s*,\s*\{[\s\S]*?table:\s*['"](?:campus_direct_messages|campus_message_reactions|campus_chat_channel_reads|campus_chat_group_members)['"]/g,
+    severity:    'HIGH',
+    description: 'Subscriptions on sensitive chat and reaction tables must specify a tenant filter (e.g. filter: `school_id=eq.${schoolId}`).',
+    allowedFiles: [
+      'src/tests/',
+      'src/components/ScheduleCalendarView',
+      'src/components/CampusEventsBoard.tsx',
+      'src/components/CampusAppointmentShoutboxModal.tsx',
+      'src/components/QRLandingPage.tsx',
+      'src/components/teacher/hooks/useTeacherTagesplan.ts'
+    ],
+    isViolation: (content) => {
+      const sensitiveTables = [
+        'campus_direct_messages',
+        'campus_message_reactions',
+        'campus_chat_channel_reads',
+        'campus_chat_group_members'
+      ];
+      const startRegex = /\.on\(\s*['"]postgres_changes['"]\s*,\s*\{/g;
+      let match;
+      while ((match = startRegex.exec(content)) !== null) {
+        const braceStart = match.index + match[0].length - 1;
+        const extracted = extractBalancedBraces(content, braceStart);
+        if (!extracted) continue;
+        const block = extracted.content;
+        const targetsSensitiveTable = sensitiveTables.some(t => block.includes(`'${t}'`) || block.includes(`"${t}"`));
+        if (targetsSensitiveTable) {
+          const hasTenantFilter = block.includes('school_id') || block.includes('user_id');
+          if (!hasTenantFilter) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+  },
+  {
+    id:          'FE-25',
+    name:        'Direct Client Bulk Delete on Core Tables (FE-21)',
+    regex:       /\.from\(\s*['"](?:stations|bands|schedules|students|rooms)['"]\s*\)[^;]*?(?:\.delete\([^)]*\)[^;]*?\.eq\(\s*['"]school_id['"]|\.eq\(\s*['"]school_id['"][^;]*?\.delete\([^)]*\))/g,
+    severity:    'HIGH',
+    description: 'Cascade deletions of school inventory must use the authoritative purge_school_test_data RPC instead of direct client-side .delete() chains.',
+    allowedFiles: [
+      'src/tests/',
+      'src/components/masterAdmin/',
+      'src/components/ScheduleBoardDesktop.tsx',
+      'src/components/secretary/hooks/useSecretarySchedules.ts'
+    ]
   }
 ];
 
@@ -238,6 +298,112 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
     }
   }
   return results;
+}
+
+function extractBalancedBraces(str, startIndex) {
+  let depth = 0;
+  let inQuote = false;
+  let quoteChar = '';
+  let start = -1;
+  for (let i = startIndex; i < str.length; i++) {
+    const ch = str[i];
+    if (inQuote) {
+      if (ch === '\\') {
+        i++; // skip escaped character in JS
+      } else if (ch === quoteChar) {
+        inQuote = false;
+      }
+    } else if (ch === "'" || ch === '"' || ch === '`') {
+      inQuote = true;
+      quoteChar = ch;
+    } else if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return { content: str.substring(start, i + 1), endIndex: i + 1 };
+      }
+    }
+  }
+  return null;
+}
+
+function extractBalancedParentheses(str, startIndex) {
+  let depth = 0;
+  let inQuote = false;
+  let quoteChar = '';
+  let start = -1;
+  for (let i = startIndex; i < str.length; i++) {
+    const ch = str[i];
+    if (inQuote) {
+      if (ch === '\\') {
+        i++; // skip backslash-escaped character
+      } else if (ch === quoteChar) {
+        if (i + 1 < str.length && str[i + 1] === quoteChar) {
+          i++; // skip SQL doubled quote ''
+        } else {
+          inQuote = false;
+        }
+      }
+    } else if (ch === "'" || ch === '"') {
+      inQuote = true;
+      quoteChar = ch;
+    } else if (ch === '(') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+      if (depth === 0) {
+        return { content: str.substring(start + 1, i), endIndex: i + 1 };
+      }
+    }
+  }
+  return null;
+}
+
+function splitSqlList(str) {
+  const tokens = [];
+  let current = '';
+  let depth = 0;
+  let inQuote = false;
+  let quoteChar = '';
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (inQuote) {
+      current += ch;
+      if (ch === '\\') {
+        if (i + 1 < str.length) {
+          current += str[++i];
+        }
+      } else if (ch === quoteChar) {
+        if (i + 1 < str.length && str[i + 1] === quoteChar) {
+          current += str[++i];
+        } else {
+          inQuote = false;
+        }
+      }
+    } else if (ch === "'" || ch === '"') {
+      inQuote = true;
+      quoteChar = ch;
+      current += ch;
+    } else if (ch === '(' || ch === '[' || ch === '{') {
+      depth++;
+      current += ch;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+      current += ch;
+    } else if (ch === ',' && depth === 0) {
+      tokens.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) {
+    tokens.push(current.trim());
+  }
+  return tokens;
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
@@ -410,7 +576,9 @@ for (const filePath of migrationFiles) {
           'authenticate_by_credential',
           'authenticate_webauthn_credential',
           'generate_webauthn_challenge',
-          'get_public_school_theme'
+          'get_public_school_theme',
+          'verify_personal_pin',
+          'register_school_and_admin'
         ].includes(funcName);
 
         if (isLoginOrChallengeExempt) continue;
@@ -444,6 +612,83 @@ for (const filePath of migrationFiles) {
         process.stderr.write(`       File: ${relPath}\n`);
         process.stderr.write(`       Match: "${pinMatch[0]}"\n`);
         process.stderr.write(`       Details: Migrations >= 540 must strictly eliminate plaintext PIN comparison fallbacks and direct equality/inequality comparisons on personal_pin or parent_pin against parameters. PIN verifications must use verify_personal_pin or verify_parent_pin RPCs.\n`);
+        violationsCount++;
+      }
+    }
+
+    // 1% Invariant SQL-09: Forbidden Primary-Key Match in Credential-Lookup RPCs (Migrations >= 555)
+    if (migNum >= 555 && content.includes('authenticate_by_credential')) {
+      const pkMatchRegex = /\b(?:[a-zA-Z0-9_]+\.)?id(?:::uuid|::text)?\s*=\s*(?:v_clean|p_credential)(?:::uuid|::text)?\b|\b(?:v_clean|p_credential)(?:::uuid|::text)?\s*=\s*(?:[a-zA-Z0-9_]+\.)?id(?:::uuid|::text)?\b/i;
+      
+      const funcRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?authenticate_by_credential\b[\s\S]*?AS\s+(\$([a-zA-Z0-9_]*)\$)([\s\S]*?)\1\s*(?:[a-zA-Z0-9_\s=,']*);/gi;
+      let funcMatch;
+      let checkedBody = false;
+      while ((funcMatch = funcRegex.exec(content)) !== null) {
+        checkedBody = true;
+        const funcBody = funcMatch[3];
+        const pkMatch = funcBody.match(pkMatchRegex);
+        if (pkMatch) {
+          process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Forbidden Primary-Key Match in authenticate_by_credential in Migration ${baseName}\n`);
+          process.stderr.write(`       File: ${relPath}\n`);
+          process.stderr.write(`       Match: "${pkMatch[0]}"\n`);
+          process.stderr.write(`       Details: authenticate_by_credential must NEVER match on primary key 'id = v_clean::uuid'. Credentials must strictly match qr_token, teacher_qr_token, or ausweis_nummer.\n`);
+          violationsCount++;
+        }
+      }
+
+      if (!checkedBody) {
+        const pkMatch = content.match(pkMatchRegex);
+        if (pkMatch) {
+          process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Forbidden Primary-Key Match in authenticate_by_credential in Migration ${baseName}\n`);
+          process.stderr.write(`       File: ${relPath}\n`);
+          process.stderr.write(`       Match: "${pkMatch[0]}"\n`);
+          process.stderr.write(`       Details: authenticate_by_credential must NEVER match on primary key 'id = v_clean::uuid'. Credentials must strictly match qr_token, teacher_qr_token, or ausweis_nummer.\n`);
+          violationsCount++;
+        }
+      }
+    }
+
+    // 1% Invariant SQL-10: Strict Non-Plaintext Password Hash in Users Raw (Migrations >= 555)
+    if (migNum >= 555 && content.includes('users_raw')) {
+      const insertStartRegex = /INSERT\s+INTO\s+(?:public\.)?users_raw\s*\(/gi;
+      let insertMatch;
+      while ((insertMatch = insertStartRegex.exec(content)) !== null) {
+        const colStart = insertMatch.index + insertMatch[0].length - 1;
+        const colExtract = extractBalancedParentheses(content, colStart);
+        if (!colExtract) continue;
+
+        const columns = splitSqlList(colExtract.content).map(c => c.toLowerCase().trim().replace(/^["']|["']$/g, ''));
+        const pwdHashIdx = columns.indexOf('password_hash');
+        if (pwdHashIdx === -1) continue;
+
+        const afterCols = content.substring(colExtract.endIndex);
+        const valuesMatch = afterCols.match(/VALUES\s*\(/i);
+        if (!valuesMatch || valuesMatch.index === undefined) continue;
+
+        const valStart = colExtract.endIndex + valuesMatch.index + valuesMatch[0].length - 1;
+        const valExtract = extractBalancedParentheses(content, valStart);
+        if (!valExtract) continue;
+
+        const values = splitSqlList(valExtract.content);
+        if (values.length > pwdHashIdx) {
+          const pwdValue = values[pwdHashIdx];
+          const isPlaintextPin = /\b(?:v_generated_pin|v_clean_pin|input_pin|v_pin|p_pin)\b/i.test(pwdValue);
+          if (isPlaintextPin) {
+            process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Plaintext PIN assigned to password_hash in Migration ${baseName}\n`);
+            process.stderr.write(`       File: ${relPath}\n`);
+            process.stderr.write(`       Assigned Value: "${pwdValue}"\n`);
+            process.stderr.write(`       Details: password_hash in users_raw must be NULL or a cryptographic hash. Initial PINs must be hashed via extensions.crypt() into private_auth.user_secrets.\n`);
+            violationsCount++;
+          }
+        }
+      }
+
+      const updateMatch = content.match(/\bpassword_hash\s*=\s*(?:v_generated_pin|v_clean_pin|input_pin|v_pin|p_pin)\b/i);
+      if (updateMatch) {
+        process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Plaintext PIN assigned to password_hash via UPDATE in Migration ${baseName}\n`);
+        process.stderr.write(`       File: ${relPath}\n`);
+        process.stderr.write(`       Match: "${updateMatch[0]}"\n`);
+        process.stderr.write(`       Details: password_hash in users_raw must be NULL or a cryptographic hash.\n`);
         violationsCount++;
       }
     }

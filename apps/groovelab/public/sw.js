@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1791615956221';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1791615956221';
+const CACHE_NAME = 'groovelab-static-v1791734705542';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1791734705542';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -47,6 +47,10 @@ function limitCacheSize(cacheName, maxItems) {
 }
 
 self.addEventListener('install', function(event) {
+  // 🛡️ 0,1% Enterprise Goldstandard: Auto-activate new Service Worker immediately
+  // Eliminates stale PWA worker locking!
+  self.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
       return cache.addAll(ASSETS_TO_CACHE);

@@ -9,7 +9,12 @@ import {
   useAuthoritativeHomeworkPlan, AuthoritativeHomeworkPlan, UseAuthoritativeHomeworkPlanParams
 } from '../hooks/useAuthoritativeHomeworkPlan';
 import { useAuthoritativeHomeworkOptional } from '../context/AuthoritativeHomeworkContext';
-import { isWeeklySnapshotContainer, formatConsecutivePageRanges } from '../tabs/briefing/homeworkSummaryHelper';
+import {
+  isWeeklySnapshotContainer,
+  formatConsecutivePageRanges,
+  extractCanonicalAudioStoragePath,
+  isMetadataOrSnapshotNote
+} from '../tabs/briefing/homeworkSummaryHelper';
 import { getSongColor } from '../studentDateUtils';
 import { StudentHomeworkStatusButton } from './StudentHomeworkStatusButton';
 import { MicroScoreSnippetButton } from '../meisterwerk/microscore/MicroScoreSnippetButton';
@@ -85,7 +90,14 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
     !isWeeklySnapshotContainer(s.title) &&
     !isWeeklySnapshotContainer(s.artist)
   );
-  const effectiveHasActiveHomework = hasActiveHomework && (books.length > 0 || safeSongs.length > 0 || generalNotes.length > 0 || (microScores && microScores.length > 0));
+  const safeGeneralNotes = (generalNotes || []).filter(n =>
+    typeof n === 'string' &&
+    !isMetadataOrSnapshotNote(n) &&
+    !isWeeklySnapshotContainer(n) &&
+    !n.startsWith('Seite ') &&
+    n.trim().length > 1
+  );
+  const effectiveHasActiveHomework = hasActiveHomework && (books.length > 0 || safeSongs.length > 0 || safeGeneralNotes.length > 0 || (microScores && microScores.length > 0));
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -139,10 +151,20 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
     return () => window.removeEventListener('campus-audio-dismissed', handleDismissed);
   }, []);
 
-  const activeAudioTracks = (audioTracks || []).filter(t => {
-    const clean = (t.url || '').replace(/^["']|["']$/g, '').trim();
-    return clean && !dismissedUrls.has(clean);
-  });
+  const activeAudioTracks = (() => {
+    const list: typeof audioTracks = [];
+    const seenCanon = new Set<string>();
+    (audioTracks || []).forEach(t => {
+      const clean = (t.url || '').replace(/^["']|["']$/g, '').trim();
+      if (!clean || dismissedUrls.has(clean)) return;
+      const canon = extractCanonicalAudioStoragePath(clean);
+      const key = canon || clean;
+      if (seenCanon.has(key)) return;
+      seenCanon.add(key);
+      list.push(t);
+    });
+    return list;
+  })();
 
   // Global Audio Bus listener (pauses playback if other audio starts)
   useEffect(() => {
@@ -666,9 +688,9 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
       )}
 
       {/* 4. General Notes Rows */}
-      {generalNotes && generalNotes.length > 0 && (
+      {safeGeneralNotes && safeGeneralNotes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {generalNotes.map((noteItem, nIdx) => (
+          {safeGeneralNotes.map((noteItem, nIdx) => (
             <div key={`hero-gn-${nIdx}`} style={cardRowStyle}>
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',

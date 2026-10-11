@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { getItemWeek } from '../studentDateUtils';
+import { getItemWeek, getISOWeek } from '../studentDateUtils';
 import {
   deriveJuniorHomeworkSummary,
   cleanTitle as baseCleanTitle,
   isDummyOrTestSong,
   isWeeklySnapshotContainer,
   cleanHomeworkNote,
-  formatConsecutivePageRanges
+  formatConsecutivePageRanges,
+  extractCanonicalAudioStoragePath,
+  isMetadataOrSnapshotNote
 } from '../tabs/briefing/homeworkSummaryHelper';
 
 export type TaskReflectionStatus = 'super' | 'wackelig' | 'hilfe' | undefined;
@@ -130,6 +132,7 @@ function parseSnapshotPayload(
           }
         });
       }
+      return;
     }
     if (entry.includes('SNAPSHOT_SONGS:')) {
       const parsedSongs = parseDelimitedJson(entry, 'SNAPSHOT_SONGS:');
@@ -156,13 +159,23 @@ function parseSnapshotPayload(
           }
         });
       }
+      return;
     }
     if (entry.includes('AUDIO:')) {
-      const match = entry.match(/AUDIO:\s*([^\s|\]}]+)/);
-      if (match && match[1] && !audio.some(a => a.url === match[1])) {
-        audio.push({ url: match[1], label: 'Aufnahme deiner Lehrkraft' });
+      const cleanStr = entry.startsWith('[') ? entry.replace(/[\[\]"]/g, '') : entry;
+      const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+      const url = (parts[0] || '').replace(/^["']|["']$/g, '').trim();
+      const dur = parseInt(parts[1] || '0', 10);
+      const date = parts[2]?.trim();
+      const label = parts[3]?.trim() || 'Aufnahme deiner Lehrkraft';
+      const author = parts[4]?.trim() || 'teacher';
+      const canonUrl = extractCanonicalAudioStoragePath(url);
+      if (url && !audio.some(a => a.url === url || (canonUrl && extractCanonicalAudioStoragePath(a.url) === canonUrl))) {
+        audio.push({ url, label, duration: dur, date, author });
       }
+      return;
     }
+    if (isMetadataOrSnapshotNote(entry)) return;
     const cleanN = cleanHomeworkNote(entry);
     if (cleanN && !cleanN.startsWith('Seite ') && cleanN.length > 2 && !notes.includes(cleanN)) {
       notes.push(cleanN);
@@ -510,18 +523,86 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
     const audioTracks: AuthoritativeAudioTrack[] = [];
     const generalNotes: string[] = [];
 
+    const addAudioTrack = (track: AuthoritativeAudioTrack) => {
+      const cleanUrl = (track.url || '').replace(/^["']|["']$/g, '').trim();
+      if (!cleanUrl) return;
+      const canon = extractCanonicalAudioStoragePath(cleanUrl);
+      if (!audioTracks.some(a => a.url === cleanUrl || (canon && extractCanonicalAudioStoragePath(a.url) === canon))) {
+        audioTracks.push({ ...track, url: cleanUrl });
+      }
+    };
+
+    // 1. Identify weekly snapshot containers (sorted newest first)
+    const candidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+    candidates.sort((a: any, b: any) => {
+      const wA = getItemWeek(a), wB = getItemWeek(b);
+      if (wA && wB && wA !== wB) return wB.localeCompare(wA);
+      return new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime();
+    });
+    const latestSnapshot = candidates[0];
+
+    // 2. 🛡️ 0.1% Goldstandard Audio Scoping: Extract audio strictly from active week snapshot
+    if (latestSnapshot) {
+      const rawNotes = latestSnapshot.homework_notes || latestSnapshot.teacher_notes;
+      if (rawNotes) {
+        let entries: any[] = [];
+        try {
+          const parsed = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
+          entries = Array.isArray(parsed) ? parsed : [rawNotes];
+        } catch { entries = [rawNotes]; }
+
+        entries.forEach((ent: any) => {
+          if (typeof ent === 'string' && ent.includes('AUDIO:')) {
+            const cleanStr = ent.startsWith('[') ? ent.replace(/[\[\]"]/g, '') : ent;
+            const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+            const url = (parts[0] || '').replace(/^["']|["']$/g, '').trim();
+            const dur = parseInt(parts[1] || '0', 10);
+            const date = parts[2]?.trim();
+            const defaultLabel = latestSnapshot.topic_name ? `Aufnahme: ${latestSnapshot.topic_name}` : 'Aufnahme deiner Lehrkraft';
+            const label = parts[3]?.trim() || defaultLabel;
+            const author = parts[4]?.trim() || 'teacher';
+            if (url) addAudioTrack({ url, label, duration: dur, date, author });
+          }
+        });
+      }
+    }
+
+    // 3. Fallback: only if no snapshot audio exists, inspect current week items (never historical items!)
+    if (audioTracks.length === 0) {
+      const currentWeekIso = getISOWeek(new Date());
+      (progressItems || []).forEach((item: any) => {
+        const itemWk = getItemWeek(item);
+        const isThisWeek = (itemWk && itemWk === currentWeekIso) || Boolean(item.is_current_homework && !item.topic_name?.startsWith('Hausaufgabe KW '));
+        if (!isThisWeek) return;
+
+        const raw = item.homework_notes || item.teacher_notes;
+        if (!raw) return;
+        let entries: any[] = [];
+        try {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          entries = Array.isArray(parsed) ? parsed : [raw];
+        } catch { entries = [raw]; }
+
+        entries.forEach((ent: any) => {
+          if (typeof ent === 'string' && ent.includes('AUDIO:')) {
+            const cleanStr = ent.startsWith('[') ? ent.replace(/[\[\]"]/g, '') : ent;
+            const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+            const url = (parts[0] || '').replace(/^["']|["']$/g, '').trim();
+            const dur = parseInt(parts[1] || '0', 10);
+            const date = parts[2]?.trim();
+            const defaultLabel = item.topic_name ? `Aufnahme: ${item.topic_name}` : 'Aufnahme deiner Lehrkraft';
+            const label = parts[3]?.trim() || defaultLabel;
+            const author = parts[4]?.trim() || 'teacher';
+            if (url) addAudioTrack({ url, label, duration: dur, date, author });
+          }
+        });
+      });
+    }
+
+    // 4. General didactic notes (strictly without metadata or snapshot tokens)
     (progressItems || []).forEach((item: any) => {
       const raw = item.homework_notes || item.teacher_notes;
       if (!raw) return;
-      if (typeof raw === 'string' && raw.includes('AUDIO:')) {
-        const match = raw.match(/AUDIO:\s*([^\s|\]}]+)/);
-        if (match && match[1] && !audioTracks.some(a => a.url === match[1])) {
-          audioTracks.push({
-            url: match[1],
-            label: item.topic_name ? `Aufnahme: ${item.topic_name}` : 'Aufnahme deiner Lehrkraft'
-          });
-        }
-      }
       const cleaned = cleanHomeworkNote(raw);
       if (
         cleaned &&
@@ -529,19 +610,14 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
         !item.topic_name?.startsWith('Hausaufgabe KW ') &&
         !generalNotes.includes(cleaned)
       ) {
-        if (!cleaned.startsWith('Seite ') && cleaned.length > 2) generalNotes.push(cleaned);
+        if (!cleaned.startsWith('Seite ') && cleaned.length > 2 && !isMetadataOrSnapshotNote(cleaned)) {
+          generalNotes.push(cleaned);
+        }
       }
     });
 
-    // 3. Fallback: Vorwochen-Carryover & Snapshots
+    // 5. Fallback: Vorwochen-Carryover & Snapshots
     if (books.length === 0 || songs.length === 0) {
-      const candidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
-      candidates.sort((a: any, b: any) => {
-        const wA = getItemWeek(a), wB = getItemWeek(b);
-        if (wA && wB && wA !== wB) return wB.localeCompare(wA);
-        return new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime();
-      });
-
       for (const snapItem of candidates) {
         const rawNotes = snapItem.homework_notes || snapItem.teacher_notes;
         if (!rawNotes) continue;

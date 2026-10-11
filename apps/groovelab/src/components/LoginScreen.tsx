@@ -2439,7 +2439,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setPinSetupInput(prev => prev + val);
       }
     } else {
-      const limit = pinVerificationUser?.role === 'student' ? 2 : 4;
+      const limit = (pinVerificationUser?.role === 'student' && !pinVerificationUser?.has_personal_pin) ? 2 : 4;
       if (val === 'back') {
         setPinVerificationInput(prev => prev.slice(0, -1));
       } else if (pinVerificationInput.length < limit) {
@@ -3083,11 +3083,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // Block students and teachers check bypassed for timetable onboarding/design
 
-      if (user.role === 'student') {
-        const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
-        user.day_of_birth = actDay?.day_of_birth || null;
-      }
-
       // Automatically resolve schoolData from the database if not present in the URL parameter
       if (!schoolData && userSchool) {
         setSchoolData(userSchool);
@@ -3124,10 +3119,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           return;
         }
 
-        const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
-        const isPinActivated = user.role === 'student' 
-          ? Boolean(user.is_pin_activated || user.has_personal_pin || !!studentBirthDay) 
-          : Boolean(user.is_pin_activated || user.has_personal_pin);
+        const isPinActivated = user.role === 'student' ? true : Boolean(user.is_pin_activated || user.has_personal_pin);
 
         if (!isPinActivated) {
           setPinSetupUser(user);
@@ -3136,6 +3128,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           setLoading(false);
           return;
         } else {
+          if (!user.ausweis_nummer && !isQrLogin) user.ausweis_nummer = cleanPin;
           setPinVerificationUser(user);
           setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
           setPinVerificationInput('');
@@ -3320,10 +3313,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.school_id = userSchool.id;
       }
 
-      if (user.role === 'student') {
-        const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
-        user.day_of_birth = actDay?.day_of_birth || null;
-      }
 
       // Automatically align school context with the scanned user's authentic school
       if (userSchool) {
@@ -3382,10 +3371,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
-      const isPinActivated = user.role === 'student' 
-        ? Boolean(user.is_pin_activated || user.has_personal_pin || !!studentBirthDay) 
-        : Boolean(user.is_pin_activated || user.has_personal_pin);
+      const isPinActivated = user.role === 'student' ? true : Boolean(user.is_pin_activated || user.has_personal_pin);
 
       if (!isPinActivated) {
         setPinSetupUser(user);
@@ -8326,8 +8312,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <button
               onClick={async () => {
                 if (pinSetupInput.length !== 4) return;
-                const dayOfBirth = pinSetupUser?.day_of_birth || (Array.isArray(pinSetupUser?.activation_days) ? pinSetupUser?.activation_days[0]?.day_of_birth : pinSetupUser?.activation_days?.day_of_birth);
-                const validation = validateNewPin(pinSetupInput, dayOfBirth);
+                const validation = validateNewPin(pinSetupInput);
                 if (!validation.isValid) {
                   alert(validation.error || 'Ungültige PIN.');
                   setPinSetupInput('');
@@ -8475,12 +8460,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN eingeben</h3>
             <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-              Login für <strong>{pinVerificationUser.first_name} {pinVerificationUser.last_name}</strong> ({pinVerificationUser.ausweis_nummer}).<br/>
-              {pinVerificationUser.role === 'student' ? 'Bitte gib deinen Geburtstag (nur den Tag, z.B. 05) als PIN ein.' : 'Bitte gib deine 4-stellige PIN ein.'}
+              Login für <strong>{pinVerificationUser.name || pinVerificationUser.first_name}</strong>{pinVerificationUser.ausweis_nummer ? ` (${pinVerificationUser.ausweis_nummer})` : ''}.<br/>
+              {(pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 'Bitte gib deinen Geburtstag (nur den Tag, z.B. 05) als PIN ein.' : 'Bitte gib deine 4-stellige PIN ein.'}
             </p>
 
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              {Array.from({ length: pinVerificationUser.role === 'student' ? 2 : 4 }).map((_, idx) => (
+              {Array.from({ length: (pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4 }).map((_, idx) => (
                 <div key={idx} style={{
                   width: '18px',
                   height: '18px',
@@ -8496,22 +8481,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
             <button
               onClick={async () => {
-                const dayOfBirthVal = Array.isArray(pinVerificationUser.activation_days) ? pinVerificationUser.activation_days[0]?.day_of_birth : pinVerificationUser.activation_days?.day_of_birth;
-                const studentBirthDay = dayOfBirthVal ? String(dayOfBirthVal).padStart(2, '0') : '';
-                const expectedLength = (pinVerificationUser.role === 'student' && studentBirthDay) ? 2 : 4;
+                const expectedLength = (pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4;
                 if (pinVerificationInput.length !== expectedLength) return;
                 
                 let isMatch = false;
-                if (pinVerificationUser.role === 'student' && studentBirthDay) {
-                  isMatch = parseInt(pinVerificationInput) === parseInt(studentBirthDay);
-                } else {
-                  const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
-                    user_uuid: pinVerificationUser.id,
-                    input_pin: pinVerificationInput
-                  });
-                  if (!pinErr && pinOk === true) {
-                    isMatch = true;
-                  }
+                const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
+                  user_uuid: pinVerificationUser.id,
+                  input_pin: pinVerificationInput
+                });
+                if (!pinErr && pinOk === true) {
+                  isMatch = true;
                 }
 
                 if (isMatch) {
@@ -8566,17 +8545,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   setPinVerificationInput('');
                 }
               }}
-              disabled={pinVerificationInput.length !== (pinVerificationUser.role === 'student' ? 2 : 4)}
+              disabled={pinVerificationInput.length !== ((pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4)}
               style={{
                 width: '100%',
                 padding: '14px',
                 borderRadius: '16px',
-                background: pinVerificationInput.length === (pinVerificationUser.role === 'student' ? 2 : 4) ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
+                background: pinVerificationInput.length === ((pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4) ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
                 color: '#0f172a',
                 fontWeight: 800,
                 border: 'none',
                 marginTop: '24px',
-                cursor: pinVerificationInput.length === (pinVerificationUser.role === 'student' ? 2 : 4) ? 'pointer' : 'not-allowed',
+                cursor: pinVerificationInput.length === ((pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4) ? 'pointer' : 'not-allowed',
                 transition: 'all 0.2s'
               }}
             >

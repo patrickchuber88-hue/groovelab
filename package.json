@@ -82,6 +82,8 @@
     "verify:enterprise": "npm run gate && npm run test:pyramid && npm run test:forensics:all && npm run check:budget",
     "verify:headers:static": "node scripts/verify_static_security_headers.mjs",
     "verify:perimeter": "node scripts/verify_perimeter_headers.mjs",
+    "verify:parity": "node scripts/verify_live_parity.mjs",
+    "preview:parity": "npm run build:groovelab && vite preview -w apps/groovelab --port 4173",
     "check:budget": "node scripts/check-bundle-budget.js",
     "prepare": "test -d .git && husky install || exit 0"
   },

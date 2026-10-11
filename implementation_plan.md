@@ -1,93 +1,52 @@
-# 🏛️ 0,1% Enterprise Goldstandard Deployment & Live-Cluster Reconciliation
+# 🏛️ 0,1% Enterprise Goldstandard Remediation: Hausaufgaben-Widget Snapshot-Leck & Audio-Aufnahmen Wochen-Scoping
 
-## 📋 1. Forensische Befund-Matrix (Status Quo)
+## 📋 1. Befund- & Ursachen-Analyse
 
-| Prüf-Vektor | Lokaler Stand (Workspace / Git) | Live-Cluster (178.105.10.2) | Forensischer Status |
-| :--- | :--- | :--- | :--- |
-| **Git HEAD** | `68625079` (Passkey Citadel, Sibling Linking, Health Guard) | `release_20261009_012940` (7 Commits im Rückstand!) | 🚨 **DRIFT: 7 Commits fehlen** |
-| **DB-Migrationen** | Migration **553** (`webauthn_passkey_citadel.sql`) | Migration **539** (`is_demo_tenant`) | 🚨 **DRIFT: 14 Migrationen fehlen** |
-| **DB-Tabellen** | `private_auth.webauthn_credentials`, `school_sepa_mandates`, `system_alerts` | Fehlen komplett auf `supabase-db` | 🚨 **CRITICAL: RPCs & Queries crashen** |
-| **BFF-Gateway** | Zod Ingress, Idempotency Ledger, Token Refresh Mutex | Docker-Container vor 7 Tagen eingefroren | ⚠️ **STALE: Backend-Logik veraltet** |
-| **Web-Ingress** | Nginx Document Root erwartet `/var/www/groovelab/current` | Docker cp in ephemeren Container ohne Host-Mount | ⚠️ **FRAGILE: Ephemerer Layer** |
-| **Agenten-Regel** | `commit und deploy` führt nur Git-Commit aus | `deploy.sh` wurde nie aufgerufen | 🚨 **PROCESS: Fehlende Pipeline-Kopplung** |
+### Problem 1: `SNAPSHOT_LEHRWERKE:[{"title":"Guitar Fitn...` wird als Aufgabe gerendert
+1. **Fall-Through im Snapshot-Parser:**
+   In [`useAuthoritativeHomeworkPlan.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/hooks/useAuthoritativeHomeworkPlan.ts#L92) und [`AuthoritativeHomeworkContext.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/context/AuthoritativeHomeworkContext.tsx#L117) besitzt die Verzweigung `if (entry.includes('SNAPSHOT_LEHRWERKE:'))` im Gegensatz zu `MICROSCORE:` kein abschließendes `return;`.
+   Der Durchlauf fällt ungebremst bis zu `cleanHomeworkNote(entry)` und `notes.push(cleanN)` durch.
+2. **Fehlende Bereinigung für Einzelstrings:**
+   In [`homeworkSummaryHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/briefing/homeworkSummaryHelper.ts#L6) filtert `cleanHomeworkNote()` Metadaten (`SNAPSHOT_*`, `AUDIO:*`) nur, wenn der Input als JSON-Array (`[...]`) formatiert ist. Rohe Einzelstrings bleiben unberührt.
+3. **Fehlender Defense-in-Depth-Filter:**
+   In [`AuthoritativeHomeworkWidget.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/homework/AuthoritativeHomeworkWidget.tsx#L669) rendert `generalNotes.map(...)` ungefiltert alle Strings als Notiz-Karten mit dem Dokumenten-Icon.
 
----
-
-## 🎯 2. Der 0,1% Enterprise Goldstandard (Soll-Zustand)
-
-Ein weltklasse Deployment nach **OWASP ASVS Level 3**, **ISO/IEC 27001 (A.8.29)** und **BSI IT-Grundschutz (OPS.1.1.6)** erfordert einen geschlossenen Regelkreis (**Closed-Loop Deployment Engine**):
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│           0,1% ENTERPRISE CLOSED-LOOP DEPLOYMENT ENGINE                │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-  Phase 1: Pre-Flight Gate         ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  npm run gate && npm run verify:invariants && npm run typecheck     │
-  └────────────────────────────────┬────────────────────────────────────┘
-                                   │
-  Phase 2: DB Schema Reconciliation▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  Automatischer Migrations-Runner (scripts/apply_pending_migrations.sh)│
-  │  - Identifiziert ausstehende Migrationen (540 bis 553)             │
-  │  - Transaktionale, atomare Ausführung auf supabase-db               │
-  │  - PostgREST Schema-Reload: NOTIFY pgrst, 'reload schema'          │
-  │  - Schema-Paritäts-Beweis: 0 ausstehende Migrationen               │
-  └────────────────────────────────┬────────────────────────────────────┘
-                                   │
-  Phase 3: Production Build & Seal ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  npm run build:groovelab (Vite + SRI + Precompression + sw.js bump) │
-  │  Erzeugt versionsgebundenen Release-Hash in dist/version.json       │
-  └────────────────────────────────┬────────────────────────────────────┘
-                                   │
-  Phase 4: Atomarer Live-Sync      ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  rsync apps/groovelab/dist/ -> 178.105.10.2:/var/www/groovelab/... │
-  │  Atomarer Symlink-Switch current -> new_release                     │
-  │  Container-Sync & Web-Ingress Reload                                │
-  │  BFF-Container Restart bei Backend-Änderungen                       │
-  └────────────────────────────────┬────────────────────────────────────┘
-                                   │
-  Phase 5: Kryptografischer Beweis ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  - Curl https://campus-groovelab.de/version.json                    │
-  │  - KRYPTOGRAFISCHER HASH-ABGLEICH: Live-Version == Build-Version    │
-  │  - Perimeter Headers Check (Mozilla Observatory A+)                 │
-  │  - Git Tag v<timestamp> & Git Push                                  │
-  └─────────────────────────────────────────────────────────────────────┘
-```
+### Problem 2: Falsche Zählung „2 Aufnahmen“ (und `+1 weitere`)
+1. **Ungefilterte historische Traversierung (`progressItems` Leak):**
+   [`useAuthoritativeHomeworkPlan.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/hooks/useAuthoritativeHomeworkPlan.ts#L259) traversiert blind **alle jemals geladenen Zeilen** der `progress_matrix` des Schülers. Audio-Aufnahmen aus früheren Kalenderwochen (KW 38, KW 37) oder aus separaten Song-Übungen werden fälschlicherweise in das aktuelle Wochen-Widget hineingemischt.
+2. **Volatile Pre-Signed URL Miss:**
+   Deduplizierung über naiven String-Vergleich `a.url === url` scheitert, wenn URLs flüchtige HMAC-Tokens (`?token=...`) oder unterschiedliche Formatierungen (relativer Storage-Pfad vs. absolute URL) aufweisen.
+3. **Scope-Verletzung:**
+   Das Wochen-Widget visualisiert den aktuellen Wochen-Fahrplan (`Hausaufgabe KW XX`). Historische Aufnahmen gehören ins Archiv / Meisterwerk ("Recordings"), nicht in das aktive Wochen-Widget.
 
 ---
 
-## 🏗️ 3. Detaillierter Umsetzungsplan (Schritt für Schritt)
+## 🛠️ 2. Geplante Änderungen (Chirurgisch & Rückwärtskompatibel)
 
-### Schritt 1: Automatischer Migrations-Runner (`scripts/apply_pending_migrations.sh`)
-* Erstellung eines deterministischen, idempotenten Shell-Skripts:
-  * Liest alle nummerierten Migrationen (`supabase/migrations/[0-9]*.sql`) ein.
-  * Prüft auf dem Live-PostgreSQL (`supabase-db`), welche Migrationen bereits angewendet wurden.
-  * Führt die noch offenen Migrationen (540 bis 553) in korrekter Reihenfolge transaktionssicher aus.
-  * Sendet `NOTIFY pgrst, 'reload schema';`.
-  * Verifiziert die Existenz der neuen Tabellen (`private_auth.webauthn_credentials`, `school_sepa_mandates`, Spalte `sibling_group_id` etc.).
+### Phase 1: Helfer-Härtung ([`homeworkSummaryHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/briefing/homeworkSummaryHelper.ts))
+- **Hermetischer Metadaten-Guard in `cleanHomeworkNote`:**
+  Sofortiger Return von `""` für jeden String, der mit Metadaten-Präfixen beginnt oder diese enthält (`SNAPSHOT_`, `AUDIO:`, `MICROSCORE:`, `LOOP:`, `STICKER:`, `SYSTEM:`, `FEEDBACK:`).
+- **Kanonischer Audio-Pfad-Extraktor `extractCanonicalAudioStoragePath(urlOrPath: string): string`:**
+  Entfernt Query-Parameter (`?token=...`) und extrahiert den reinen Dateipfad zur verlässlichen Deduplizierung.
 
-### Schritt 2: Härtung von `deploy.sh`
-* **Entfernung veralteter Heuristiken:** Der starre Check auf `teacher_score_snippets` (Migration 537) wird durch den dynamischen Schema-Paritäts-Check ersetzt.
-* **Release-Hash Verifikation:** Nach dem Upload ruft `deploy.sh` `https://campus-groovelab.de/version.json` ab und vergleicht den Zeitstempel/Hash mit der lokalen `dist/version.json`. Bei Abweichung schlägt das Skript fail-closed mit Rollback fehl.
-* **BFF-Awareness:** Bei Änderungen in `packages/bff-server` wird der Container `groovelab-bff` neu gebaut bzw. neugestartet.
+### Phase 2: Parser- & Hook-Härtung ([`useAuthoritativeHomeworkPlan.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/hooks/useAuthoritativeHomeworkPlan.ts))
+- **Saubere `return;`-Abschlüsse in `parseSnapshotPayload`:**
+  Sobald `SNAPSHOT_LEHRWERKE:`, `SNAPSHOT_SONGS:` oder `AUDIO:` erkannt und verarbeitet wurden, bricht die Schleifen-Iteration per `return;` ab.
+- **Wochen-Scoping für Audio-Aufnahmen:**
+  1. Falls ein aktiver Wochen-Snapshot (`Hausaufgabe KW XX`) existiert: Aufnahmen werden **primär und autoritativ** aus diesem Snapshot bezogen.
+  2. Nur wenn dort keine Aufnahmen vorliegen: Fallback ausschließlich auf Items der aktuellen Woche (`getItemWeek(item) === currentWeekIso` oder `is_current_homework`), strikter Ausschluss historischer Alt-Wochen.
+- **Deduplizierung via kanonischem Storage-Pfad.**
 
-### Schritt 3: Schärfung von `.agents/AGENTS.md` (Verbindliche Codewort-Doktrin)
-* Definition des Codeworts **`commit und deploy`**:
-  * Der Agent führt **nicht nur** `git commit` aus, sondern zwingend die gesamte Kette bis einschließlich `bash deploy.sh` und kryptografischer Live-Verifikation.
-  * Erst wenn `https://campus-groovelab.de/version.json` den identischen Hash liefert und der Perimeter-Check bestanden ist, darf der Agent Vollzug melden.
+### Phase 3: Context-Parität ([`AuthoritativeHomeworkContext.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/context/AuthoritativeHomeworkContext.tsx))
+- Exakt identische Absicherung von `parseSnapshotPayload` (`return;`-Abschlüsse) und Wochen-Scoping für `audioTracks`.
 
-### Schritt 4: Sofortige Live-Reconciliation (Ausführung)
-1. **Migrationen 540 bis 553** atomar auf `178.105.10.2` anwenden.
-2. **Neuen Produktions-Build** erstellen (inkl. der 7 unübertragenen Commits).
-3. **Live-Deployment** nach `178.105.10.2` ausführen.
-4. **Verifikation:** Live-Perimeter-Check und Hash-Validierung live auf `https://campus-groovelab.de`.
+### Phase 4: UI Defense-in-Depth ([`AuthoritativeHomeworkWidget.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/homework/AuthoritativeHomeworkWidget.tsx))
+- Vor dem Rendern von `generalNotes` zusätzliche Filterung: Nur didaktische Klartext-Notizen rendern, niemals Tokens mit `SNAPSHOT_` oder `AUDIO:`.
+- `activeAudioTracks` via kanonischem Pfad deduplizieren.
 
 ---
 
-## 🛑 Stopp-Punkt & Genehmigungsvorbehalt
-Gemäß der Monolith-Governance und Implementierungsplan-Richtlinie startet die Ausführung **erst nach deiner ausdrücklichen Freigabe** im Chat.
+## 🔒 3. Invarianten- & Monolith-Ceiling-Prüfung
+- Keine der betroffenen Dateien überschreitet die 1.500-Zeilen-Grenze (`useAuthoritativeHomeworkPlan.ts` ~355 Zeilen, `AuthoritativeHomeworkContext.tsx` ~645 Zeilen, `AuthoritativeHomeworkWidget.tsx` ~915 Zeilen, `homeworkSummaryHelper.ts` ~830 Zeilen).
+- Keine Regression bei bestehenden Features oder Snapshot-Entpackung.
+- Netto-Änderung: < 40 Zeilen chirurgische Anpassungen.

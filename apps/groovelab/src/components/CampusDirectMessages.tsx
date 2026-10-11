@@ -1411,11 +1411,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
     loadReactions();
 
+    const activeSchoolId = user?.school_id || selectedRecipient?.school_id;
     const channel = supabase
       .channel(`reactions-${selectedRecipient.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'campus_message_reactions' },
+        { event: '*', schema: 'public', table: 'campus_message_reactions', ...(activeSchoolId ? { filter: `school_id=eq.${activeSchoolId}` } : {}) },
         (payload: any) => {
           if (payload.eventType === 'INSERT' && payload.new) {
             setMessageReactions(prev => {
@@ -1435,7 +1436,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [selectedRecipient?.id, selectedRecipient?.is_group]);
+  }, [selectedRecipient?.id, selectedRecipient?.is_group, selectedRecipient?.school_id, user?.school_id]);
 
   const handlePublishTopic = async (subject: string, content?: string) => {
     if (!selectedRecipient) return;

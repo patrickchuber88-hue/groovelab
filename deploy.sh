@@ -115,7 +115,8 @@ ssh "$SERVER" "if command -v nginx >/dev/null 2>&1; then \
   sudo ln -sf /etc/nginx/sites-available/campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
   sudo ln -sf /etc/nginx/sites-available/supabase.campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
   sudo nginx -t && sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress & Security Headers erfolgreich reloaded.'; \
-elif [ -n \"$WEB_CONTAINER\" ]; then \
+fi; \
+if [ -n \"$WEB_CONTAINER\" ]; then \
   docker cp $TARGET_RELEASE/. $WEB_CONTAINER:/usr/share/nginx/html/ 2>/dev/null || true; \
   docker exec $WEB_CONTAINER mkdir -p /etc/nginx/snippets 2>/dev/null || true; \
   docker cp /tmp/nginx_sync/security-headers.conf $WEB_CONTAINER:/etc/nginx/snippets/security-headers.conf 2>/dev/null || true; \

@@ -3,7 +3,7 @@ import { subscribeUserToPush } from '../utils/webPush';
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { requestPersistentStorage } from '../utils/storagePersistence';
 import { flushOfflineSyncQueue } from '../services/offlineSyncService';
-import { runStorageJanitor, runClientStorageJanitor } from '../services/storageJanitorService';
+import { runClientStorageJanitor } from '../services/storageJanitorService';
 
 export interface UseCampusPwaAndSystemEventsParams {
   isLocalhost: boolean;
@@ -74,9 +74,10 @@ export function useCampusPwaAndSystemEvents({
           // 📱 Tier-1 Storage Persistence Guard (Protects IndexedDB & Offline Vault from iOS ITP 7-day auto-purge)
           requestPersistentStorage().catch(() => {});
 
-          // If there is already a waiting worker, prompt user to update smoothly via floating toast
-          if (reg.waiting && navigator.serviceWorker.controller) {
-            console.log('[PWA] Waiting service worker found on load.');
+          // If there is already a waiting worker, prompt user to update and activate immediately
+          if (reg.waiting) {
+            console.log('[PWA] Waiting service worker found on load -> activating immediately.');
+            reg.waiting.postMessage({ action: 'skipWaiting' });
             setShowPwaUpdateToast(true);
           }
 
@@ -91,36 +92,66 @@ export function useCampusPwaAndSystemEvents({
 
           const handleControllerChange = () => {
             console.log('[PWA] Service Worker controller updated successfully.');
+            const activeVer = sessionStorage.getItem('campus_app_loaded_version');
+            const runningHash = typeof __CG_BUILD_HASH__ !== 'undefined' ? __CG_BUILD_HASH__ : '';
+            if (runningHash && activeVer && activeVer !== runningHash) {
+              console.log('[PWA] Controller changed and running bundle is outdated. Reloading...');
+              window.location.reload();
+            }
           };
           navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
           // Fast version checker via /version.json (Bypasses SW cache via sw.js exception rule)
           const checkServerVersion = async () => {
             try {
-              const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
+              const res = await fetch('/version.json?t=' + Date.now(), { 
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json' }
+              });
               if (res.ok) {
+                const contentType = res.headers.get('content-type') || '';
+                // 🛡️ Fail-Closed: If Nginx returned HTML instead of JSON (e.g. gate page), abort safely
+                if (!contentType.includes('application/json')) {
+                  console.warn('[PWA] Version check returned non-JSON content-type:', contentType);
+                  return;
+                }
                 const data = await res.json();
                 if (!data?.version) return;
 
+                const serverVersion: string = data.version;
                 const currentLoadedVer = sessionStorage.getItem('campus_app_loaded_version');
+                const runningHash = typeof __CG_BUILD_HASH__ !== 'undefined' ? __CG_BUILD_HASH__ : '';
 
-                // Initialer Kaltstart: Verankere Version der aktuell geladenen Session
-                if (!currentLoadedVer) {
-                  sessionStorage.setItem('campus_app_loaded_version', data.version);
-                  localStorage.setItem('campus_installed_cache_version', data.version);
+                // 🛡️ 10.000% Parity Invariante: Prüfe Diskrepanz SOWOHL gegen Session ALS AUCH gegen Compile-Time-Hash des laufenden Bundles
+                const isMismatch = (Boolean(currentLoadedVer) && currentLoadedVer !== serverVersion) ||
+                                   (Boolean(runningHash) && runningHash !== serverVersion);
+
+                if (isMismatch) {
+                  console.log('[PWA] New server version detected via version.json:', serverVersion, 'Running Bundle:', runningHash, 'Session:', currentLoadedVer);
+                  sessionStorage.setItem('campus_app_loaded_version', serverVersion);
+                  localStorage.setItem('campus_installed_cache_version', serverVersion);
+                  setShowPwaUpdateToast(true);
+
+                  if (reg) {
+                    if (reg.waiting) {
+                      reg.waiting.postMessage({ action: 'skipWaiting' });
+                    }
+                    if (reg.update) {
+                      reg.update().catch(() => {});
+                    }
+                  }
                   return;
                 }
 
-                // Autoritativer Versions-Unterschied zwischen Server und laufender SPA
-                if (currentLoadedVer !== data.version) {
-                  console.log('[PWA] New server version detected via version.json:', data.version, 'Running:', currentLoadedVer);
-                  setShowPwaUpdateToast(true);
-                  if (reg && reg.update) {
-                    reg.update().catch(() => {});
-                  }
+                // Initialer Kaltstart ohne Mismatch: Verankere Version der aktuell geladenen Session
+                if (!currentLoadedVer) {
+                  sessionStorage.setItem('campus_app_loaded_version', serverVersion);
+                  localStorage.setItem('campus_installed_cache_version', serverVersion);
                 }
               }
-            } catch {}
+            } catch (err) {
+              console.warn('[PWA] Version check failed:', err);
+            }
           };
           checkServerVersion();
           document.addEventListener('visibilitychange', () => {
@@ -154,7 +185,8 @@ export function useCampusPwaAndSystemEvents({
               installingWorker.onstatechange = () => {
                 if (installingWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
-                    console.log('[PWA] New content is available; prompt user via toast.');
+                    console.log('[PWA] New content is available -> activating immediately.');
+                    installingWorker.postMessage({ action: 'skipWaiting' });
                     setShowPwaUpdateToast(true);
                   } else {
                     console.log('[PWA] Content is cached for offline use.');
@@ -258,17 +290,6 @@ export function useCampusPwaAndSystemEvents({
     
     // Always prune stale local client caches on mount to prevent QuotaExceededError
     runClientStorageJanitor().catch(() => {});
-
-    const lastRunStr = localStorage.getItem('groovelab_storage_janitor_last_run');
-    const lastRun = lastRunStr ? parseInt(lastRunStr, 10) : 0;
-    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-
-    if (Date.now() - lastRun > twentyFourHoursMs) {
-      console.log('[StorageJanitor] Triggering scheduled 24h background audio storage audit...');
-      runStorageJanitor('campus-assets').catch(err => {
-        console.warn('[StorageJanitor] Background storage audit error:', err);
-      });
-    }
   }, []);
 
   return {

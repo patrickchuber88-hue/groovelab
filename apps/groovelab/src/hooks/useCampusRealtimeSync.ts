@@ -245,7 +245,7 @@ export function useCampusRealtimeSync({
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'campus_direct_messages' },
+        { event: '*', schema: 'public', table: 'campus_direct_messages', ...(schoolId ? { filter: `school_id=eq.${schoolId}` } : {}) },
         () => {
           console.log('[Realtime] campus_direct_messages update detected');
           fetchCampusMessages();
@@ -253,7 +253,7 @@ export function useCampusRealtimeSync({
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'campus_chat_channel_reads' },
+        { event: '*', schema: 'public', table: 'campus_chat_channel_reads', ...(schoolId ? { filter: `school_id=eq.${schoolId}` } : {}) },
         () => {
           console.log('[Realtime] campus_chat_channel_reads update detected');
           fetchCampusMessages();
@@ -261,7 +261,7 @@ export function useCampusRealtimeSync({
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'campus_chat_group_members' },
+        { event: '*', schema: 'public', table: 'campus_chat_group_members', ...(schoolId ? { filter: `school_id=eq.${schoolId}` } : {}) },
         () => {
           console.log('[Realtime] campus_chat_group_members update detected');
           fetchCampusMessages();

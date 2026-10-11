@@ -3,36 +3,37 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 
+const BUILD_TIMESTAMP = Date.now();
+const BUILD_VERSION = `groovelab-static-v${BUILD_TIMESTAMP}`;
+const BUILD_DYNAMIC_VERSION = `groovelab-dynamic-v${BUILD_TIMESTAMP}`;
+
 function swCacheBusterPlugin() {
   return {
     name: 'sw-cache-buster',
     closeBundle() {
       const distSwPath = path.resolve(__dirname, './dist/sw.js');
       const publicSwPath = path.resolve(__dirname, './public/sw.js');
-      const now = Date.now();
-      const newVersion = `groovelab-static-v${now}`;
-      const newDynamicVersion = `groovelab-dynamic-v${now}`;
 
       if (fs.existsSync(distSwPath)) {
         let content = fs.readFileSync(distSwPath, 'utf-8');
-        content = content.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${newVersion}';`);
-        content = content.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = '${newDynamicVersion}';`);
+        content = content.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${BUILD_VERSION}';`);
+        content = content.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = '${BUILD_DYNAMIC_VERSION}';`);
         fs.writeFileSync(distSwPath, content, 'utf-8');
-        console.log(`\n[SW Cache Buster] Automatically injected dynamic cache version: ${newVersion} into dist/sw.js\n`);
+        console.log(`\n[SW Cache Buster] Automatically injected dynamic cache version: ${BUILD_VERSION} into dist/sw.js\n`);
       }
 
       if (fs.existsSync(publicSwPath)) {
         let pContent = fs.readFileSync(publicSwPath, 'utf-8');
-        pContent = pContent.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${newVersion}';`);
-        pContent = pContent.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = '${newDynamicVersion}';`);
+        pContent = pContent.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${BUILD_VERSION}';`);
+        pContent = pContent.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = '${BUILD_DYNAMIC_VERSION}';`);
         fs.writeFileSync(publicSwPath, pContent, 'utf-8');
         console.log(`[SW Cache Buster] Synchronized cache version into public/sw.js\n`);
       }
 
       const distVersionPath = path.resolve(__dirname, './dist/version.json');
       try {
-        fs.writeFileSync(distVersionPath, JSON.stringify({ version: newVersion, timestamp: now }), 'utf-8');
-        console.log(`[SW Cache Buster] Generated dist/version.json with version ${newVersion}\n`);
+        fs.writeFileSync(distVersionPath, JSON.stringify({ version: BUILD_VERSION, timestamp: BUILD_TIMESTAMP }), 'utf-8');
+        console.log(`[SW Cache Buster] Generated dist/version.json with version ${BUILD_VERSION}\n`);
       } catch (err) {
         console.warn('[SW Cache Buster] Could not write dist/version.json:', err);
       }
@@ -42,6 +43,10 @@ function swCacheBusterPlugin() {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __CG_BUILD_HASH__: JSON.stringify(BUILD_VERSION),
+    __CG_BUILD_TIMESTAMP__: JSON.stringify(BUILD_TIMESTAMP),
+  },
   plugins: [react(), swCacheBusterPlugin()],
   resolve: {
     alias: {

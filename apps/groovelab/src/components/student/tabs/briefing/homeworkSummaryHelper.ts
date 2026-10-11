@@ -3,9 +3,43 @@
  * Eliminates synchronous localStorage blocking queries and JSON parsing during render passes.
  */
 
+export function isMetadataOrSnapshotNote(str?: string | null): boolean {
+  if (!str) return false;
+  const s = String(str).trim();
+  return (
+    s.startsWith('SNAPSHOT_') ||
+    s.startsWith('AUDIO:') ||
+    s.startsWith('MICROSCORE:') ||
+    s.startsWith('LOOP:') ||
+    s.startsWith('STICKER:') ||
+    s.startsWith('SYSTEM:') ||
+    s.startsWith('FEEDBACK:') ||
+    s.toLowerCase().startsWith('latency:') ||
+    s.includes('SNAPSHOT_LEHRWERKE:') ||
+    s.includes('SNAPSHOT_SONGS:')
+  );
+}
+
+/**
+ * 0.1% Goldstandard Helper: Extrahiert den kanonischen Storage-Pfad eines Audio-Assets
+ * zur verlässlichen Deduplizierung über Render-Passes und Session-Leases hinweg (eliminiert volatile Query-Tokens).
+ */
+export function extractCanonicalAudioStoragePath(urlOrPath?: string | null): string {
+  if (!urlOrPath) return '';
+  const clean = String(urlOrPath).replace(/^["']|["']$/g, '').trim();
+  if (!clean) return '';
+  const withoutQuery = clean.split('?')[0].split('#')[0];
+  const match = withoutQuery.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+)/);
+  if (match && match[1]) {
+    return decodeURIComponent(match[1]).trim();
+  }
+  return withoutQuery.trim();
+}
+
 export function cleanHomeworkNote(rawNote?: string | null): string {
   if (!rawNote) return '';
-  let note = String(rawNote);
+  let note = String(rawNote).trim();
+  if (!note || isMetadataOrSnapshotNote(note)) return '';
 
   if (note.startsWith('[') || note.startsWith('{')) {
     try {
@@ -15,13 +49,7 @@ export function cleanHomeworkNote(rawNote?: string | null): string {
           .filter(
             (n: unknown) =>
               typeof n === 'string' &&
-              !n.startsWith('AUDIO:') &&
-              !n.startsWith('STICKER:') &&
-              !n.toLowerCase().startsWith('latency:') &&
-              !n.startsWith('LOOP:') &&
-              !n.startsWith('SYSTEM:') &&
-              !n.startsWith('SNAPSHOT_') &&
-              !n.startsWith('FEEDBACK:') &&
+              !isMetadataOrSnapshotNote(n) &&
               !n.startsWith('STUDENT_NOTE_PUBLIC:') &&
               !n.startsWith('STUDENT_NOTE_PRIVATE:')
           )
@@ -32,10 +60,12 @@ export function cleanHomeworkNote(rawNote?: string | null): string {
     }
   }
 
-  return note
+  const cleaned = note
     .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
     .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
     .trim();
+
+  return isMetadataOrSnapshotNote(cleaned) ? '' : cleaned;
 }
 
 export function cleanTitle(str?: string | null): string {

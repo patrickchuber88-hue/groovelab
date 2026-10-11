@@ -21,3 +21,7 @@ declare module 'qr.js/lib/ErrorCorrectLevel' {
   const ErrorCorrectLevel: ErrorCorrectLevelMap;
   export default ErrorCorrectLevel;
 }
+
+// 🛡️ Enterprise Parity Engine: Compile-Time Build Signatures
+declare const __CG_BUILD_HASH__: string;
+declare const __CG_BUILD_TIMESTAMP__: number;
