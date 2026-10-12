@@ -294,10 +294,12 @@ function auditStudentContracts() {
 
   const studentDashboardPath = path.resolve(ROOT_DIR, 'apps/groovelab/src/components/StudentAvatarDashboard.tsx');
   const parentControlsHookPath = path.resolve(ROOT_DIR, 'apps/groovelab/src/components/student/hooks/useStudentParentControls.ts');
+  const parentLeaseServicePath = path.resolve(ROOT_DIR, 'apps/groovelab/src/services/parentSecurityLeaseService.ts');
   const m433Path = path.resolve(ROOT_DIR, 'supabase/migrations/433_enterprise_tier1_phase2_hardening.sql');
 
   const dashboardCode = fs.readFileSync(studentDashboardPath, 'utf-8');
   const parentControlsCode = fs.readFileSync(parentControlsHookPath, 'utf-8');
+  const parentLeaseCode = fs.existsSync(parentLeaseServicePath) ? fs.readFileSync(parentLeaseServicePath, 'utf-8') : '';
   const m433Sql = fs.existsSync(m433Path) ? fs.readFileSync(m433Path, 'utf-8') : '';
 
   // STU-CTR-01: StudentAvatarDashboardProps Interface Contract
@@ -312,9 +314,10 @@ function auditStudentContracts() {
   );
 
   // STU-CTR-02: verify_parent_pin_with_lease RPC Schema Contract
-  const hasParentPinRpc = parentControlsCode.includes('verify_parent_pin_with_lease') &&
-    parentControlsCode.includes('p_student_id') &&
-    parentControlsCode.includes('p_input_pin');
+  const combinedParentCode = parentControlsCode + '\n' + parentLeaseCode;
+  const hasParentPinRpc = combinedParentCode.includes('verify_parent_pin_with_lease') &&
+    combinedParentCode.includes('p_student_id') &&
+    combinedParentCode.includes('p_input_pin');
   assertContract(
     'STUDENT',
     'STU-CTR-02',

@@ -1,52 +1,40 @@
-# 🏛️ 0,1% Enterprise Goldstandard Remediation: Hausaufgaben-Widget Snapshot-Leck & Audio-Aufnahmen Wochen-Scoping
+# 🏛️ 0,1% Enterprise Goldstandard Remediation: Zero-Trust Chat Governance (OWASP ASVS L3)
 
 ## 📋 1. Befund- & Ursachen-Analyse
 
-### Problem 1: `SNAPSHOT_LEHRWERKE:[{"title":"Guitar Fitn...` wird als Aufgabe gerendert
-1. **Fall-Through im Snapshot-Parser:**
-   In [`useAuthoritativeHomeworkPlan.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/hooks/useAuthoritativeHomeworkPlan.ts#L92) und [`AuthoritativeHomeworkContext.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/context/AuthoritativeHomeworkContext.tsx#L117) besitzt die Verzweigung `if (entry.includes('SNAPSHOT_LEHRWERKE:'))` im Gegensatz zu `MICROSCORE:` kein abschließendes `return;`.
-   Der Durchlauf fällt ungebremst bis zu `cleanHomeworkNote(entry)` und `notes.push(cleanN)` durch.
-2. **Fehlende Bereinigung für Einzelstrings:**
-   In [`homeworkSummaryHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/briefing/homeworkSummaryHelper.ts#L6) filtert `cleanHomeworkNote()` Metadaten (`SNAPSHOT_*`, `AUDIO:*`) nur, wenn der Input als JSON-Array (`[...]`) formatiert ist. Rohe Einzelstrings bleiben unberührt.
-3. **Fehlender Defense-in-Depth-Filter:**
-   In [`AuthoritativeHomeworkWidget.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/homework/AuthoritativeHomeworkWidget.tsx#L669) rendert `generalNotes.map(...)` ungefiltert alle Strings als Notiz-Karten mit dem Dokumenten-Icon.
+Die aktuelle Architektur von Campus-Groovelab für Nachrichten-Boards ist UX-seitig hervorragend (Goldstandard), verletzt jedoch auf Systemebene das **Zero-Trust Frontend Axiom**. 
 
-### Problem 2: Falsche Zählung „2 Aufnahmen“ (und `+1 weitere`)
-1. **Ungefilterte historische Traversierung (`progressItems` Leak):**
-   [`useAuthoritativeHomeworkPlan.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/hooks/useAuthoritativeHomeworkPlan.ts#L259) traversiert blind **alle jemals geladenen Zeilen** der `progress_matrix` des Schülers. Audio-Aufnahmen aus früheren Kalenderwochen (KW 38, KW 37) oder aus separaten Song-Übungen werden fälschlicherweise in das aktuelle Wochen-Widget hineingemischt.
-2. **Volatile Pre-Signed URL Miss:**
-   Deduplizierung über naiven String-Vergleich `a.url === url` scheitert, wenn URLs flüchtige HMAC-Tokens (`?token=...`) oder unterschiedliche Formatierungen (relativer Storage-Pfad vs. absolute URL) aufweisen.
-3. **Scope-Verletzung:**
-   Das Wochen-Widget visualisiert den aktuellen Wochen-Fahrplan (`Hausaufgabe KW XX`). Historische Aufnahmen gehören ins Archiv / Meisterwerk ("Recordings"), nicht in das aktive Wochen-Widget.
+1. **PostgREST Bypass (Sicherheitsillusion):** 
+   Die juristischen Wächter `chatRespectGuard.ts` (Schutz vor Hassrede/Gewalt nach SGB VIII / StGB) und `medicalTermGuard.ts` (Schutz vor Gesundheitsdaten nach Art. 9 DSGVO) laufen ausschließlich im React-Frontend. Über direkte API-Calls (Postman/Curl) können diese Wächter verlustfrei umgangen werden.
+2. **Filter-Evasion (Zalgo/Homoglyphen):** 
+   Unsichtbare Unicode-Zeichen (`\u200B`) und Homoglyphen (kyrillisches `а`) hebeln den aktuellen Leetspeak-Regex im Client aus.
+3. **Fehlendes Crisis-Logging (§ 8a SGB VIII):** 
+   Suizidandrohungen (`isCrisis: true`) blockieren zwar die UI (Nummer gegen Kummer), erzeugen aber serverseitig keinen revisionssicheren Audit-Trail zur physischen Alarmierung der Krisenbeauftragten.
+4. **Fehlendes Rate-Limiting (Anti-Spam):** 
+   Der aktuelle DB-Trigger `trg_enforce_campus_chat_governance` prüft nur die Länge, nicht die Frequenz. Ein DoS/Spam-Angriff ist per API möglich.
 
 ---
 
-## 🛠️ 2. Geplante Änderungen (Chirurgisch & Rückwärtskompatibel)
+## 🛠️ 2. Geplante Änderungen (Hermetisches Backend-Enforcement)
 
-### Phase 1: Helfer-Härtung ([`homeworkSummaryHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/briefing/homeworkSummaryHelper.ts))
-- **Hermetischer Metadaten-Guard in `cleanHomeworkNote`:**
-  Sofortiger Return von `""` für jeden String, der mit Metadaten-Präfixen beginnt oder diese enthält (`SNAPSHOT_`, `AUDIO:`, `MICROSCORE:`, `LOOP:`, `STICKER:`, `SYSTEM:`, `FEEDBACK:`).
-- **Kanonischer Audio-Pfad-Extraktor `extractCanonicalAudioStoragePath(urlOrPath: string): string`:**
-  Entfernt Query-Parameter (`?token=...`) und extrahiert den reinen Dateipfad zur verlässlichen Deduplizierung.
+### Phase 1: Neue PostgreSQL Migration `557_enterprise_zero_trust_chat_governance.sql`
+Wir überführen die Core-Logik von TypeScript in hochperformantes PL/pgSQL:
+- **Unicode-Sanitization:** Stripping von Zero-Width-Spaces (`\u200B-\u200F`) direkt in der DB (`regexp_replace(NEW.content, '[\u200B-\u200F]', '', 'g')`).
+- **Art. 9 DSGVO Guard in PL/pgSQL:** Serverseitige Erkennung der `MEDICAL_HEALTH_KEYWORDS` und automatische Ersetzung durch `[gesundheitliche Angabe neutralisiert]`.
+- **SGB VIII Hate-Speech Guard in PL/pgSQL:** Portierung des 4-Vektoren-Checks (Extremismus, Ehrverletzung, Belästigung, Gewalt) inkl. der `MUSIC_PEDAGOGY_WHITELIST`.
+- **Crisis Audit Trail:** Wenn `isCrisis` (z.B. "ich bring mich um") zutrifft, wirft der Trigger einen `RAISE EXCEPTION` (Fail-Closed) **und** loggt einen asynchronen Warn-Eintrag in eine neue Audit-Funktion, um Schulleiter zu benachrichtigen.
+- **Anti-Spam Token-Bucket:** Prüfung, ob der Sender in der letzten Minute mehr als 10 Nachrichten gesendet hat -> `HTTP 429`.
 
-### Phase 2: Parser- & Hook-Härtung ([`useAuthoritativeHomeworkPlan.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/hooks/useAuthoritativeHomeworkPlan.ts))
-- **Saubere `return;`-Abschlüsse in `parseSnapshotPayload`:**
-  Sobald `SNAPSHOT_LEHRWERKE:`, `SNAPSHOT_SONGS:` oder `AUDIO:` erkannt und verarbeitet wurden, bricht die Schleifen-Iteration per `return;` ab.
-- **Wochen-Scoping für Audio-Aufnahmen:**
-  1. Falls ein aktiver Wochen-Snapshot (`Hausaufgabe KW XX`) existiert: Aufnahmen werden **primär und autoritativ** aus diesem Snapshot bezogen.
-  2. Nur wenn dort keine Aufnahmen vorliegen: Fallback ausschließlich auf Items der aktuellen Woche (`getItemWeek(item) === currentWeekIso` oder `is_current_homework`), strikter Ausschluss historischer Alt-Wochen.
-- **Deduplizierung via kanonischem Storage-Pfad.**
+### Phase 2: Anpassung Edge Function (Optional / Späterer Scope)
+- Die ArbZG (Quiet Hours) Queue in `send-push` würde konzeptionell hier folgen, aber für diesen Plan konzentrieren wir uns auf die kritischste Flanke: die Datenbank-Schicht.
 
-### Phase 3: Context-Parität ([`AuthoritativeHomeworkContext.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/context/AuthoritativeHomeworkContext.tsx))
-- Exakt identische Absicherung von `parseSnapshotPayload` (`return;`-Abschlüsse) und Wochen-Scoping für `audioTracks`.
-
-### Phase 4: UI Defense-in-Depth ([`AuthoritativeHomeworkWidget.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/homework/AuthoritativeHomeworkWidget.tsx))
-- Vor dem Rendern von `generalNotes` zusätzliche Filterung: Nur didaktische Klartext-Notizen rendern, niemals Tokens mit `SNAPSHOT_` oder `AUDIO:`.
-- `activeAudioTracks` via kanonischem Pfad deduplizieren.
+### Phase 3: Frontend-Alignment
+- Die TypeScript-Wächter bleiben als UX-Layer (für sofortiges Feedback ohne Network-Latency) bestehen.
+- Wir stellen sicher, dass bei einem `RAISE EXCEPTION` der Datenbank ein sauberer Error im Frontend gefangen wird, falls der TS-Wächter doch umgangen wurde.
 
 ---
 
 ## 🔒 3. Invarianten- & Monolith-Ceiling-Prüfung
-- Keine der betroffenen Dateien überschreitet die 1.500-Zeilen-Grenze (`useAuthoritativeHomeworkPlan.ts` ~355 Zeilen, `AuthoritativeHomeworkContext.tsx` ~645 Zeilen, `AuthoritativeHomeworkWidget.tsx` ~915 Zeilen, `homeworkSummaryHelper.ts` ~830 Zeilen).
-- Keine Regression bei bestehenden Features oder Snapshot-Entpackung.
-- Netto-Änderung: < 40 Zeilen chirurgische Anpassungen.
+- 100% Fail-Closed Doktrin wird durchgesetzt.
+- Keine US-Cloud Einbindung, 100% lokales PostgREST / PostgreSQL In-Memory.
+- "Zero-Trust Frontend" Regel ist mit dieser Architektur formal erfüllt.

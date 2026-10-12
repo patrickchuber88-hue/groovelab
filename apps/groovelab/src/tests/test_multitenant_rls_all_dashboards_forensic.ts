@@ -319,11 +319,13 @@ function auditStudentDashboard() {
 
   const studentProfileHookPath = path.resolve(ROOT_DIR, 'apps/groovelab/src/components/student/hooks/useStudentProfile.ts');
   const studentParentControlsPath = path.resolve(ROOT_DIR, 'apps/groovelab/src/components/student/hooks/useStudentParentControls.ts');
+  const parentLeaseServicePath = path.resolve(ROOT_DIR, 'apps/groovelab/src/services/parentSecurityLeaseService.ts');
   const m389Path = path.resolve(ROOT_DIR, 'supabase/migrations/389_enterprise_forensic_remediation.sql');
   const m433Path = path.resolve(ROOT_DIR, 'supabase/migrations/433_enterprise_tier1_phase2_hardening.sql');
 
   const studentProfileCode = fs.readFileSync(studentProfileHookPath, 'utf-8');
   const parentControlsCode = fs.readFileSync(studentParentControlsPath, 'utf-8');
+  const parentLeaseCode = fs.existsSync(parentLeaseServicePath) ? fs.readFileSync(parentLeaseServicePath, 'utf-8') : '';
   const m389Sql = fs.readFileSync(m389Path, 'utf-8');
   const m433Sql = fs.readFileSync(m433Path, 'utf-8');
 
@@ -362,8 +364,9 @@ function auditStudentDashboard() {
   );
 
   // STU-4: Server-Side Parent PIN Verification & Parent Role Timeout
-  const verifiesViaRpc = parentControlsCode.includes("supabase.rpc('verify_parent_pin_with_lease'") ||
-    parentControlsCode.includes("supabase.rpc('verify_parent_pin'");
+  const combinedParentCode = parentControlsCode + '\n' + parentLeaseCode;
+  const verifiesViaRpc = /supabase\.rpc\(\s*['"](verify_parent_pin_with_lease|verify_parent_pin)['"]/.test(combinedParentCode) ||
+    /rpc\(\s*['"](verify_parent_pin_with_lease|verify_parent_pin)['"]/.test(combinedParentCode);
   const hasParentLeaseCheck = m433Sql.includes("role = 'parent'") &&
     m433Sql.includes("INTERVAL '15 minutes'") &&
     m433Sql.includes('save_parent_controls');
