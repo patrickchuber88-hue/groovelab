@@ -473,6 +473,46 @@ export function deriveActiveHomeworkSummary({
       }
 
       if (Array.isArray(parsedSnapNotes)) {
+        const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
+        if (snapLwEntry) {
+          try {
+            const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
+            const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+            const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+            const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+            const parsedLw = JSON.parse(jsonStr);
+            if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+              parsedLw.forEach((lw: any) => {
+                const title = cleanTitle(lw.title || '');
+                const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
+                if (title && pages.length > 0) {
+                  if (!activeLehrwerkeMap[title]) {
+                    activeLehrwerkeMap[title] = {
+                      pages: pages.map((pNum: number) => ({
+                        num: pNum,
+                        notes: '',
+                        status: 'homework'
+                      }))
+                    };
+                  } else {
+                    pages.forEach((pNum: number) => {
+                      if (!activeLehrwerkeMap[title].pages.some(p => p.num === pNum)) {
+                        activeLehrwerkeMap[title].pages.push({
+                          num: pNum,
+                          notes: '',
+                          status: 'homework'
+                        });
+                      }
+                    });
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('Error hydrating current week SNAPSHOT_LEHRWERKE in briefing helper:', e);
+          }
+        }
+
         const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
         if (snapSongEntry) {
           try {
@@ -603,6 +643,20 @@ export function deriveActiveHomeworkSummary({
     }
   }
 
+  // 🛡️ Zero-Phantom Sanitizer: Kollabiere generisches 'Lehrwerk' in das reale Buch
+  const bookTitles = Object.keys(activeLehrwerkeMap);
+  const realBookTitle = bookTitles.find(t => t.toLowerCase() !== 'lehrwerk');
+  if (realBookTitle && activeLehrwerkeMap['Lehrwerk']) {
+    const phantomPages = activeLehrwerkeMap['Lehrwerk'].pages || [];
+    phantomPages.forEach(pp => {
+      if (!activeLehrwerkeMap[realBookTitle].pages.some(rp => rp.num === pp.num)) {
+        activeLehrwerkeMap[realBookTitle].pages.push(pp);
+      }
+    });
+    activeLehrwerkeMap[realBookTitle].pages.sort((a, b) => a.num - b.num);
+    delete activeLehrwerkeMap['Lehrwerk'];
+  }
+
   return {
     activeLehrwerkeMap,
     otherActiveHWItems,
@@ -718,6 +772,29 @@ export function deriveJuniorHomeworkSummary({
       }
     }
   });
+
+  // 🛡️ Zero-Phantom Sanitizer: Wenn reale Bücher existieren, kollabiere generisches 'Lehrwerk' restlos in das reale Buch
+  const hasRealBooks = activeJuniorBooks.some(b => b.title.toLowerCase() !== 'lehrwerk');
+  if (hasRealBooks) {
+    const phantomIdx = activeJuniorBooks.findIndex(b => b.title.toLowerCase() === 'lehrwerk');
+    if (phantomIdx !== -1) {
+      const phantom = activeJuniorBooks[phantomIdx];
+      const realBook = activeJuniorBooks.find(b => b.title.toLowerCase() !== 'lehrwerk')!;
+      phantom.pages.forEach(p => {
+        if (!realBook.pages.includes(p)) realBook.pages.push(p);
+      });
+      realBook.pages.sort((a, b) => a - b);
+      realBook.formattedPages = formatConsecutivePageRanges(realBook.pages);
+      if (phantom.notes && phantom.notes.length > 0) {
+        phantom.notes.forEach(n => {
+          if (!realBook.notes?.includes(n)) {
+            realBook.notes = [...(realBook.notes || []), n];
+          }
+        });
+      }
+      activeJuniorBooks.splice(phantomIdx, 1);
+    }
+  }
 
   // 2. Songs & progress items
   const activeJuniorSongs: any[] = [];

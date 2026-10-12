@@ -103,6 +103,20 @@ export const extractSongArtistAndTitle = (songOrItem: any): {
     }
   }
 
+  // 0,1% Goldstandard: Wenn rawTitle bereits mit dem Künstlernamen beginnt (z. B. "Linkin Park - Numb"),
+  // wird das Präfix abgetrennt, sodass title rein "Numb" und artist "Linkin Park" ist (Apple Music Style)
+  if (rawArtist && rawTitle) {
+    const aLower = rawArtist.toLowerCase();
+    const tLower = rawTitle.toLowerCase();
+    if (tLower.startsWith(aLower + ' - ') || tLower.startsWith(aLower + ' – ') || tLower.startsWith(aLower + ' — ')) {
+      rawTitle = rawTitle.slice(rawArtist.length).replace(/^[\s–—-]+/, '').trim();
+    }
+  } else if (rawTitle && !rawArtist && rawTitle.includes(' - ')) {
+    const parts = rawTitle.split(' - ');
+    rawArtist = parts[0]?.trim() || '';
+    rawTitle = parts.slice(1).join(' - ').trim();
+  }
+
   const artist = normalizeSongStr(rawArtist);
   const title = normalizeSongStr(rawTitle);
   const canonical = title || artist;

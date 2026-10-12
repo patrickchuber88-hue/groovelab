@@ -5,8 +5,9 @@ import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
-import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
+import { getSecureAudioUrl, buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
 import { byteFrequencyToDawMeterPercent } from '../../utils/audioVuMeterHelper';
+import { toggleStudentAudioShare, getAssignedTeachersForStudent, TeacherAssignment } from '../../services/studentAudioShareService';
 
 interface AudioMemoRecorderProps {
   user: any;
@@ -30,6 +31,11 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 🛡️ Zero-Trust ReBAC Teacher Sharing State
+  const [assignedTeachers, setAssignedTeachers] = useState<TeacherAssignment[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [isSharedWithTeacher, setIsSharedWithTeacher] = useState<boolean>(true);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
@@ -38,6 +44,21 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
+
+  const isStudent = user?.role?.toLowerCase() === 'student';
+
+  // Load assigned teachers for student caller
+  useEffect(() => {
+    if (isStudent && user?.id) {
+      const schoolId = user?.school_id || (user as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || '';
+      getAssignedTeachersForStudent(user.id, schoolId).then(teachers => {
+        setAssignedTeachers(teachers);
+        if (teachers.length > 0) {
+          setSelectedTeacherId(teachers[0].id);
+        }
+      });
+    }
+  }, [isStudent, user?.id]);
 
   // Stop hardware mic stream strictly and teardown audio analysis
   const stopHardwareStream = useCallback(() => {
@@ -230,9 +251,10 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
 
     try {
       const targetSchoolId = user?.school_id || (user as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
-      const fileName = `memo_${user?.id || 'guest'}_${Date.now()}.${audioBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-      const filePath = `${schoolPathPrefix}audio/${fileName}`;
+      const rawFileName = `memo_${user?.id || 'guest'}_${Date.now()}.${audioBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+      const filePath = isStudent && user?.id
+        ? buildCanonicalAudioStoragePath(targetSchoolId, user.id, 'recordings', rawFileName)
+        : (targetSchoolId ? `schools/${targetSchoolId}/audio/${rawFileName}` : `audio/${rawFileName}`);
 
       const { data, error } = await supabase.storage
         .from('campus-assets')
@@ -244,6 +266,15 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
       let finalUrl = '';
       if (!error) {
         finalUrl = await getSecureAudioUrl(filePath, 'campus-assets', 1800);
+
+        // 🛡️ Zero-Trust ReBAC: Opt-In Share für zugewiesene Lehrkraft registrieren
+        if (isStudent && isSharedWithTeacher && selectedTeacherId) {
+          try {
+            await toggleStudentAudioShare(filePath, selectedTeacherId, true);
+          } catch (shareErr) {
+            console.warn('[AudioMemoRecorder] ReBAC share registration notice:', shareErr);
+          }
+        }
 
         // Update school storage quota
         if (targetSchoolId && audioBlob.size) {
@@ -541,6 +572,59 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
           </button>
         </div>
       </div>
+
+      {audioUrl && isStudent && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+          marginTop: '8px',
+          padding: '8px 12px',
+          background: isSharedWithTeacher ? '#f0fdf4' : '#f8fafc',
+          border: '1px solid ' + (isSharedWithTeacher ? '#bbf7d0' : '#e2e8f0'),
+          borderRadius: '10px',
+          fontSize: '0.74rem'
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#166534', fontWeight: 700 }}>
+            <input
+              type="checkbox"
+              checked={isSharedWithTeacher}
+              onChange={e => setIsSharedWithTeacher(e.target.checked)}
+              style={{ accentColor: '#16a34a', width: '15px', height: '15px' }}
+            />
+            <span>Mit Lehrkraft teilen</span>
+          </label>
+
+          {isSharedWithTeacher && assignedTeachers.length > 1 && (
+            <select
+              value={selectedTeacherId}
+              onChange={e => setSelectedTeacherId(e.target.value)}
+              style={{
+                fontSize: '0.72rem',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#334155',
+                fontWeight: 600
+              }}
+            >
+              {assignedTeachers.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.first_name} {t.last_name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {!isSharedWithTeacher && (
+            <span style={{ color: '#64748b', fontSize: '0.70rem', fontWeight: 600 }}>
+              100% Privat (nur du hast Zugriff)
+            </span>
+          )}
+        </div>
+      )}
 
       {errorMsg && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '0.72rem', marginTop: '8px', fontWeight: 600 }}>

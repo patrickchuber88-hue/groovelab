@@ -38,8 +38,10 @@ CREATE TABLE IF NOT EXISTS private_auth.schema_migrations_ledger (
     version TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     applied_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    checksum TEXT
+    checksum TEXT,
+    status TEXT DEFAULT 'applied'
 );
+ALTER TABLE private_auth.schema_migrations_ledger ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'applied';
 EOF
 echo "  ✓ Migrations-Ledger aktiv."
 
@@ -64,7 +66,7 @@ echo "  ✓ Migrations-Ledger aktiv."
 
 # 4. Ermittle und wende alle ausstehenden Migrationen sequenziell an
 echo "🚀 [3/5] Identifiziere und wende ausstehende Migrationen an..."
-APPLIED_LIST=$(ssh -o BatchMode=yes "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -tAc \"SELECT version FROM private_auth.schema_migrations_ledger;\"")
+APPLIED_LIST=$(ssh -o BatchMode=yes "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -tAc \"SELECT version FROM private_auth.schema_migrations_ledger WHERE status = 'applied';\"")
 
 PENDING_COUNT=0
 SUCCESS_COUNT=0
@@ -96,9 +98,9 @@ for f in $(ls -1 "$MIGRATIONS_DIR"/[0-9]*.sql | sort -V); do
 
   # Im Ledger registrieren
   ssh -o BatchMode=yes "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -v ON_ERROR_STOP=1" << EOF
-INSERT INTO private_auth.schema_migrations_ledger (version, name, checksum)
-VALUES ('$MIG_NUM', '$MIG_BASENAME', '$MIG_HASH')
-ON CONFLICT (version) DO UPDATE SET applied_at = NOW(), checksum = EXCLUDED.checksum;
+INSERT INTO private_auth.schema_migrations_ledger (version, name, checksum, status)
+VALUES ('$MIG_NUM', '$MIG_BASENAME', '$MIG_HASH', 'applied')
+ON CONFLICT (version) DO UPDATE SET applied_at = NOW(), checksum = EXCLUDED.checksum, status = 'applied';
 EOF
 
   echo "    ✓ Migration $MIG_NUM erfolgreich angewendet & im Ledger protokolliert."

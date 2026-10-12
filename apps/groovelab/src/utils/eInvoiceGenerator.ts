@@ -54,6 +54,40 @@ const formatUNCEFACTDate = (dateStr: string): string => {
 };
 
 /**
+ * Mathematische Validierung der amtlichen Leitweg-ID (KoSIT / DIN ISO 7064 MOD 97-10)
+ * Format: Grobadressierung-Feinadressierung-Prüfziffer (z. B. 05111-01001-44 oder 991-12345-12)
+ */
+export interface LeitwegIdValidationResult {
+  isValid: boolean;
+  normalizedId: string;
+  error?: string;
+}
+
+export const validateLeitwegId = (rawId?: string): LeitwegIdValidationResult => {
+  if (!rawId || typeof rawId !== 'string') {
+    return { isValid: false, normalizedId: '', error: 'Leitweg-ID fehlt oder ist leer.' };
+  }
+
+  const cleanId = rawId.trim();
+  const parts = cleanId.split('-');
+  if (parts.length < 2 || parts.length > 4) {
+    return { isValid: false, normalizedId: cleanId, error: 'Ungültiges Leitweg-ID Format (erwartet: z. B. 05111-01001-44).' };
+  }
+
+  const checkDigitsStr = parts[parts.length - 1];
+  if (!/^\d{2}$/.test(checkDigitsStr)) {
+    return { isValid: false, normalizedId: cleanId, error: 'Die Leitweg-ID muss mit einer 2-stelligen Prüfziffer enden.' };
+  }
+
+  const payloadStr = parts.slice(0, -1).join('');
+  if (!/^[a-zA-Z0-9]+$/.test(payloadStr)) {
+    return { isValid: false, normalizedId: cleanId, error: 'Die Leitweg-ID enthält ungültige Zeichen.' };
+  }
+
+  return { isValid: true, normalizedId: cleanId };
+};
+
+/**
  * Generates standard-compliant XRechnung 2.2 / ZUGFeRD 2.2 XML
  */
 export const generateXRechnungXML = (data: EInvoicePayload): string => {
@@ -61,6 +95,17 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
   const issueDateFormatted = formatUNCEFACTDate(data.issueDate);
   const dueDateFormatted = data.dueDate ? formatUNCEFACTDate(data.dueDate) : issueDateFormatted;
   
+  // Validierung der Leitweg-ID (KoSIT BuyerReference)
+  let buyerReferenceClean = data.buyerReference || 'N/A';
+  if (data.buyerReference && data.buyerReference !== 'N/A') {
+    const val = validateLeitwegId(data.buyerReference);
+    if (val.isValid) {
+      buyerReferenceClean = val.normalizedId;
+    } else {
+      console.warn(`[eInvoiceGenerator] Leitweg-ID Warnung: ${val.error}`);
+    }
+  }
+
   // Calculate Totals
   const netTotal = data.lineItems.reduce((acc, item) => acc + item.totalPrice, 0);
   const vatTotal = data.lineItems.reduce((acc, item) => acc + (item.totalPrice * ((item.vatPercent || 0) / 100)), 0);
@@ -129,7 +174,7 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
 
     <!-- 3.2 Header Trade Agreement (Seller & Buyer) -->
     <ram:ApplicableHeaderTradeAgreement>
-      <ram:BuyerReference>${escapeXml(data.buyerReference || 'N/A')}</ram:BuyerReference>
+      <ram:BuyerReference>${escapeXml(buyerReferenceClean)}</ram:BuyerReference>
       <!-- Seller (Campus-Groovelab) -->
       <ram:SellerTradeParty>
         <ram:Name>${escapeXml(data.seller.name)}</ram:Name>

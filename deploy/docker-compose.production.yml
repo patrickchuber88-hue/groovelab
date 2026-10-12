@@ -187,11 +187,17 @@ services:
       STORAGE_PUBLIC_URL: https://supabase.campus-groovelab.de
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
       FILE_SIZE_LIMIT: 26214400 # 25 MB Limit
-      STORAGE_BACKEND: file
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-file}
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
-      GLOBAL_S3_BUCKET: campus-groovelab-assets
+      GLOBAL_S3_BUCKET: ${GLOBAL_S3_BUCKET:-campus-groovelab-assets}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-campus-groovelab-assets}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-eu-central-1}
+      STORAGE_S3_FORCE_PATH_STYLE: ${STORAGE_S3_FORCE_PATH_STYLE:-true}
+      STORAGE_S3_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-}
+      STORAGE_S3_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-}
     volumes:
-      # Storage data resides on the 100 GB Cloud Volume
+      # Storage data resides on the 100 GB Cloud Volume (local fallback & offline cache)
       - /mnt/cloud-volume/storage-data:/var/lib/storage:z
     networks:
       - default

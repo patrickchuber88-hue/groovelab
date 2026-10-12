@@ -46,8 +46,18 @@ jobs:
       - name: "5. Production Build (TypeScript + Vite + Precompression)"
         run: npm run build:groovelab
 
-      - name: "6. Configure SSH Keys (Ephemeral Agent)"
-        if: env.DEPLOY_SSH_KEY != ''
+      - name: "6. Verify Sovereign Deployment Credentials (Fail-Closed)"
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "${DEPLOY_SSH_KEY}" ]; then
+            echo "::error title=Fail-Closed Architecture Guard::DEPLOY_SSH_KEY ist in GitHub Actions nicht konfiguriert."
+            echo "::notice::Gemäß der 0% US-Cloud-Doktrin werden Produktions-SSH-Schlüssel nicht in US-Cloud-Systemen hinterlegt."
+            echo "::notice::Produktions-Deployments werden souverän und sicher vom Betreiber-Arbeitsplatz via 'npm run deploy' ausgeführt."
+            exit 1
+          fi
+
+      - name: "7. Configure SSH Keys (Ephemeral Agent)"
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER || 'deployuser@178.105.10.2' }}
@@ -64,8 +74,7 @@ jobs:
           chmod 600 ~/.ssh/config
           ssh-keyscan -H 178.105.10.2 >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: "7. Deploy Release to Live Production Cluster"
-        if: env.DEPLOY_SSH_KEY != ''
+      - name: "8. Deploy Release to Live Production Cluster"
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SERVER: ${{ secrets.DEPLOY_SERVER || 'deployuser@178.105.10.2' }}
@@ -75,7 +84,7 @@ jobs:
           ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new "${SERVER}" "echo 'SSH connection verified.'"
           bash deploy.sh
 
-      - name: "8. Post-Deploy Live Health & Perimeter Verification"
+      - name: "9. Post-Deploy Live Health & Perimeter Verification"
         run: |
           echo "Verifying live edge ingress: https://campus-groovelab.de/healthz"
           HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 https://campus-groovelab.de/healthz || echo "000")

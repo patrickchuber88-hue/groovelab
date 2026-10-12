@@ -14,7 +14,7 @@ import {
 } from '../hooks/useAuthoritativeHomeworkPlan';
 import { useAuthoritativeHomeworkOptional } from '../context/AuthoritativeHomeworkContext';
 import { isWeeklySnapshotContainer, formatConsecutivePageRanges } from '../tabs/briefing/homeworkSummaryHelper';
-import { getSongColor } from '../studentDateUtils';
+import { getSongColor, CANONICAL_LEHRWERK_COLOR } from '../studentDateUtils';
 import { StudentHomeworkStatusButton } from '../homework/StudentHomeworkStatusButton';
 import { MicroScoreSnippetButton } from '../meisterwerk/microscore/MicroScoreSnippetButton';
 
@@ -727,68 +727,119 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
               </span>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {secondaryBooks.map((b, idx) => (
-                  <div
-                    key={`sec-b-${idx}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                      <BookOpen size={14} color="#e11d48" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {b.title}
-                      </span>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#059669', background: '#ecfdf5', padding: '2px 6px', borderRadius: '6px', flexShrink: 0 }}>
-                        {formatConsecutivePageRanges(b.pages) || b.formattedPages}
-                      </span>
+                {secondaryBooks.map((b, idx) => {
+                  const pageBadge = formatConsecutivePageRanges(b.pages) || b.formattedPages;
+                  return (
+                    <div
+                      key={`sec-b-${idx}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '7px',
+                          background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                          border: '1px solid rgba(255, 255, 255, 0.85)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#e11d48',
+                          boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
+                          flexShrink: 0
+                        }}>
+                          <BookOpen size={12} strokeWidth={2.4} />
+                        </div>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {b.title}
+                        </span>
+                        {pageBadge && (
+                          <span style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 850,
+                            color: '#15803d',
+                            background: '#dcfce7',
+                            border: '1px solid #bbf7d0',
+                            padding: '2px 8px',
+                            borderRadius: '99px',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0
+                          }}>
+                            {pageBadge.startsWith('S.') ? pageBadge : `S. ${pageBadge}`}
+                          </span>
+                        )}
+                      </div>
+
+                      <StudentHomeworkStatusButton
+                        studentId={studentId || studentUser?.id}
+                        taskId={`book-${b.title}`}
+                        label={b.title}
+                        variant="compact_hud"
+                      />
                     </div>
+                  );
+                })}
 
-                    <StudentHomeworkStatusButton
-                      studentId={studentId || studentUser?.id}
-                      taskId={`book-${b.title}`}
-                      label={b.title}
-                      variant="compact_hud"
-                    />
-                  </div>
-                ))}
+                {secondarySongs.map((s, idx) => {
+                  const songColor = getSongColor(s.cleanTitle);
+                  return (
+                    <div
+                      key={`sec-s-${idx}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '7px',
+                          background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
+                          border: '1px solid rgba(255, 255, 255, 0.85)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: songColor.text || '#0f172a',
+                          boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0, 0, 0, 0.06)'}`,
+                          flexShrink: 0
+                        }}>
+                          <Music size={12} strokeWidth={2.4} />
+                        </div>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.cleanTitle}
+                          {s.artist && !s.cleanTitle.toLowerCase().includes(s.artist.toLowerCase()) && (
+                            <span style={{ fontSize: '0.80rem', fontWeight: 650, color: '#64748b', marginLeft: '6px' }}>
+                              · {s.artist}
+                            </span>
+                          )}
+                        </span>
+                      </div>
 
-                {secondarySongs.map((s, idx) => (
-                  <div
-                    key={`sec-s-${idx}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                      <Music size={14} color="#ca8a04" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {s.cleanTitle}
-                      </span>
+                      <StudentHomeworkStatusButton
+                        studentId={studentId || studentUser?.id}
+                        taskId={`song-${s.id || s.cleanTitle}`}
+                        label={s.cleanTitle}
+                        variant="compact_hud"
+                      />
                     </div>
-
-                    <StudentHomeworkStatusButton
-                      studentId={studentId || studentUser?.id}
-                      taskId={`song-${s.id || s.cleanTitle}`}
-                      label={s.cleanTitle}
-                      variant="compact_hud"
-                    />
-                  </div>
-                ))}
+                  );
+                })}
 
                 {generalNotes && generalNotes.length > 0 && (
                   <div style={{

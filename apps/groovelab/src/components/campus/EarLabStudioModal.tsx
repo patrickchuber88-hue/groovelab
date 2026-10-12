@@ -1178,6 +1178,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
         borderRadius: '24px',
         border: '1.5px solid rgba(139, 92, 246, 0.25)',
         padding: embedded ? '16px' : '22px',
+        paddingBottom: embedded ? '16px' : 'calc(22px + env(safe-area-inset-bottom, 0px))',
         boxShadow: embedded ? 'none' : '0 12px 36px -4px rgba(139, 92, 246, 0.14), 0 2px 8px rgba(0, 0, 0, 0.02)',
         boxSizing: 'border-box',
         display: 'flex',
@@ -1187,6 +1188,11 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
         color: '#0f172a'
       }}
     >
+      {/* BFSG 2025 / WCAG 2.2 AA: Screenreader Live-Region für Gehörbildung */}
+      <div role="status" aria-live="polite" aria-atomic="true" style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+        {isIntervalAnswerSubmitted ? (selectedIntervalAnswer === currentIntervalQuestion?.interval.id ? 'Richtig beantwortet!' : `Leider nicht richtig. Die richtige Antwort war ${currentIntervalQuestion?.interval.name}.`) : isChordAnswerSubmitted ? (selectedChordAnswer === currentChordQuestion?.chord.id ? 'Akkord richtig erkannt!' : `Leider nicht richtig. Die richtige Antwort war ${currentChordQuestion?.chord.name}.`) : ''}
+      </div>
+
       {/* 1. Header: Titel, Ansichten-Switch (Studio vs. Hall of Ear) & Schließen */}
       <div style={{
         display: 'flex',

@@ -40,6 +40,95 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
+const VAULT_META_STORE = 'CampusGroovelabVaultMeta';
+const VAULT_SALT_KEY = 'campus_offline_vault_salt_v1';
+
+/**
+ * Persists and retrieves a stable, cryptographically random salt bound to the physical device.
+ * Ensures offline takes remain AES-GCM-256 encrypted at rest, but can be decrypted across tab reloads.
+ */
+async function getOrCreatePersistentSalt(): Promise<Uint8Array> {
+  if (volatileSessionSalt && volatileSessionSalt.length === 16) {
+    return volatileSessionSalt;
+  }
+
+  // 1. Check LocalStorage for existing device-bound salt
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const storedB64 = localStorage.getItem(VAULT_SALT_KEY);
+      if (storedB64) {
+        const decoded = base64ToUint8Array(storedB64);
+        if (decoded && decoded.length === 16) {
+          volatileSessionSalt = decoded;
+          return volatileSessionSalt;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Check IndexedDB persistent store
+  if (typeof window !== 'undefined' && window.indexedDB) {
+    try {
+      const idbSalt = await new Promise<Uint8Array | null>((resolve) => {
+        const req = window.indexedDB.open(VAULT_META_STORE, 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains('metadata')) {
+            req.result.createObjectStore('metadata');
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const tx = db.transaction('metadata', 'readonly');
+            const getReq = tx.objectStore('metadata').get(VAULT_SALT_KEY);
+            getReq.onsuccess = () => resolve(getReq.result || null);
+            getReq.onerror = () => resolve(null);
+          } catch {
+            resolve(null);
+          }
+        };
+        req.onerror = () => resolve(null);
+      });
+
+      if (idbSalt && idbSalt.length === 16) {
+        volatileSessionSalt = idbSalt;
+        if (typeof localStorage !== 'undefined') {
+          try { localStorage.setItem(VAULT_SALT_KEY, bufferToBase64(idbSalt)); } catch {}
+        }
+        return volatileSessionSalt;
+      }
+    } catch {}
+  }
+
+  // 3. Generate a fresh 16-byte cryptographically secure salt
+  const freshSalt = window.crypto.getRandomValues(new Uint8Array(16));
+  volatileSessionSalt = freshSalt;
+
+  // Persist to both LocalStorage and IndexedDB
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.setItem(VAULT_SALT_KEY, bufferToBase64(freshSalt)); } catch {}
+  }
+  if (typeof window !== 'undefined' && window.indexedDB) {
+    try {
+      const req = window.indexedDB.open(VAULT_META_STORE, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('metadata')) {
+          req.result.createObjectStore('metadata');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction('metadata', 'readwrite');
+          tx.objectStore('metadata').put(freshSalt, VAULT_SALT_KEY);
+        } catch {}
+      };
+    } catch {}
+  }
+
+  return volatileSessionSalt;
+}
+
 /**
  * Initialisiert oder liefert den flüchtigen Sitzungsschlüssel
  */
@@ -53,14 +142,13 @@ async function getOrCreateSessionKey(customPassphrase?: string): Promise<CryptoK
   }
 
   if (!volatileSessionSalt) {
-    volatileSessionSalt = window.crypto.getRandomValues(new Uint8Array(16));
+    volatileSessionSalt = await getOrCreatePersistentSalt();
   }
 
-  // Ableitung aus Passphrase oder kryptografischem Zufall
+  // Ableitung aus Passphrase oder gerätegebundenem Seed
   const seedString = customPassphrase || (
-    'campus_session_' + 
-    (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('campus_active_role') || 'ephemeral' : 'ephemeral') + 
-    '_' + volatileSessionSalt[0] + '_' + volatileSessionSalt[15]
+    'campus_session_vault_' + 
+    volatileSessionSalt[0] + '_' + volatileSessionSalt[7] + '_' + volatileSessionSalt[15]
   );
 
   const encoder = new TextEncoder();

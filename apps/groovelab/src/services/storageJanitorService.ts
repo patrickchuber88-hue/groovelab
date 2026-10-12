@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { VOLATILE_STORAGE_PREFIXES } from '../utils/storageQuotaGuard';
+import { deleteAudioAssets } from '../utils/audioStorageHelper';
 
 export interface JanitorReport {
   scannedFiles: number;
@@ -251,47 +252,57 @@ export const runClientStorageJanitor = async (): Promise<{ bytesFreedEstimated: 
 /**
  * DSGVO Art. 17 Immediate Physical Storage Purge
  * Removes the physical audio file from Supabase Storage when an item is deleted in the UI.
+ * 🛡️ Enterprise Goldstandard: Delegiert autoritativ an BFF POST /api/storage/delete-assets.
  */
 export const deletePhysicalAudioBlob = async (audioUrlOrPath: string): Promise<boolean> => {
   if (!audioUrlOrPath || typeof audioUrlOrPath !== 'string') return false;
 
   try {
     const cleanPath = audioUrlOrPath.trim();
+    let actualBucket = 'campus-assets';
+    let relativePath = cleanPath;
 
-    // If it is a full URL, extract bucket and file path
+    // 1. If it is a full URL, extract bucket and relative path (supports both /public/ and /sign/)
     if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
-      try {
-        const urlObj = new URL(cleanPath);
-        const pathSegments = urlObj.pathname.split('/');
-        // Supabase storage URLs typically have format: .../object/public/{bucket}/{filePath...}
-        const publicIdx = pathSegments.indexOf('public');
-        if (publicIdx !== -1 && pathSegments.length > publicIdx + 2) {
-          const bucket = pathSegments[publicIdx + 1];
-          const relativePath = pathSegments.slice(publicIdx + 2).join('/');
-          const { error } = await supabase.storage.from(bucket).remove([relativePath]);
-          if (!error) {
-            console.log(`[StorageJanitor] Physically purged audio file from bucket '${bucket}':`, relativePath);
-            return true;
+      const match = cleanPath.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/?#]+)\/([^?#]+)/);
+      if (match) {
+        actualBucket = decodeURIComponent(match[1]);
+        relativePath = decodeURIComponent(match[2]);
+      } else {
+        try {
+          const urlObj = new URL(cleanPath);
+          const pathSegments = urlObj.pathname.split('/');
+          const markerIdx = pathSegments.findIndex(s => s === 'public' || s === 'sign');
+          if (markerIdx !== -1 && pathSegments.length > markerIdx + 2) {
+            actualBucket = decodeURIComponent(pathSegments[markerIdx + 1]);
+            relativePath = decodeURIComponent(pathSegments.slice(markerIdx + 2).join('/'));
           }
+        } catch (e) {
+          console.warn('[StorageJanitor] URL parsing warning:', e);
         }
-      } catch (e) {
-        console.warn('[StorageJanitor] URL parsing failed, attempting fallback buckets:', e);
       }
     }
 
-    // Fallback: Attempt removal from standard audio buckets
-    const bucketsToTry = ['recordings', 'audio', 'student-recordings', 'campus-assets'];
-    for (const bucket of bucketsToTry) {
+    // 2. Authoritative deletion via BFF Gateway (JWE session authenticated + BOLA verified)
+    const purgeResult = await deleteAudioAssets([relativePath], actualBucket);
+    if (purgeResult.success && purgeResult.deletedCount > 0) {
+      console.log(`[StorageJanitor] Authoritatively purged audio file from '${actualBucket}':`, relativePath);
+      return true;
+    }
+
+    // 3. Fallback: Direct Supabase client removal if offline or BFF unreachable
+    const bucketsToTry = [actualBucket, 'campus-assets', 'groovelab-assets'];
+    for (const b of Array.from(new Set(bucketsToTry))) {
       try {
-        const { error } = await supabase.storage.from(bucket).remove([cleanPath]);
+        const { error } = await supabase.storage.from(b).remove([relativePath]);
         if (!error) {
-          console.log(`[StorageJanitor] Successfully purged audio blob from bucket '${bucket}':`, cleanPath);
+          console.log(`[StorageJanitor] Fallback purged audio blob from '${b}':`, relativePath);
           return true;
         }
       } catch {}
     }
 
-    return true;
+    return purgeResult.success;
   } catch (err) {
     console.error('[StorageJanitor] Failed to physically delete audio blob:', err);
     return false;

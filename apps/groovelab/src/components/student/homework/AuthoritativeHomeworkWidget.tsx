@@ -15,7 +15,7 @@ import {
   extractCanonicalAudioStoragePath,
   isMetadataOrSnapshotNote
 } from '../tabs/briefing/homeworkSummaryHelper';
-import { getSongColor } from '../studentDateUtils';
+import { getSongColor, CANONICAL_LEHRWERK_COLOR } from '../studentDateUtils';
 import { StudentHomeworkStatusButton } from './StudentHomeworkStatusButton';
 import { MicroScoreSnippetButton } from '../meisterwerk/microscore/MicroScoreSnippetButton';
 
@@ -378,17 +378,20 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
             </div>
           ))}
 
-          {safeSongs.map((s, idx) => (
-            <div key={`sb-s-${idx}`} style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', fontWeight: 800,
-              color: theme === 'dark' ? '#f8fafc' : '#0f172a',
-              background: theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc',
-              border: '1px solid #e2e8f0', padding: '3px 9px', borderRadius: '8px'
-            }}>
-              <Music size={13} color="#ca8a04" />
-              <span>{s.cleanTitle}</span>
-            </div>
-          ))}
+          {safeSongs.map((s, idx) => {
+            const sColor = getSongColor(s.cleanTitle);
+            return (
+              <div key={`sb-s-${idx}`} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', fontWeight: 800,
+                color: theme === 'dark' ? '#f8fafc' : '#0f172a',
+                background: theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc',
+                border: '1px solid #e2e8f0', padding: '3px 9px', borderRadius: '8px'
+              }}>
+                <Music size={13} color={sColor.text || '#0f172a'} />
+                <span>{s.cleanTitle}</span>
+              </div>
+            );
+          })}
 
           {studentQuestion && (
             <div style={{
@@ -459,16 +462,43 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
 
         {books.map((b, idx) => {
           const taskId = `book-${b.title}`;
+          const pageBadge = formatConsecutivePageRanges(b.pages) || b.formattedPages;
           return (
             <div key={`hud-b-${idx}`} style={hudRow}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                <BookOpen size={14} color="#f43f5e" style={{ flexShrink: 0 }} />
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '7px',
+                  background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#e11d48',
+                  boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
+                  flexShrink: 0
+                }}>
+                  <BookOpen size={12} strokeWidth={2.4} />
+                </div>
                 <span style={{ fontSize: '0.88rem', fontWeight: 800, color: isDark ? '#f8fafc' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {b.title}
                 </span>
-                <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#059669', background: '#ecfdf5', border: '1px solid #10b981', padding: '2px 6px', borderRadius: '6px', flexShrink: 0 }}>
-                  {formatConsecutivePageRanges(b.pages) || b.formattedPages}
-                </span>
+                {pageBadge && (
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 850,
+                    color: '#15803d',
+                    background: '#dcfce7',
+                    border: '1px solid #bbf7d0',
+                    padding: '2px 8px',
+                    borderRadius: '99px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}>
+                    {pageBadge.startsWith('S.') ? pageBadge : `S. ${pageBadge}`}
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                 <StudentHomeworkStatusButton
@@ -485,12 +515,32 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
 
         {safeSongs.map((s, idx) => {
           const taskId = `song-${s.id || s.cleanTitle || idx}`;
+          const songColor = getSongColor(s.cleanTitle);
           return (
             <div key={`hud-s-${idx}`} style={hudRow}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                <Music size={14} color="#eab308" style={{ flexShrink: 0 }} />
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '7px',
+                  background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
+                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: songColor.text || '#0f172a',
+                  boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0, 0, 0, 0.06)'}`,
+                  flexShrink: 0
+                }}>
+                  <Music size={12} strokeWidth={2.4} />
+                </div>
                 <span style={{ fontSize: '0.88rem', fontWeight: 800, color: isDark ? '#f8fafc' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {s.cleanTitle}
+                  {s.artist && !s.cleanTitle.toLowerCase().includes(s.artist.toLowerCase()) && (
+                    <span style={{ fontSize: '0.80rem', fontWeight: 650, color: isDark ? '#94a3b8' : '#64748b', marginLeft: '6px' }}>
+                      · {s.artist}
+                    </span>
+                  )}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -573,8 +623,9 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px',
                 background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.85)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#e11d48', boxShadow: 'none', flexShrink: 0
+                color: '#e11d48', boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)', flexShrink: 0
               }}>
                 <BookOpen size={14} strokeWidth={2.4} />
               </div>
@@ -583,10 +634,10 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               </span>
               {pageRangeText && (
                 <span style={{
-                  fontSize: '0.80rem', fontWeight: 900, color: '#059669', background: '#ecfdf5',
-                  border: '1px solid #10b981', padding: '3px 9px', borderRadius: '8px', whiteSpace: 'nowrap', flexShrink: 0
+                  fontSize: '0.76rem', fontWeight: 850, color: '#15803d', background: '#dcfce7',
+                  border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '99px', whiteSpace: 'nowrap', flexShrink: 0
                 }}>
-                  {pageRangeText}
+                  {pageRangeText.startsWith('S.') ? pageRangeText : `S. ${pageRangeText}`}
                 </span>
               )}
             </div>
@@ -631,6 +682,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px',
                 background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
+                border: '1px solid rgba(255, 255, 255, 0.85)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: songColor.text || '#0f172a', boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`, flexShrink: 0
               }}>
@@ -638,6 +690,11 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               </div>
               <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {s.cleanTitle}
+                {s.artist && !s.cleanTitle.toLowerCase().includes(s.artist.toLowerCase()) && (
+                  <span style={{ fontSize: '0.86rem', fontWeight: 650, color: '#64748b', marginLeft: '6px' }}>
+                    · {s.artist}
+                  </span>
+                )}
               </span>
             </div>
 
@@ -708,14 +765,31 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
 
       {/* 5. Student Question Yellow Pill */}
       {studentQuestion && (
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.88rem', padding: '8px 12px',
-          borderRadius: '12px', background: '#fffdf0', border: '1px solid #fde047', boxShadow: 'none'
-        }}>
-          <HelpCircle size={15} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
-            <strong style={{ color: '#ca8a04', fontWeight: 850, flexShrink: 0 }}>Deine Frage:</strong>
-            <span style={{ color: '#713f12', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div
+          role={onOpenQuestionModal ? "button" : undefined}
+          tabIndex={onOpenQuestionModal ? 0 : undefined}
+          onClick={onOpenQuestionModal}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenQuestionModal?.(); } }}
+          title={onOpenQuestionModal ? "Klicken, um deine Frage an die Lehrkraft zu bearbeiten" : undefined}
+          aria-label={onOpenQuestionModal ? "Deine Frage an die Lehrkraft bearbeiten" : undefined}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.88rem', padding: '10px 14px',
+            borderRadius: '14px', background: '#fffdf0', border: '1px solid #fde047', boxShadow: 'none',
+            cursor: onOpenQuestionModal ? 'pointer' : 'default', transition: 'all 0.15s ease'
+          }}
+          className={onOpenQuestionModal ? "hover-scale-mini" : undefined}
+        >
+          <HelpCircle size={16} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+              <span style={{ color: '#854d0e', fontWeight: 900, fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                FRAGE an Lehrkraft · Für deine nächste Stunde vorgemerkt
+              </span>
+              {onOpenQuestionModal && (
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ca8a04' }}>Bearbeiten →</span>
+              )}
+            </div>
+            <span style={{ color: '#713f12', fontWeight: 750, fontSize: '0.90rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               „{studentQuestion}“
             </span>
           </div>

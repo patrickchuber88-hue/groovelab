@@ -434,3 +434,5 @@ export const CampusAppModalsHub: React.FC<CampusAppModalsHubProps> = React.memo(
 });
 
 CampusAppModalsHub.displayName = 'CampusAppModalsHub';
+
+export default CampusAppModalsHub;

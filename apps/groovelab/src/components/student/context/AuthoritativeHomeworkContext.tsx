@@ -11,6 +11,7 @@ import {
   extractCanonicalAudioStoragePath,
   isMetadataOrSnapshotNote
 } from '../tabs/briefing/homeworkSummaryHelper';
+import { MicroScoreSnippet } from '../meisterwerk/microscore/microScore.types';
 
 export type TaskReflectionStatus = 'super' | 'wackelig' | 'hilfe' | undefined;
 
@@ -52,7 +53,7 @@ export interface AuthoritativeHomeworkPlan {
   songs: AuthoritativeHomeworkSong[];
   generalNotes: string[];
   audioTracks: AuthoritativeAudioTrack[];
-  microScores?: any[];
+  microScores: MicroScoreSnippet[];
   studentQuestion: string | null;
   taskReflections: Record<string, TaskReflectionItem>;
   completedTasks: Record<string, boolean>;
@@ -103,7 +104,9 @@ function parseSnapshotPayload(
   books: AuthoritativeHomeworkBook[],
   songs: AuthoritativeHomeworkSong[],
   audio: AuthoritativeAudioTrack[],
-  notes: string[]
+  notes: string[],
+  microScores: MicroScoreSnippet[] = [],
+  onExtractedQuestion?: (q: string) => void
 ) {
   if (!rawNotes) return;
   let entries: any[] = [];
@@ -116,13 +119,46 @@ function parseSnapshotPayload(
 
   entries.forEach((entry: any) => {
     if (typeof entry !== 'string') return;
+    if (entry.includes('MICROSCORE:')) {
+      try {
+        const jsonIdx = entry.indexOf('MICROSCORE:') + 'MICROSCORE:'.length;
+        const parsedMs = JSON.parse(entry.substring(jsonIdx).trim());
+        if (parsedMs && !microScores.some(m => m.id === parsedMs.id)) {
+          microScores.push(parsedMs);
+        }
+      } catch (err) {
+        console.warn('[AuthoritativeHomeworkContext] Error parsing MICROSCORE:', err);
+      }
+      return;
+    }
     if (entry.includes('SNAPSHOT_LEHRWERKE:')) {
       const parsedLw = parseDelimitedJson(entry, 'SNAPSHOT_LEHRWERKE:');
       if (Array.isArray(parsedLw)) {
         parsedLw.forEach((lw: any) => {
-          const title = cleanAuthoritativeTitle(lw.title || '');
+          const rawTitle = lw.title || lw.bookTitle || lw.lehrwerkTitle || '';
+          const title = cleanAuthoritativeTitle(rawTitle);
           const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
-          if (title && pages.length > 0 && !books.some(b => b.title.toLowerCase() === title.toLowerCase())) {
+          if (!title || pages.length === 0) return;
+
+          // 🛡️ Zero-Phantom Sanitizer: Kollabiere generisches 'Lehrwerk' in das reale Buch
+          if (title.toLowerCase() === 'lehrwerk' && books.some(b => b.title.toLowerCase() !== 'lehrwerk')) {
+            const realBook = books.find(b => b.title.toLowerCase() !== 'lehrwerk')!;
+            pages.forEach(p => {
+              if (!realBook.pages.includes(p)) realBook.pages.push(p);
+            });
+            realBook.pages.sort((a, b) => a - b);
+            realBook.formattedPages = formatConsecutivePageRanges(realBook.pages);
+            return;
+          }
+
+          const existing = books.find(b => b.title.toLowerCase() === title.toLowerCase());
+          if (existing) {
+            pages.forEach(p => {
+              if (!existing.pages.includes(p)) existing.pages.push(p);
+            });
+            existing.pages.sort((a, b) => a - b);
+            existing.formattedPages = formatConsecutivePageRanges(existing.pages);
+          } else {
             books.push({
               title,
               pages,
@@ -175,6 +211,20 @@ function parseSnapshotPayload(
       }
       return;
     }
+    if (entry.includes('STUDENT_QUESTION:') || entry.includes('❓ Frage für den Unterricht:')) {
+      let qText = '';
+      if (entry.includes('STUDENT_QUESTION:')) {
+        const withoutPfx = entry.substring(entry.indexOf('STUDENT_QUESTION:') + 'STUDENT_QUESTION:'.length).trim();
+        const pipeIdx = withoutPfx.indexOf('|');
+        qText = (pipeIdx !== -1 ? withoutPfx.slice(pipeIdx + 1) : withoutPfx).trim();
+      } else {
+        qText = entry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+      }
+      if (qText && onExtractedQuestion) {
+        onExtractedQuestion(qText);
+      }
+      return;
+    }
     if (isMetadataOrSnapshotNote(entry)) return;
     const cleanN = cleanHomeworkNote(entry);
     if (cleanN && !cleanN.startsWith('Seite ') && cleanN.length > 2 && !notes.includes(cleanN)) {
@@ -222,7 +272,24 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
   const [studentQuestion, setStudentQuestionState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      return localStorage.getItem(`campus_student_question_${effectiveStudentId}`) || null;
+      const direct = localStorage.getItem(`campus_student_question_${effectiveStudentId}`);
+      if (direct && direct.trim()) return direct.trim();
+      const rawNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
+      if (rawNotes) {
+        const parsed = JSON.parse(rawNotes);
+        if (Array.isArray(parsed)) {
+          const qEntry = parsed.find((n: any) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+          if (qEntry) {
+            if (qEntry.startsWith('STUDENT_QUESTION:')) {
+              const withoutPfx = qEntry.substring(17);
+              const pIdx = withoutPfx.indexOf('|');
+              return (pIdx !== -1 ? withoutPfx.slice(pIdx + 1) : withoutPfx).trim();
+            }
+            return qEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+          }
+        }
+      }
+      return null;
     } catch {
       return null;
     }
@@ -299,7 +366,28 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
         const rawRefl = localStorage.getItem(`campus_student_task_reflections_${effectiveStudentId}`);
         if (rawRefl) setTaskReflections(JSON.parse(rawRefl));
         const rawQ = localStorage.getItem(`campus_student_question_${effectiveStudentId}`);
-        setStudentQuestionState(rawQ || null);
+        if (rawQ && rawQ.trim()) {
+          setStudentQuestionState(rawQ.trim());
+        } else {
+          const rawNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
+          if (rawNotes) {
+            const parsed = JSON.parse(rawNotes);
+            if (Array.isArray(parsed)) {
+              const qEntry = parsed.find((n: any) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+              if (qEntry) {
+                if (qEntry.startsWith('STUDENT_QUESTION:')) {
+                  const withoutPfx = qEntry.substring(17);
+                  const pIdx = withoutPfx.indexOf('|');
+                  setStudentQuestionState((pIdx !== -1 ? withoutPfx.slice(pIdx + 1) : withoutPfx).trim());
+                  return;
+                }
+                setStudentQuestionState(qEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim());
+                return;
+              }
+            }
+          }
+          setStudentQuestionState(null);
+        }
         const rawComp = localStorage.getItem(`campus_student_completed_tasks_${effectiveStudentId}`);
         if (rawComp) setCompletedTasks(JSON.parse(rawComp));
       } catch {}
@@ -309,6 +397,7 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
       'campus_homework_updated',
       'campus_homework_notes_updated',
       'campus_student_question_updated',
+      'campus_student_question_draft_updated',
       'campus_homework_reflection_updated',
       'storage'
     ];
@@ -522,6 +611,7 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
     let carriedOverWeek: string | null = null;
     const audioTracks: AuthoritativeAudioTrack[] = [];
     const generalNotes: string[] = [];
+    const microScores: MicroScoreSnippet[] = [];
 
     const addAudioTrack = (track: AuthoritativeAudioTrack) => {
       const cleanUrl = (track.url || '').replace(/^["']|["']$/g, '').trim();
@@ -599,10 +689,19 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
       });
     }
 
-    // 4. General didactic notes (strictly without metadata or snapshot tokens)
+    // 4. MicroScores & general didactic notes (strictly without metadata or snapshot tokens)
     (progressItems || []).forEach((item: any) => {
       const raw = item.homework_notes || item.teacher_notes;
       if (!raw) return;
+      if (typeof raw === 'string' && raw.includes('MICROSCORE:')) {
+        try {
+          const jsonIdx = raw.indexOf('MICROSCORE:') + 'MICROSCORE:'.length;
+          const parsedMs = JSON.parse(raw.substring(jsonIdx).trim());
+          if (parsedMs && !microScores.some(m => m.id === parsedMs.id)) {
+            microScores.push(parsedMs);
+          }
+        } catch {}
+      }
       const cleaned = cleanHomeworkNote(raw);
       if (
         cleaned &&
@@ -616,13 +715,29 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
       }
     });
 
-    // 5. Fallback: Vorwochen-Carryover & Snapshots
+    // 5. Autoritatives Unpacking des aktiven Wochen-Snapshots (Notes, MicroScores, Audios, Questions)
+    let extractedSnapshotQuestion: string | null = null;
+    const handleSnapshotQuestion = (q: string) => {
+      if (!extractedSnapshotQuestion && q) {
+        extractedSnapshotQuestion = q;
+      }
+    };
+
+    if (latestSnapshot) {
+      const rawNotes = latestSnapshot.homework_notes || latestSnapshot.teacher_notes;
+      if (rawNotes) {
+        parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
+      }
+    }
+
+    // 5.1 Falls noch keine Bücher oder Songs vorhanden sind, Vorwochen-Kandidaten durchsuchen (Pädagogischer Übertrag)
     if (books.length === 0 || songs.length === 0) {
       for (const snapItem of candidates) {
+        if (snapItem === latestSnapshot) continue;
         const rawNotes = snapItem.homework_notes || snapItem.teacher_notes;
         if (!rawNotes) continue;
         const bCount = books.length, sCount = songs.length;
-        parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes);
+        parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
         if (books.length > bCount || songs.length > sCount) {
           isCarriedOver = true;
           if (!carriedOverWeek) {
@@ -636,11 +751,37 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
       if (books.length === 0 && songs.length === 0 && typeof window !== 'undefined') {
         const cachedNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
         if (cachedNotes) {
-          parseSnapshotPayload(cachedNotes, books, songs, audioTracks, generalNotes);
+          parseSnapshotPayload(cachedNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
           const cachedW = localStorage.getItem(`campus_homework_week_${effectiveStudentId}`);
           if (cachedW) carriedOverWeek = cachedW;
         }
       }
+    }
+
+    // 🛡️ Zero-Phantom Sanitizer: Wenn reale Bücher existieren, kollabiere generisches 'Lehrwerk' restlos
+    const hasRealBooks = books.some(b => b.title.toLowerCase() !== 'lehrwerk');
+    if (hasRealBooks) {
+      const phantomIdx = books.findIndex(b => b.title.toLowerCase() === 'lehrwerk');
+      if (phantomIdx !== -1) {
+        const phantom = books[phantomIdx];
+        const realBook = books.find(b => b.title.toLowerCase() !== 'lehrwerk')!;
+        phantom.pages.forEach(p => {
+          if (!realBook.pages.includes(p)) realBook.pages.push(p);
+        });
+        realBook.pages.sort((a, b) => a - b);
+        realBook.formattedPages = formatConsecutivePageRanges(realBook.pages);
+        books.splice(phantomIdx, 1);
+      }
+    }
+
+    // Auto-Sync extractedSnapshotQuestion in LocalStorage
+    if (extractedSnapshotQuestion && typeof window !== 'undefined') {
+      try {
+        const currentStored = localStorage.getItem(`campus_student_question_${effectiveStudentId}`);
+        if (!currentStored || !currentStored.trim()) {
+          localStorage.setItem(`campus_student_question_${effectiveStudentId}`, extractedSnapshotQuestion);
+        }
+      } catch {}
     }
 
     return {
@@ -648,8 +789,10 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
       songs,
       generalNotes,
       audioTracks,
+      microScores,
       isCarriedOver,
-      carriedOverWeek
+      carriedOverWeek,
+      snapshotQuestion: extractedSnapshotQuestion
     };
   }, [
     effectiveStudentId,
@@ -666,10 +809,11 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
     songs: planData.songs,
     generalNotes: planData.generalNotes,
     audioTracks: planData.audioTracks,
-    studentQuestion,
+    microScores: planData.microScores,
+    studentQuestion: studentQuestion || planData.snapshotQuestion || null,
     taskReflections,
     completedTasks,
-    hasActiveHomework: planData.books.length > 0 || planData.songs.length > 0 || planData.generalNotes.length > 0,
+    hasActiveHomework: planData.books.length > 0 || planData.songs.length > 0 || planData.generalNotes.length > 0 || planData.microScores.length > 0,
     isCarriedOver: planData.isCarriedOver,
     carriedOverWeek: planData.carriedOverWeek,
     setTaskReflection,

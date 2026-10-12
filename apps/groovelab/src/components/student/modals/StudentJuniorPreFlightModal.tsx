@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, Check, Compass, Headphones, Lightbulb, Music, Rocket, Star, X } from "lucide-react";
-import { getSongColor } from "../studentDateUtils";
+import { getSongColor, CANONICAL_LEHRWERK_COLOR } from "../studentDateUtils";
 import { PreFlightAudioPlayerSection } from "../../campus/ZenPlayAlongDock";
 
 export interface StudentJuniorPreFlightModalProps {
@@ -176,11 +176,13 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                       width: '28px',
                       height: '28px',
                       borderRadius: '8px',
-                      background: '#fee2e2',
+                      background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.85)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#dc2626',
+                      color: '#e11d48',
+                      boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
                       flexShrink: 0
                     }}>
                       <BookOpen size={15} strokeWidth={2.4} />
@@ -193,13 +195,13 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
                     {b.pageNums.map((pNum: number) => (
                       <span key={`p-pill-${pNum}`} style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: '#ffffff',
-                        fontSize: '0.78rem',
-                        fontWeight: 900,
-                        padding: '3px 8px',
-                        borderRadius: '7px',
-                        border: 'none',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        border: '1px solid #bbf7d0',
+                        fontSize: '0.76rem',
+                        fontWeight: 850,
+                        padding: '2px 8px',
+                        borderRadius: '99px',
                         boxShadow: 'none'
                       }}>
                         S. {pNum}

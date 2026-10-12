@@ -13,9 +13,7 @@ import { ErrorBoundary, DashboardLoader } from './components/ui/ErrorBoundary';
 import { CampusSystemBannersOverlay } from './components/layout/CampusSystemBannersOverlay';
 import { CampusAppLayout } from './components/layout/CampusAppLayout';
 import { useCampusAppOrchestrator } from './hooks/useCampusAppOrchestrator';
-import { lazyWithRetry } from './utils/lazyWithRetry';
-
-const CampusAppModalsHub = lazyWithRetry(() => import('./components/layout/CampusAppModalsHub'), 'CampusAppModalsHub');
+import CampusAppModalsHub from './components/layout/CampusAppModalsHub';
 
 import './App.css';
 

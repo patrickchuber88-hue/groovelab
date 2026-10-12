@@ -234,6 +234,103 @@ async function runStorageEgressGovernanceSuite() {
   assert('Lehrkraft darf Schul-Assets löschen', teacherDeleteSchoolAsset.allowed);
 
   // ----------------------------------------------------------------------------
+  // 2b. ZERO-TRUST ReBAC STUDENT AUDIO SHARING GOVERNANCE (§ 201 StGB / § 73 UrhG)
+  // ----------------------------------------------------------------------------
+  console.log('\n▶ Prüfe Zero-Trust ReBAC Student Audio Sharing Governance...');
+
+  const adminAlpha: AuthUserData = {
+    accessToken: 'mock_token_admin_alpha',
+    user: { id: 'usr-admin-alpha' },
+    role: 'admin',
+    schoolId: 'school-alpha'
+  };
+
+  const secretaryAlpha: AuthUserData = {
+    accessToken: 'mock_token_secretary_alpha',
+    user: { id: 'usr-secretary-alpha' },
+    role: 'secretary',
+    schoolId: 'school-alpha'
+  };
+
+  const canonicalStudentRecPath = 'schools/school-alpha/students/usr-student-a/recordings/memo_12345.webm';
+
+  // 1. Student owns recording
+  const studentRecAccess = validatePathAccess(canonicalStudentRecPath, studentA);
+  assert('Schüler darf eigene Vertraulichkeits-Aufnahme (recordings) abhören', studentRecAccess.allowed);
+
+  // 2. Schulleitung (admin) MUST be completely blocked (0% access)
+  const adminRecAccess = validatePathAccess(canonicalStudentRecPath, adminAlpha);
+  assert('Schulleitung wird bei Schüler-Aufnahmen hermetisch abgewiesen (0% Leadership Access)', 
+    !adminRecAccess.allowed && adminRecAccess.reason === 'LEADERSHIP_STUDENT_AUDIO_ACCESS_PROHIBITED');
+
+  // 3. Sekretariat (secretary) MUST be completely blocked (0% access)
+  const secRecAccess = validatePathAccess(canonicalStudentRecPath, secretaryAlpha);
+  assert('Sekretariat wird bei Schüler-Aufnahmen hermetisch abgewiesen (0% Admin Access)', 
+    !secRecAccess.allowed && secRecAccess.reason === 'LEADERSHIP_STUDENT_AUDIO_ACCESS_PROHIBITED');
+
+  // 4. Assigned Teacher WITHOUT student share MUST be blocked
+  const teacherUnshared = validatePathAccess(canonicalStudentRecPath, teacherAlpha, 'read', { isSharedWithTeacher: false });
+  assert('Lehrkraft ohne aktive Freigabe wird verweigert (STUDENT_AUDIO_NOT_SHARED_WITH_TEACHER)', 
+    !teacherUnshared.allowed && teacherUnshared.reason === 'STUDENT_AUDIO_NOT_SHARED_WITH_TEACHER');
+
+  // 5. Assigned Teacher WITH student share is granted stream access
+  const teacherShared = validatePathAccess(canonicalStudentRecPath, teacherAlpha, 'read', { isSharedWithTeacher: true });
+  assert('Lehrkraft mit aktiver Freigabe erhält Stream-Zugriff', teacherShared.allowed);
+
+  // 6. Teacher CANNOT delete student recording
+  const teacherDeleteAttempt = validatePathAccess(canonicalStudentRecPath, teacherAlpha, 'delete', { isSharedWithTeacher: true });
+  assert('Lehrkraft darf fremde Schüler-Aufnahme NIEMALS löschen (TEACHER_CANNOT_DELETE_STUDENT_RECORDING)', 
+    !teacherDeleteAttempt.allowed && teacherDeleteAttempt.reason === 'TEACHER_CANNOT_DELETE_STUDENT_RECORDING');
+
+  // 7. Student can delete own recording
+  const studentDeleteCanonical = validatePathAccess(canonicalStudentRecPath, studentA, 'delete');
+  assert('Schüler darf eigene Aufnahme jederzeit autonom löschen (Art. 17 DSGVO)', studentDeleteCanonical.allowed);
+
+  // ----------------------------------------------------------------------------
+  // 2c. WHOLE-TREE STUDENT SHIELD GOVERNANCE (Homework, Meisterwerk, Notes)
+  // ----------------------------------------------------------------------------
+  console.log('\n▶ Prüfe Whole-Tree Student Shield Governance (Homework, Meisterwerk, Notes)...');
+
+  const studentHomeworkPath = 'schools/school-alpha/students/usr-student-a/homework/exercise_01.pdf';
+  const studentMeisterwerkPath = 'schools/school-alpha/students/usr-student-a/meisterwerk/composition.mp3';
+  const studentNotesPath = 'schools/school-alpha/students/usr-student-a/notes/practice_memo.txt';
+
+  // 1. Schulleitung (admin) MUST be completely blocked from student homework (0% access)
+  const adminHomeworkAccess = validatePathAccess(studentHomeworkPath, adminAlpha);
+  assert('Schulleitung wird bei Schüler-Hausaufgaben hermetisch abgewiesen (LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED)',
+    !adminHomeworkAccess.allowed && adminHomeworkAccess.reason === 'LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED');
+
+  // 2. Sekretariat (secretary) MUST be completely blocked from student meisterwerk (0% access)
+  const secMeisterwerkAccess = validatePathAccess(studentMeisterwerkPath, secretaryAlpha);
+  assert('Sekretariat wird bei Schüler-Meisterwerk hermetisch abgewiesen (LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED)',
+    !secMeisterwerkAccess.allowed && secMeisterwerkAccess.reason === 'LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED');
+
+  // 3. Schulleitung (admin) MUST be completely blocked from student notes
+  const adminNotesAccess = validatePathAccess(studentNotesPath, adminAlpha);
+  assert('Schulleitung wird bei Schüler-Notizen hermetisch abgewiesen (LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED)',
+    !adminNotesAccess.allowed && adminNotesAccess.reason === 'LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED');
+
+  // 4. Assigned Teacher WITHOUT assignment verification is blocked
+  const teacherUnassignedHw = validatePathAccess(studentHomeworkPath, teacherAlpha, 'read', { isAssignedTeacher: false });
+  assert('Nicht zugewiesene Lehrkraft wird bei Schüler-Hausaufgaben blockiert (TEACHER_NOT_ASSIGNED_TO_STUDENT)',
+    !teacherUnassignedHw.allowed && teacherUnassignedHw.reason === 'TEACHER_NOT_ASSIGNED_TO_STUDENT');
+
+  // 5. Assigned Teacher WITH assignment verification is granted access
+  const teacherAssignedHw = validatePathAccess(studentHomeworkPath, teacherAlpha, 'read', { isAssignedTeacher: true });
+  assert('Zugewiesene Lehrkraft erhält Lesezugriff auf Schüler-Hausaufgaben', teacherAssignedHw.allowed);
+
+  // 6. Teacher CANNOT delete student homework
+  const teacherDeleteHw = validatePathAccess(studentHomeworkPath, teacherAlpha, 'delete', { isAssignedTeacher: true });
+  assert('Lehrkraft darf Schüler-Dateien NIEMALS löschen (CANNOT_DELETE_STUDENT_DATA)',
+    !teacherDeleteHw.allowed && teacherDeleteHw.reason === 'CANNOT_DELETE_STUDENT_DATA');
+
+  // 7. Student can access and delete own homework
+  const studentAccessHw = validatePathAccess(studentHomeworkPath, studentA, 'read');
+  const studentDeleteHw = validatePathAccess(studentHomeworkPath, studentA, 'delete');
+  assert('Schüler darf eigene Hausaufgaben lesen und löschen', studentAccessHw.allowed && studentDeleteHw.allowed);
+
+
+  // ----------------------------------------------------------------------------
   // 3. IN-MEMORY LRU CACHE DYNAMICS & LEASE EXPIRATION
   // ----------------------------------------------------------------------------
   console.log('\n▶ Prüfe In-Memory LRU Cache für Pre-Signed Streaming URLs...');
@@ -294,7 +391,7 @@ async function runStorageEgressGovernanceSuite() {
 
   assert(
     'BOLA Gatekeeper: validatePathAccess wird auf Egress- und Purge-Routen angewendet',
-    storageContent.includes('validatePathAccess(filePath, authData)') &&
+    storageContent.includes('validatePathAccess(filePath, authData') &&
     storageContent.includes("validatePathAccess(p, authData, 'delete')")
   );
 

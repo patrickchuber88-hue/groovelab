@@ -68,7 +68,8 @@ function parseSnapshotPayload(
   songs: AuthoritativeHomeworkSong[],
   audio: AuthoritativeAudioTrack[],
   notes: string[],
-  microScores: MicroScoreSnippet[] = []
+  microScores: MicroScoreSnippet[] = [],
+  onExtractedQuestion?: (q: string) => void
 ) {
   if (!rawNotes) return;
   let entries: any[] = [];
@@ -95,9 +96,30 @@ function parseSnapshotPayload(
       const parsedLw = parseDelimitedJson(entry, 'SNAPSHOT_LEHRWERKE:');
       if (Array.isArray(parsedLw)) {
         parsedLw.forEach((lw: any) => {
-          const title = cleanAuthoritativeTitle(lw.title || '');
+          const rawTitle = lw.title || lw.bookTitle || lw.lehrwerkTitle || '';
+          const title = cleanAuthoritativeTitle(rawTitle);
           const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
-          if (title && pages.length > 0 && !books.some(b => b.title.toLowerCase() === title.toLowerCase())) {
+          if (!title || pages.length === 0) return;
+
+          // 🛡️ Zero-Phantom Sanitizer: Kollabiere generisches 'Lehrwerk' in das reale Buch
+          if (title.toLowerCase() === 'lehrwerk' && books.some(b => b.title.toLowerCase() !== 'lehrwerk')) {
+            const realBook = books.find(b => b.title.toLowerCase() !== 'lehrwerk')!;
+            pages.forEach(p => {
+              if (!realBook.pages.includes(p)) realBook.pages.push(p);
+            });
+            realBook.pages.sort((a, b) => a - b);
+            realBook.formattedPages = formatConsecutivePageRanges(realBook.pages);
+            return;
+          }
+
+          const existing = books.find(b => b.title.toLowerCase() === title.toLowerCase());
+          if (existing) {
+            pages.forEach(p => {
+              if (!existing.pages.includes(p)) existing.pages.push(p);
+            });
+            existing.pages.sort((a, b) => a - b);
+            existing.formattedPages = formatConsecutivePageRanges(existing.pages);
+          } else {
             books.push({ title, pages, formattedPages: formatConsecutivePageRanges(pages), notes: Array.isArray(lw.notes) ? lw.notes : [] });
           }
         });
@@ -111,11 +133,18 @@ function parseSnapshotPayload(
           if (song.is_campus_active === false || isDummyOrTestSong(song)) return;
           const rawSongTitle = song.topic_name || song.title || '';
           if (isWeeklySnapshotContainer(rawSongTitle)) return;
-          const cTitle = cleanAuthoritativeTitle(rawSongTitle);
+          let cTitle = cleanAuthoritativeTitle(rawSongTitle);
           if (!cTitle || isWeeklySnapshotContainer(cTitle)) return;
           let artist = (song.artist || song.songs?.artist || '').trim();
           if (/^campus[- ]?song$/i.test(artist)) artist = '';
           if (isWeeklySnapshotContainer(artist)) return;
+          if (artist && (cTitle.toLowerCase().startsWith(artist.toLowerCase() + ' - ') || cTitle.toLowerCase().startsWith(artist.toLowerCase() + ' – '))) {
+            cTitle = cTitle.slice(artist.length).replace(/^[\s–—-]+/, '').trim();
+          } else if (!artist && cTitle.includes(' - ')) {
+            const parts = cTitle.split(' - ');
+            artist = parts[0]?.trim() || '';
+            cTitle = parts.slice(1).join(' - ').trim();
+          }
           if (!songs.some(s => s.cleanTitle.toLowerCase() === cTitle.toLowerCase())) {
             songs.push({ id: String(song.id || song.song_id || cTitle), song_id: song.song_id || song.id, title: cTitle, cleanTitle: cTitle, artist, notes: cleanHomeworkNote(song.homework_notes || song.notes), is_current_homework: true });
           }
@@ -134,6 +163,20 @@ function parseSnapshotPayload(
       const canonUrl = extractCanonicalAudioStoragePath(url);
       if (url && !audio.some(a => a.url === url || (canonUrl && extractCanonicalAudioStoragePath(a.url) === canonUrl))) {
         audio.push({ url, label, duration: dur, date, author });
+      }
+      return;
+    }
+    if (entry.includes('STUDENT_QUESTION:') || entry.includes('❓ Frage für den Unterricht:')) {
+      let qText = '';
+      if (entry.includes('STUDENT_QUESTION:')) {
+        const withoutPfx = entry.substring(entry.indexOf('STUDENT_QUESTION:') + 'STUDENT_QUESTION:'.length).trim();
+        const pipeIdx = withoutPfx.indexOf('|');
+        qText = (pipeIdx !== -1 ? withoutPfx.slice(pipeIdx + 1) : withoutPfx).trim();
+      } else {
+        qText = entry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+      }
+      if (qText && onExtractedQuestion) {
+        onExtractedQuestion(qText);
       }
       return;
     }
@@ -172,7 +215,24 @@ export function useAuthoritativeHomeworkPlan(
   const [studentQuestion, setStudentQuestion] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      return localStorage.getItem(`campus_student_question_${effectiveStudentId}`) || null;
+      const direct = localStorage.getItem(`campus_student_question_${effectiveStudentId}`);
+      if (direct && direct.trim()) return direct.trim();
+      const rawNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
+      if (rawNotes) {
+        const parsed = JSON.parse(rawNotes);
+        if (Array.isArray(parsed)) {
+          const qEntry = parsed.find((n: any) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+          if (qEntry) {
+            if (qEntry.startsWith('STUDENT_QUESTION:')) {
+              const withoutPfx = qEntry.substring(17);
+              const pIdx = withoutPfx.indexOf('|');
+              return (pIdx !== -1 ? withoutPfx.slice(pIdx + 1) : withoutPfx).trim();
+            }
+            return qEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+          }
+        }
+      }
+      return null;
     } catch { return null; }
   });
 
@@ -183,11 +243,39 @@ export function useAuthoritativeHomeworkPlan(
         const rawRefl = localStorage.getItem(`campus_student_task_reflections_${effectiveStudentId}`);
         if (rawRefl) setTaskReflections(JSON.parse(rawRefl));
         const rawQ = localStorage.getItem(`campus_student_question_${effectiveStudentId}`);
-        setStudentQuestion(rawQ || null);
+        if (rawQ && rawQ.trim()) {
+          setStudentQuestion(rawQ.trim());
+        } else {
+          const rawNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
+          if (rawNotes) {
+            const parsed = JSON.parse(rawNotes);
+            if (Array.isArray(parsed)) {
+              const qEntry = parsed.find((n: any) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+              if (qEntry) {
+                if (qEntry.startsWith('STUDENT_QUESTION:')) {
+                  const withoutPfx = qEntry.substring(17);
+                  const pIdx = withoutPfx.indexOf('|');
+                  setStudentQuestion((pIdx !== -1 ? withoutPfx.slice(pIdx + 1) : withoutPfx).trim());
+                  return;
+                }
+                setStudentQuestion(qEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim());
+                return;
+              }
+            }
+          }
+          setStudentQuestion(null);
+        }
       } catch {}
     };
 
-    const evs = ['campus_homework_updated', 'campus_homework_notes_updated', 'campus_student_question_updated', 'campus_homework_reflection_updated', 'storage'];
+    const evs = [
+      'campus_homework_updated',
+      'campus_homework_notes_updated',
+      'campus_student_question_updated',
+      'campus_student_question_draft_updated',
+      'campus_homework_reflection_updated',
+      'storage'
+    ];
     evs.forEach(ev => window.addEventListener(ev, handleSync));
     return () => evs.forEach(ev => window.removeEventListener(ev, handleSync));
   }, [effectiveStudentId]);
@@ -241,9 +329,16 @@ export function useAuthoritativeHomeworkPlan(
     );
     const songs: AuthoritativeHomeworkSong[] = rawSongs
       .map(s => {
-        const cTitle = cleanAuthoritativeTitle(s.topic_name || s.title || 'Song');
+        let cTitle = cleanAuthoritativeTitle(s.topic_name || s.title || 'Song');
         let artist = (s.artist || s.songs?.artist || '').trim();
         if (/^campus[- ]?song$/i.test(artist)) artist = '';
+        if (artist && (cTitle.toLowerCase().startsWith(artist.toLowerCase() + ' - ') || cTitle.toLowerCase().startsWith(artist.toLowerCase() + ' – '))) {
+          cTitle = cTitle.slice(artist.length).replace(/^[\s–—-]+/, '').trim();
+        } else if (!artist && cTitle.includes(' - ')) {
+          const parts = cTitle.split(' - ');
+          artist = parts[0]?.trim() || '';
+          cTitle = parts.slice(1).join(' - ').trim();
+        }
         return {
           id: String(s.id || s.song_id || cTitle),
           song_id: s.song_id || s.songs?.id,
@@ -360,13 +455,29 @@ export function useAuthoritativeHomeworkPlan(
       }
     });
 
-    // 5. Unpack books & songs if not already populated
+    // 5. Autoritatives Unpacking des aktiven Wochen-Snapshots (Notes, MicroScores, Audios, Questions)
+    let extractedSnapshotQuestion: string | null = null;
+    const handleSnapshotQuestion = (q: string) => {
+      if (!extractedSnapshotQuestion && q) {
+        extractedSnapshotQuestion = q;
+      }
+    };
+
+    if (latestSnapshot) {
+      const rawNotes = latestSnapshot.homework_notes || latestSnapshot.teacher_notes;
+      if (rawNotes) {
+        parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
+      }
+    }
+
+    // 5.1 Falls noch keine Bücher oder Songs vorhanden sind, Vorwochen-Kandidaten durchsuchen (Pädagogischer Übertrag)
     if (books.length === 0 || songs.length === 0) {
       for (const snapItem of candidates) {
+        if (snapItem === latestSnapshot) continue;
         const rawNotes = snapItem.homework_notes || snapItem.teacher_notes;
         if (!rawNotes) continue;
         const bCount = books.length, sCount = songs.length;
-        parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes, microScores);
+        parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
         if (books.length > bCount || songs.length > sCount) {
           isCarriedOver = true;
           if (!carriedOverWeek) {
@@ -380,14 +491,49 @@ export function useAuthoritativeHomeworkPlan(
       if (books.length === 0 && songs.length === 0 && typeof window !== 'undefined') {
         const cachedNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
         if (cachedNotes) {
-          parseSnapshotPayload(cachedNotes, books, songs, audioTracks, generalNotes, microScores);
+          parseSnapshotPayload(cachedNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
           const cachedW = localStorage.getItem(`campus_homework_week_${effectiveStudentId}`);
           if (cachedW) carriedOverWeek = cachedW;
         }
       }
     }
 
-    return { books, songs, generalNotes, audioTracks, microScores, isCarriedOver, carriedOverWeek };
+    // 🛡️ Zero-Phantom Sanitizer: Wenn reale Bücher existieren, kollabiere generisches 'Lehrwerk' restlos
+    const hasRealBooks = books.some(b => b.title.toLowerCase() !== 'lehrwerk');
+    if (hasRealBooks) {
+      const phantomIdx = books.findIndex(b => b.title.toLowerCase() === 'lehrwerk');
+      if (phantomIdx !== -1) {
+        const phantom = books[phantomIdx];
+        const realBook = books.find(b => b.title.toLowerCase() !== 'lehrwerk')!;
+        phantom.pages.forEach(p => {
+          if (!realBook.pages.includes(p)) realBook.pages.push(p);
+        });
+        realBook.pages.sort((a, b) => a - b);
+        realBook.formattedPages = formatConsecutivePageRanges(realBook.pages);
+        books.splice(phantomIdx, 1);
+      }
+    }
+
+    // Auto-Sync extractedSnapshotQuestion in LocalStorage
+    if (extractedSnapshotQuestion && typeof window !== 'undefined') {
+      try {
+        const currentStored = localStorage.getItem(`campus_student_question_${effectiveStudentId}`);
+        if (!currentStored || !currentStored.trim()) {
+          localStorage.setItem(`campus_student_question_${effectiveStudentId}`, extractedSnapshotQuestion);
+        }
+      } catch {}
+    }
+
+    return {
+      books,
+      songs,
+      generalNotes,
+      audioTracks,
+      microScores,
+      isCarriedOver,
+      carriedOverWeek,
+      snapshotQuestion: extractedSnapshotQuestion
+    };
   }, [effectiveStudentId, localProgress, lehrwerke, progressItems, activeSongSkills, assignedCampusSongs, syncTrigger]);
 
   return {
@@ -396,7 +542,7 @@ export function useAuthoritativeHomeworkPlan(
     generalNotes: planData.generalNotes,
     audioTracks: planData.audioTracks,
     microScores: planData.microScores,
-    studentQuestion,
+    studentQuestion: studentQuestion || planData.snapshotQuestion || null,
     taskReflections,
     setTaskReflection,
     hasActiveHomework: planData.books.length > 0 || planData.songs.length > 0 || planData.generalNotes.length > 0 || planData.microScores.length > 0,

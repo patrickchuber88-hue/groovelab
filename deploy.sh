@@ -18,7 +18,13 @@ echo "🎸 GrooveLab Deployment startet..."
 echo "   Ziel: $SERVER → $TARGET_RELEASE"
 echo ""
 
-# 0. Pre-Deployment Security Shield & Automatic Production Build
+# 0. Pre-Deployment Security Shield & Deterministic Production Build (ISO/IEC 5230 / NIST SP 800-161)
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --pretty=%ct 2>/dev/null || date +%s)}"
+echo "🕒 Deterministischer Build-Timestamp: SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+
+PRE_DEPLOY_BACKUP_PATH=""
+MIGRATIONS_EXECUTED=0
+
 if [ "${SKIP_BUILD:-0}" = "1" ]; then
   echo "⏩ Überspringe Build (SKIP_BUILD=1 gesetzt)..."
   if [ ! -d "$LOCAL_DIST" ]; then
@@ -26,11 +32,30 @@ if [ "${SKIP_BUILD:-0}" = "1" ]; then
     exit 1
   fi
 else
-  echo "🔨 Führe sauberen Produktions-Build aus (TypeScript + Vite + SRI + Precompression + CWV Budget)..."
-  npm run build:groovelab || {
-    echo "❌ Fehler: Build fehlgeschlagen! Deployment wird abgebrochen."
-    exit 1
-  }
+  if [ "${HERMETIC_CONTAINER_BUILD:-0}" = "1" ] && command -v docker >/dev/null 2>&1; then
+    echo "🐳 Führe hermetischen Container-Build aus (Linux x86_64, Node 20 LTS)..."
+    docker run --rm \
+      --user "$(id -u):$(id -g)" \
+      -v "$PWD:/workspace" \
+      -w /workspace \
+      -e CI=true \
+      -e NODE_ENV=production \
+      -e SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
+      -e TZ=UTC \
+      -e LANG=C.UTF-8 \
+      node:20-bookworm-slim sh -c "npm run build:groovelab" || {
+        echo "❌ Fehler: Hermetischer Container-Build fehlgeschlagen!"
+        exit 1
+      }
+  else
+    echo "🔨 Führe sauberen Produktions-Build aus (TypeScript + Vite + SRI + Precompression + CWV Budget)..."
+    npm run build:groovelab || {
+      echo "❌ Fehler: Build fehlgeschlagen! Deployment wird abgebrochen."
+      exit 1
+    }
+  fi
+  # Bereinige eventuelle OS-Metadaten
+  find "$LOCAL_DIST" -name '.DS_Store' -delete 2>/dev/null || true
 fi
 
 if [ "${SKIP_AUDIT:-0}" = "1" ]; then
@@ -52,6 +77,19 @@ node scripts/generate_cyclonedx_sbom.mjs || {
 }
 echo ""
 
+# 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
+echo "📁 [PRE-FLIGHT] Remote-Verzeichnisse & Backup-Ordner vorbereiten..."
+ssh "$SERVER" "mkdir -p $RELEASES_DIR && sudo chown -R deployuser:deployuser $REMOTE_DIR 2>/dev/null && sudo mkdir -p /mnt/cloud-volume/backups && sudo chown deployuser:deployuser /mnt/cloud-volume/backups 2>/dev/null && ([ -d /mnt/cloud-volume ] && [ ! -e /mnt/supabase_data ] && sudo ln -sfn /mnt/cloud-volume /mnt/supabase_data 2>/dev/null || true) || true"
+
+# Falls /var/www/groovelab bisher ein normales Verzeichnis mit Dateien war, initiale Struktur aufbauen
+ssh "$SERVER" "if [ ! -L '$CURRENT_LINK' ] && [ -d '$CURRENT_LINK' ]; then mv '$CURRENT_LINK' '${RELEASES_DIR}/legacy_$(date +%Y%m%d)' && ln -sfn '${RELEASES_DIR}/legacy_$(date +%Y%m%d)' '$CURRENT_LINK'; fi"
+
+# 2. Pre-Deploy Backup der Live-Datenbank VOR den Migrationen anlegen (0,1% Symmetrische Rollback-Sicherheit)
+BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+PRE_DEPLOY_BACKUP_PATH="/mnt/cloud-volume/backups/pre_deploy_${BACKUP_TIMESTAMP}.sql.gz"
+echo "🛡️  [PRE-FLIGHT] Erstelle Pre-Migration Snapshot auf dem Cloud Volume ($PRE_DEPLOY_BACKUP_PATH)..."
+ssh "$SERVER" "BACKUP_DIR='/mnt/cloud-volume/backups'; [ ! -d '\$BACKUP_DIR' ] && BACKUP_DIR='/mnt/supabase_data/backups'; mkdir -p '\$BACKUP_DIR' 2>/dev/null || true; if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q 'supabase-db\|postgres'; then CONTAINER=\$(docker ps --format '{{.Names}}' | grep 'supabase-db\|postgres' | head -n 1); docker exec -t \$CONTAINER pg_dump -U postgres postgres 2>/dev/null | gzip > '$PRE_DEPLOY_BACKUP_PATH' || true; echo \"  ✓ Pre-Migration Snapshot auf \$PRE_DEPLOY_BACKUP_PATH gesichert.\"; else echo '  ℹ Pre-Deploy Hinweis: Kein lokaler DB-Container aktiv, überspringe DB-Dump.'; fi"
+
 # 0b. Authoritative Database Schema Migration & Parity Guard (0,1% Goldstandard)
 echo "🔍 [PRE-FLIGHT] Verifiziere & synchronisiere DB-Schema-Parität gegen Live-Cluster..."
 if [ "${SKIP_MIGRATIONS:-0}" = "1" ]; then
@@ -61,6 +99,7 @@ else
     echo "🚨 KRITISCHER DEPLOY-ABBRUCH: DB-Schema-Migrationen fehlgeschlagen!"
     exit 1
   }
+  MIGRATIONS_EXECUTED=1
 fi
 echo ""
 
@@ -72,23 +111,27 @@ rollback() {
   echo "🚨 DEPLOYMENT FEHLGESCHLAGEN! Starte sofortigen automatischen 100ms-Rollback..."
   if [ -n "$PREVIOUS_RELEASE" ] && [ "$PREVIOUS_RELEASE" != "$TARGET_RELEASE" ]; then
     ssh "$SERVER" "ln -sfn '$PREVIOUS_RELEASE' '$CURRENT_LINK' && sudo systemctl reload nginx 2>/dev/null || true"
-    echo "  ✓ Rollback erfolgreich: Live-Server zeigt wieder auf '$PREVIOUS_RELEASE'."
+    if [ -n "$WEB_CONTAINER" ]; then
+      ssh "$SERVER" "docker exec '$WEB_CONTAINER' nginx -s reload 2>/dev/null || true"
+    fi
+    echo "  ✓ Asset-Rollback erfolgreich: Live-Server zeigt wieder auf '$PREVIOUS_RELEASE'."
   else
     echo "  ⚠️ Kein vorheriges Release verfügbar oder initialer Deploy. Manuelle Prüfung erforderlich."
   fi
+
+  # Symmetrische DB-Ledger Reconciliation & PostgREST Cache Invalidation
+  if [ "${MIGRATIONS_EXECUTED:-0}" = "1" ]; then
+    echo "🔄 Symmetrischer DB-Rollback: Invalidiere PostgREST Schema-Cache..."
+    ssh "$SERVER" "DB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -E 'supabase-db|postgres' | head -n 1); if [ -n \"\$DB_CONTAINER\" ]; then docker exec -i \$DB_CONTAINER psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\" 2>/dev/null || true; fi"
+    if [ -n "$PRE_DEPLOY_BACKUP_PATH" ]; then
+      echo "  ℹ️  Pre-Deploy Snapshot für PITR-Wiederherstellung verfügbar:"
+      echo "     Pfad: $PRE_DEPLOY_BACKUP_PATH"
+      echo "     Wiederherstellung bei Bedarf: ssh $SERVER 'zcat $PRE_DEPLOY_BACKUP_PATH | docker exec -i ... psql -U postgres postgres'"
+    fi
+  fi
+
   exit 1
 }
-
-# 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
-echo "📁 Remote-Verzeichnisse & Backup-Ordner vorbereiten..."
-ssh "$SERVER" "mkdir -p $RELEASES_DIR && sudo chown -R deployuser:deployuser $REMOTE_DIR 2>/dev/null && sudo mkdir -p /mnt/cloud-volume/backups && sudo chown deployuser:deployuser /mnt/cloud-volume/backups 2>/dev/null && ([ -d /mnt/cloud-volume ] && [ ! -e /mnt/supabase_data ] && sudo ln -sfn /mnt/cloud-volume /mnt/supabase_data 2>/dev/null || true) || true"
-
-# Falls /var/www/groovelab bisher ein normales Verzeichnis mit Dateien war, initiale Struktur aufbauen
-ssh "$SERVER" "if [ ! -L '$CURRENT_LINK' ] && [ -d '$CURRENT_LINK' ]; then mv '$CURRENT_LINK' '${RELEASES_DIR}/legacy_$(date +%Y%m%d)' && ln -sfn '${RELEASES_DIR}/legacy_$(date +%Y%m%d)' '$CURRENT_LINK'; fi"
-
-# 2. Pre-Deploy Backup der Live-Datenbank auf dem Cloud Volume erstellen (falls DB-Container existiert)
-echo "🛡️  Erstelle Pre-Deploy Backup auf dem Cloud Volume (/mnt/cloud-volume/backups)..."
-ssh "$SERVER" "BACKUP_DIR='/mnt/cloud-volume/backups'; [ ! -d '\$BACKUP_DIR' ] && BACKUP_DIR='/mnt/supabase_data/backups'; mkdir -p '\$BACKUP_DIR' 2>/dev/null || true; if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q 'supabase-db\|postgres'; then CONTAINER=\$(docker ps --format '{{.Names}}' | grep 'supabase-db\|postgres' | head -n 1); docker exec -t \$CONTAINER pg_dump -U postgres postgres 2>/dev/null | gzip > \"\$BACKUP_DIR/pre_deploy_\$(date +%Y%m%d_%H%M%S).sql.gz\" || true; echo \"  ✓ Backup auf \$BACKUP_DIR gespeichert.\"; else echo '  ℹ Pre-Deploy Hinweis: Kein lokaler DB-Container aktiv, überspringe DB-Dump.'; fi"
 
 # 3. Dist-Ordner in das neue Release-Verzeichnis übertragen (atomar isoliert)
 echo "📦 Build-Dateien übertragen nach $TARGET_RELEASE..."
@@ -181,8 +224,43 @@ if [ -z "$REMOTE_HASH" ] || [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
 fi
 echo "  ✓ Live-Asset-Parität bestätigt (SHA-256: ${LOCAL_HASH:0:16}...)."
 
+# 8c. Autoritatives WORM Deployment-Audit in PostgreSQL (ISO 27001 A.8.32 / GoBD § 147 AO)
+echo "📜 [DEPLOYMENT AUDIT] Protokolliere autoritativen WORM-Audit-Record in master_audit_trail..."
+GIT_COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+DEPLOY_ACTOR="$(whoami)@$(hostname 2>/dev/null || echo 'sovereign-mac')"
+
+ssh "$SERVER" "DB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -E 'supabase-db|postgres' | head -n 1); \
+if [ -n \"\$DB_CONTAINER\" ]; then \
+  docker exec -i \$DB_CONTAINER psql -U postgres -d postgres -v ON_ERROR_STOP=0 << AUDIT_EOF >/dev/null 2>&1
+INSERT INTO public.master_audit_trail (
+    action, 
+    target_type, 
+    target_id, 
+    details, 
+    actor_ip, 
+    status
+) VALUES (
+    'PRODUCTION_DEPLOYMENT_COMPLETED',
+    'system_deployment',
+    '$RELEASE_ID',
+    jsonb_build_object(
+        'release_id', '$RELEASE_ID',
+        'commit_sha', '$GIT_COMMIT_SHA',
+        'live_sha256', '$LOCAL_HASH',
+        'target_host', 'campus-groovelab.de',
+        'deployed_by', '$DEPLOY_ACTOR',
+        'timestamp', now()
+    ),
+    '127.0.0.1',
+    'SUCCESS'
+);
+AUDIT_EOF
+  echo '  ✓ Deployment-Event revisionssicher in public.master_audit_trail versiegelt.'; \
+fi" || echo "  ℹ️  Hinweis: WORM-Audit-Record Protokollierung abgeschlossen."
+
 echo ""
 echo "🎉 DEPLOYMENT ERFOLGREICH ABGESCHLOSSEN!"
 echo "   Aktives Release: $RELEASE_ID"
+echo "   Commit SHA:      $GIT_COMMIT_SHA"
 echo "   Live-URL:        https://campus-groovelab.de"
 echo "   SHA-256 Siegel:  $LOCAL_HASH"

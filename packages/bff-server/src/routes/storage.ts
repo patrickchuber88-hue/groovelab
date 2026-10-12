@@ -138,7 +138,8 @@ export type StorageAction = 'read' | 'write' | 'delete';
 export function validatePathAccess(
   filePath: string,
   authData: AuthUserData,
-  action: StorageAction = 'read'
+  action: StorageAction = 'read',
+  options?: { isSharedWithTeacher?: boolean; isAssignedTeacher?: boolean }
 ): { allowed: boolean; reason?: string } {
   // 1. Strict Path Traversal Prevention
   if (filePath.includes('..') || filePath.includes('\\') || filePath.includes('//')) {
@@ -173,13 +174,61 @@ export function validatePathAccess(
       return { allowed: false, reason: 'MALFORMED_STUDENT_PATH' };
     }
     const targetStudentId = segments[3];
+    const subContext = segments[4];
 
     // If student caller, they can ONLY access their own student folder
-    if (authData.role === 'student' && authData.user.id !== targetStudentId) {
-      return { allowed: false, reason: 'STUDENT_BOLA_VIOLATION' };
+    if (authData.role === 'student') {
+      if (authData.user.id !== targetStudentId) {
+        return { allowed: false, reason: 'STUDENT_BOLA_VIOLATION' };
+      }
+      return { allowed: true };
     }
 
-    // Teachers, Admins, and the student themselves have legitimate access
+    // 🛡️ Whole-Tree Student Shield (0,1% Goldstandard Pedagogical Zero-Trust Isolation):
+    // Schulleitung & Sekretariat sind hermetisch von ALLEN Schülerunterordnern ausgeschlossen!
+    if (authData.role === 'admin' || authData.role === 'secretary') {
+      if (subContext === 'recordings') {
+        return { allowed: false, reason: 'LEADERSHIP_STUDENT_AUDIO_ACCESS_PROHIBITED' };
+      }
+      return { allowed: false, reason: 'LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED' };
+    }
+
+    // 🛡️ Student Recordings Zero-Trust ReBAC Governance (§ 201 StGB, § 73 UrhG, ASVS Level 3)
+    if (subContext === 'recordings') {
+      // 1. Löschen: Ausschließlich der Schüler selbst darf eigene Aufnahmen löschen
+      if (action === 'delete') {
+        return { allowed: false, reason: 'TEACHER_CANNOT_DELETE_STUDENT_RECORDING' };
+      }
+
+      // 2. Lehrkraft darf nur lesen, wenn Opt-In Freigabe aktiv ist
+      if (authData.role === 'teacher') {
+        if (options?.isSharedWithTeacher === true) {
+          return { allowed: true };
+        }
+        return { allowed: false, reason: 'STUDENT_AUDIO_NOT_SHARED_WITH_TEACHER' };
+      }
+
+      return { allowed: false, reason: 'UNAUTHORIZED_ROLE_FOR_STUDENT_RECORDING' };
+    }
+
+    // 🛡️ Student Homework, Meisterwerk & Notes: Nur für verifiziert zugewiesene Lehrkräfte
+    if (subContext === 'homework' || subContext === 'meisterwerk' || subContext === 'notes') {
+      if (action === 'delete' && authData.user.id !== targetStudentId) {
+        return { allowed: false, reason: 'CANNOT_DELETE_STUDENT_DATA' };
+      }
+      if (authData.role === 'teacher') {
+        if (options?.isAssignedTeacher === false) {
+          return { allowed: false, reason: 'TEACHER_NOT_ASSIGNED_TO_STUDENT' };
+        }
+        return { allowed: true };
+      }
+    }
+
+    // Non-recording assets (e.g. general audio, avatars) delete check
+    if (action === 'delete' && authData.role !== 'admin' && authData.user.id !== targetStudentId) {
+      return { allowed: false, reason: 'STUDENT_DELETE_SCHOOL_ASSET_DENIED' };
+    }
+
     return { allowed: true };
   }
 
@@ -205,6 +254,33 @@ export function validatePathAccess(
   }
 
   // ── School-Wide Media & Context Sub-Path Governance (e.g. schools/<schoolId>/audio/...) ──
+  // 🛡️ Forensic Backward Compatibility for Legacy Audio Paths (length >= 5):
+  // schools/<schoolId>/audio/<studentId>/<filename>
+  if (segments[2] === 'audio' && segments.length >= 5) {
+    const candidateStudentId = segments[3];
+    if (authData.role === 'student') {
+      if (authData.user.id === candidateStudentId) {
+        return { allowed: true };
+      } else {
+        return { allowed: false, reason: 'STUDENT_BOLA_VIOLATION' };
+      }
+    }
+
+    // Schulleitung & Sekretariat sind auch bei Legacy-Schüleraufnahmen ausgeschlossen
+    if (authData.role === 'admin' || authData.role === 'secretary') {
+      return { allowed: false, reason: 'LEADERSHIP_STUDENT_AUDIO_ACCESS_PROHIBITED' };
+    }
+
+    if (authData.role === 'teacher') {
+      if (options?.isSharedWithTeacher === false) {
+        return { allowed: false, reason: 'STUDENT_AUDIO_NOT_SHARED_WITH_TEACHER' };
+      }
+      if (options?.isSharedWithTeacher === true) {
+        return { allowed: true };
+      }
+    }
+  }
+
   // Students are NEVER allowed to delete school-wide shared media
   if (action === 'delete' && authData.role === 'student') {
     return { allowed: false, reason: 'STUDENT_DELETE_SCHOOL_ASSET_DENIED' };
@@ -261,6 +337,62 @@ export function invalidateUserStreamLeases(userId: string): void {
     if (lease.userId === userId) {
       streamLeaseCache.delete(key);
     }
+  }
+}
+
+// ── In-Memory Debounce Map for WORM Access Audit (15 Min TTL per Accessor & File) ──
+const audioAccessAuditDebounce = new Map<string, number>();
+const AUDIT_DEBOUNCE_MS = 15 * 60 * 1000; // 15 Minuten Debounce
+
+export async function recordAudioAccessAudit(
+  authData: AuthUserData,
+  filePath: string,
+  targetStudentId: string
+): Promise<void> {
+  // Schüler, die ihre eigenen Takes abspielen, erzeugen kein DB-Log (Anti-Bloat)
+  if (authData.role === 'student' && authData.user?.id === targetStudentId) {
+    return;
+  }
+
+  const debounceKey = `${authData.user?.id || 'anon'}:${filePath}`;
+  const now = Date.now();
+  const lastLogged = audioAccessAuditDebounce.get(debounceKey);
+
+  if (lastLogged && now - lastLogged < AUDIT_DEBOUNCE_MS) {
+    return; // Innerhalb des 15-Minuten-Fensters gedebounced
+  }
+
+  audioAccessAuditDebounce.set(debounceKey, now);
+
+  // Evict older entries if map grows beyond limit
+  if (audioAccessAuditDebounce.size > 2000) {
+    for (const [k, time] of audioAccessAuditDebounce.entries()) {
+      if (now - time > AUDIT_DEBOUNCE_MS) audioAccessAuditDebounce.delete(k);
+    }
+  }
+
+  try {
+    const serviceClient = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+
+    await serviceClient.from('audit_logs').insert({
+      school_id: authData.schoolId || '00000000-0000-0000-0000-000000000000',
+      user_id: authData.user?.id,
+      action: 'STUDENT_AUDIO_STREAM_ACCESSED',
+      target_type: 'storage.objects',
+      target_id: targetStudentId,
+      details: {
+        accessor_role: authData.role,
+        accessor_id: authData.user?.id,
+        student_id: targetStudentId,
+        storage_path: filePath,
+        accessed_at: new Date().toISOString()
+      },
+      created_at: new Date().toISOString()
+    });
+  } catch (auditErr) {
+    console.warn('[BFF Storage Audit] Notice: Could not record student audio access audit:', auditErr);
   }
 }
 
@@ -437,6 +569,76 @@ router.post('/verify-upload-buffer', express.raw({ type: '*/*', limit: '25mb' })
 });
 
 /**
+ * Authoritatively verifies whether a teacher has active ReBAC share access to a student's recording.
+ * Invokes the database kernel function verify_student_audio_access.
+ */
+export async function verifyTeacherStudentAudioAccess(
+  filePath: string,
+  studentId: string,
+  teacherId: string,
+  accessToken: string
+): Promise<boolean> {
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    });
+
+    const { data, error } = await client.rpc('verify_student_audio_access', {
+      p_student_id: studentId,
+      p_file_path: filePath,
+      p_requesting_user_id: teacherId
+    });
+
+    if (error) {
+      console.warn(`[verifyTeacherStudentAudioAccess] RPC error:`, error.message);
+      return false; // Fail-closed default-deny
+    }
+
+    return Boolean(data);
+  } catch (err) {
+    console.error(`[verifyTeacherStudentAudioAccess] Execution error:`, err);
+    return false; // Fail-closed default-deny
+  }
+}
+
+/**
+ * Authoritatively verifies whether a teacher is assigned to a student via enrollment or band.
+ * Invokes the database kernel function is_assigned_teacher_of_student.
+ */
+export async function verifyTeacherStudentAssignment(
+  teacherId: string,
+  studentId: string,
+  accessToken: string
+): Promise<boolean> {
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    });
+
+    const { data, error } = await client.rpc('is_assigned_teacher_of_student', {
+      p_teacher_id: teacherId,
+      p_student_id: studentId
+    });
+
+    if (error) {
+      console.warn(`[verifyTeacherStudentAssignment] RPC error:`, error.message);
+      return false; // Fail-closed default-deny
+    }
+
+    return Boolean(data);
+  } catch (err) {
+    console.error(`[verifyTeacherStudentAssignment] Execution error:`, err);
+    return false; // Fail-closed default-deny
+  }
+}
+
+/**
  * POST /api/storage/presign-stream
  * 
  * Generates an ephemeral, cryptographically authenticated Pre-signed Streaming URL (UrhG § 73).
@@ -454,13 +656,63 @@ router.post('/presign-stream', validateBody(presignStreamSchema), async (req: Re
 
     const { filePath, bucket = 'campus-assets', expiresInSeconds = 1800 } = req.body;
 
-    const accessCheck = validatePathAccess(filePath, authData);
+    const pathParts = filePath.split('/').filter(Boolean);
+    let isSharedWithTeacher: boolean | undefined = undefined;
+    let isAssignedTeacher: boolean | undefined = undefined;
+
+    // Check if this is a student recording being requested by a teacher
+    const isStudentRecording = 
+      (pathParts[0] === 'schools' && pathParts[2] === 'students' && pathParts[4] === 'recordings' && pathParts.length >= 5) ||
+      (pathParts[0] === 'schools' && pathParts[2] === 'audio' && pathParts.length >= 5);
+
+    const isStudentPedagogicalData = 
+      (pathParts[0] === 'schools' && pathParts[2] === 'students' && ['homework', 'meisterwerk', 'notes'].includes(pathParts[4]) && pathParts.length >= 5);
+
+    if (authData.role === 'teacher') {
+      const targetStudentId = pathParts[3];
+      if (isStudentRecording) {
+        isSharedWithTeacher = await verifyTeacherStudentAudioAccess(
+          filePath,
+          targetStudentId,
+          authData.user.id,
+          authData.accessToken
+        );
+      } else if (isStudentPedagogicalData) {
+        isAssignedTeacher = await verifyTeacherStudentAssignment(
+          authData.user.id,
+          targetStudentId,
+          authData.accessToken
+        );
+      }
+    }
+
+    const accessCheck = validatePathAccess(filePath, authData, 'read', { isSharedWithTeacher, isAssignedTeacher });
     if (!accessCheck.allowed) {
       console.warn(`🚨 [BFF Storage BOLA Guard] Blocked stream access to ${filePath} by user ${authData.user.id}: ${accessCheck.reason}`);
       return res.status(403).json({
         error: 'FORBIDDEN',
-        message: 'Zugriff auf diese Mediendatei verweigert (BOLA / Mandantenschutz).'
+        reason: accessCheck.reason,
+        message: accessCheck.reason === 'LEADERSHIP_STUDENT_AUDIO_ACCESS_PROHIBITED'
+          ? 'Schulleitung und Verwaltung besitzen keinen Zugriff auf vertrauliche Schüleraufnahmen (§ 201 StGB / § 73 UrhG).'
+          : accessCheck.reason === 'LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED'
+            ? 'Schulleitung und Verwaltung besitzen keinen Zugriff auf pädagogische Schülerdaten (OWASP ASVS L3 / Art. 9 DSGVO).'
+            : accessCheck.reason === 'STUDENT_AUDIO_NOT_SHARED_WITH_TEACHER'
+              ? 'Diese Schüleraufnahme wurde nicht für dich freigegeben.'
+              : accessCheck.reason === 'TEACHER_NOT_ASSIGNED_TO_STUDENT'
+                ? 'Du bist diesem Schüler nicht als Lehrkraft zugewiesen.'
+                : 'Zugriff auf diese Mediendatei verweigert (BOLA / Mandantenschutz).'
       });
+    }
+
+    // 🛡️ Forensic WORM Access-Audit für Fremdzugriffe (§ 8a SGB VIII / DSGVO Art. 15)
+    let targetStudentId: string | null = null;
+    if (pathParts[0] === 'schools' && pathParts[2] === 'students' && pathParts.length >= 4) {
+      targetStudentId = pathParts[3];
+    } else if (pathParts[0] === 'schools' && pathParts[2] === 'audio' && pathParts.length >= 4) {
+      targetStudentId = pathParts[3];
+    }
+    if (targetStudentId) {
+      recordAudioAccessAudit(authData, filePath, targetStudentId).catch(() => {});
     }
 
     // Sub-millisecond In-Memory LRU Cache lookup
@@ -541,13 +793,65 @@ router.get('/stream/:bucket/*', async (req: Request, res: Response) => {
       });
     }
 
+    const streamParts = filePath.split('/').filter(Boolean);
+    let isSharedWithTeacher: boolean | undefined = undefined;
+    let isAssignedTeacher: boolean | undefined = undefined;
+
+    const isStudentRecording = 
+      (streamParts[0] === 'schools' && streamParts[2] === 'students' && streamParts[4] === 'recordings' && streamParts.length >= 5) ||
+      (streamParts[0] === 'schools' && streamParts[2] === 'audio' && streamParts.length >= 5);
+
+    const isStudentPedagogicalData = 
+      (streamParts[0] === 'schools' && streamParts[2] === 'students' && ['homework', 'meisterwerk', 'notes'].includes(streamParts[4]) && streamParts.length >= 5);
+
+    if (authData.role === 'teacher') {
+      const targetStudentId = streamParts[3];
+      if (isStudentRecording) {
+        isSharedWithTeacher = await verifyTeacherStudentAudioAccess(
+          filePath,
+          targetStudentId,
+          authData.user.id,
+          authData.accessToken
+        );
+      } else if (isStudentPedagogicalData) {
+        isAssignedTeacher = await verifyTeacherStudentAssignment(
+          authData.user.id,
+          targetStudentId,
+          authData.accessToken
+        );
+      }
+    }
+
     // 🛡️ Path Traversal & BOLA Validation
-    const accessCheck = validatePathAccess(filePath, authData);
+    const accessCheck = validatePathAccess(filePath, authData, 'read', { isSharedWithTeacher, isAssignedTeacher });
     if (!accessCheck.allowed) {
       if (accessCheck.reason === 'PATH_TRAVERSAL_DETECTED') {
         return res.status(400).json({ error: 'BAD_REQUEST', message: 'Ungültiger Pfad.' });
       }
-      return res.status(403).json({ error: 'FORBIDDEN', message: 'Zugriff auf diese Mediendatei verweigert (BOLA).' });
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        reason: accessCheck.reason,
+        message: accessCheck.reason === 'LEADERSHIP_STUDENT_AUDIO_ACCESS_PROHIBITED'
+          ? 'Schulleitung und Verwaltung besitzen keinen Zugriff auf vertrauliche Schüleraufnahmen (§ 201 StGB / § 73 UrhG).'
+          : accessCheck.reason === 'LEADERSHIP_STUDENT_DATA_ACCESS_PROHIBITED'
+            ? 'Schulleitung und Verwaltung besitzen keinen Zugriff auf pädagogische Schülerdaten (OWASP ASVS L3 / Art. 9 DSGVO).'
+            : accessCheck.reason === 'STUDENT_AUDIO_NOT_SHARED_WITH_TEACHER'
+              ? 'Diese Schüleraufnahme wurde nicht für dich freigegeben.'
+              : accessCheck.reason === 'TEACHER_NOT_ASSIGNED_TO_STUDENT'
+                ? 'Du bist diesem Schüler nicht als Lehrkraft zugewiesen.'
+                : 'Zugriff auf diese Mediendatei verweigert (BOLA).'
+      });
+    }
+
+    // 🛡️ Forensic WORM Access-Audit für Fremdzugriffe (§ 8a SGB VIII / DSGVO Art. 15)
+    let streamStudentId: string | null = null;
+    if (streamParts[0] === 'schools' && streamParts[2] === 'students' && streamParts.length >= 4) {
+      streamStudentId = streamParts[3];
+    } else if (streamParts[0] === 'schools' && streamParts[2] === 'audio' && streamParts.length >= 4) {
+      streamStudentId = streamParts[3];
+    }
+    if (streamStudentId) {
+      recordAudioAccessAudit(authData, filePath, streamStudentId).catch(() => {});
     }
 
     // Ephemeral download client

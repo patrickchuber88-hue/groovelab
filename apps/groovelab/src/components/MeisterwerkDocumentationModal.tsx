@@ -561,6 +561,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 String(a.lehrwerkId) === String(targetId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase())
               );
               
+              // 🛡️ Zero-Phantom Guard: Binde generisches 'Lehrwerk' an existierendes reales Lehrwerk an
+              if (!assignment && bookTitle.toLowerCase() === 'lehrwerk') {
+                const realAss = healed.find((a: any) => (a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() !== 'lehrwerk');
+                if (realAss) assignment = realAss;
+              }
+              
               if (!assignment) {
                 assignment = normLw({
                   studentId: student.id,

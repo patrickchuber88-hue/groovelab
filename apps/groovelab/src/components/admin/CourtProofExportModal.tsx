@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Shield, Download, CheckCircle2, AlertTriangle, X, Copy, Check, FileText } from 'lucide-react';
+import { generateDrvComplianceDossierPDF } from '../../utils/drvComplianceDossierGenerator';
 
 interface CourtProofExportModalProps {
   isOpen: boolean;
@@ -67,6 +68,7 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
   schoolName
 }) => {
   const [loading, setLoading] = useState<boolean>(false);
+  const [pdfLoading, setPdfLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
@@ -149,6 +151,39 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
     navigator.clipboard.writeText(exportResult.sha256);
     setCopiedHash(true);
     setTimeout(() => setCopiedHash(false), 2500);
+  };
+
+  const handleDownloadPdfDossier = async () => {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    setError(null);
+    try {
+      let currentResult = exportResult;
+      if (!currentResult) {
+        const { data, error: rpcError } = await supabase.rpc('export_school_forensic_dossier', {
+          p_school_id: schoolId
+        });
+        if (rpcError) throw rpcError;
+        if (!data || !data.sha256) throw new Error('Ungültige Antwort von der forensischen Export-Engine erhalten.');
+        currentResult = data as ExportResult;
+        setExportResult(currentResult);
+      }
+
+      await generateDrvComplianceDossierPDF({
+        schoolName,
+        schoolId,
+        exportedByUserId: currentResult?.manifest?.exported_by_user_id,
+        callerRole: currentResult?.manifest?.caller_role,
+        sha256Digest: currentResult?.sha256,
+        exportTimestampUtc: currentResult?.manifest?.export_timestamp_utc,
+        summary: currentResult?.data?.summary
+      });
+    } catch (err: any) {
+      console.error('[DRV-PDF-Export] Error generating PDF dossier:', err);
+      setError(err?.message || 'Fehler beim Erzeugen des DRV-PDF-Dossiers.');
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   return (
@@ -373,7 +408,8 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
-            gap: '12px'
+            gap: '12px',
+            flexWrap: 'wrap'
           }}
         >
           <button
@@ -399,30 +435,47 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
             disabled={loading}
             onClick={handleGenerateAndDownload}
             style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: '#334155',
+              fontSize: '13.5px',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              minHeight: '44px',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Download size={15} aria-hidden="true" />
+            <span>{loading ? 'Wird generiert...' : 'JSON-Rohdaten'}</span>
+          </button>
+          <button
+            type="button"
+            disabled={pdfLoading}
+            onClick={handleDownloadPdfDossier}
+            style={{
               padding: '10px 18px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: loading ? '#94a3b8' : '#2563eb',
+              backgroundColor: pdfLoading ? '#94a3b8' : '#1e3a8a',
               color: '#ffffff',
               fontSize: '14px',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: '700',
+              cursor: pdfLoading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               minHeight: '44px',
               touchAction: 'manipulation',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              boxShadow: '0 2px 4px rgba(30, 58, 138, 0.2)'
             }}
           >
-            {loading ? (
-              <span>Wird signiert & generiert...</span>
-            ) : (
-              <>
-                <Download size={16} aria-hidden="true" />
-                <span>{exportResult ? 'Erneut herunterladen' : 'Protokoll signieren & herunterladen'}</span>
-              </>
-            )}
+            <FileText size={16} aria-hidden="true" />
+            <span>{pdfLoading ? 'DRV-PDF wird signiert...' : 'DRV-Prüfungsdossier (PDF)'}</span>
           </button>
         </div>
       </div>

@@ -617,7 +617,8 @@ export async function uploadAudioWithIntegrityVerification(
       metadata: {
         sha256_checksum: checksum,
         file_size_bytes: sizeBytes,
-        uploaded_at: new Date().toISOString()
+        uploaded_at: new Date().toISOString(),
+        legal_disclaimer: 'Campus-Groovelab Didactic Record gem. UrhG § 53 Abs. 1 / § 60a / § 73. Reines Lehrmaterial - Keine oeffentliche Zugaenglichmachung.'
       }
     });
 

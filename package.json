@@ -40,6 +40,7 @@
     "test:pentest": "tsx tests/e2e/pentest-race-conditions.test.ts",
     "test:domain": "tsx tests/unit/gobd-sepa-domain.test.ts",
     "test:api": "tsx tests/contracts/auth-rpc-fuzzing.test.ts",
+    "test:cicd": "tsx tests/security/cicd-pipeline-governance.test.ts",
     "guard:buttons": "node scripts/button_interaction_guard.mjs",
     "guard:pwa-mobile": "node scripts/pwa_mobile_architecture_guard.mjs",
     "guard:licenses": "node scripts/license_compliance_guard.mjs",

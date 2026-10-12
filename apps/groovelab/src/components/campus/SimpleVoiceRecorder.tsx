@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
-import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
+import { getSecureAudioUrl, buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
+import { toggleStudentAudioShare } from '../../services/studentAudioShareService';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -13,6 +14,8 @@ interface SimpleVoiceRecorderProps {
   colorTheme?: string;
   buttonLabel?: string;
   topicName?: string;
+  targetTeacherId?: string;
+  enableTeacherSharing?: boolean;
 }
 
 export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
@@ -21,7 +24,9 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   onAudioSaved,
   colorTheme = '#16a34a',
   buttonLabel = 'Stück aufnehmen',
-  topicName
+  topicName,
+  targetTeacherId,
+  enableTeacherSharing = true
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -31,6 +36,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
+  const [isSharedWithTeacher, setIsSharedWithTeacher] = useState<boolean>(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -127,7 +133,14 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       setRecordingDuration(0);
 
       timerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
+        setRecordingDuration(prev => {
+          const next = prev + 1;
+          // 🛡️ 300s (5 Min) Hard-Cap gem. § 201 StGB / UrhG Anti-Abuse
+          if (next >= 300) {
+            stopRecording();
+          }
+          return next;
+        });
       }, 1000);
     } catch (err: any) {
       console.error('Error accessing microphone:', err);
@@ -198,9 +211,10 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       const fileExt = isWav ? 'wav' : (blobToUpload.type.includes('mp4') ? 'mp4' : 'webm');
       const contentType = isWav ? 'audio/wav' : (blobToUpload.type || 'audio/webm');
       const targetSchoolId = localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || '';
-      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
-      // 🛡️ DIN 66398 / Art. 17 DSGVO Harmonisierung: ID als Ordner für verlässliches Löschen
-      const fileName = `${schoolPathPrefix}audio/${studentId}/memo_${Date.now()}.${fileExt}`;
+      // 🛡️ Canonical Storage Path (OWASP ASVS L3 / BOLA Parität mit Migration 399):
+      // schools/<schoolId>/students/<studentId>/recordings/memo_<timestamp>.<ext>
+      const rawFileName = `memo_${Date.now()}.${fileExt}`;
+      const fileName = buildCanonicalAudioStoragePath(targetSchoolId, studentId, 'recordings', rawFileName);
 
       // 🛡️ Keller-Resilienz: Wenn offline, sofort im lokalen IndexedDB-Tresor puffern
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -232,6 +246,16 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
         if (error) throw error;
 
         const secureAudioUrl = await getSecureAudioUrl(fileName, 'campus-assets', 1800);
+
+        // 🛡️ Zero-Trust ReBAC: Opt-In Share für zugewiesene Lehrkraft registrieren
+        if (targetTeacherId && isSharedWithTeacher) {
+          try {
+            await toggleStudentAudioShare(fileName, targetTeacherId, true);
+          } catch (shareErr) {
+            console.warn('[SimpleVoiceRecorder] ReBAC share registration notice:', shareErr);
+          }
+        }
+
         setUploadSuccess(true);
         setIsOfflineSaved(false);
         if (onRecordingComplete) {
@@ -337,8 +361,13 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
             <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>
               {isRecording ? 'Aufnahme läuft...' : buttonLabel}
             </div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isRecording ? '#ef4444' : '#64748b', marginTop: '2px' }}>
-              {isRecording ? `Dauer: ${formatSeconds(recordingDuration)} (Klick zum Stoppen)` : 'Tippe auf das Mikrofon'}
+            <div style={{
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: isRecording ? (recordingDuration >= 270 ? '#f59e0b' : '#ef4444') : '#64748b',
+              marginTop: '2px'
+            }}>
+              {isRecording ? `Dauer: ${formatSeconds(recordingDuration)} / 05:00 (Klick zum Stoppen)` : 'Tippe auf das Mikrofon (max. 5 Min)'}
             </div>
           </div>
         </div>

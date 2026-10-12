@@ -145,13 +145,21 @@ export function applyDirectPageStatusUpdate(params: DirectPageUpdateParams): {
     rawStatus,
     isHomework: explicitIsHomework,
     studentId,
-    bookTitle = 'Lehrwerk',
+    bookTitle: rawBookTitle = 'Lehrwerk',
     teacherId,
     currentAssigned = [],
     setAssignedLehrwerke,
     setProgressItems,
     notifyHomeworkChange
   } = params;
+
+  // 🛡️ Zero-Phantom Resolver: Verwende den echten Buchtitel anstelle des generischen 'Lehrwerk'
+  const resolvedBookTitle = (rawBookTitle && rawBookTitle.toLowerCase() !== 'lehrwerk')
+    ? rawBookTitle
+    : (currentAssigned.find(b => (b.bookTitle || b.title || '').toLowerCase() !== 'lehrwerk')?.bookTitle ||
+       currentAssigned.find(b => (b.bookTitle || b.title || '').toLowerCase() !== 'lehrwerk')?.title ||
+       rawBookTitle || 'Lehrwerk');
+  const bookTitle = resolvedBookTitle;
 
   // 1. Didaktische Normalisierung
   const isMastered = rawStatus === 'MASTERED' || rawStatus === 'mastered';

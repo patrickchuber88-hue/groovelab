@@ -7482,10 +7482,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }
                           });
 
-                          lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
-                            info.pages.sort((a: number, b: number) => a - b);
-                            return { title, pages: info.pages, notes: info.notes };
-                          });
+                          const realBk = Object.keys(groupedLehrwerke).find(k => k.toLowerCase() !== 'lehrwerk');
+                          if (realBk && groupedLehrwerke['Lehrwerk']) {
+                            groupedLehrwerke['Lehrwerk'].pages.forEach(p => { if (!groupedLehrwerke[realBk].pages.includes(p)) groupedLehrwerke[realBk].pages.push(p); });
+                            (groupedLehrwerke['Lehrwerk'].notes || []).forEach(n => { if (!groupedLehrwerke[realBk].notes.includes(n)) groupedLehrwerke[realBk].notes.push(n); });
+                            delete groupedLehrwerke['Lehrwerk'];
+                          }
+                          lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => ({ title, pages: info.pages.sort((a: number, b: number) => a - b), notes: info.notes }));
 
                           audioNotes = (homeworkNotesList || [])
                             .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
@@ -7911,10 +7914,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }
                           });
 
-                          lehrwerkeList = Object.entries(groupedHistLehrwerke).map(([title, info]) => {
-                            info.pages.sort((a: number, b: number) => a - b);
-                            return { title, pages: info.pages, notes: info.notes };
-                          });
+                          const realHistBk = Object.keys(groupedHistLehrwerke).find(k => k.toLowerCase() !== 'lehrwerk');
+                          if (realHistBk && groupedHistLehrwerke['Lehrwerk']) {
+                            groupedHistLehrwerke['Lehrwerk'].pages.forEach(p => { if (!groupedHistLehrwerke[realHistBk].pages.includes(p)) groupedHistLehrwerke[realHistBk].pages.push(p); });
+                            (groupedHistLehrwerke['Lehrwerk'].notes || []).forEach(n => { if (!groupedHistLehrwerke[realHistBk].notes.includes(n)) groupedHistLehrwerke[realHistBk].notes.push(n); });
+                            delete groupedHistLehrwerke['Lehrwerk'];
+                          }
+                          lehrwerkeList = Object.entries(groupedHistLehrwerke).map(([title, info]) => ({ title, pages: info.pages.sort((a: number, b: number) => a - b), notes: info.notes }));
 
                           // 🌉 INTELLIGENTE SELBSTHEILUNG & BRÜCKE FÜR VORWOCHEN:
                           // Wenn in einer vergangenen Woche (z. B. KW 36) zwar ein Wochen-Snapshot (Hausaufgabe KW 36 mit Aufnahmen/Notizen)
@@ -9895,8 +9901,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           const songInfo = extractSongArtistAndTitle(item);
                                           const rawSongTopic = item.topic_name || item.title || item.song_title || 'Song';
                                           const cleanSongDisplayTitle = rawSongTopic.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/\s*\([^)]*\)\s*$/, '').replace(/linken park/gi, 'Linkin Park');
-                                          const songTitle = songInfo.displayTitle || formatDisplayTitle(cleanSongDisplayTitle) || songInfo.title;
                                           const songArtist = (songInfo.displayArtist || formatDisplayTitle(songInfo.artist) || '').replace(/linken park/gi, 'Linkin Park');
+                                          const songTitle = (() => { const t = songInfo.displayTitle || formatDisplayTitle(cleanSongDisplayTitle) || songInfo.title; return (songArtist && t.toLowerCase().startsWith(songArtist.toLowerCase() + ' - ')) ? t.slice(songArtist.length + 3).trim() : t; })();
                                           const songColor = getSongColor(songTitle);
                                           const isSpeakingThisSongRow = isTtsSpeaking && activeTtsKey === `song_head_${idx}`;
                                           const isSpeakingThisSong = isTtsSpeaking && activeTtsKey === `song_note_${idx}`;
@@ -9949,7 +9955,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     lineHeight: 1.25
                                                   }}>
                                                     {songTitle}
-                                                    {songArtist && (
+                                                    {songArtist && !songTitle.toLowerCase().includes(songArtist.toLowerCase()) && (
                                                       <span style={{ fontSize: '0.90rem', fontWeight: 650, color: '#64748b', marginLeft: '6px' }}>
                                                         · {songArtist}
                                                       </span>

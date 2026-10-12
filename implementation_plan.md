@@ -1,40 +1,62 @@
-# 🏛️ 0,1% Enterprise Goldstandard Remediation: Zero-Trust Chat Governance (OWASP ASVS L3)
+# 🎨 Implementierungsplan: Vollständige Harmonisierung der Hausaufgaben-Visualisierung
 
-## 📋 1. Befund- & Ursachen-Analyse
-
-Die aktuelle Architektur von Campus-Groovelab für Nachrichten-Boards ist UX-seitig hervorragend (Goldstandard), verletzt jedoch auf Systemebene das **Zero-Trust Frontend Axiom**. 
-
-1. **PostgREST Bypass (Sicherheitsillusion):** 
-   Die juristischen Wächter `chatRespectGuard.ts` (Schutz vor Hassrede/Gewalt nach SGB VIII / StGB) und `medicalTermGuard.ts` (Schutz vor Gesundheitsdaten nach Art. 9 DSGVO) laufen ausschließlich im React-Frontend. Über direkte API-Calls (Postman/Curl) können diese Wächter verlustfrei umgangen werden.
-2. **Filter-Evasion (Zalgo/Homoglyphen):** 
-   Unsichtbare Unicode-Zeichen (`\u200B`) und Homoglyphen (kyrillisches `а`) hebeln den aktuellen Leetspeak-Regex im Client aus.
-3. **Fehlendes Crisis-Logging (§ 8a SGB VIII):** 
-   Suizidandrohungen (`isCrisis: true`) blockieren zwar die UI (Nummer gegen Kummer), erzeugen aber serverseitig keinen revisionssicheren Audit-Trail zur physischen Alarmierung der Krisenbeauftragten.
-4. **Fehlendes Rate-Limiting (Anti-Spam):** 
-   Der aktuelle DB-Trigger `trg_enforce_campus_chat_governance` prüft nur die Länge, nicht die Frequenz. Ein DoS/Spam-Angriff ist per API möglich.
+**Ziel:** Identische Visualisierung der Hausaufgaben- und Fokus-Elemente (gleiche Farben, gleiche Badges, konsistente Apple-Squircles) über alle Bildschirme hinweg:
+1. **Aufgaben (Wochen-Fahrplan)** (`MeisterwerkDocumentTab.tsx` / Image 3) – *Goldstandard-Referenz*
+2. **Übe-Pfad (Wochen-Fokus)** (`PracticeHomeworkCard.tsx` / Image 2)
+3. **Studio-Fokus (Fokus-Timer HUD)** (`AuthoritativeHomeworkWidget.tsx` [variant="hud"] / Image 4)
+4. **Begleitende Stages & Widgets** (`PracticeExerciseStageView.tsx`, `StudentJuniorPreFlightModal.tsx`, `AuthoritativeHomeworkWidget.tsx` [stage_banner & hero])
 
 ---
 
-## 🛠️ 2. Geplante Änderungen (Hermetisches Backend-Enforcement)
+## 🔍 1. Status Quo & Identifizierte Farbdifferenzen
 
-### Phase 1: Neue PostgreSQL Migration `557_enterprise_zero_trust_chat_governance.sql`
-Wir überführen die Core-Logik von TypeScript in hochperformantes PL/pgSQL:
-- **Unicode-Sanitization:** Stripping von Zero-Width-Spaces (`\u200B-\u200F`) direkt in der DB (`regexp_replace(NEW.content, '[\u200B-\u200F]', '', 'g')`).
-- **Art. 9 DSGVO Guard in PL/pgSQL:** Serverseitige Erkennung der `MEDICAL_HEALTH_KEYWORDS` und automatische Ersetzung durch `[gesundheitliche Angabe neutralisiert]`.
-- **SGB VIII Hate-Speech Guard in PL/pgSQL:** Portierung des 4-Vektoren-Checks (Extremismus, Ehrverletzung, Belästigung, Gewalt) inkl. der `MUSIC_PEDAGOGY_WHITELIST`.
-- **Crisis Audit Trail:** Wenn `isCrisis` (z.B. "ich bring mich um") zutrifft, wirft der Trigger einen `RAISE EXCEPTION` (Fail-Closed) **und** loggt einen asynchronen Warn-Eintrag in eine neue Audit-Funktion, um Schulleiter zu benachrichtigen.
-- **Anti-Spam Token-Bucket:** Prüfung, ob der Sender in der letzten Minute mehr als 10 Nachrichten gesendet hat -> `HTTP 429`.
-
-### Phase 2: Anpassung Edge Function (Optional / Späterer Scope)
-- Die ArbZG (Quiet Hours) Queue in `send-push` würde konzeptionell hier folgen, aber für diesen Plan konzentrieren wir uns auf die kritischste Flanke: die Datenbank-Schicht.
-
-### Phase 3: Frontend-Alignment
-- Die TypeScript-Wächter bleiben als UX-Layer (für sofortiges Feedback ohne Network-Latency) bestehen.
-- Wir stellen sicher, dass bei einem `RAISE EXCEPTION` der Datenbank ein sauberer Error im Frontend gefangen wird, falls der TS-Wächter doch umgangen wurde.
+| Element | Aufgaben (Image 3) | Übe-Pfad (Image 2) | Studio-Fokus HUD (Image 4) | Ziel-Standard (Goldstandard) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Lehrwerk Icon** | Rosa Squircle (`#ffe4e6` ➔ `#fecdd3`, Text `#e11d48`) | Rosa Squircle (`#ffe4e6` ➔ `#fecdd3`, Text `#e11d48`) | Nacktes Icon (`#f43f5e`), **kein Squircle** | **Rosa Squircle** (`linear-gradient(135deg, #ffe4e6, #fecdd3)`, Icon `BookOpen` `#e11d48`, Border `rgba(255,255,255,0.85)`) |
+| **Seitenzahl-Badge** | Sanftes Grün (`bg: #dcfce7`, `text: #15803d`, `border: 1px solid #bbf7d0`, Pill `99px`) | Sanftes Grün (`bg: #dcfce7`, `text: #15803d`), **kein Rand**, Radius `6px` | Dunkleres Grün (`bg: #ecfdf5`, `text: #059669`, `border: 1px solid #10b981`) | **Sanftes Grün-Pill** (`bg: #dcfce7`, `text: #15803d`, `border: 1px solid #bbf7d0`, `borderRadius: 99px`) |
+| **Song Icon** | Magenta/Rose Squircle via `getSongColor("Linkin Park - Numb")` (`#fce7f3` ➔ `#fbcfe8`, Text `#be185d`) | **Hartcodiertes Blau** (`#e0f2fe` ➔ `#bae6fd`, Text `#0284c7`) ❌ | **Hartcodiertes Gelb** (`#eab308`), **kein Squircle** ❌ | **Deterministisches Song-Squircle** via `getSongColor(songTitle)` (`linear-gradient(135deg, from, to)`, Icon `Music` `songColor.text`) |
+| **Song Subtitle/Badge** | Clean Typo (`· Linkin Park` in `#64748b`) | **Blauer Pill "Song-Projekt"** (`#e0f2fe` / `#0369a1`) ❌ | Kein Subtitle | **Clean Typo** (`· {artist}` in `#64748b` oder weglassen; **kein blauer Fremdkörper**) |
+| **Status-Button** | `StudentHomeworkStatusButton` (`Status`) | `StudentHomeworkStatusButton` (`Status`) | `StudentHomeworkStatusButton` (`Status`) | Bereits harmonisiert (100% Parität) |
 
 ---
 
-## 🔒 3. Invarianten- & Monolith-Ceiling-Prüfung
-- 100% Fail-Closed Doktrin wird durchgesetzt.
-- Keine US-Cloud Einbindung, 100% lokales PostgREST / PostgreSQL In-Memory.
-- "Zero-Trust Frontend" Regel ist mit dieser Architektur formal erfüllt.
+## 🛠️ 2. Schrittweiser Implementierungsplan (Status: Vollständig umgesetzt ✅)
+
+### Schritt 1: `PracticeHomeworkCard.tsx` (Übe-Pfad / Image 2) ✅
+* **Song-Farb-Parität:** Ersetzen des hartcodierten hellblauen Farbverlaufs durch `getSongColor(task.title)` aus `studentDateUtils.ts`.
+* **Entfernung des blauen "Song-Projekt"-Pills:**
+  * Das Lehrwerk zeigt den grünen Seitenzahl-Badge (`S. {pages}`).
+  * Der Song zeigt die saubere Künstler-Zeile (`· {artist}`) in dezentem `#64748b`; isolierter blauer "Song-Projekt"-Badge restlos entfernt.
+* **Lehrwerk-Seitenzahl-Badge:** Angleichung auf den exakten Goldstandard:
+  * `background: '#dcfce7'`
+  * `color: '#15803d'`
+  * `border: '1px solid #bbf7d0'`
+  * `borderRadius: '99px'` (vollwertige Apple Pill)
+
+### Schritt 2: `AuthoritativeHomeworkWidget.tsx` (Studio-Fokus HUD / Image 4) ✅
+* **HUD-Lehrwerk:**
+  * Hinzufügen des 24x24px Squircles mit `CANONICAL_LEHRWERK_COLOR` (`#ffe4e6` ➔ `#fecdd3`, Icon `BookOpen` `#e11d48`, transluzenter Rand, Schlagschatten).
+  * Angleichung des Seitenzahl-Badges auf `#dcfce7` / `#15803d` / `border: 1px solid #bbf7d0` / `borderRadius: 99px`.
+* **HUD-Song:**
+  * Ersetzen des nackten gelben Music-Icons (`#eab308`) durch das deterministische Song-Squircle mit `getSongColor(s.cleanTitle)`.
+  * Icon `Music` mit `songColor.text`.
+* **Stage-Banner & Hero Varianten:**
+  * Bereinigung verbliebener gelber Fallbacks (`#ca8a04`) in `variant="stage_banner"` zugunsten `sColor.text`.
+  * `variant="hero"`: Squircles, Schatten und Seitenzahl-Pillen synchronisiert.
+
+### Schritt 3: `PracticeExerciseStageView.tsx` & `StudentJuniorPreFlightModal.tsx` ✅
+* **PracticeExerciseStageView:**
+  * In `secondaryBooks`: Buch-Squircle und grüner Pill mit `#dcfce7` / `#15803d` / `#bbf7d0`.
+  * In `secondarySongs`: Song-Squircle mit `getSongColor(s.cleanTitle)` statt nacktem gelbem Icon (`#ca8a04`).
+* **StudentJuniorPreFlightModal:**
+  * Vereinheitlichung der Buch-Farben (`CANONICAL_LEHRWERK_COLOR`) und des Seitenzahl-Badges.
+
+### Schritt 4: Exocortex & Product Bible Synchronisation ✅
+* `docs/SYSTEM_FEATURE_MATRIX.md`: Eintrag **CAM-153** verankert (Autoritative Hausaufgaben-Visualisierung & 100% Farb- und Badge-Parität).
+
+---
+
+## 🔒 3. Enterprise Invarianten & Schutzregeln
+* **Zero Color-Clash Doktrin (Axiom 9):** Reine Unifarben & monochrome Konturen, keine unharmonischen Füllungs-Kontur-Kollisionen.
+* **Monolith Ceiling:** Chirurgische Änderungen an den betroffenen Komponenten unter Einhaltung des Netto-Null- bzw. <15-Zeilen-Budgets.
+* **Strikter Genehmigungsvorbehalt:** Keine Code-Änderungen vor ausdrücklicher Benutzer-Freigabe.

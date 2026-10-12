@@ -627,8 +627,14 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       margin: '0 auto',
       width: '100%',
       padding: '0 12px',
+      paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
       fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
     }}>
+      {/* BFSG 2025 / WCAG 2.2 AA: Screenreader Live-Region für barrierefreie Intonation */}
+      <div role="status" aria-live="polite" aria-atomic="true" style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+        {isListening && detectedPitch !== null ? `Erkannter Ton: ${detectedNote}, ${detectedPitch.toFixed(1)} Hertz, ${isInTune ? 'Eingestimmt' : isFlat ? `${Math.abs(centsDeviation)} Cent zu tief` : `${centsDeviation} Cent zu hoch`}` : ''}
+      </div>
+
       {/* 1. Header Bar: Zurück, Instrument, Kammerton-Kalibrierung & Notation (100% Monochrome) */}
       <div style={{
         display: 'flex',

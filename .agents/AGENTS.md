@@ -44,6 +44,8 @@
   - `/campus-disaster-recovery`: 7-Phasen Hetzner Notfall-Runbook (RTO $\le$ 45 Min, RPO $\le$ 60 Min, Age X25519, WORM Tombstones).
   - `/campus-legacy-ingestion`: Migration 502 Ingestion Engine (WinMusik/MBS/Excel, Zero-Payroll RAM-Filter, Ausweisdruck).
   - `/campus-dpo-dossier`: Behördlicher Compliance-Koffer (Art. 30 VVT, Art. 35 DSFA, Art. 32 TOMs, § 87 BetrVG Personalrat).
+  - `/campus-migration-architect`: Idempotente PostgreSQL-DDL/DML, RLS Default-Deny, WORM-Audit-Logging & Zero US-Cloud Doktrin.
+  - `/campus-a11y-bfsg`: BFSG & WCAG 2.2 AA Parität, Kontrast $\ge$ 4,5:1, Tastaturbedienbarkeit & Desktop Layout Immunity.
 - **Verifikations-Doktrin**: Außerhalb dieser expliziten Trigger führt der KI-Agent NIEMALS ungefragt Terminal-Testschleifen aus.
 
 ## ⚖️ 360° IT-Forensik & Legal-Compliance Governance (Two-Tier Standard & 5 Interaktions-Vektoren)
